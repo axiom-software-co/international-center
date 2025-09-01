@@ -1,0 +1,508 @@
+# =============================================================================
+# International Center - Comprehensive .gitignore
+# =============================================================================
+
+# =============================================================================
+# Go Build Artifacts and Dependencies
+# =============================================================================
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool
+*.out
+
+# Dependency directories
+vendor/
+
+# Go workspace files
+go.work
+go.work.sum
+
+# Built binaries
+bin/
+build/
+dist/
+
+# Go module cache
+go.sum.backup
+
+# =============================================================================
+# IDE and Editor Files
+# =============================================================================
+# Visual Studio Code
+.vscode/
+*.code-workspace
+
+# GoLand/IntelliJ IDEA
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# Vim
+*.swp
+*.swo
+*~
+
+# Emacs
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+auto-save-list
+tramp
+.\#*
+
+# Sublime Text
+*.tmlanguage.cache
+*.tmPreferences.cache
+*.stTheme.cache
+*.sublime-workspace
+*.sublime-project
+
+# Atom
+.atom/
+
+# =============================================================================
+# Operating System Files
+# =============================================================================
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# =============================================================================
+# Container and Orchestration Files
+# =============================================================================
+# Podman/Docker volumes and data
+volumes/
+data/
+storage/
+.podman/
+.docker/
+
+# Compose override files
+docker-compose.override.yml
+podman-compose.override.yml
+compose.override.yml
+
+# Container logs
+containers/
+logs/
+*.log
+
+# =============================================================================
+# Environment and Configuration Files
+# =============================================================================
+# Environment files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env.staging.local
+*.env
+
+# Configuration overrides
+config.local.yaml
+config.local.yml
+config.local.json
+appsettings.local.json
+
+# =============================================================================
+# Secrets and Security
+# =============================================================================
+# Secret files
+secrets/
+.secrets/
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+*.jks
+*.keystore
+
+# Auth tokens and credentials
+.token
+.credentials
+auth.json
+service-account.json
+
+# HashiCorp Vault files
+.vault-token
+vault-config.json
+
+# =============================================================================
+# Database Files and Backups
+# =============================================================================
+# PostgreSQL
+*.sql.backup
+*.dump
+*.backup
+
+# SQLite
+*.sqlite
+*.sqlite3
+*.db
+
+# Database data directories
+postgres-data/
+cosmosdb-data/
+redis-data/
+
+# Migration files (development only)
+migrations/*.tmp
+migrations/dev_*
+
+# =============================================================================
+# Azure and Cloud Service Files
+# =============================================================================
+# Azure CLI
+.azure/
+
+# Azurite storage emulator data
+__azurite_db_blob__.json
+__azurite_db_blob_extent__.json
+__azurite_db_queue__.json
+__azurite_db_table__.json
+__blobstorage__/
+__queuestorage__/
+__tablestorage__/
+
+# Azure Functions
+local.settings.json
+.vscode/
+bin
+obj
+
+# Pulumi
+.pulumi/
+Pulumi.*.yaml
+!Pulumi.yaml
+
+# Terraform
+*.tfstate
+*.tfstate.backup
+.terraform/
+.terraform.lock.hcl
+
+# =============================================================================
+# Dapr and Service Mesh
+# =============================================================================
+# Dapr runtime files
+.dapr/
+dapr.yaml.backup
+
+# Service mesh certificates
+certs/
+*.pem
+*.crt
+*.key
+
+# Dapr logs
+dapr_*.log
+daprd.log
+
+# =============================================================================
+# Monitoring and Observability
+# =============================================================================
+# Grafana data
+grafana-data/
+grafana.db
+
+# Prometheus data
+prometheus-data/
+prometheus.yml.backup
+
+# Loki data
+loki-data/
+chunks/
+index/
+
+# Tempo data
+tempo-data/
+
+# Pyroscope data
+pyroscope-data/
+
+# Jaeger data
+jaeger-data/
+
+# =============================================================================
+# Testing and Coverage
+# =============================================================================
+# Test outputs
+test-results/
+coverage.out
+coverage.html
+coverage.xml
+
+# Test data
+testdata/tmp/
+testdata/output/
+test-output/
+
+# Benchmarking results
+benchmark-results/
+*.bench
+
+# =============================================================================
+# Node.js and Frontend (for future website development)
+# =============================================================================
+# Dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory used by tools like istanbul
+coverage/
+*.lcov
+
+# nyc test coverage
+.nyc_output
+
+# Dependency directories
+jspm_packages/
+
+# TypeScript cache
+*.tsbuildinfo
+
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache
+
+# Optional REPL history
+.node_repl_history
+
+# Output of 'npm pack'
+*.tgz
+
+# Yarn Integrity file
+.yarn-integrity
+
+# dotenv environment variables file
+.env.build
+
+# parcel-bundler cache (https://parceljs.org/)
+.cache
+.parcel-cache
+
+# Next.js build output
+.next
+out
+
+# Nuxt.js build / generate output
+.nuxt
+dist
+
+# Vite build output
+dist/
+dist-ssr/
+*.local
+
+# Rollup
+.rollup.cache/
+
+# Astro
+dist/
+.astro/
+
+# =============================================================================
+# Build and Deployment Artifacts
+# =============================================================================
+# Build outputs
+build/
+out/
+target/
+release/
+
+# Package files
+*.tar.gz
+*.zip
+*.7z
+*.rar
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.temp
+
+# =============================================================================
+# Development Tools and Utilities
+# =============================================================================
+# Air (Go live reload)
+.air.toml
+tmp/
+
+# Task runner
+.task/
+
+# Make
+*.make.cache
+
+# Benchmarking
+benchmarks/
+*.bench
+
+# Profiling
+*.prof
+*.pprof
+
+# =============================================================================
+# CI/CD and Automation
+# =============================================================================
+# GitHub Actions
+!.github/
+
+# Build artifacts
+artifacts/
+reports/
+
+# =============================================================================
+# Documentation Build Artifacts
+# =============================================================================
+# Sphinx documentation
+docs/_build/
+
+# MkDocs documentation
+/site
+
+# mdBook
+book/
+
+# =============================================================================
+# Local Development Overrides
+# =============================================================================
+# Local development scripts
+*.local.sh
+*.local.ps1
+dev-*
+local-*
+
+# Personal notes and scratchpad
+NOTES.md
+TODO.md
+SCRATCHPAD.md
+.notes/
+
+# =============================================================================
+# Generated Files
+# =============================================================================
+# Protocol buffers
+*.pb.go
+*_pb2.py
+*_pb2_grpc.py
+
+# Swagger/OpenAPI generated
+swagger.json
+swagger.yaml
+openapi.json
+openapi.yaml
+
+# Code generation
+generated/
+gen/
+*_generated.go
+*_gen.go
+
+# =============================================================================
+# Compliance and Audit (keep some files but ignore sensitive data)
+# =============================================================================
+# Audit logs with sensitive data
+audit-logs/*.sensitive
+compliance-reports/*.private
+
+# But keep compliance templates and schemas
+!compliance-templates/
+!audit-schemas/
+
+# =============================================================================
+# Performance and Load Testing
+# =============================================================================
+# Load testing results
+load-test-results/
+performance-reports/
+*.jmx.backup
+
+# =============================================================================
+# Custom Project Specific
+# =============================================================================
+# International Center specific ignores
+medical-data/
+patient-records/
+phi-data/
+
+# Development databases
+*.dev.db
+dev-*.sql
+test-*.sql
+
+# Local service configurations
+*-local.yaml
+*-dev.yaml
+*-test.yaml
+
+# Service discovery local files
+service-registry.local.json
+consul.local.json
+
+# =============================================================================
+# End of .gitignore
+# =============================================================================
