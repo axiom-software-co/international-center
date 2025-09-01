@@ -12,8 +12,6 @@
 
 - IMPORTANT AXIOM RULE TO FOLLOW : consider stubs the worst anti-pattern ( we should use propper infrastructure and fix root issues as they arise ) ( we should not fall back to stubs in integration tests ) 
 
-- IMPORTANT AXIOM RULE TO FOLLOW : only run integration tests when the entire podman compose development environment is up
-
 - IMPORTANT AXIOM RULE TO FOLLOW : environment variables are defined only in the container files ( networking configuration , including ports  , should not be hardcoded , it should always come from the environment ) ( we should not have fallback networking configuration in implementation nor integration tests ) 
 
 
@@ -176,25 +174,23 @@
 - oauth2 client credentials : dapr oauth2 client credentials in production ( dapr oauth2 client credentials for local development )
 - opa policies : dapr opa policies in production ( dapr opa policies for local development )
 
-## managed stateful resources
-
-- authenticated sessions and dapr bindings : upstash redis hosted for production ( redis container for local development )
-
-- pub/sub : rabbitmq cloudamqp hosted in production ( rabbitmq in container for local development ) 
+## azure managed stateful resources
 
 - secret store : hashicorp vault cloud hosted for production ( hashicorp vault and vault data containers for local development )
-- relational database ( includes configuration store and state store and identity storage and services storage ) : azure manged postgre hosted for production ( postgre container for local development ) 
-- non-relational database : mongodb cloud hosted for production ( mongodb container for local development )
+
 - file storage : azure blob storage hosted for production ( azurite blob storage emulator and azurite-data containers for local development https://github.com/Azure/Azurite )
+- non-relational database : azure cosmosdb hosted for production ( azure cosmos db emulator and cosmos-data containers for local development https://github.com/Azure/azure-cosmos-db-emulator-docker )
+
+- pub/sub ( includes bindings ) : azure service bus hosted for production ( service bus emulator and sql edge data containers for local development https://github.com/Azure/azure-service-bus-emulator-installer https://hub.docker.com/r/microsoft/azure-sql-edge )
+- relational database ( includes configuration store and state store ) : azure manged postgre hosted for production ( postgre container for local development ) 
 
 ## grafana cloud observability 
 
 - objeservability : grafana , mimir , loki , tempo , pyroscope in container with their respective data volumes containers ( grafana-data , mimir-data , loki-data , tempo-data , pyroscope-data ) for production and local development 
 
-## content delivery
+## content delivery optimization
 
-- website hosting : cloudflare pages
-- content delivery netowkr : cloudflare cdn
+- cloudflare cdn
 
 ## persistent storage migrations
 
