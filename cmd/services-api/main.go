@@ -37,7 +37,7 @@ func main() {
 	
 	// Health check endpoints
 	router.HandleFunc("/health", healthCheckHandler).Methods("GET")
-	router.HandleFunc("/health/ready", readinessCheckHandler(daprClient)).Methods("GET")
+	router.HandleFunc("/health/ready", readinessCheckHandler(daprClient, stateStoreName)).Methods("GET")
 	
 	// Register service routes
 	handler.RegisterRoutes(router)
@@ -57,10 +57,10 @@ func healthCheckHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprint(w, `{"status":"ok","service":"services-api"}`)
 }
 
-func readinessCheckHandler(daprClient client.Client) http.HandlerFunc {
+func readinessCheckHandler(daprClient client.Client, stateStoreName string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Test Dapr connection by attempting to get a state that doesn't exist
-		_, err := daprClient.GetState(r.Context(), "services-store", "health-check", nil)
+		_, err := daprClient.GetState(r.Context(), stateStoreName, "health-check", nil)
 		if err != nil {
 			// This is expected for a non-existent key, so we check if it's a connection error
 			if err.Error() != "state not found" && err.Error() != "error getting state: state not found" {

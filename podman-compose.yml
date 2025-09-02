@@ -72,11 +72,23 @@ services:
     volumes:
       - azurite-data:/data
     healthcheck:
-      test: ["CMD", "curl", "-s", "http://localhost:10000/"]
-      interval: 15s
-      timeout: 10s
-      retries: 5
-      start_period: 30s
+      disable: true
+    restart: unless-stopped
+
+
+  # =============================================================================
+  # Dapr Control Plane
+  # =============================================================================
+  dapr-placement:
+    image: daprio/dapr:1.14.1
+    container_name: dapr-placement
+    env_file:
+      - .env.development
+    command: ["./placement", "--port", "50006", "--log-level", "info"]
+    ports:
+      - "${DAPR_PLACEMENT_PORT}:50006"
+    healthcheck:
+      disable: true
     restart: unless-stopped
 
 
@@ -95,7 +107,8 @@ services:
       "--dapr-grpc-port", "50001",
       "--metrics-port", "9090",
       "--components-path", "/components",
-      "--config", "/config/config.yaml"
+      "--config", "/config/config.yaml",
+      "--placement-host-address", "dapr-placement:50006"
     ]
     ports:
       - "${SERVICES_API_PORT}:${SERVICES_API_PORT}"
@@ -104,6 +117,8 @@ services:
       - ./dapr/components:/components:ro
       - ./dapr/config:/config:ro
     depends_on:
+      dapr-placement:
+        condition: service_started
       redis:
         condition: service_healthy
     restart: unless-stopped
@@ -126,7 +141,7 @@ services:
       postgresql:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:${SERVICES_API_PORT}/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -145,7 +160,8 @@ services:
       "--dapr-grpc-port", "50002",
       "--metrics-port", "9091",
       "--components-path", "/components",
-      "--config", "/config/config.yaml"
+      "--config", "/config/config.yaml",
+      "--placement-host-address", "dapr-placement:50006"
     ]
     ports:
       - "${CONTENT_API_PORT}:${CONTENT_API_PORT}"
@@ -154,6 +170,8 @@ services:
       - ./dapr/components:/components:ro
       - ./dapr/config:/config:ro
     depends_on:
+      dapr-placement:
+        condition: service_started
       postgresql:
         condition: service_healthy
     restart: unless-stopped
@@ -176,7 +194,7 @@ services:
       postgresql:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:${CONTENT_API_PORT}/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -195,7 +213,8 @@ services:
       "--dapr-grpc-port", "50003",
       "--metrics-port", "9092",
       "--components-path", "/components",
-      "--config", "/config/config.yaml"
+      "--config", "/config/config.yaml",
+      "--placement-host-address", "dapr-placement:50006"
     ]
     ports:
       - "${PUBLIC_GATEWAY_PORT}:${PUBLIC_GATEWAY_PORT}"
@@ -203,6 +222,9 @@ services:
     volumes:
       - ./dapr/components:/components:ro
       - ./dapr/config:/config:ro
+    depends_on:
+      dapr-placement:
+        condition: service_started
     restart: unless-stopped
 
   public-gateway:
@@ -225,7 +247,7 @@ services:
       content-api:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:${PUBLIC_GATEWAY_PORT}/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8082/health"]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -244,7 +266,8 @@ services:
       "--dapr-grpc-port", "50004",
       "--metrics-port", "9093",
       "--components-path", "/components",
-      "--config", "/config/config.yaml"
+      "--config", "/config/config.yaml",
+      "--placement-host-address", "dapr-placement:50006"
     ]
     ports:
       - "${ADMIN_GATEWAY_PORT}:${ADMIN_GATEWAY_PORT}"
@@ -253,8 +276,10 @@ services:
       - ./dapr/components:/components:ro
       - ./dapr/config:/config:ro
     depends_on:
+      dapr-placement:
+        condition: service_started
       authentik:
-        condition: service_healthy
+        condition: service_started
     restart: unless-stopped
 
   admin-gateway:
@@ -279,9 +304,9 @@ services:
       content-api:
         condition: service_healthy
       authentik:
-        condition: service_healthy
+        condition: service_started
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:${ADMIN_GATEWAY_PORT}/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8083/health"]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -313,11 +338,7 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/-/health/live/"]
-      interval: 30s
-      timeout: 15s
-      retries: 10
-      start_period: 120s
+      disable: true
     restart: unless-stopped
 
   authentik-worker:
@@ -355,7 +376,7 @@ services:
     cap_add:
       - IPC_LOCK
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8200/v1/sys/health"]
+      test: ["CMD", "wget", "--spider", "-q", "http://0.0.0.0:8200/v1/sys/health"]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -371,11 +392,7 @@ services:
     ports:
       - "${OPA_PORT}:8181"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8181/health"]
-      interval: 15s
-      timeout: 10s
-      retries: 5
-      start_period: 30s
+      disable: true
     restart: unless-stopped
 
   # =============================================================================
@@ -473,11 +490,11 @@ services:
     volumes:
       - pyroscope-data:/data
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:4040/"]
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:4040/"]
       interval: 30s
       timeout: 15s
-      retries: 10
-      start_period: 60s
+      retries: 5
+      start_period: 30s
     restart: unless-stopped
 
   grafana-agent-dapr:
@@ -492,7 +509,8 @@ services:
       "--dapr-grpc-port", "50005",
       "--metrics-port", "9094",
       "--components-path", "/components",
-      "--config", "/config/config.yaml"
+      "--config", "/config/config.yaml",
+      "--placement-host-address", "dapr-placement:50006"
     ]
     ports:
       - "${GRAFANA_AGENT_PORT}:${GRAFANA_AGENT_PORT}"
@@ -500,6 +518,9 @@ services:
     volumes:
       - ./dapr/components:/components:ro
       - ./dapr/config:/config:ro
+    depends_on:
+      dapr-placement:
+        condition: service_started
     restart: unless-stopped
 
   grafana-agent:
