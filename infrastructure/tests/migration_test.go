@@ -26,7 +26,7 @@ func TestMigrationExecution(t *testing.T) {
 
 	t.Run("postgresql database connectivity", func(t *testing.T) {
 		// Test: PostgreSQL is accessible for migrations
-		dbURL := buildPostgreSQLConnectionString()
+		dbURL := buildPostgreSQLConnectionString(t)
 		
 		db, err := sql.Open("postgres", dbURL)
 		require.NoError(t, err, "Should connect to PostgreSQL database")
@@ -44,7 +44,9 @@ func TestMigrationExecution(t *testing.T) {
 		require.NoError(t, err, "Should get PostgreSQL container IP")
 		
 		// Build migration command
-		dbURL := fmt.Sprintf("postgres://postgres:development@%s:5432/international_center?sslmode=disable", postgresIP)
+		dbURL := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable", 
+			requireEnv(t, "POSTGRES_USER"), requireEnv(t, "POSTGRES_PASSWORD"), 
+			postgresIP, requireEnv(t, "POSTGRES_PORT"), requireEnv(t, "POSTGRES_DB"))
 		
 		// Check current version first
 		versionCmd := buildMigrationCommand(dbURL, "version")
@@ -75,7 +77,7 @@ func TestMigrationExecution(t *testing.T) {
 
 	t.Run("expected tables created", func(t *testing.T) {
 		// Test: All expected tables are created by migrations
-		dbURL := buildPostgreSQLConnectionString()
+		dbURL := buildPostgreSQLConnectionString(t)
 		
 		db, err := sql.Open("postgres", dbURL)
 		require.NoError(t, err, "Should connect to PostgreSQL database")
@@ -108,7 +110,7 @@ func TestMigrationExecution(t *testing.T) {
 
 	t.Run("services schema validation", func(t *testing.T) {
 		// Test: Services table has expected schema structure
-		dbURL := buildPostgreSQLConnectionString()
+		dbURL := buildPostgreSQLConnectionString(t)
 		
 		db, err := sql.Open("postgres", dbURL)
 		require.NoError(t, err, "Should connect to PostgreSQL database")
@@ -139,7 +141,7 @@ func TestMigrationExecution(t *testing.T) {
 
 	t.Run("content schema validation", func(t *testing.T) {
 		// Test: Content table has expected schema structure
-		dbURL := buildPostgreSQLConnectionString()
+		dbURL := buildPostgreSQLConnectionString(t)
 		
 		db, err := sql.Open("postgres", dbURL)
 		require.NoError(t, err, "Should connect to PostgreSQL database")
@@ -180,7 +182,9 @@ func TestMigrationExecution(t *testing.T) {
 		postgresIP, err := getPostgreSQLContainerIP()
 		require.NoError(t, err, "Should get PostgreSQL container IP")
 		
-		dbURL := fmt.Sprintf("postgres://postgres:development@%s:5432/international_center?sslmode=disable", postgresIP)
+		dbURL := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable", 
+			requireEnv(t, "POSTGRES_USER"), requireEnv(t, "POSTGRES_PASSWORD"), 
+			postgresIP, requireEnv(t, "POSTGRES_PORT"), requireEnv(t, "POSTGRES_DB"))
 		
 		// Ensure clean state
 		forceCmd := buildMigrationCommand(dbURL, "force", "2") // Force to version 2 (latest)
@@ -196,7 +200,7 @@ func TestMigrationExecution(t *testing.T) {
 		assert.NotContains(t, versionOutput, "dirty", "Migration should not be in dirty state")
 		
 		// Also verify through database query
-		db, err := sql.Open("postgres", buildPostgreSQLConnectionString())
+		db, err := sql.Open("postgres", buildPostgreSQLConnectionString(t))
 		require.NoError(t, err, "Should connect to PostgreSQL database")
 		defer db.Close()
 
@@ -228,7 +232,9 @@ func TestMigrationRollback(t *testing.T) {
 		postgresIP, err := getPostgreSQLContainerIP()
 		require.NoError(t, err, "Should get PostgreSQL container IP")
 		
-		dbURL := fmt.Sprintf("postgres://postgres:development@%s:5432/international_center?sslmode=disable", postgresIP)
+		dbURL := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable", 
+			requireEnv(t, "POSTGRES_USER"), requireEnv(t, "POSTGRES_PASSWORD"), 
+			postgresIP, requireEnv(t, "POSTGRES_PORT"), requireEnv(t, "POSTGRES_DB"))
 		
 		// Execute down migration for one step
 		downCmd := buildMigrationCommand(dbURL, "down", "1")
@@ -257,7 +263,9 @@ func TestMigrationRecovery(t *testing.T) {
 		postgresIP, err := getPostgreSQLContainerIP()
 		require.NoError(t, err, "Should get PostgreSQL container IP")
 		
-		dbURL := fmt.Sprintf("postgres://postgres:development@%s:5432/international_center?sslmode=disable", postgresIP)
+		dbURL := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable", 
+			requireEnv(t, "POSTGRES_USER"), requireEnv(t, "POSTGRES_PASSWORD"), 
+			postgresIP, requireEnv(t, "POSTGRES_PORT"), requireEnv(t, "POSTGRES_DB"))
 		
 		// Force a dirty state
 		forceCmd := buildMigrationCommand(dbURL, "force", "1")
@@ -277,12 +285,12 @@ func TestMigrationRecovery(t *testing.T) {
 
 // Helper functions
 
-func buildPostgreSQLConnectionString() string {
+func buildPostgreSQLConnectionString(t *testing.T) string {
 	host := "localhost"
-	port := getEnvWithDefault("POSTGRES_PORT", "5432")
-	user := "postgres"
-	password := "development"
-	dbname := "international_center"
+	port := requireEnv(t, "POSTGRES_PORT")
+	user := requireEnv(t, "POSTGRES_USER")
+	password := requireEnv(t, "POSTGRES_PASSWORD")
+	dbname := requireEnv(t, "POSTGRES_DB")
 	
 	return fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable",
 		user, password, host, port, dbname)
@@ -365,3 +373,13 @@ func validateTableColumns(ctx context.Context, t *testing.T, db *sql.DB, tableNa
 	}
 }
 
+
+
+// requireEnv retrieves environment variable or fails test if missing
+func requireEnv(t *testing.T, key string) string {
+	value := os.Getenv(key)
+	if value == "" {
+		t.Fatalf("Required environment variable %s is not set", key)
+	}
+	return value
+}

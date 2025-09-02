@@ -25,7 +25,7 @@ func TestAuthentikIdentityProvider(t *testing.T) {
 
 	t.Run("authentik service startup and configuration", func(t *testing.T) {
 		// Test: Authentik service starts and is accessible
-		authentikPort := getEnvWithDefault("AUTHENTIK_PORT", "9000")
+		authentikPort := requireEnv(t, "AUTHENTIK_PORT")
 		authentikURL := fmt.Sprintf("http://localhost:%s/if/flow/default-authentication-flow/", authentikPort)
 		
 		client := &http.Client{Timeout: 5 * time.Second}
@@ -48,7 +48,7 @@ func TestAuthentikIdentityProvider(t *testing.T) {
 
 	t.Run("oauth2 endpoint availability", func(t *testing.T) {
 		// Test: OAuth2 endpoints are available
-		authentikPort := getEnvWithDefault("AUTHENTIK_PORT", "9000")
+		authentikPort := requireEnv(t, "AUTHENTIK_PORT")
 		
 		// Test OAuth2 discovery endpoint
 		discoveryURL := fmt.Sprintf("http://localhost:%s/application/o/.well-known/openid_configuration", authentikPort)
@@ -75,7 +75,7 @@ func TestAuthentikIdentityProvider(t *testing.T) {
 
 	t.Run("jwt token validation capability", func(t *testing.T) {
 		// Test: JWT validation endpoints are available
-		authentikPort := getEnvWithDefault("AUTHENTIK_PORT", "9000")
+		authentikPort := requireEnv(t, "AUTHENTIK_PORT")
 		
 		// Test token introspection endpoint
 		tokenURL := fmt.Sprintf("http://localhost:%s/application/o/introspect/", authentikPort)
@@ -106,7 +106,7 @@ func TestAuthentikIdentityProvider(t *testing.T) {
 
 	t.Run("anonymous access configuration", func(t *testing.T) {
 		// Test: Anonymous access is properly configured
-		authentikPort := getEnvWithDefault("AUTHENTIK_PORT", "9000")
+		authentikPort := requireEnv(t, "AUTHENTIK_PORT")
 		
 		// Test public endpoints that should allow anonymous access
 		healthURL := fmt.Sprintf("http://localhost:%s/-/health/live/", authentikPort)
@@ -138,7 +138,7 @@ func TestVaultSecretsManagement(t *testing.T) {
 
 	t.Run("vault service initialization", func(t *testing.T) {
 		// Test: Vault service is initialized and accessible
-		vaultPort := getEnvWithDefault("VAULT_PORT", "8200")
+		vaultPort := requireEnv(t, "VAULT_PORT")
 		vaultURL := fmt.Sprintf("http://localhost:%s/v1/sys/health", vaultPort)
 		
 		client := &http.Client{Timeout: 5 * time.Second}
@@ -161,7 +161,7 @@ func TestVaultSecretsManagement(t *testing.T) {
 
 	t.Run("secret storage and retrieval", func(t *testing.T) {
 		// Test: Basic secret operations are available
-		vaultPort := getEnvWithDefault("VAULT_PORT", "8200")
+		vaultPort := requireEnv(t, "VAULT_PORT")
 		
 		// Test that secret endpoints are accessible
 		secretURL := fmt.Sprintf("http://localhost:%s/v1/secret/data/test", vaultPort)
@@ -190,7 +190,7 @@ func TestVaultSecretsManagement(t *testing.T) {
 
 	t.Run("policy enforcement", func(t *testing.T) {
 		// Test: Policy enforcement is operational
-		vaultPort := getEnvWithDefault("VAULT_PORT", "8200")
+		vaultPort := requireEnv(t, "VAULT_PORT")
 		
 		// Test policy endpoint
 		policyURL := fmt.Sprintf("http://localhost:%s/v1/sys/policies/acl", vaultPort)
@@ -225,7 +225,7 @@ func TestOPAPolicyEngine(t *testing.T) {
 
 	t.Run("opa service startup", func(t *testing.T) {
 		// Test: OPA service starts and is accessible
-		opaPort := getEnvWithDefault("OPA_PORT", "8181")
+		opaPort := requireEnv(t, "OPA_PORT")
 		opaURL := fmt.Sprintf("http://localhost:%s/health", opaPort)
 		
 		client := &http.Client{Timeout: 5 * time.Second}
@@ -245,7 +245,7 @@ func TestOPAPolicyEngine(t *testing.T) {
 
 	t.Run("policy loading and compilation", func(t *testing.T) {
 		// Test: OPA can load and compile policies
-		opaPort := getEnvWithDefault("OPA_PORT", "8181")
+		opaPort := requireEnv(t, "OPA_PORT")
 		
 		// Test policy endpoint
 		policyURL := fmt.Sprintf("http://localhost:%s/v1/policies", opaPort)
@@ -272,7 +272,7 @@ func TestOPAPolicyEngine(t *testing.T) {
 
 	t.Run("policy evaluation endpoint availability", func(t *testing.T) {
 		// Test: Policy evaluation endpoints are available
-		opaPort := getEnvWithDefault("OPA_PORT", "8181")
+		opaPort := requireEnv(t, "OPA_PORT")
 		
 		// Test data API endpoint (used for policy evaluation)
 		dataURL := fmt.Sprintf("http://localhost:%s/v1/data", opaPort)

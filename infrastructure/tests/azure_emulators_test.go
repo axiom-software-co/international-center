@@ -108,7 +108,7 @@ func TestAzuriteStorageEmulator(t *testing.T) {
 
 	t.Run("azurite blob storage container creation", func(t *testing.T) {
 		// Test: Azurite can create blob containers
-		azuritePort := getEnvWithDefault("AZURITE_BLOB_PORT", "10000")
+		azuritePort := requireEnv(t, "AZURITE_BLOB_PORT")
 		containerName := "test-container"
 		
 		// Create container using Azure Blob Storage REST API
@@ -142,7 +142,7 @@ func TestAzuriteStorageEmulator(t *testing.T) {
 
 	t.Run("blob storage read/write operations", func(t *testing.T) {
 		// Test: Can perform basic blob operations
-		azuritePort := getEnvWithDefault("AZURITE_BLOB_PORT", "10000")
+		azuritePort := requireEnv(t, "AZURITE_BLOB_PORT")
 		containerName := "test-container"
 		blobName := "test-blob.txt"
 		testContent := "test content for integration testing"
@@ -214,7 +214,7 @@ func TestAzuriteStorageEmulator(t *testing.T) {
 
 	t.Run("storage backend health monitoring", func(t *testing.T) {
 		// Test: Storage backend reports healthy status
-		azuritePort := getEnvWithDefault("AZURITE_BLOB_PORT", "10000")
+		azuritePort := requireEnv(t, "AZURITE_BLOB_PORT")
 		
 		// Test Azurite health by checking service availability
 		healthURL := fmt.Sprintf("http://localhost:%s/devstoreaccount1?comp=properties&restype=service", 

@@ -19,7 +19,7 @@ func TestMongoDBConnectivity(t *testing.T) {
 
 	t.Run("mongodb service connectivity", func(t *testing.T) {
 		// Test: MongoDB service is accessible
-		mongoPort := getEnvWithDefault("MONGO_PORT", "27017")
+		mongoPort := requireEnv(t, "MONGO_PORT")
 		
 		// Test MongoDB connectivity using TCP connection
 		conn, err := net.DialTimeout("tcp", fmt.Sprintf("localhost:%s", mongoPort), 5*time.Second)

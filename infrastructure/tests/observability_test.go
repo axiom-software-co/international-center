@@ -25,7 +25,7 @@ func TestGrafanaObservabilityStack(t *testing.T) {
 
 	t.Run("grafana service availability", func(t *testing.T) {
 		// Test: Grafana service is accessible
-		grafanaPort := getEnvWithDefault("GRAFANA_PORT", "3000")
+		grafanaPort := requireEnv(t, "GRAFANA_PORT")
 		grafanaURL := fmt.Sprintf("http://localhost:%s/api/health", grafanaPort)
 		
 		client := &http.Client{Timeout: 5 * time.Second}
@@ -50,7 +50,7 @@ func TestGrafanaObservabilityStack(t *testing.T) {
 
 	t.Run("mimir metrics storage connectivity", func(t *testing.T) {
 		// Test: Mimir metrics storage is accessible
-		mimirPort := getEnvWithDefault("MIMIR_PORT", "9009")
+		mimirPort := requireEnv(t, "MIMIR_PORT")
 		mimirURL := fmt.Sprintf("http://localhost:%s/ready", mimirPort)
 		
 		client := &http.Client{Timeout: 5 * time.Second}
@@ -70,7 +70,7 @@ func TestGrafanaObservabilityStack(t *testing.T) {
 
 	t.Run("loki log aggregation functionality", func(t *testing.T) {
 		// Test: Loki log aggregation is accessible
-		lokiPort := getEnvWithDefault("LOKI_PORT", "3100")
+		lokiPort := requireEnv(t, "LOKI_PORT")
 		lokiURL := fmt.Sprintf("http://localhost:%s/ready", lokiPort)
 		
 		client := &http.Client{Timeout: 5 * time.Second}
@@ -124,7 +124,7 @@ func TestGrafanaObservabilityStack(t *testing.T) {
 
 	t.Run("tempo tracing capability", func(t *testing.T) {
 		// Test: Tempo distributed tracing is accessible
-		tempoPort := getEnvWithDefault("TEMPO_PORT", "3200")
+		tempoPort := requireEnv(t, "TEMPO_PORT")
 		tempoURL := fmt.Sprintf("http://localhost:%s/ready", tempoPort)
 		
 		client := &http.Client{Timeout: 5 * time.Second}
@@ -157,7 +157,7 @@ func TestGrafanaObservabilityStack(t *testing.T) {
 
 	t.Run("pyroscope profiling integration", func(t *testing.T) {
 		// Test: Pyroscope continuous profiling is accessible
-		pyroscopePort := getEnvWithDefault("PYROSCOPE_PORT", "4040")
+		pyroscopePort := requireEnv(t, "PYROSCOPE_PORT")
 		pyroscopeURL := fmt.Sprintf("http://localhost:%s/api/apps", pyroscopePort)
 		
 		client := &http.Client{Timeout: 5 * time.Second}
@@ -223,7 +223,7 @@ func TestTelemetryCollection(t *testing.T) {
 		client := &http.Client{Timeout: 3 * time.Second}
 		
 		// Test Mimir push endpoint
-		mimirEndpoint := fmt.Sprintf("http://localhost:%s/api/v1/push", getEnvWithDefault("MIMIR_PORT", "9009"))
+		mimirEndpoint := fmt.Sprintf("http://localhost:%s/api/v1/push", requireEnv(t, "MIMIR_PORT"))
 		req, err := http.NewRequestWithContext(ctx, "POST", mimirEndpoint, bytes.NewReader([]byte("{}")))
 		require.NoError(t, err)
 		req.Header.Set("Content-Type", "application/json")
@@ -236,7 +236,7 @@ func TestTelemetryCollection(t *testing.T) {
 		}
 		
 		// Test Loki push endpoint
-		lokiEndpoint := fmt.Sprintf("http://localhost:%s/loki/api/v1/push", getEnvWithDefault("LOKI_PORT", "3100"))
+		lokiEndpoint := fmt.Sprintf("http://localhost:%s/loki/api/v1/push", requireEnv(t, "LOKI_PORT"))
 		req, err = http.NewRequestWithContext(ctx, "POST", lokiEndpoint, bytes.NewReader([]byte("{}")))
 		require.NoError(t, err)
 		req.Header.Set("Content-Type", "application/json")
@@ -248,8 +248,8 @@ func TestTelemetryCollection(t *testing.T) {
 				"Loki telemetry endpoint should be accessible")
 		}
 		
-		// Test Tempo OTLP HTTP endpoint (port 4318 for HTTP)
-		tempoEndpoint := "http://localhost:4318/v1/traces"
+		// Test Tempo OTLP HTTP endpoint
+		tempoEndpoint := fmt.Sprintf("http://localhost:%s/v1/traces", requireEnv(t, "OTLP_HTTP_PORT"))
 		req, err = http.NewRequestWithContext(ctx, "POST", tempoEndpoint, bytes.NewReader([]byte("{}")))
 		require.NoError(t, err)
 		req.Header.Set("Content-Type", "application/json")
@@ -268,7 +268,7 @@ func TestTelemetryCollection(t *testing.T) {
 		// Test: Data pipeline from collection to storage is functional
 		
 		// Test metrics pipeline
-		mimirPort := getEnvWithDefault("MIMIR_PORT", "9009")
+		mimirPort := requireEnv(t, "MIMIR_PORT")
 		metricsURL := fmt.Sprintf("http://localhost:%s/prometheus/api/v1/query", mimirPort)
 		
 		client := &http.Client{Timeout: 5 * time.Second}
@@ -288,7 +288,7 @@ func TestTelemetryCollection(t *testing.T) {
 		}
 		
 		// Test logs pipeline
-		lokiPort := getEnvWithDefault("LOKI_PORT", "3100")
+		lokiPort := requireEnv(t, "LOKI_PORT")
 		logsQueryURL := fmt.Sprintf("http://localhost:%s/loki/api/v1/query", lokiPort)
 		
 		logsReq, err := http.NewRequestWithContext(ctx, "GET", logsQueryURL+"?query={service=\"test\"}", nil)
@@ -307,7 +307,7 @@ func TestTelemetryCollection(t *testing.T) {
 		// Test: All observability components can communicate with each other
 		
 		// Test Grafana data source connectivity
-		grafanaPort := getEnvWithDefault("GRAFANA_PORT", "3000")
+		grafanaPort := requireEnv(t, "GRAFANA_PORT")
 		dataSourceURL := fmt.Sprintf("http://localhost:%s/api/datasources", grafanaPort)
 		
 		client := &http.Client{Timeout: 5 * time.Second}
@@ -315,7 +315,7 @@ func TestTelemetryCollection(t *testing.T) {
 		// Test with basic auth (admin:admin is default for Grafana)
 		req, err := http.NewRequestWithContext(ctx, "GET", dataSourceURL, nil)
 		require.NoError(t, err)
-		req.SetBasicAuth("admin", "admin")
+		req.SetBasicAuth("admin", requireEnv(t, "GRAFANA_ADMIN_PASSWORD"))
 		
 		resp, err := client.Do(req)
 		if err == nil {
@@ -335,11 +335,11 @@ func TestTelemetryCollection(t *testing.T) {
 		// Verify observability stack health overall
 		services := map[string]string{
 			"Grafana":       fmt.Sprintf("http://localhost:%s/api/health", grafanaPort),
-			"Mimir":         fmt.Sprintf("http://localhost:%s/ready", getEnvWithDefault("MIMIR_PORT", "9009")),
-			"Loki":          fmt.Sprintf("http://localhost:%s/ready", getEnvWithDefault("LOKI_PORT", "3100")),
-			"Tempo":         fmt.Sprintf("http://localhost:%s/ready", getEnvWithDefault("TEMPO_PORT", "3200")),
-			"Pyroscope":     fmt.Sprintf("http://localhost:%s/api/apps", getEnvWithDefault("PYROSCOPE_PORT", "4040")),
-			"Grafana-Agent": "http://localhost:12345/-/ready",
+			"Mimir":         fmt.Sprintf("http://localhost:%s/ready", requireEnv(t, "MIMIR_PORT")),
+			"Loki":          fmt.Sprintf("http://localhost:%s/ready", requireEnv(t, "LOKI_PORT")),
+			"Tempo":         fmt.Sprintf("http://localhost:%s/ready", requireEnv(t, "TEMPO_PORT")),
+			"Pyroscope":     fmt.Sprintf("http://localhost:%s/api/apps", requireEnv(t, "PYROSCOPE_PORT")),
+			"Grafana-Agent": fmt.Sprintf("http://localhost:%s/-/ready", requireEnv(t, "GRAFANA_AGENT_PORT")),
 		}
 		
 		healthyServices := 0
@@ -376,7 +376,7 @@ func TestGrafanaAgentIntegration(t *testing.T) {
 
 	t.Run("grafana agent health and configuration", func(t *testing.T) {
 		// Test: Grafana Agent is running and healthy
-		agentURL := "http://localhost:12345/-/ready"
+		agentURL := fmt.Sprintf("http://localhost:%s/-/ready", requireEnv(t, "GRAFANA_AGENT_PORT"))
 		
 		client := &http.Client{Timeout: 5 * time.Second}
 		req, err := http.NewRequestWithContext(ctx, "GET", agentURL, nil)
@@ -393,7 +393,7 @@ func TestGrafanaAgentIntegration(t *testing.T) {
 			"Grafana Agent health check should return 200 OK")
 		
 		// Verify configuration API is accessible
-		configURL := "http://localhost:12345/agent/api/v1/config"
+		configURL := fmt.Sprintf("http://localhost:%s/agent/api/v1/config", requireEnv(t, "GRAFANA_AGENT_PORT"))
 		configReq, err := http.NewRequestWithContext(ctx, "GET", configURL, nil)
 		require.NoError(t, err)
 		
@@ -414,7 +414,7 @@ func TestGrafanaAgentIntegration(t *testing.T) {
 		client := &http.Client{Timeout: 5 * time.Second}
 		
 		// Verify agent's internal metrics endpoint
-		metricsURL := "http://localhost:12345/metrics"
+		metricsURL := fmt.Sprintf("http://localhost:%s/metrics", requireEnv(t, "GRAFANA_AGENT_PORT"))
 		req, err := http.NewRequestWithContext(ctx, "GET", metricsURL, nil)
 		require.NoError(t, err)
 		
@@ -438,7 +438,7 @@ func TestGrafanaAgentIntegration(t *testing.T) {
 		
 		// Test that the agent is configured to send logs to Loki
 		// We can verify this by checking if Loki is receiving data from the agent
-		lokiURL := fmt.Sprintf("http://localhost:%s/ready", getEnvWithDefault("LOKI_PORT", "3100"))
+		lokiURL := fmt.Sprintf("http://localhost:%s/ready", requireEnv(t, "LOKI_PORT"))
 		req, err := http.NewRequestWithContext(ctx, "GET", lokiURL, nil)
 		require.NoError(t, err)
 		
@@ -450,7 +450,7 @@ func TestGrafanaAgentIntegration(t *testing.T) {
 		}
 		
 		// Test Loki label API to see if we have any labels (indicating data flow)
-		labelsURL := fmt.Sprintf("http://localhost:%s/loki/api/v1/labels", getEnvWithDefault("LOKI_PORT", "3100"))
+		labelsURL := fmt.Sprintf("http://localhost:%s/loki/api/v1/labels", requireEnv(t, "LOKI_PORT"))
 		labelsReq, err := http.NewRequestWithContext(ctx, "GET", labelsURL, nil)
 		require.NoError(t, err)
 		
@@ -469,7 +469,7 @@ func TestGrafanaAgentIntegration(t *testing.T) {
 		client := &http.Client{Timeout: 5 * time.Second}
 		
 		// Test that Tempo is ready to receive traces from the agent
-		tempoURL := fmt.Sprintf("http://localhost:%s/ready", getEnvWithDefault("TEMPO_PORT", "3200"))
+		tempoURL := fmt.Sprintf("http://localhost:%s/ready", requireEnv(t, "TEMPO_PORT"))
 		req, err := http.NewRequestWithContext(ctx, "GET", tempoURL, nil)
 		require.NoError(t, err)
 		
@@ -482,7 +482,7 @@ func TestGrafanaAgentIntegration(t *testing.T) {
 		
 		// Test that agent's OTLP receivers are accessible
 		// Agent should expose OTLP endpoints for receiving traces
-		otlpHTTPURL := "http://localhost:4318/v1/traces"
+		otlpHTTPURL := fmt.Sprintf("http://localhost:%s/v1/traces", requireEnv(t, "OTLP_HTTP_PORT"))
 		otlpReq, err := http.NewRequestWithContext(ctx, "POST", otlpHTTPURL, 
 			bytes.NewReader([]byte("{}")))
 		require.NoError(t, err)
@@ -504,9 +504,9 @@ func TestGrafanaAgentIntegration(t *testing.T) {
 		
 		// Verify all configured backend services are accessible from agent's perspective
 		backendServices := map[string]string{
-			"Mimir (metrics)": fmt.Sprintf("http://localhost:%s/ready", getEnvWithDefault("MIMIR_PORT", "9009")),
-			"Loki (logs)":     fmt.Sprintf("http://localhost:%s/ready", getEnvWithDefault("LOKI_PORT", "3100")),
-			"Tempo (traces)":  fmt.Sprintf("http://localhost:%s/ready", getEnvWithDefault("TEMPO_PORT", "3200")),
+			"Mimir (metrics)": fmt.Sprintf("http://localhost:%s/ready", requireEnv(t, "MIMIR_PORT")),
+			"Loki (logs)":     fmt.Sprintf("http://localhost:%s/ready", requireEnv(t, "LOKI_PORT")),
+			"Tempo (traces)":  fmt.Sprintf("http://localhost:%s/ready", requireEnv(t, "TEMPO_PORT")),
 		}
 		
 		healthyBackends := 0
@@ -531,7 +531,7 @@ func TestGrafanaAgentIntegration(t *testing.T) {
 			"Agent should be able to reach all observability backend services")
 		
 		// Verify agent itself is responsive
-		agentHealthURL := "http://localhost:12345/-/ready"
+		agentHealthURL := fmt.Sprintf("http://localhost:%s/-/ready", requireEnv(t, "GRAFANA_AGENT_PORT"))
 		agentReq, err := http.NewRequestWithContext(ctx, "GET", agentHealthURL, nil)
 		require.NoError(t, err)
 		
@@ -542,4 +542,13 @@ func TestGrafanaAgentIntegration(t *testing.T) {
 		assert.Equal(t, http.StatusOK, agentResp.StatusCode,
 			"Agent should report healthy status")
 	})
+}
+
+// requireEnv retrieves environment variable or fails test if missing
+func requireEnv(t *testing.T, key string) string {
+	value := os.Getenv(key)
+	if value == "" {
+		t.Fatalf("Required environment variable %s is not set", key)
+	}
+	return value
 }

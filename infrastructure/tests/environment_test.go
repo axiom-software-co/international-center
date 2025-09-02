@@ -113,14 +113,10 @@ func TestEnvironmentVariableConfiguration(t *testing.T) {
 			"RABBITMQ_USERNAME":        "",  // Will be set in environment
 			"RABBITMQ_PASSWORD":        "",  // Will be set in environment
 			
-			// Dapr Configuration
-			"DAPR_PLACEMENT_PORT": "6050",
-			"DAPR_SENTRY_PORT":    "6051", 
+ 
 			
 			// Azure Emulators
 			"AZURITE_BLOB_PORT":  "10000",
-			"AZURITE_QUEUE_PORT": "10001",
-			"AZURITE_TABLE_PORT": "10002",
 			
 			// Security Services
 			"AUTHENTIK_PORT": "9000",

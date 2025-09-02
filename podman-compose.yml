@@ -92,72 +92,6 @@ services:
       start_period: 30s
     restart: unless-stopped
 
-  rabbitmq:
-    image: rabbitmq:3.12-management-alpine
-    container_name: rabbitmq
-    env_file:
-      - .env.development
-    environment:
-      - RABBITMQ_DEFAULT_USER=${RABBITMQ_USERNAME}
-      - RABBITMQ_DEFAULT_PASS=${RABBITMQ_PASSWORD}
-    ports:
-      - "${RABBITMQ_PORT}:5672"
-      - "${RABBITMQ_MANAGEMENT_PORT}:15672"
-    volumes:
-      - ${RABBITMQ_DATA_VOLUME}:/var/lib/rabbitmq
-    networks:
-      - international-center-network
-    healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "check_port_connectivity"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 60s
-    restart: unless-stopped
-
-  # =============================================================================
-  # Dapr Control Plane Services
-  # =============================================================================
-
-  dapr-placement:
-    image: daprio/dapr:1.12.0
-    container_name: dapr-placement
-    env_file:
-      - .env.development
-    command: ["./placement", "--port", "${DAPR_PLACEMENT_PORT}", "--log-level", "info"]
-    ports:
-      - "${DAPR_PLACEMENT_PORT}:${DAPR_PLACEMENT_PORT}"
-    networks:
-      - international-center-network
-    depends_on:
-      redis:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:${DAPR_PLACEMENT_PORT}/placement/state"]
-      interval: 15s
-      timeout: 10s
-      retries: 5
-      start_period: 30s
-    restart: unless-stopped
-
-  dapr-sentry:
-    image: daprio/dapr:1.12.0
-    container_name: dapr-sentry
-    env_file:
-      - .env.development
-    command: ["./sentry", "--port", "${DAPR_SENTRY_PORT}", "--log-level", "info"]
-    ports:
-      - "${DAPR_SENTRY_PORT}:${DAPR_SENTRY_PORT}"
-    networks:
-      - international-center-network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:${DAPR_SENTRY_PORT}/v1/health"]
-      interval: 15s
-      timeout: 10s
-      retries: 5
-      start_period: 30s
-    restart: unless-stopped
-
   # =============================================================================
   # Azure Emulator Services
   # =============================================================================
@@ -166,11 +100,9 @@ services:
     container_name: azurite
     env_file:
       - .env.development
-    command: ["azurite", "--blobHost", "0.0.0.0", "--queueHost", "0.0.0.0", "--tableHost", "0.0.0.0", "--blobPort", "10000", "--queuePort", "10001", "--tablePort", "10002", "--location", "/data", "--debug", "/data/debug.log"]
+    command: ["azurite", "--blobHost", "0.0.0.0", "--blobPort", "10000", "--location", "/data", "--debug", "/data/debug.log"]
     ports:
       - "${AZURITE_BLOB_PORT}:10000"
-      - "${AZURITE_QUEUE_PORT}:10001"
-      - "${AZURITE_TABLE_PORT}:10002"
     volumes:
       - ${AZURITE_DATA_VOLUME}:/data
     networks:
@@ -422,8 +354,6 @@ volumes:
     name: ${POSTGRES_DATA_VOLUME}
   mongodb-data:
     name: ${MONGO_DATA_VOLUME}
-  rabbitmq-data:
-    name: ${RABBITMQ_DATA_VOLUME}
   grafana-data:
     name: ${GRAFANA_DATA_VOLUME}
   mimir-data:

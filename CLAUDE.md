@@ -184,7 +184,7 @@
 
 - authenticated sessions and dapr bindings : upstash redis hosted for production ( redis container for local development )
 
-- pub/sub : rabbitmq cloudamqp hosted in production ( rabbitmq in container for local development ) 
+- pub/sub : upstash redis hosted in production ( redis in container for local development ) 
 
 - secret store : hashicorp vault cloud hosted for production ( hashicorp vault and vault data containers for local development )
 - relational database ( includes configuration store and state store and identity storage and services storage ) : azure manged postgre hosted for production ( postgre container for local development ) 
