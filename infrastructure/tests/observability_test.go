@@ -18,10 +18,7 @@ func TestGrafanaObservabilityStack(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
-	// Skip if not in integration test environment
-	if os.Getenv("INTEGRATION_TESTS") != "true" {
-		t.Skip("Skipping integration test: INTEGRATION_TESTS not set to true")
-	}
+	// Integration test - requires full podman compose environment
 
 	t.Run("grafana service availability", func(t *testing.T) {
 		// Test: Grafana service is accessible
@@ -189,10 +186,7 @@ func TestTelemetryCollection(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
-	// Skip if not in integration test environment
-	if os.Getenv("INTEGRATION_TESTS") != "true" {
-		t.Skip("Skipping integration test: INTEGRATION_TESTS not set to true")
-	}
+	// Integration test - requires full podman compose environment
 
 	t.Run("grafana agent configuration", func(t *testing.T) {
 		// Test: Grafana Agent is configured and running
@@ -369,10 +363,7 @@ func TestGrafanaAgentIntegration(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
-	// Skip if not in integration test environment
-	if os.Getenv("INTEGRATION_TESTS") != "true" {
-		t.Skip("Skipping integration test: INTEGRATION_TESTS not set to true")
-	}
+	// Integration test - requires full podman compose environment
 
 	t.Run("grafana agent health and configuration", func(t *testing.T) {
 		// Test: Grafana Agent is running and healthy

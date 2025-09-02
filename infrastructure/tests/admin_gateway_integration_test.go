@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"testing"
 	"time"
 
@@ -15,10 +14,7 @@ import (
 )
 
 func TestAdminGatewayIntegration(t *testing.T) {
-	// Skip if not in integration test environment
-	if os.Getenv("INTEGRATION_TESTS") != "true" {
-		t.Skip("Skipping integration test: INTEGRATION_TESTS not set to true")
-	}
+	// Integration test - requires full podman compose environment
 
 	t.Run("admin gateway authentication requirement", func(t *testing.T) {
 		// Test: Admin gateway enforces authentication for admin endpoints
@@ -90,10 +86,7 @@ func TestAdminGatewayIntegration(t *testing.T) {
 }
 
 func TestAuthentikIntegration(t *testing.T) {
-	// Skip if not in integration test environment
-	if os.Getenv("INTEGRATION_TESTS") != "true" {
-		t.Skip("Skipping integration test: INTEGRATION_TESTS not set to true")
-	}
+	// Integration test - requires full podman compose environment
 
 	t.Run("authentik health check", func(t *testing.T) {
 		// Test: Authentik identity provider is accessible and healthy
@@ -132,10 +125,7 @@ func TestAuthentikIntegration(t *testing.T) {
 }
 
 func TestDaprMiddlewareIntegration(t *testing.T) {
-	// Skip if not in integration test environment
-	if os.Getenv("INTEGRATION_TESTS") != "true" {
-		t.Skip("Skipping integration test: INTEGRATION_TESTS not set to true")
-	}
+	// Integration test - requires full podman compose environment
 
 	t.Run("dapr component health validation", func(t *testing.T) {
 		// Test: Dapr components are properly configured and accessible

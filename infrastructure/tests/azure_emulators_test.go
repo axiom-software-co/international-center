@@ -9,7 +9,6 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"os"
 	"sort"
 	"strings"
 	"testing"
@@ -101,10 +100,7 @@ func TestAzuriteStorageEmulator(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
-	// Skip if not in integration test environment
-	if os.Getenv("INTEGRATION_TESTS") != "true" {
-		t.Skip("Skipping integration test: INTEGRATION_TESTS not set to true")
-	}
+	// Integration test - requires full podman compose environment
 
 	t.Run("azurite blob storage container creation", func(t *testing.T) {
 		// Test: Azurite can create blob containers

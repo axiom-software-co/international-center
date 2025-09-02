@@ -14,10 +14,7 @@ import (
 )
 
 func TestPodmanComposeEnvironmentStartup(t *testing.T) {
-	// Skip if not in integration test environment
-	if os.Getenv("INTEGRATION_TESTS") != "true" {
-		t.Skip("Skipping integration test: INTEGRATION_TESTS not set to true")
-	}
+	// Integration test - requires full podman compose environment
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -87,10 +84,7 @@ func TestPodmanComposeEnvironmentStartup(t *testing.T) {
 }
 
 func TestEnvironmentVariableConfiguration(t *testing.T) {
-	// Skip if not in integration test environment
-	if os.Getenv("INTEGRATION_TESTS") != "true" {
-		t.Skip("Skipping integration test: INTEGRATION_TESTS not set to true")
-	}
+	// Integration test - requires full podman compose environment
 
 	t.Run("all required environment variables present", func(t *testing.T) {
 		requiredEnvVars := map[string]string{

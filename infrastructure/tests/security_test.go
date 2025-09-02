@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"os"
 	"testing"
 	"time"
 
@@ -18,10 +17,7 @@ func TestAuthentikIdentityProvider(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
-	// Skip if not in integration test environment
-	if os.Getenv("INTEGRATION_TESTS") != "true" {
-		t.Skip("Skipping integration test: INTEGRATION_TESTS not set to true")
-	}
+	// Integration test - requires full podman compose environment
 
 	t.Run("authentik service startup and configuration", func(t *testing.T) {
 		// Test: Authentik service starts and is accessible
@@ -131,10 +127,7 @@ func TestVaultSecretsManagement(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
-	// Skip if not in integration test environment
-	if os.Getenv("INTEGRATION_TESTS") != "true" {
-		t.Skip("Skipping integration test: INTEGRATION_TESTS not set to true")
-	}
+	// Integration test - requires full podman compose environment
 
 	t.Run("vault service initialization", func(t *testing.T) {
 		// Test: Vault service is initialized and accessible
@@ -218,10 +211,7 @@ func TestOPAPolicyEngine(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
-	// Skip if not in integration test environment
-	if os.Getenv("INTEGRATION_TESTS") != "true" {
-		t.Skip("Skipping integration test: INTEGRATION_TESTS not set to true")
-	}
+	// Integration test - requires full podman compose environment
 
 	t.Run("opa service startup", func(t *testing.T) {
 		// Test: OPA service starts and is accessible

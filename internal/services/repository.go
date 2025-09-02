@@ -415,7 +415,7 @@ func (r *DaprStateStoreRepository) List(offset, limit int) ([]*Service, error) {
 		return nil, fmt.Errorf("failed to query services: %w", err)
 	}
 	
-	var services []*Service
+	services := make([]*Service, 0)
 	for _, result := range results.Results {
 		var service Service
 		err = json.Unmarshal(result.Value, &service)
@@ -454,7 +454,7 @@ func (r *DaprStateStoreRepository) ListByCategory(categoryID string, offset, lim
 		return nil, fmt.Errorf("failed to query services by category: %w", err)
 	}
 	
-	var services []*Service
+	services := make([]*Service, 0)
 	for _, result := range results.Results {
 		var service Service
 		err = json.Unmarshal(result.Value, &service)
@@ -493,7 +493,7 @@ func (r *DaprStateStoreRepository) ListPublished(offset, limit int) ([]*Service,
 		return nil, fmt.Errorf("failed to query published services: %w", err)
 	}
 	
-	var services []*Service
+	services := make([]*Service, 0)
 	for _, result := range results.Results {
 		var service Service
 		err = json.Unmarshal(result.Value, &service)

@@ -2,6 +2,7 @@ package services
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 
@@ -45,11 +46,11 @@ func NewServicesHandler(service *ServicesService) *ServicesHandler {
 }
 
 func (h *ServicesHandler) RegisterRoutes(router *mux.Router) {
-	// Public routes
-	public := router.PathPrefix("/api/v1/services").Subrouter()
-	public.HandleFunc("", h.ListPublishedServices).Methods("GET")
-	public.HandleFunc("/{id}", h.GetService).Methods("GET")
-	public.HandleFunc("/slug/{slug}", h.GetServiceBySlug).Methods("GET")
+	// Public routes - register directly to avoid subrouter issues
+	router.HandleFunc("/api/v1/services", h.ListPublishedServices).Methods("GET")
+	router.HandleFunc("/api/v1/services/{id}", h.GetService).Methods("GET")
+	router.HandleFunc("/api/v1/services/slug/{slug}", h.GetServiceBySlug).Methods("GET")
+	fmt.Println("DEBUG: Registering /api/v1/services route directly")
 	
 	// Admin routes
 	admin := router.PathPrefix("/admin/api/v1/services").Subrouter()
@@ -195,6 +196,11 @@ func (h *ServicesHandler) ListAllServices(w http.ResponseWriter, r *http.Request
 		return
 	}
 	
+	// Ensure services is never nil for consistent JSON serialization
+	if services == nil {
+		services = make([]*Service, 0)
+	}
+	
 	response := &ServicesListResponse{
 		Services: services,
 		Total:    len(services),
@@ -204,13 +210,23 @@ func (h *ServicesHandler) ListAllServices(w http.ResponseWriter, r *http.Request
 }
 
 func (h *ServicesHandler) ListPublishedServices(w http.ResponseWriter, r *http.Request) {
+	fmt.Printf("DEBUG: ListPublishedServices called! URL: %s\n", r.URL.Path)
 	offset, limit := h.getPagination(r)
 	
 	services, err := h.service.ListPublishedServices(offset, limit)
+	fmt.Printf("DEBUG ListPublished: services=%v, err=%v\n", services, err)
 	if err != nil {
 		h.sendError(w, http.StatusInternalServerError, "Failed to list published services", err.Error())
 		return
 	}
+	
+	// Ensure services is never nil for consistent JSON serialization
+	fmt.Printf("DEBUG: services before nil check: %v, is_nil=%t\n", services, services == nil)
+	if services == nil {
+		fmt.Println("DEBUG: services was nil, creating empty slice")
+		services = make([]*Service, 0)
+	}
+	fmt.Printf("DEBUG: services after nil check: %v, len=%d\n", services, len(services))
 	
 	response := &ServicesListResponse{
 		Services: services,

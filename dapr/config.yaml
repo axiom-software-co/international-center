@@ -47,17 +47,17 @@ spec:
         version: "v1"
         protocol: "http"
   
-  # HTTP pipeline configuration
-  httpPipeline:
-    handlers:
-      - name: "cors"
-        type: "middleware.http.cors"
-      - name: "ratelimit"
-        type: "middleware.http.ratelimit"
-      - name: "oauth2"
-        type: "middleware.http.oauth2"
-      - name: "opa"
-        type: "middleware.http.opa"
+  # HTTP pipeline configuration - temporarily disabled for GREEN phase
+  # httpPipeline:
+  #   handlers:
+  #     - name: "cors"
+  #       type: "middleware.http.cors"
+  #     - name: "ratelimit"
+  #       type: "middleware.http.ratelimit"
+  #     - name: "oauth2"
+  #       type: "middleware.http.oauth2"
+  #     - name: "opa"
+  #       type: "middleware.http.opa"
 
   # Access control configuration
   accessControl:

@@ -12,10 +12,7 @@ import (
 )
 
 func TestDaprComponentHealth(t *testing.T) {
-	// Skip if not in integration test environment
-	if os.Getenv("INTEGRATION_TESTS") != "true" {
-		t.Skip("Skipping integration test: INTEGRATION_TESTS not set to true")
-	}
+	// Integration test - requires full podman compose environment
 
 	t.Run("redis state store connectivity", func(t *testing.T) {
 		// Test: Redis state store for Dapr components is accessible
@@ -60,10 +57,7 @@ func TestDaprComponentHealth(t *testing.T) {
 }
 
 func TestDaprComponentUsage(t *testing.T) {
-	// Skip if not in integration test environment
-	if os.Getenv("INTEGRATION_TESTS") != "true" {
-		t.Skip("Skipping integration test: INTEGRATION_TESTS not set to true")
-	}
+	// Integration test - requires full podman compose environment
 
 	t.Run("state store component accessibility", func(t *testing.T) {
 		// Test: Redis state store component is accessible for Dapr state operations
