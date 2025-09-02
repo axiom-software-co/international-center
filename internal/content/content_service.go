@@ -14,8 +14,8 @@ func NewContentService(repository ContentRepository) *ContentService {
 	}
 }
 
-func (s *ContentService) CreateContent(ctx context.Context, title, body, slug, contentType string) (*Content, error) {
-	content, err := NewContent(title, body, slug, contentType)
+func (s *ContentService) CreateContent(ctx context.Context, originalFilename string, fileSize int64, mimeType string, contentHash string, contentCategory ContentCategory) (*Content, error) {
+	content, err := NewContent(originalFilename, fileSize, mimeType, contentHash, contentCategory)
 	if err != nil {
 		return nil, err
 	}
@@ -32,24 +32,28 @@ func (s *ContentService) GetContent(ctx context.Context, contentID string) (*Con
 	return s.repository.GetByID(ctx, contentID)
 }
 
-func (s *ContentService) GetContentBySlug(ctx context.Context, slug string) (*Content, error) {
-	return s.repository.GetBySlug(ctx, slug)
-}
-
-func (s *ContentService) UpdateContent(ctx context.Context, contentID, title, body, slug, contentType, userID string) (*Content, error) {
+func (s *ContentService) UpdateContentMetadata(ctx context.Context, contentID, altText, description string, tags []string, userID string) (*Content, error) {
 	content, err := s.repository.GetByID(ctx, contentID)
 	if err != nil {
 		return nil, err
 	}
 	
-	content.Title = title
-	content.Body = body
-	content.Slug = slug
-	content.ContentType = ContentType(contentType)
-	content.ModifiedBy = userID
+	if altText != "" {
+		content.AltText = altText
+	}
 	
-	if !isValidContentType(content.ContentType) {
-		return nil, err
+	if description != "" {
+		err = content.SetDescription(description, userID)
+		if err != nil {
+			return nil, err
+		}
+	}
+	
+	if tags != nil {
+		err = content.AssignTags(tags, userID)
+		if err != nil {
+			return nil, err
+		}
 	}
 	
 	err = s.repository.Update(ctx, content)
@@ -60,13 +64,27 @@ func (s *ContentService) UpdateContent(ctx context.Context, contentID, title, bo
 	return content, nil
 }
 
-func (s *ContentService) PublishContent(ctx context.Context, contentID, userID string) error {
+func (s *ContentService) MarkContentAsAvailable(ctx context.Context, contentID, userID string) error {
 	content, err := s.repository.GetByID(ctx, contentID)
 	if err != nil {
 		return err
 	}
 	
-	err = content.Publish(userID)
+	err = content.MarkAsAvailable(userID)
+	if err != nil {
+		return err
+	}
+	
+	return s.repository.Update(ctx, content)
+}
+
+func (s *ContentService) MarkContentAsFailed(ctx context.Context, contentID, userID string) error {
+	content, err := s.repository.GetByID(ctx, contentID)
+	if err != nil {
+		return err
+	}
+	
+	err = content.MarkAsFailed(userID)
 	if err != nil {
 		return err
 	}
@@ -88,13 +106,13 @@ func (s *ContentService) ArchiveContent(ctx context.Context, contentID, userID s
 	return s.repository.Update(ctx, content)
 }
 
-func (s *ContentService) AssignContentCategory(ctx context.Context, contentID, categoryID, userID string) error {
+func (s *ContentService) SetContentAccessLevel(ctx context.Context, contentID string, accessLevel AccessLevel, userID string) error {
 	content, err := s.repository.GetByID(ctx, contentID)
 	if err != nil {
 		return err
 	}
 	
-	err = content.AssignCategory(categoryID, userID)
+	err = content.SetAccessLevel(accessLevel, userID)
 	if err != nil {
 		return err
 	}
@@ -124,18 +142,18 @@ func (s *ContentService) ListContent(ctx context.Context, offset, limit int) ([]
 	return s.repository.List(ctx, offset, limit)
 }
 
-func (s *ContentService) ListContentByCategory(ctx context.Context, categoryID string, offset, limit int) ([]*Content, error) {
-	return s.repository.ListByCategory(ctx, categoryID, offset, limit)
+func (s *ContentService) ListContentByCategory(ctx context.Context, contentCategory ContentCategory, offset, limit int) ([]*Content, error) {
+	return s.repository.ListByCategory(ctx, contentCategory, offset, limit)
 }
 
 func (s *ContentService) ListContentByTags(ctx context.Context, tags []string, offset, limit int) ([]*Content, error) {
 	return s.repository.ListByTags(ctx, tags, offset, limit)
 }
 
-func (s *ContentService) ListPublishedContent(ctx context.Context, offset, limit int) ([]*Content, error) {
+func (s *ContentService) ListAvailableContent(ctx context.Context, offset, limit int) ([]*Content, error) {
 	return s.repository.ListPublished(ctx, offset, limit)
 }
 
-func (s *ContentService) ListContentByType(ctx context.Context, contentType ContentType, offset, limit int) ([]*Content, error) {
-	return s.repository.ListByType(ctx, contentType, offset, limit)
+func (s *ContentService) ListContentByType(ctx context.Context, contentCategory ContentCategory, offset, limit int) ([]*Content, error) {
+	return s.repository.ListByType(ctx, contentCategory, offset, limit)
 }

@@ -24,22 +24,14 @@ type ProxyConfig struct {
 }
 
 func NewPublicGateway(config *ProxyConfig) *PublicGateway {
-	// Get Dapr gRPC endpoint from environment variable
+	// Get Dapr gRPC endpoint from environment variable (required)
 	daprEndpoint := os.Getenv("DAPR_GRPC_ENDPOINT")
 	if daprEndpoint == "" {
-		daprEndpoint = "127.0.0.1:50001" // Default Dapr gRPC port
+		log.Fatalf("DAPR_GRPC_ENDPOINT environment variable is required")
 	}
 	log.Printf("dapr client initializing for: %s", daprEndpoint)
 	
-	var daprClient client.Client
-	var err error
-	
-	if daprEndpoint != "" {
-		daprClient, err = client.NewClientWithAddress(daprEndpoint)
-	} else {
-		daprClient, err = client.NewClient()
-	}
-	
+	daprClient, err := client.NewClientWithAddress(daprEndpoint)
 	if err != nil {
 		log.Fatalf("Failed to create Dapr client: %v", err)
 	}
@@ -140,16 +132,18 @@ func (g *PublicGateway) corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		origin := r.Header.Get("Origin")
 		
-		// Allow requests from public website origins
-		allowedOrigins := []string{
-			"https://international-center.com",
-			"https://www.international-center.com",
-			"http://localhost:3000", // Development
-			"http://localhost:4321", // Astro dev server
+		// Get allowed origins from environment variable (required)
+		allowedOriginsEnv := os.Getenv("PUBLIC_GATEWAY_ALLOWED_ORIGINS")
+		if allowedOriginsEnv == "" {
+			log.Printf("PUBLIC_GATEWAY_ALLOWED_ORIGINS environment variable is required")
+			w.WriteHeader(http.StatusInternalServerError)
+			return
 		}
 		
+		allowedOrigins := strings.Split(allowedOriginsEnv, ",")
+		
 		for _, allowedOrigin := range allowedOrigins {
-			if origin == allowedOrigin {
+			if origin == strings.TrimSpace(allowedOrigin) {
 				w.Header().Set("Access-Control-Allow-Origin", origin)
 				break
 			}

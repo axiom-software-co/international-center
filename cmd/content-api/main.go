@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"log"
 	"net/http"
@@ -10,8 +11,7 @@ import (
 
 	"github.com/axiom-software-co/international-center/internal/content"
 	"github.com/gorilla/mux"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	_ "github.com/lib/pq"
 )
 
 func main() {
@@ -19,37 +19,34 @@ func main() {
 	
 	// Environment configuration
 	port := getEnv("CONTENT_API_PORT", "8081")
-	mongoConnectionString := getEnv("MONGO_CONNECTION_STRING", "")
-	mongoDatabaseName := getEnv("MONGO_DATABASE_NAME", "international_center")
+	databaseConnectionString := getEnv("DATABASE_CONNECTION_STRING", "")
 	
-	if mongoConnectionString == "" {
-		log.Fatal("MONGO_CONNECTION_STRING environment variable is required")
+	if databaseConnectionString == "" {
+		log.Fatal("DATABASE_CONNECTION_STRING environment variable is required")
 	}
 	
-	// MongoDB connection
+	// PostgreSQL connection
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	
-	client, err := mongo.Connect(ctx, options.Client().ApplyURI(mongoConnectionString))
+	db, err := sql.Open("postgres", databaseConnectionString)
 	if err != nil {
-		log.Fatalf("Failed to connect to MongoDB: %v", err)
+		log.Fatalf("Failed to connect to PostgreSQL: %v", err)
 	}
 	defer func() {
-		if err := client.Disconnect(context.Background()); err != nil {
-			log.Printf("Failed to disconnect from MongoDB: %v", err)
+		if err := db.Close(); err != nil {
+			log.Printf("Failed to close PostgreSQL connection: %v", err)
 		}
 	}()
 	
-	// Test MongoDB connection
-	if err := client.Ping(ctx, nil); err != nil {
-		log.Fatalf("MongoDB connection test failed: %v", err)
+	// Test PostgreSQL connection
+	if err := db.PingContext(ctx); err != nil {
+		log.Fatalf("PostgreSQL connection test failed: %v", err)
 	}
-	log.Println("MongoDB connection established")
-	
-	db := client.Database(mongoDatabaseName)
+	log.Println("PostgreSQL connection established")
 	
 	// Initialize layers
-	repository := content.NewMongoContentRepository(db)
+	repository := content.NewPostgreSQLContentRepository(db)
 	service := content.NewContentService(repository)
 	handler := content.NewContentHandler(service)
 	
@@ -58,7 +55,7 @@ func main() {
 	
 	// Health check endpoints
 	router.HandleFunc("/health", healthCheckHandler).Methods("GET")
-	router.HandleFunc("/health/ready", readinessCheckHandler(client)).Methods("GET")
+	router.HandleFunc("/health/ready", readinessCheckHandler(db)).Methods("GET")
 	
 	// Register content routes
 	handler.RegisterRoutes(router)
@@ -78,12 +75,12 @@ func healthCheckHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprint(w, `{"status":"ok","service":"content-api"}`)
 }
 
-func readinessCheckHandler(client *mongo.Client) http.HandlerFunc {
+func readinessCheckHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		
-		if err := client.Ping(ctx, nil); err != nil {
+		if err := db.PingContext(ctx); err != nil {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusServiceUnavailable)
 			fmt.Fprintf(w, `{"status":"not_ready","error":"%s"}`, err.Error())

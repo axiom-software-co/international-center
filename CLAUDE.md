@@ -23,6 +23,8 @@
 
 - note : we do not need cloudfalre CDN for now
 
+- note : we will only work on the simple GET endpoints for now , while we validate our development environment and deployment
+
 
 [ important project related rules to follow ]
 
@@ -182,13 +184,10 @@
 
 ## managed stateful resources
 
-- authenticated sessions and dapr bindings : upstash redis hosted for production ( redis container for local development )
-
-- pub/sub : upstash redis hosted in production ( redis in container for local development ) 
-
+- pub/sub and authenticated sessions : upstash redis hosted for production ( redis container for local development ) 
 - secret store : hashicorp vault cloud hosted for production ( hashicorp vault and vault data containers for local development )
+
 - relational database ( includes configuration store and state store and identity storage and services storage ) : azure manged postgre hosted for production ( postgre container for local development ) 
-- non-relational database : mongodb cloud hosted for production ( mongodb container for local development )
 - file storage : azure blob storage hosted for production ( azurite blob storage emulator and azurite-data containers for local development https://github.com/Azure/Azurite )
 
 ## grafana cloud observability 

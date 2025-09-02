@@ -1,15 +1,14 @@
 package main
 
 import (
-	"database/sql"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
 
 	"github.com/axiom-software-co/international-center/internal/services"
+	"github.com/dapr/go-sdk/client"
 	"github.com/gorilla/mux"
-	_ "github.com/lib/pq"
 )
 
 func main() {
@@ -17,27 +16,19 @@ func main() {
 	
 	// Environment configuration
 	port := getEnv("SERVICES_API_PORT", "8080")
-	dbConnectionString := getEnv("DATABASE_CONNECTION_STRING", "")
+	stateStoreName := getEnv("DAPR_STATE_STORE_NAME", "services-store")
 	
-	if dbConnectionString == "" {
-		log.Fatal("DATABASE_CONNECTION_STRING environment variable is required")
-	}
-	
-	// Database connection
-	db, err := sql.Open("postgres", dbConnectionString)
+	// Dapr client connection
+	daprClient, err := client.NewClient()
 	if err != nil {
-		log.Fatalf("Failed to connect to database: %v", err)
+		log.Fatalf("Failed to create Dapr client: %v", err)
 	}
-	defer db.Close()
+	defer daprClient.Close()
 	
-	// Test database connection
-	if err := db.Ping(); err != nil {
-		log.Fatalf("Database connection test failed: %v", err)
-	}
-	log.Println("Database connection established")
+	log.Println("Dapr client connection established")
 	
 	// Initialize layers
-	repository := services.NewPostgreSQLServicesRepository(db)
+	repository := services.NewDaprStateStoreRepository(daprClient, stateStoreName)
 	service := services.NewServicesService(repository)
 	handler := services.NewServicesHandler(service)
 	
@@ -46,7 +37,7 @@ func main() {
 	
 	// Health check endpoints
 	router.HandleFunc("/health", healthCheckHandler).Methods("GET")
-	router.HandleFunc("/health/ready", readinessCheckHandler(db)).Methods("GET")
+	router.HandleFunc("/health/ready", readinessCheckHandler(daprClient)).Methods("GET")
 	
 	// Register service routes
 	handler.RegisterRoutes(router)
@@ -66,13 +57,18 @@ func healthCheckHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprint(w, `{"status":"ok","service":"services-api"}`)
 }
 
-func readinessCheckHandler(db *sql.DB) http.HandlerFunc {
+func readinessCheckHandler(daprClient client.Client) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if err := db.Ping(); err != nil {
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusServiceUnavailable)
-			fmt.Fprintf(w, `{"status":"not_ready","error":"%s"}`, err.Error())
-			return
+		// Test Dapr connection by attempting to get a state that doesn't exist
+		_, err := daprClient.GetState(r.Context(), "services-store", "health-check", nil)
+		if err != nil {
+			// This is expected for a non-existent key, so we check if it's a connection error
+			if err.Error() != "state not found" && err.Error() != "error getting state: state not found" {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusServiceUnavailable)
+				fmt.Fprintf(w, `{"status":"not_ready","error":"%s"}`, err.Error())
+				return
+			}
 		}
 		
 		w.Header().Set("Content-Type", "application/json")

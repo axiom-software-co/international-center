@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -104,15 +105,18 @@ func (g *AdminGateway) corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		origin := r.Header.Get("Origin")
 		
-		// Allow requests from admin origins only
-		allowedOrigins := []string{
-			"https://admin.international-center.com",
-			"https://dashboard.international-center.com",
-			"http://localhost:3001", // Development admin
+		// Get allowed origins from environment variable (required)
+		allowedOriginsEnv := os.Getenv("ADMIN_GATEWAY_ALLOWED_ORIGINS")
+		if allowedOriginsEnv == "" {
+			log.Printf("ADMIN_GATEWAY_ALLOWED_ORIGINS environment variable is required")
+			w.WriteHeader(http.StatusInternalServerError)
+			return
 		}
 		
+		allowedOrigins := strings.Split(allowedOriginsEnv, ",")
+		
 		for _, allowedOrigin := range allowedOrigins {
-			if origin == allowedOrigin {
+			if origin == strings.TrimSpace(allowedOrigin) {
 				w.Header().Set("Access-Control-Allow-Origin", origin)
 				break
 			}

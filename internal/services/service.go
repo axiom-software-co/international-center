@@ -27,13 +27,34 @@ type Service struct {
 	Title            string
 	Description      string
 	Slug             string
+	ContentURL       string
 	CategoryID       string
+	ImageURL         string
+	OrderNumber      int
 	DeliveryMode     DeliveryMode
 	PublishingStatus PublishingStatus
-	IsDeleted        bool
 	CreatedOn        time.Time
+	CreatedBy        string
 	ModifiedOn       time.Time
 	ModifiedBy       string
+	IsDeleted        bool
+	DeletedOn        time.Time
+	DeletedBy        string
+}
+
+type ServiceCategory struct {
+	CategoryID            string
+	Name                  string
+	Slug                  string
+	OrderNumber           int
+	IsDefaultUnassigned   bool
+	CreatedOn             time.Time
+	CreatedBy             string
+	ModifiedOn            time.Time
+	ModifiedBy            string
+	IsDeleted             bool
+	DeletedOn             time.Time
+	DeletedBy             string
 }
 
 var slugRegex = regexp.MustCompile(`^[a-z0-9-]+$`)

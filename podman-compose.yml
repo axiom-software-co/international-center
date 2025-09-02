@@ -57,26 +57,6 @@ services:
       retries: 5
     restart: unless-stopped
 
-  mongodb:
-    image: mongo:7.0-jammy
-    container_name: mongodb
-    env_file:
-      - .env.development
-    environment:
-      - MONGO_INITDB_ROOT_USERNAME=${MONGO_USERNAME}
-      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_PASSWORD}
-      - MONGO_INITDB_DATABASE=${MONGO_DB}
-    ports:
-      - "${MONGO_PORT}:27017"
-    volumes:
-      - mongodb-data:/data/db
-    healthcheck:
-      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
-    restart: unless-stopped
 
   # =============================================================================
   # Azure Emulator Services
@@ -119,6 +99,7 @@ services:
     ]
     ports:
       - "${SERVICES_API_PORT}:${SERVICES_API_PORT}"
+      - "${SERVICES_API_DAPR_HTTP_PORT}:3500"
     volumes:
       - ./dapr/components:/components:ro
       - ./dapr/config:/config:ro
@@ -168,11 +149,12 @@ services:
     ]
     ports:
       - "${CONTENT_API_PORT}:${CONTENT_API_PORT}"
+      - "${CONTENT_API_DAPR_HTTP_PORT}:3500"
     volumes:
       - ./dapr/components:/components:ro
       - ./dapr/config:/config:ro
     depends_on:
-      mongodb:
+      postgresql:
         condition: service_healthy
     restart: unless-stopped
 
@@ -186,13 +168,12 @@ services:
       - .env.development
     environment:
       - CONTENT_API_PORT=${CONTENT_API_PORT}
-      - MONGO_CONNECTION_STRING=mongodb://${MONGO_USERNAME}:${MONGO_PASSWORD}@mongodb:27017
-      - MONGO_DATABASE_NAME=${MONGO_DB}
+      - DATABASE_CONNECTION_STRING=postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgresql:5432/${POSTGRES_DB}?sslmode=disable
       - DAPR_GRPC_ENDPOINT=127.0.0.1:50002
     depends_on:
       content-api-dapr:
         condition: service_started
-      mongodb:
+      postgresql:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:${CONTENT_API_PORT}/health"]
@@ -218,6 +199,7 @@ services:
     ]
     ports:
       - "${PUBLIC_GATEWAY_PORT}:${PUBLIC_GATEWAY_PORT}"
+      - "${PUBLIC_GATEWAY_DAPR_HTTP_PORT}:3500"
     volumes:
       - ./dapr/components:/components:ro
       - ./dapr/config:/config:ro
@@ -266,6 +248,7 @@ services:
     ]
     ports:
       - "${ADMIN_GATEWAY_PORT}:${ADMIN_GATEWAY_PORT}"
+      - "${ADMIN_GATEWAY_DAPR_HTTP_PORT}:3500"
     volumes:
       - ./dapr/components:/components:ro
       - ./dapr/config:/config:ro
@@ -497,27 +480,55 @@ services:
       start_period: 60s
     restart: unless-stopped
 
+  grafana-agent-dapr:
+    image: daprio/daprd:1.14.1
+    container_name: grafana-agent-dapr
+    env_file:
+      - .env.development
+    command: ["./daprd", 
+      "--app-id", "grafana-agent", 
+      "--app-port", "${GRAFANA_AGENT_PORT}", 
+      "--dapr-http-port", "3500",
+      "--dapr-grpc-port", "50005",
+      "--metrics-port", "9094",
+      "--components-path", "/components",
+      "--config", "/config/config.yaml"
+    ]
+    ports:
+      - "${GRAFANA_AGENT_PORT}:${GRAFANA_AGENT_PORT}"
+      - "${GRAFANA_AGENT_DAPR_HTTP_PORT}:3500"
+    volumes:
+      - ./dapr/components:/components:ro
+      - ./dapr/config:/config:ro
+    restart: unless-stopped
+
   grafana-agent:
     image: grafana/agent:v0.38.0
     container_name: grafana-agent
+    network_mode: "container:grafana-agent-dapr"
     env_file:
       - .env.development
-    command: ["-config.file=/etc/agent/agent.yaml", "-server.http.address=0.0.0.0:12345"]
-    ports:
-      - "${GRAFANA_AGENT_PORT}:12345"
+    environment:
+      - GRAFANA_AGENT_PORT=${GRAFANA_AGENT_PORT}
+      - DAPR_GRPC_ENDPOINT=127.0.0.1:50005
+    command: ["-config.file=/etc/agent/agent.yaml", "-server.http.address=0.0.0.0:${GRAFANA_AGENT_PORT}"]
     volumes:
       - ./observability/grafana-agent.yaml:/etc/agent/agent.yaml:ro
     depends_on:
-      - mimir
-      - loki
-      - tempo
+      grafana-agent-dapr:
+        condition: service_started
+      mimir:
+        condition: service_healthy
+      loki:
+        condition: service_healthy
+      tempo:
+        condition: service_healthy
     restart: unless-stopped
 
 # Using default podman network for better DNS resolution
 
 volumes:
   postgres-data:
-  mongodb-data:
   grafana-data:
   mimir-data:
   loki-data:
