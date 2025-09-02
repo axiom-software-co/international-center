@@ -1,7 +1,6 @@
 package tests
 
 import (
-	"context"
 	"fmt"
 	"net"
 	"os"
@@ -13,9 +12,6 @@ import (
 )
 
 func TestDaprComponentHealth(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-	defer cancel()
-
 	// Skip if not in integration test environment
 	if os.Getenv("INTEGRATION_TESTS") != "true" {
 		t.Skip("Skipping integration test: INTEGRATION_TESTS not set to true")
@@ -64,9 +60,6 @@ func TestDaprComponentHealth(t *testing.T) {
 }
 
 func TestDaprComponentUsage(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-	defer cancel()
-
 	// Skip if not in integration test environment
 	if os.Getenv("INTEGRATION_TESTS") != "true" {
 		t.Skip("Skipping integration test: INTEGRATION_TESTS not set to true")
@@ -111,11 +104,3 @@ func TestDaprComponentUsage(t *testing.T) {
 	})
 }
 
-// requireEnv retrieves environment variable or fails test if missing
-func requireEnv(t *testing.T, key string) string {
-	value := os.Getenv(key)
-	if value == "" {
-		t.Fatalf("Required environment variable %s is not set", key)
-	}
-	return value
-}

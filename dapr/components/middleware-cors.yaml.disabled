@@ -1,0 +1,20 @@
+apiVersion: dapr.io/v1alpha1
+kind: Component
+metadata:
+  name: cors
+spec:
+  type: middleware.http.cors
+  version: v1
+  metadata:
+  - name: allowOrigins
+    value: "https://international-center.com,https://www.international-center.com,https://admin.international-center.com,http://localhost:3000,http://localhost:3001,http://localhost:4321"
+  - name: allowMethods
+    value: "GET,POST,PUT,DELETE,OPTIONS"
+  - name: allowHeaders
+    value: "Content-Type,Authorization,X-Requested-With,X-User-ID"
+  - name: exposeHeaders
+    value: "X-Custom-Header"
+  - name: allowCredentials
+    value: "true"
+  - name: maxAge
+    value: "3600"

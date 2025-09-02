@@ -1,0 +1,26 @@
+apiVersion: dapr.io/v1alpha1
+kind: Component
+metadata:
+  name: binding-mongodb
+spec:
+  type: bindings.mongodb
+  version: v1
+  metadata:
+  - name: host
+    value: mongodb:27017
+  - name: username
+    value: admin
+  - name: password
+    value: development
+  - name: databaseName
+    value: international_center
+  - name: collection
+    value: content
+  - name: writeConcern
+    value: majority
+  - name: readConcern
+    value: majority
+  - name: operationTimeout
+    value: 5s
+scopes:
+- content-api

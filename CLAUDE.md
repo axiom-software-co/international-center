@@ -14,7 +14,7 @@
 
 - IMPORTANT AXIOM RULE TO FOLLOW : only run integration tests when the entire podman compose development environment is up
 
-- IMPORTANT AXIOM RULE TO FOLLOW : environment variables are defined only in the container files ( networking configuration , including ports  , should not be hardcoded , it should always come from the environment ) ( we should not have fallback networking configuration in implementation nor integration tests ) 
+- IMPORTANT AXIOM RULE TO FOLLOW : environment variables are defined only in the env files ( networking configuration , including ports  , should not be hardcoded , it should always come from the environment ) ( we should not have fallback networking configuration in implementation nor integration tests ) 
 
 
 - note : we will not work on the public and admin website frontend at the moment ( once we confirm our infrastructure and api gateways CICD is working , we will consider working on the website )

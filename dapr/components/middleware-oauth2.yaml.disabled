@@ -1,0 +1,26 @@
+apiVersion: dapr.io/v1alpha1
+kind: Component
+metadata:
+  name: oauth2
+spec:
+  type: middleware.http.oauth2
+  version: v1
+  metadata:
+  - name: clientId
+    secretKeyRef:
+      name: oauth2-client
+      key: clientId
+  - name: clientSecret
+    secretKeyRef:
+      name: oauth2-client
+      key: clientSecret
+  - name: scopes
+    value: "read,write"
+  - name: authURL
+    value: "http://authentik:9000/application/o/authorize/"
+  - name: tokenURL
+    value: "http://authentik:9000/application/o/token/"
+  - name: redirectURL
+    value: "http://localhost:8083/oauth2/callback"
+  - name: authStyle
+    value: "1"

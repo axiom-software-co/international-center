@@ -10,15 +10,13 @@ services:
     env_file:
       - .env.development
     environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=development
-      - POSTGRES_DB=international_center
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT}:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
-    networks:
-      - international-center-network
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d international_center"]
       interval: 10s
@@ -33,21 +31,13 @@ services:
     container_name: migration
     env_file:
       - .env.development
-    environment:
-      - POSTGRES_HOST=postgresql
-      - POSTGRES_PORT=5432
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=development
-      - POSTGRES_DB=international_center
     command: [
       "-path", "/migrations",
-      "-database", "postgres://postgres:development@postgresql:5432/international_center?sslmode=disable",
+      "-database", "postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}?sslmode=disable",
       "up"
     ]
     volumes:
       - ./infrastructure/migrations/migrations:/migrations:ro
-    networks:
-      - international-center-network
     depends_on:
       postgresql:
         condition: service_healthy
@@ -60,8 +50,6 @@ services:
       - .env.development
     ports:
       - "${REDIS_PORT}:6379"
-    networks:
-      - international-center-network
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -81,9 +69,7 @@ services:
     ports:
       - "${MONGO_PORT}:27017"
     volumes:
-      - ${MONGO_DATA_VOLUME}:/data/db
-    networks:
-      - international-center-network
+      - mongodb-data:/data/db
     healthcheck:
       test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
       interval: 10s
@@ -104,17 +90,220 @@ services:
     ports:
       - "${AZURITE_BLOB_PORT}:10000"
     volumes:
-      - ${AZURITE_DATA_VOLUME}:/data
-    networks:
-      - international-center-network
+      - azurite-data:/data
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:10000/devstoreaccount1"]
+      test: ["CMD", "curl", "-s", "http://localhost:10000/"]
       interval: 15s
       timeout: 10s
       retries: 5
       start_period: 30s
     restart: unless-stopped
 
+
+  # =============================================================================
+  # Microservices APIs
+  # =============================================================================
+  services-api-dapr:
+    image: daprio/daprd:1.14.1
+    container_name: services-api-dapr
+    env_file:
+      - .env.development
+    command: ["./daprd", 
+      "--app-id", "services-api", 
+      "--app-port", "${SERVICES_API_PORT}", 
+      "--dapr-http-port", "3500",
+      "--dapr-grpc-port", "50001",
+      "--metrics-port", "9090",
+      "--components-path", "/components",
+      "--config", "/config/config.yaml"
+    ]
+    ports:
+      - "${SERVICES_API_PORT}:${SERVICES_API_PORT}"
+    volumes:
+      - ./dapr/components:/components:ro
+      - ./dapr/config:/config:ro
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  services-api:
+    build: 
+      context: .
+      dockerfile: ./cmd/services-api/Dockerfile
+    container_name: services-api
+    network_mode: "container:services-api-dapr"
+    env_file:
+      - .env.development
+    environment:
+      - SERVICES_API_PORT=${SERVICES_API_PORT}
+      - DATABASE_CONNECTION_STRING=postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgresql:5432/${POSTGRES_DB}?sslmode=disable
+      - DAPR_GRPC_ENDPOINT=127.0.0.1:50001
+    depends_on:
+      services-api-dapr:
+        condition: service_started
+      postgresql:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:${SERVICES_API_PORT}/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
+  content-api-dapr:
+    image: daprio/daprd:1.14.1
+    container_name: content-api-dapr
+    env_file:
+      - .env.development
+    command: ["./daprd", 
+      "--app-id", "content-api", 
+      "--app-port", "${CONTENT_API_PORT}", 
+      "--dapr-http-port", "3500",
+      "--dapr-grpc-port", "50002",
+      "--metrics-port", "9091",
+      "--components-path", "/components",
+      "--config", "/config/config.yaml"
+    ]
+    ports:
+      - "${CONTENT_API_PORT}:${CONTENT_API_PORT}"
+    volumes:
+      - ./dapr/components:/components:ro
+      - ./dapr/config:/config:ro
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    restart: unless-stopped
+
+  content-api:
+    build: 
+      context: .
+      dockerfile: ./cmd/content-api/Dockerfile
+    container_name: content-api
+    network_mode: "container:content-api-dapr"
+    env_file:
+      - .env.development
+    environment:
+      - CONTENT_API_PORT=${CONTENT_API_PORT}
+      - MONGO_CONNECTION_STRING=mongodb://${MONGO_USERNAME}:${MONGO_PASSWORD}@mongodb:27017
+      - MONGO_DATABASE_NAME=${MONGO_DB}
+      - DAPR_GRPC_ENDPOINT=127.0.0.1:50002
+    depends_on:
+      content-api-dapr:
+        condition: service_started
+      mongodb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:${CONTENT_API_PORT}/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
+  public-gateway-dapr:
+    image: daprio/daprd:1.14.1
+    container_name: public-gateway-dapr
+    env_file:
+      - .env.development
+    command: ["./daprd", 
+      "--app-id", "public-gateway", 
+      "--app-port", "${PUBLIC_GATEWAY_PORT}", 
+      "--dapr-http-port", "3500",
+      "--dapr-grpc-port", "50003",
+      "--metrics-port", "9092",
+      "--components-path", "/components",
+      "--config", "/config/config.yaml"
+    ]
+    ports:
+      - "${PUBLIC_GATEWAY_PORT}:${PUBLIC_GATEWAY_PORT}"
+    volumes:
+      - ./dapr/components:/components:ro
+      - ./dapr/config:/config:ro
+    restart: unless-stopped
+
+  public-gateway:
+    build: 
+      context: .
+      dockerfile: ./cmd/public-gateway/Dockerfile
+    container_name: public-gateway
+    network_mode: "container:public-gateway-dapr"
+    env_file:
+      - .env.development
+    environment:
+      - PUBLIC_GATEWAY_PORT=${PUBLIC_GATEWAY_PORT}
+      - RATE_LIMIT_PER_MINUTE=${PUBLIC_GATEWAY_RATE_LIMIT}
+      - DAPR_GRPC_ENDPOINT=127.0.0.1:50003
+    depends_on:
+      public-gateway-dapr:
+        condition: service_started
+      services-api:
+        condition: service_healthy
+      content-api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:${PUBLIC_GATEWAY_PORT}/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
+  admin-gateway-dapr:
+    image: daprio/daprd:1.14.1
+    container_name: admin-gateway-dapr
+    env_file:
+      - .env.development
+    command: ["./daprd", 
+      "--app-id", "admin-gateway", 
+      "--app-port", "${ADMIN_GATEWAY_PORT}", 
+      "--dapr-http-port", "3500",
+      "--dapr-grpc-port", "50004",
+      "--metrics-port", "9093",
+      "--components-path", "/components",
+      "--config", "/config/config.yaml"
+    ]
+    ports:
+      - "${ADMIN_GATEWAY_PORT}:${ADMIN_GATEWAY_PORT}"
+    volumes:
+      - ./dapr/components:/components:ro
+      - ./dapr/config:/config:ro
+    depends_on:
+      authentik:
+        condition: service_healthy
+    restart: unless-stopped
+
+  admin-gateway:
+    build: 
+      context: .
+      dockerfile: ./cmd/admin-gateway/Dockerfile
+    container_name: admin-gateway
+    network_mode: "container:admin-gateway-dapr"
+    env_file:
+      - .env.development
+    environment:
+      - ADMIN_GATEWAY_PORT=${ADMIN_GATEWAY_PORT}
+      - SERVICES_API_URL=http://services-api-dapr:${SERVICES_API_PORT}
+      - CONTENT_API_URL=http://content-api-dapr:${CONTENT_API_PORT}
+      - RATE_LIMIT_PER_MINUTE=${ADMIN_GATEWAY_RATE_LIMIT}
+      - DAPR_GRPC_ENDPOINT=127.0.0.1:50004
+    depends_on:
+      admin-gateway-dapr:
+        condition: service_started
+      services-api:
+        condition: service_healthy
+      content-api:
+        condition: service_healthy
+      authentik:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:${ADMIN_GATEWAY_PORT}/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
 
   # =============================================================================
   # Identity and Security Services
@@ -126,17 +315,15 @@ services:
       - .env.development
     environment:
       - AUTHENTIK_SECRET_KEY=${AUTHENTIK_SECRET_KEY}
-      - AUTHENTIK_POSTGRESQL__HOST=postgresql
+      - AUTHENTIK_POSTGRESQL__HOST=${POSTGRES_HOST}
       - AUTHENTIK_POSTGRESQL__NAME=${POSTGRES_DB}
       - AUTHENTIK_POSTGRESQL__USER=${POSTGRES_USER}
       - AUTHENTIK_POSTGRESQL__PASSWORD=${POSTGRES_PASSWORD}
-      - AUTHENTIK_REDIS__HOST=redis
+      - AUTHENTIK_REDIS__HOST=${REDIS_HOST}
     command: server
     ports:
       - "${AUTHENTIK_PORT}:9000"
-      - "9443:9443"
-    networks:
-      - international-center-network
+      - "${AUTHENTIK_HTTPS_PORT}:9443"
     depends_on:
       postgresql:
         condition: service_healthy
@@ -157,14 +344,12 @@ services:
       - .env.development
     environment:
       - AUTHENTIK_SECRET_KEY=${AUTHENTIK_SECRET_KEY}
-      - AUTHENTIK_POSTGRESQL__HOST=postgresql
+      - AUTHENTIK_POSTGRESQL__HOST=${POSTGRES_HOST}
       - AUTHENTIK_POSTGRESQL__NAME=${POSTGRES_DB}
       - AUTHENTIK_POSTGRESQL__USER=${POSTGRES_USER}
       - AUTHENTIK_POSTGRESQL__PASSWORD=${POSTGRES_PASSWORD}
-      - AUTHENTIK_REDIS__HOST=redis
+      - AUTHENTIK_REDIS__HOST=${REDIS_HOST}
     command: worker
-    networks:
-      - international-center-network
     depends_on:
       postgresql:
         condition: service_healthy
@@ -183,13 +368,11 @@ services:
     ports:
       - "${VAULT_PORT}:8200"
     volumes:
-      - ${VAULT_DATA_VOLUME}:/vault/data
-    networks:
-      - international-center-network
+      - vault-data:/vault/data
     cap_add:
       - IPC_LOCK
     healthcheck:
-      test: ["CMD", "vault", "status"]
+      test: ["CMD", "curl", "-f", "http://localhost:8200/v1/sys/health"]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -204,8 +387,6 @@ services:
     command: ["run", "--server", "--addr=0.0.0.0:8181", "--log-level=info"]
     ports:
       - "${OPA_PORT}:8181"
-    networks:
-      - international-center-network
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8181/health"]
       interval: 15s
@@ -229,9 +410,7 @@ services:
     ports:
       - "${GRAFANA_PORT}:3000"
     volumes:
-      - ${GRAFANA_DATA_VOLUME}:/var/lib/grafana
-    networks:
-      - international-center-network
+      - grafana-data:/var/lib/grafana
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
       interval: 30s
@@ -249,10 +428,8 @@ services:
     ports:
       - "${MIMIR_PORT}:9009"
     volumes:
-      - ${MIMIR_DATA_VOLUME}:/data
+      - mimir-data:/data
       - ./observability/mimir.yaml:/etc/mimir/mimir.yaml:ro
-    networks:
-      - international-center-network
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:9009/ready"]
       interval: 30s
@@ -270,10 +447,8 @@ services:
     ports:
       - "${LOKI_PORT}:3100"
     volumes:
-      - ${LOKI_DATA_VOLUME}:/data
+      - loki-data:/data
       - ./observability/loki.yaml:/etc/loki/loki.yaml:ro
-    networks:
-      - international-center-network
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:3100/ready"]
       interval: 30s
@@ -290,15 +465,13 @@ services:
     command: ["-config.file=/etc/tempo/tempo.yaml"]
     ports:
       - "${TEMPO_PORT}:3200"
-      - "14268:14268"  # Jaeger ingest
-      - "4317:4317"    # otlp grpc
-      - "4318:4318"    # otlp http
-      - "9411:9411"    # zipkin
+      - "${TEMPO_JAEGER_PORT}:14268"  # Jaeger ingest
+      - "${TEMPO_OTLP_GRPC_PORT}:4317"    # otlp grpc
+      - "${TEMPO_OTLP_HTTP_PORT}:4318"    # otlp http
+      - "${TEMPO_ZIPKIN_PORT}:9411"    # zipkin
     volumes:
-      - ${TEMPO_DATA_VOLUME}:/data
+      - tempo-data:/data
       - ./observability/tempo.yaml:/etc/tempo/tempo.yaml:ro
-    networks:
-      - international-center-network
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:3200/ready"]
       interval: 30s
@@ -315,11 +488,9 @@ services:
     ports:
       - "${PYROSCOPE_PORT}:4040"
     volumes:
-      - ${PYROSCOPE_DATA_VOLUME}:/data
-    networks:
-      - international-center-network
+      - pyroscope-data:/data
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:4040/api/apps"]
+      test: ["CMD", "curl", "-f", "http://localhost:4040/"]
       interval: 30s
       timeout: 15s
       retries: 10
@@ -333,38 +504,24 @@ services:
       - .env.development
     command: ["-config.file=/etc/agent/agent.yaml", "-server.http.address=0.0.0.0:12345"]
     ports:
-      - "12345:12345"
+      - "${GRAFANA_AGENT_PORT}:12345"
     volumes:
       - ./observability/grafana-agent.yaml:/etc/agent/agent.yaml:ro
-    networks:
-      - international-center-network
     depends_on:
       - mimir
       - loki
       - tempo
     restart: unless-stopped
 
-networks:
-  international-center-network:
-    name: ${NETWORK_NAME}
-    driver: bridge
+# Using default podman network for better DNS resolution
 
 volumes:
   postgres-data:
-    name: ${POSTGRES_DATA_VOLUME}
   mongodb-data:
-    name: ${MONGO_DATA_VOLUME}
   grafana-data:
-    name: ${GRAFANA_DATA_VOLUME}
   mimir-data:
-    name: ${MIMIR_DATA_VOLUME}
   loki-data:
-    name: ${LOKI_DATA_VOLUME}
   tempo-data:
-    name: ${TEMPO_DATA_VOLUME}
   pyroscope-data:
-    name: ${PYROSCOPE_DATA_VOLUME}
   azurite-data:
-    name: ${AZURITE_DATA_VOLUME}
   vault-data:
-    name: ${VAULT_DATA_VOLUME}

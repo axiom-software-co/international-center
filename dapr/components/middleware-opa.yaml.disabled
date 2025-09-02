@@ -1,0 +1,45 @@
+apiVersion: dapr.io/v1alpha1
+kind: Component
+metadata:
+  name: opa
+spec:
+  type: middleware.http.opa
+  version: v1
+  metadata:
+  - name: defaultStatus
+    value: "403"
+  - name: defaultMessage
+    value: "Forbidden by policy"
+  - name: rego
+    value: |
+      package httpapi.authz
+      
+      import rego.v1
+      
+      default allow := false
+      
+      allow if {
+        input.method == "GET"
+        startswith(input.path, "/health")
+      }
+      
+      allow if {
+        input.method == "GET"
+        startswith(input.path, "/api/v1/")
+        input.headers.authorization
+      }
+      
+      allow if {
+        input.method in ["POST", "PUT", "DELETE"]
+        startswith(input.path, "/admin/api/v1/")
+        input.headers.authorization
+        has_admin_role
+      }
+      
+      has_admin_role if {
+        auth_header := input.headers.authorization
+        startswith(auth_header, "Bearer ")
+        token := substring(auth_header, count("Bearer "), -1)
+        payload := io.jwt.decode(token)[1]
+        "admin" in payload.roles
+      }
