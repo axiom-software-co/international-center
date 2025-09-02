@@ -30,7 +30,7 @@
 
 - test-driven development ( red phase , green phase , refactor phase ) ( tests drive and validate the design of our architecture ) ( creating new methods from refactoring should not require us to write new tests , this violates the contract-first testing principle ) ( you are allowed to modify the project and tests implementations as you see fit , since project and/or tests abstractions and/or implementations sometimes need to be updated ) ( when planning a new TDD cycle , provide a list of all the files you intend to edit and what you intend to do in each phase )
 
-- use podman compose with containerd runtime to provision our local development environment ( resources and services ) ( do not mention docker )
+- use podman compose with containerd runtime to provision our local development environment ( resources and services ) ( do not mention docker ) ( 'podman-compose --env-file .env.development' should be used to manage podman containers in local development ) 
 
 # architecture patterns
 

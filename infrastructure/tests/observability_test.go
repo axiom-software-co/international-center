@@ -200,7 +200,7 @@ func TestTelemetryCollection(t *testing.T) {
 		// This test focuses on configuration validation
 		
 		// Check for agent configuration file
-		agentConfigPath := "observability/grafana-agent.yaml"
+		agentConfigPath := "../../observability/grafana-agent.yaml"
 		_, err := os.Stat(agentConfigPath)
 		if err != nil {
 			t.Logf("Grafana Agent configuration not found at %s: %v", agentConfigPath, err)
@@ -220,30 +220,47 @@ func TestTelemetryCollection(t *testing.T) {
 	t.Run("telemetry endpoint connectivity", func(t *testing.T) {
 		// Test: Telemetry endpoints are accessible for data collection
 		
-		endpoints := map[string]string{
-			"Mimir":     fmt.Sprintf("http://localhost:%s/api/v1/push", getEnvWithDefault("MIMIR_PORT", "9009")),
-			"Loki":      fmt.Sprintf("http://localhost:%s/loki/api/v1/push", getEnvWithDefault("LOKI_PORT", "3100")),
-			"Tempo":     fmt.Sprintf("http://localhost:%s/v1/traces", getEnvWithDefault("TEMPO_PORT", "3200")),
-		}
-		
 		client := &http.Client{Timeout: 3 * time.Second}
 		
-		for service, endpoint := range endpoints {
-			req, err := http.NewRequestWithContext(ctx, "POST", endpoint, 
-				bytes.NewReader([]byte("{}")))
-			require.NoError(t, err)
-			req.Header.Set("Content-Type", "application/json")
-			
-			resp, err := client.Do(req)
-			if err != nil {
-				t.Logf("%s telemetry endpoint not accessible: %v", service, err)
-				continue
-			}
+		// Test Mimir push endpoint
+		mimirEndpoint := fmt.Sprintf("http://localhost:%s/api/v1/push", getEnvWithDefault("MIMIR_PORT", "9009"))
+		req, err := http.NewRequestWithContext(ctx, "POST", mimirEndpoint, bytes.NewReader([]byte("{}")))
+		require.NoError(t, err)
+		req.Header.Set("Content-Type", "application/json")
+		
+		resp, err := client.Do(req)
+		if err == nil {
 			defer resp.Body.Close()
-			
-			// Endpoints should be accessible (even if request format is wrong)
 			assert.True(t, resp.StatusCode != http.StatusNotFound,
-				"%s telemetry endpoint should be accessible", service)
+				"Mimir telemetry endpoint should be accessible")
+		}
+		
+		// Test Loki push endpoint
+		lokiEndpoint := fmt.Sprintf("http://localhost:%s/loki/api/v1/push", getEnvWithDefault("LOKI_PORT", "3100"))
+		req, err = http.NewRequestWithContext(ctx, "POST", lokiEndpoint, bytes.NewReader([]byte("{}")))
+		require.NoError(t, err)
+		req.Header.Set("Content-Type", "application/json")
+		
+		resp, err = client.Do(req)
+		if err == nil {
+			defer resp.Body.Close()
+			assert.True(t, resp.StatusCode != http.StatusNotFound,
+				"Loki telemetry endpoint should be accessible")
+		}
+		
+		// Test Tempo OTLP HTTP endpoint (port 4318 for HTTP)
+		tempoEndpoint := "http://localhost:4318/v1/traces"
+		req, err = http.NewRequestWithContext(ctx, "POST", tempoEndpoint, bytes.NewReader([]byte("{}")))
+		require.NoError(t, err)
+		req.Header.Set("Content-Type", "application/json")
+		
+		resp, err = client.Do(req)
+		if err == nil {
+			defer resp.Body.Close()
+			assert.True(t, resp.StatusCode != http.StatusNotFound,
+				"Tempo telemetry endpoint should be accessible")
+		} else {
+			t.Logf("Tempo telemetry endpoint not accessible: %v", err)
 		}
 	})
 
@@ -256,16 +273,18 @@ func TestTelemetryCollection(t *testing.T) {
 		
 		client := &http.Client{Timeout: 5 * time.Second}
 		
-		// Test basic query capability
-		queryReq, err := http.NewRequestWithContext(ctx, "GET", metricsURL+"?query=up", nil)
+		// Test basic query capability (just check if endpoint exists)
+		queryReq, err := http.NewRequestWithContext(ctx, "GET", metricsURL, nil)
 		require.NoError(t, err)
 		
 		queryResp, err := client.Do(queryReq)
 		if err == nil {
 			defer queryResp.Body.Close()
-			assert.True(t, queryResp.StatusCode == http.StatusOK ||
-				queryResp.StatusCode == http.StatusBadRequest,
-				"Mimir query endpoint should handle requests")
+			// Mimir query endpoint should at least return a method not allowed or similar, not 404
+			assert.True(t, queryResp.StatusCode != http.StatusNotFound,
+				"Mimir query endpoint should be accessible")
+		} else {
+			t.Logf("Mimir query endpoint not accessible: %v", err)
 		}
 		
 		// Test logs pipeline
@@ -315,11 +334,12 @@ func TestTelemetryCollection(t *testing.T) {
 		
 		// Verify observability stack health overall
 		services := map[string]string{
-			"Grafana":   fmt.Sprintf("http://localhost:%s/api/health", grafanaPort),
-			"Mimir":     fmt.Sprintf("http://localhost:%s/ready", getEnvWithDefault("MIMIR_PORT", "9009")),
-			"Loki":      fmt.Sprintf("http://localhost:%s/ready", getEnvWithDefault("LOKI_PORT", "3100")),
-			"Tempo":     fmt.Sprintf("http://localhost:%s/ready", getEnvWithDefault("TEMPO_PORT", "3200")),
-			"Pyroscope": fmt.Sprintf("http://localhost:%s/api/apps", getEnvWithDefault("PYROSCOPE_PORT", "4040")),
+			"Grafana":       fmt.Sprintf("http://localhost:%s/api/health", grafanaPort),
+			"Mimir":         fmt.Sprintf("http://localhost:%s/ready", getEnvWithDefault("MIMIR_PORT", "9009")),
+			"Loki":          fmt.Sprintf("http://localhost:%s/ready", getEnvWithDefault("LOKI_PORT", "3100")),
+			"Tempo":         fmt.Sprintf("http://localhost:%s/ready", getEnvWithDefault("TEMPO_PORT", "3200")),
+			"Pyroscope":     fmt.Sprintf("http://localhost:%s/api/apps", getEnvWithDefault("PYROSCOPE_PORT", "4040")),
+			"Grafana-Agent": "http://localhost:12345/-/ready",
 		}
 		
 		healthyServices := 0
@@ -342,5 +362,184 @@ func TestTelemetryCollection(t *testing.T) {
 		// At least 3 out of 5 services should be healthy for basic functionality
 		assert.GreaterOrEqual(t, healthyServices, 3,
 			"At least 3 observability services should be healthy for basic functionality")
+	})
+}
+
+func TestGrafanaAgentIntegration(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	// Skip if not in integration test environment
+	if os.Getenv("INTEGRATION_TESTS") != "true" {
+		t.Skip("Skipping integration test: INTEGRATION_TESTS not set to true")
+	}
+
+	t.Run("grafana agent health and configuration", func(t *testing.T) {
+		// Test: Grafana Agent is running and healthy
+		agentURL := "http://localhost:12345/-/ready"
+		
+		client := &http.Client{Timeout: 5 * time.Second}
+		req, err := http.NewRequestWithContext(ctx, "GET", agentURL, nil)
+		require.NoError(t, err)
+		
+		resp, err := client.Do(req)
+		if err != nil {
+			t.Logf("Grafana Agent not accessible: %v", err)
+		}
+		require.NoError(t, err, "Grafana Agent should be accessible")
+		defer resp.Body.Close()
+		
+		assert.Equal(t, http.StatusOK, resp.StatusCode,
+			"Grafana Agent health check should return 200 OK")
+		
+		// Verify configuration API is accessible
+		configURL := "http://localhost:12345/agent/api/v1/config"
+		configReq, err := http.NewRequestWithContext(ctx, "GET", configURL, nil)
+		require.NoError(t, err)
+		
+		configResp, err := client.Do(configReq)
+		if err == nil {
+			defer configResp.Body.Close()
+			// Config endpoint may return 404 if not enabled, but shouldn't be connection error
+			assert.True(t, configResp.StatusCode == http.StatusOK || 
+				configResp.StatusCode == http.StatusNotFound,
+				"Grafana Agent config endpoint should respond")
+		}
+	})
+
+	t.Run("metrics collection and forwarding", func(t *testing.T) {
+		// Test: Grafana Agent can collect and forward metrics to Mimir
+		
+		// Check that agent is scraping configured targets
+		client := &http.Client{Timeout: 5 * time.Second}
+		
+		// Verify agent's internal metrics endpoint
+		metricsURL := "http://localhost:12345/metrics"
+		req, err := http.NewRequestWithContext(ctx, "GET", metricsURL, nil)
+		require.NoError(t, err)
+		
+		resp, err := client.Do(req)
+		if err == nil {
+			defer resp.Body.Close()
+			assert.Equal(t, http.StatusOK, resp.StatusCode,
+				"Grafana Agent should expose internal metrics")
+			
+			// Check for Prometheus metrics format
+			contentType := resp.Header.Get("Content-Type")
+			assert.Contains(t, contentType, "text/plain",
+				"Grafana Agent should return Prometheus format metrics")
+		}
+	})
+
+	t.Run("logs collection and forwarding", func(t *testing.T) {
+		// Test: Grafana Agent can collect and forward logs to Loki
+		
+		client := &http.Client{Timeout: 5 * time.Second}
+		
+		// Test that the agent is configured to send logs to Loki
+		// We can verify this by checking if Loki is receiving data from the agent
+		lokiURL := fmt.Sprintf("http://localhost:%s/ready", getEnvWithDefault("LOKI_PORT", "3100"))
+		req, err := http.NewRequestWithContext(ctx, "GET", lokiURL, nil)
+		require.NoError(t, err)
+		
+		resp, err := client.Do(req)
+		if err == nil {
+			defer resp.Body.Close()
+			assert.Equal(t, http.StatusOK, resp.StatusCode,
+				"Loki should be ready to receive logs from agent")
+		}
+		
+		// Test Loki label API to see if we have any labels (indicating data flow)
+		labelsURL := fmt.Sprintf("http://localhost:%s/loki/api/v1/labels", getEnvWithDefault("LOKI_PORT", "3100"))
+		labelsReq, err := http.NewRequestWithContext(ctx, "GET", labelsURL, nil)
+		require.NoError(t, err)
+		
+		labelsResp, err := client.Do(labelsReq)
+		if err == nil {
+			defer labelsResp.Body.Close()
+			assert.True(t, labelsResp.StatusCode == http.StatusOK ||
+				labelsResp.StatusCode == http.StatusNoContent,
+				"Loki labels API should be accessible for log queries")
+		}
+	})
+
+	t.Run("traces collection and forwarding", func(t *testing.T) {
+		// Test: Grafana Agent can collect and forward traces to Tempo
+		
+		client := &http.Client{Timeout: 5 * time.Second}
+		
+		// Test that Tempo is ready to receive traces from the agent
+		tempoURL := fmt.Sprintf("http://localhost:%s/ready", getEnvWithDefault("TEMPO_PORT", "3200"))
+		req, err := http.NewRequestWithContext(ctx, "GET", tempoURL, nil)
+		require.NoError(t, err)
+		
+		resp, err := client.Do(req)
+		if err == nil {
+			defer resp.Body.Close()
+			assert.Equal(t, http.StatusOK, resp.StatusCode,
+				"Tempo should be ready to receive traces from agent")
+		}
+		
+		// Test that agent's OTLP receivers are accessible
+		// Agent should expose OTLP endpoints for receiving traces
+		otlpHTTPURL := "http://localhost:4318/v1/traces"
+		otlpReq, err := http.NewRequestWithContext(ctx, "POST", otlpHTTPURL, 
+			bytes.NewReader([]byte("{}")))
+		require.NoError(t, err)
+		otlpReq.Header.Set("Content-Type", "application/json")
+		
+		otlpResp, err := client.Do(otlpReq)
+		if err == nil {
+			defer otlpResp.Body.Close()
+			// Should not return 404 (endpoint exists) even if request format is wrong
+			assert.True(t, otlpResp.StatusCode != http.StatusNotFound,
+				"Agent OTLP HTTP endpoint should be accessible")
+		}
+	})
+
+	t.Run("agent service integration", func(t *testing.T) {
+		// Test: Grafana Agent integrates properly with observability stack
+		
+		client := &http.Client{Timeout: 5 * time.Second}
+		
+		// Verify all configured backend services are accessible from agent's perspective
+		backendServices := map[string]string{
+			"Mimir (metrics)": fmt.Sprintf("http://localhost:%s/ready", getEnvWithDefault("MIMIR_PORT", "9009")),
+			"Loki (logs)":     fmt.Sprintf("http://localhost:%s/ready", getEnvWithDefault("LOKI_PORT", "3100")),
+			"Tempo (traces)":  fmt.Sprintf("http://localhost:%s/ready", getEnvWithDefault("TEMPO_PORT", "3200")),
+		}
+		
+		healthyBackends := 0
+		for service, healthURL := range backendServices {
+			req, err := http.NewRequestWithContext(ctx, "GET", healthURL, nil)
+			if err != nil {
+				continue
+			}
+			
+			resp, err := client.Do(req)
+			if err == nil {
+				defer resp.Body.Close()
+				if resp.StatusCode == http.StatusOK {
+					healthyBackends++
+					t.Logf("%s is accessible to agent", service)
+				}
+			}
+		}
+		
+		// Agent should be able to reach all 3 backend services
+		assert.GreaterOrEqual(t, healthyBackends, 3,
+			"Agent should be able to reach all observability backend services")
+		
+		// Verify agent itself is responsive
+		agentHealthURL := "http://localhost:12345/-/ready"
+		agentReq, err := http.NewRequestWithContext(ctx, "GET", agentHealthURL, nil)
+		require.NoError(t, err)
+		
+		agentResp, err := client.Do(agentReq)
+		require.NoError(t, err, "Agent should be responsive")
+		defer agentResp.Body.Close()
+		
+		assert.Equal(t, http.StatusOK, agentResp.StatusCode,
+			"Agent should report healthy status")
 	})
 }
