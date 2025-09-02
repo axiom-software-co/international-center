@@ -27,6 +27,32 @@ services:
       start_period: 30s
     restart: unless-stopped
 
+  # Database Migration Service
+  migration:
+    image: migrate/migrate:v4.19.0
+    container_name: migration
+    env_file:
+      - .env.development
+    environment:
+      - POSTGRES_HOST=postgresql
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=development
+      - POSTGRES_DB=international_center
+    command: [
+      "-path", "/migrations",
+      "-database", "postgres://postgres:development@postgresql:5432/international_center?sslmode=disable",
+      "up"
+    ]
+    volumes:
+      - ./infrastructure/migrations/migrations:/migrations:ro
+    networks:
+      - international-center-network
+    depends_on:
+      postgresql:
+        condition: service_healthy
+    restart: "no"
+
   redis:
     image: redis:7-alpine
     container_name: redis

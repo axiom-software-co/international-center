@@ -147,9 +147,13 @@
 
 ## apis and events and public and admin api gateways
 
-- go
+- golang
+- golang-migrate
+
 - sql
+
 - dapr apis
+
 - feature flags
 
 ## dapr stateless services

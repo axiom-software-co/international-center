@@ -42,10 +42,9 @@ CREATE TABLE service_categories (
     -- Soft delete fields  
     is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
     deleted_on TIMESTAMPTZ,
-    deleted_by VARCHAR(255),
-    
-    -- Complex constraint for single default category enforced at application level
+    deleted_by VARCHAR(255)
 );
+-- Note: Complex constraint for single default category enforced at application level
 
 -- Featured categories table
 CREATE TABLE featured_categories (
@@ -60,9 +59,9 @@ CREATE TABLE featured_categories (
     modified_by VARCHAR(255),
     
     UNIQUE(feature_position)
-    -- Note: Complex constraint for preventing default_unassigned categories from being featured
-    -- is enforced at application level due to PostgreSQL subquery limitation in CHECK constraints
 );
+-- Note: Complex constraint for preventing default_unassigned categories from being featured
+-- is enforced at application level due to PostgreSQL subquery limitation in CHECK constraints
 
 -- Add foreign key constraint for services table
 ALTER TABLE services ADD CONSTRAINT fk_services_category_id FOREIGN KEY (category_id) REFERENCES service_categories(category_id);
