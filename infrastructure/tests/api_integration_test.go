@@ -63,7 +63,7 @@ func TestServicesAPIIntegration(t *testing.T) {
 	})
 
 	t.Run("services api public endpoints", func(t *testing.T) {
-		// Test: Public services endpoints are accessible
+		// Test: Public services endpoints are accessible via Dapr sidecar
 		servicesAPIPort := requireEnv(t, "SERVICES_API_PORT")
 		
 		client := &http.Client{Timeout: 15 * time.Second}
@@ -84,6 +84,16 @@ func TestServicesAPIIntegration(t *testing.T) {
 		
 		assert.Contains(t, servicesResponse, "services", "Response should contain services array")
 		assert.Contains(t, servicesResponse, "total", "Response should contain total count")
+		
+		// Validate we have seed data 
+		services, ok := servicesResponse["services"].([]interface{})
+		require.True(t, ok, "Services should be an array")
+		assert.Greater(t, len(services), 0, "Should have at least one published service from seed data")
+		
+		// Validate total count matches services array
+		total, ok := servicesResponse["total"].(float64)
+		require.True(t, ok, "Total should be a number")
+		assert.Equal(t, float64(len(services)), total, "Total should match services array length")
 	})
 }
 

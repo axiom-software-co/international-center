@@ -52,21 +52,22 @@ func (r *PostgreSQLServicesRepository) Create(service *Service) error {
 
 func (r *PostgreSQLServicesRepository) GetByID(serviceID string) (*Service, error) {
 	query := `
-		SELECT service_id, title, description, slug, COALESCE(category_id, ''), 
+		SELECT service_id, title, description, slug, category_id, 
 			   delivery_mode, publishing_status, is_deleted, created_on, 
-			   COALESCE(modified_on, '0001-01-01'::timestamptz), COALESCE(modified_by, '')
+			   modified_on, COALESCE(modified_by, '')
 		FROM services 
 		WHERE service_id = $1 AND is_deleted = false`
 	
 	service := &Service{}
-	var modifiedOn time.Time
+	var categoryID sql.NullString
+	var modifiedOn sql.NullTime
 	
 	err := r.db.QueryRow(query, serviceID).Scan(
 		&service.ServiceID,
 		&service.Title,
 		&service.Description,
 		&service.Slug,
-		&service.CategoryID,
+		&categoryID,
 		&service.DeliveryMode,
 		&service.PublishingStatus,
 		&service.IsDeleted,
@@ -75,8 +76,12 @@ func (r *PostgreSQLServicesRepository) GetByID(serviceID string) (*Service, erro
 		&service.ModifiedBy,
 	)
 	
-	if !modifiedOn.IsZero() && modifiedOn.Year() > 1 {
-		service.ModifiedOn = modifiedOn
+	if categoryID.Valid {
+		service.CategoryID = categoryID.String
+	}
+	
+	if modifiedOn.Valid {
+		service.ModifiedOn = modifiedOn.Time
 	}
 	
 	return service, err
@@ -84,21 +89,22 @@ func (r *PostgreSQLServicesRepository) GetByID(serviceID string) (*Service, erro
 
 func (r *PostgreSQLServicesRepository) GetBySlug(slug string) (*Service, error) {
 	query := `
-		SELECT service_id, title, description, slug, COALESCE(category_id, ''), 
+		SELECT service_id, title, description, slug, category_id, 
 			   delivery_mode, publishing_status, is_deleted, created_on, 
-			   COALESCE(modified_on, '0001-01-01'::timestamptz), COALESCE(modified_by, '')
+			   modified_on, COALESCE(modified_by, '')
 		FROM services 
 		WHERE slug = $1 AND is_deleted = false`
 	
 	service := &Service{}
-	var modifiedOn time.Time
+	var categoryID sql.NullString
+	var modifiedOn sql.NullTime
 	
 	err := r.db.QueryRow(query, slug).Scan(
 		&service.ServiceID,
 		&service.Title,
 		&service.Description,
 		&service.Slug,
-		&service.CategoryID,
+		&categoryID,
 		&service.DeliveryMode,
 		&service.PublishingStatus,
 		&service.IsDeleted,
@@ -107,8 +113,12 @@ func (r *PostgreSQLServicesRepository) GetBySlug(slug string) (*Service, error) 
 		&service.ModifiedBy,
 	)
 	
-	if !modifiedOn.IsZero() && modifiedOn.Year() > 1 {
-		service.ModifiedOn = modifiedOn
+	if categoryID.Valid {
+		service.CategoryID = categoryID.String
+	}
+	
+	if modifiedOn.Valid {
+		service.ModifiedOn = modifiedOn.Time
 	}
 	
 	return service, err
@@ -148,9 +158,9 @@ func (r *PostgreSQLServicesRepository) Delete(serviceID, userID string) error {
 
 func (r *PostgreSQLServicesRepository) List(offset, limit int) ([]*Service, error) {
 	query := `
-		SELECT service_id, title, description, slug, COALESCE(category_id, ''), 
+		SELECT service_id, title, description, slug, category_id, 
 			   delivery_mode, publishing_status, is_deleted, created_on, 
-			   COALESCE(modified_on, '0001-01-01'::timestamptz), COALESCE(modified_by, '')
+			   modified_on, COALESCE(modified_by, '')
 		FROM services 
 		WHERE is_deleted = false
 		ORDER BY created_on DESC
@@ -161,9 +171,9 @@ func (r *PostgreSQLServicesRepository) List(offset, limit int) ([]*Service, erro
 
 func (r *PostgreSQLServicesRepository) ListByCategory(categoryID string, offset, limit int) ([]*Service, error) {
 	query := `
-		SELECT service_id, title, description, slug, COALESCE(category_id, ''), 
+		SELECT service_id, title, description, slug, category_id, 
 			   delivery_mode, publishing_status, is_deleted, created_on, 
-			   COALESCE(modified_on, '0001-01-01'::timestamptz), COALESCE(modified_by, '')
+			   modified_on, COALESCE(modified_by, '')
 		FROM services 
 		WHERE category_id = $1 AND is_deleted = false
 		ORDER BY order_number ASC, created_on DESC
@@ -174,9 +184,9 @@ func (r *PostgreSQLServicesRepository) ListByCategory(categoryID string, offset,
 
 func (r *PostgreSQLServicesRepository) ListPublished(offset, limit int) ([]*Service, error) {
 	query := `
-		SELECT service_id, title, description, slug, COALESCE(category_id, ''), 
+		SELECT service_id, title, description, slug, category_id, 
 			   delivery_mode, publishing_status, is_deleted, created_on, 
-			   COALESCE(modified_on, '0001-01-01'::timestamptz), COALESCE(modified_by, '')
+			   modified_on, COALESCE(modified_by, '')
 		FROM services 
 		WHERE publishing_status = 'published' AND is_deleted = false
 		ORDER BY order_number ASC, created_on DESC
@@ -195,14 +205,15 @@ func (r *PostgreSQLServicesRepository) scanServices(query string, args ...interf
 	var services []*Service
 	for rows.Next() {
 		service := &Service{}
-		var modifiedOn time.Time
+		var categoryID sql.NullString
+		var modifiedOn sql.NullTime
 		
 		err := rows.Scan(
 			&service.ServiceID,
 			&service.Title,
 			&service.Description,
 			&service.Slug,
-			&service.CategoryID,
+			&categoryID,
 			&service.DeliveryMode,
 			&service.PublishingStatus,
 			&service.IsDeleted,
@@ -214,8 +225,12 @@ func (r *PostgreSQLServicesRepository) scanServices(query string, args ...interf
 			return nil, err
 		}
 		
-		if !modifiedOn.IsZero() && modifiedOn.Year() > 1 {
-			service.ModifiedOn = modifiedOn
+		if categoryID.Valid {
+			service.CategoryID = categoryID.String
+		}
+		
+		if modifiedOn.Valid {
+			service.ModifiedOn = modifiedOn.Time
 		}
 		
 		services = append(services, service)
