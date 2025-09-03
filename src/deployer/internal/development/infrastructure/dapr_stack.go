@@ -85,10 +85,19 @@ func (ds *DaprStack) createRedisNetwork() (*docker.Network, error) {
 		Options: pulumi.StringMap{
 			"com.docker.network.driver.mtu": pulumi.String("1500"),
 		},
-		Labels: pulumi.StringMap{
-			"environment": pulumi.String(ds.environment),
-			"component":   pulumi.String("redis"),
-			"managed-by":  pulumi.String("pulumi"),
+		Labels: docker.NetworkLabelArray{
+			&docker.NetworkLabelArgs{
+				Label: pulumi.String("environment"),
+				Value: pulumi.String(ds.environment),
+			},
+			&docker.NetworkLabelArgs{
+				Label: pulumi.String("component"),
+				Value: pulumi.String("redis"),
+			},
+			&docker.NetworkLabelArgs{
+				Label: pulumi.String("managed-by"),
+				Value: pulumi.String("pulumi"),
+			},
 		},
 	})
 	if err != nil {
@@ -102,10 +111,19 @@ func (ds *DaprStack) createRedisDataVolume() (*docker.Volume, error) {
 	volume, err := docker.NewVolume(ds.ctx, "redis-data", &docker.VolumeArgs{
 		Name: pulumi.Sprintf("%s-redis-data", ds.environment),
 		Driver: pulumi.String("local"),
-		Labels: pulumi.StringMap{
-			"environment": pulumi.String(ds.environment),
-			"component":   pulumi.String("redis"),
-			"data-type":   pulumi.String("persistent"),
+		Labels: docker.VolumeLabelArray{
+			&docker.VolumeLabelArgs{
+				Label: pulumi.String("environment"),
+				Value: pulumi.String(ds.environment),
+			},
+			&docker.VolumeLabelArgs{
+				Label: pulumi.String("component"),
+				Value: pulumi.String("redis"),
+			},
+			&docker.VolumeLabelArgs{
+				Label: pulumi.String("data-type"),
+				Value: pulumi.String("persistent"),
+			},
 		},
 	})
 	if err != nil {
@@ -119,10 +137,19 @@ func (ds *DaprStack) createDaprComponentsVolume() (*docker.Volume, error) {
 	volume, err := docker.NewVolume(ds.ctx, "dapr-components", &docker.VolumeArgs{
 		Name: pulumi.Sprintf("%s-dapr-components", ds.environment),
 		Driver: pulumi.String("local"),
-		Labels: pulumi.StringMap{
-			"environment": pulumi.String(ds.environment),
-			"component":   pulumi.String("dapr"),
-			"data-type":   pulumi.String("configuration"),
+		Labels: docker.VolumeLabelArray{
+			&docker.VolumeLabelArgs{
+				Label: pulumi.String("environment"),
+				Value: pulumi.String(ds.environment),
+			},
+			&docker.VolumeLabelArgs{
+				Label: pulumi.String("component"),
+				Value: pulumi.String("dapr"),
+			},
+			&docker.VolumeLabelArgs{
+				Label: pulumi.String("data-type"),
+				Value: pulumi.String("configuration"),
+			},
 		},
 	})
 	if err != nil {
@@ -194,12 +221,27 @@ func (ds *DaprStack) deployRedisContainer(deployment *DaprDeployment) (*docker.C
 			Retries:  pulumi.Int(3),
 		},
 		
-		Labels: pulumi.StringMap{
-			"environment":     pulumi.String(ds.environment),
-			"component":       pulumi.String("redis"),
-			"service":         pulumi.String("pubsub"),
-			"dapr-component":  pulumi.String("pubsub"),
-			"managed-by":      pulumi.String("pulumi"),
+		Labels: docker.ContainerLabelArray{
+			&docker.ContainerLabelArgs{
+				Label: pulumi.String("environment"),
+				Value: pulumi.String(ds.environment),
+			},
+			&docker.ContainerLabelArgs{
+				Label: pulumi.String("component"),
+				Value: pulumi.String("redis"),
+			},
+			&docker.ContainerLabelArgs{
+				Label: pulumi.String("service"),
+				Value: pulumi.String("pubsub"),
+			},
+			&docker.ContainerLabelArgs{
+				Label: pulumi.String("dapr-component"),
+				Value: pulumi.String("pubsub"),
+			},
+			&docker.ContainerLabelArgs{
+				Label: pulumi.String("managed-by"),
+				Value: pulumi.String("pulumi"),
+			},
 		},
 		
 		LogDriver: pulumi.String("json-file"),
@@ -261,11 +303,23 @@ func (ds *DaprStack) deployDaprPlacementContainer(deployment *DaprDeployment) (*
 			Retries:  pulumi.Int(3),
 		},
 		
-		Labels: pulumi.StringMap{
-			"environment":    pulumi.String(ds.environment),
-			"component":      pulumi.String("dapr"),
-			"service":        pulumi.String("placement"),
-			"managed-by":     pulumi.String("pulumi"),
+		Labels: docker.ContainerLabelArray{
+			&docker.ContainerLabelArgs{
+				Label: pulumi.String("environment"),
+				Value: pulumi.String(ds.environment),
+			},
+			&docker.ContainerLabelArgs{
+				Label: pulumi.String("component"),
+				Value: pulumi.String("dapr"),
+			},
+			&docker.ContainerLabelArgs{
+				Label: pulumi.String("service"),
+				Value: pulumi.String("placement"),
+			},
+			&docker.ContainerLabelArgs{
+				Label: pulumi.String("managed-by"),
+				Value: pulumi.String("pulumi"),
+			},
 		},
 	})
 	if err != nil {
@@ -311,11 +365,23 @@ func (ds *DaprStack) deployDaprSentryContainer(deployment *DaprDeployment) (*doc
 			},
 		},
 		
-		Labels: pulumi.StringMap{
-			"environment": pulumi.String(ds.environment),
-			"component":   pulumi.String("dapr"),
-			"service":     pulumi.String("sentry"),
-			"managed-by":  pulumi.String("pulumi"),
+		Labels: docker.ContainerLabelArray{
+			&docker.ContainerLabelArgs{
+				Label: pulumi.String("environment"),
+				Value: pulumi.String(ds.environment),
+			},
+			&docker.ContainerLabelArgs{
+				Label: pulumi.String("component"),
+				Value: pulumi.String("dapr"),
+			},
+			&docker.ContainerLabelArgs{
+				Label: pulumi.String("service"),
+				Value: pulumi.String("sentry"),
+			},
+			&docker.ContainerLabelArgs{
+				Label: pulumi.String("managed-by"),
+				Value: pulumi.String("pulumi"),
+			},
 		},
 	})
 	if err != nil {
@@ -364,11 +430,23 @@ func (ds *DaprStack) deployDaprOperatorContainer(deployment *DaprDeployment) (*d
 			},
 		},
 		
-		Labels: pulumi.StringMap{
-			"environment": pulumi.String(ds.environment),
-			"component":   pulumi.String("dapr"),
-			"service":     pulumi.String("operator"),
-			"managed-by":  pulumi.String("pulumi"),
+		Labels: docker.ContainerLabelArray{
+			&docker.ContainerLabelArgs{
+				Label: pulumi.String("environment"),
+				Value: pulumi.String(ds.environment),
+			},
+			&docker.ContainerLabelArgs{
+				Label: pulumi.String("component"),
+				Value: pulumi.String("dapr"),
+			},
+			&docker.ContainerLabelArgs{
+				Label: pulumi.String("service"),
+				Value: pulumi.String("operator"),
+			},
+			&docker.ContainerLabelArgs{
+				Label: pulumi.String("managed-by"),
+				Value: pulumi.String("pulumi"),
+			},
 		},
 	})
 	if err != nil {

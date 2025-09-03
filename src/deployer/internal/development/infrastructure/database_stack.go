@@ -67,10 +67,19 @@ func (ds *DatabaseStack) createDatabaseNetwork() (*docker.Network, error) {
 		Options: pulumi.StringMap{
 			"com.docker.network.driver.mtu": pulumi.String("1500"),
 		},
-		Labels: pulumi.StringMap{
-			"environment": pulumi.String(ds.environment),
-			"component":   pulumi.String("database"),
-			"managed-by":  pulumi.String("pulumi"),
+		Labels: docker.NetworkLabelArray{
+			&docker.NetworkLabelArgs{
+				Label: pulumi.String("environment"),
+				Value: pulumi.String(ds.environment),
+			},
+			&docker.NetworkLabelArgs{
+				Label: pulumi.String("component"),
+				Value: pulumi.String("database"),
+			},
+			&docker.NetworkLabelArgs{
+				Label: pulumi.String("managed-by"),
+				Value: pulumi.String("pulumi"),
+			},
 		},
 	})
 	if err != nil {
@@ -84,10 +93,19 @@ func (ds *DatabaseStack) createPostgreSQLDataVolume() (*docker.Volume, error) {
 	volume, err := docker.NewVolume(ds.ctx, "postgresql-data", &docker.VolumeArgs{
 		Name:   pulumi.Sprintf("%s-postgresql-data", ds.environment),
 		Driver: pulumi.String("local"),
-		Labels: pulumi.StringMap{
-			"environment": pulumi.String(ds.environment),
-			"component":   pulumi.String("postgresql"),
-			"data-type":   pulumi.String("persistent"),
+		Labels: docker.VolumeLabelArray{
+			&docker.VolumeLabelArgs{
+				Label: pulumi.String("environment"),
+				Value: pulumi.String(ds.environment),
+			},
+			&docker.VolumeLabelArgs{
+				Label: pulumi.String("component"),
+				Value: pulumi.String("postgresql"),
+			},
+			&docker.VolumeLabelArgs{
+				Label: pulumi.String("data-type"),
+				Value: pulumi.String("persistent"),
+			},
 		},
 	})
 	if err != nil {
@@ -101,10 +119,19 @@ func (ds *DatabaseStack) createPostgreSQLInitVolume() (*docker.Volume, error) {
 	volume, err := docker.NewVolume(ds.ctx, "postgresql-init", &docker.VolumeArgs{
 		Name:   pulumi.Sprintf("%s-postgresql-init", ds.environment),
 		Driver: pulumi.String("local"),
-		Labels: pulumi.StringMap{
-			"environment": pulumi.String(ds.environment),
-			"component":   pulumi.String("postgresql"),
-			"data-type":   pulumi.String("initialization"),
+		Labels: docker.VolumeLabelArray{
+			&docker.VolumeLabelArgs{
+				Label: pulumi.String("environment"),
+				Value: pulumi.String(ds.environment),
+			},
+			&docker.VolumeLabelArgs{
+				Label: pulumi.String("component"),
+				Value: pulumi.String("postgresql"),
+			},
+			&docker.VolumeLabelArgs{
+				Label: pulumi.String("data-type"),
+				Value: pulumi.String("initialization"),
+			},
 		},
 	})
 	if err != nil {
@@ -180,11 +207,23 @@ func (ds *DatabaseStack) deployPostgreSQLContainer(deployment *DatabaseDeploymen
 			StartPeriod: pulumi.String("60s"),
 		},
 		
-		Labels: pulumi.StringMap{
-			"environment": pulumi.String(ds.environment),
-			"component":   pulumi.String("postgresql"),
-			"service":     pulumi.String("database"),
-			"managed-by":  pulumi.String("pulumi"),
+		Labels: docker.ContainerLabelArray{
+			&docker.ContainerLabelArgs{
+				Label: pulumi.String("environment"),
+				Value: pulumi.String(ds.environment),
+			},
+			&docker.ContainerLabelArgs{
+				Label: pulumi.String("component"),
+				Value: pulumi.String("postgresql"),
+			},
+			&docker.ContainerLabelArgs{
+				Label: pulumi.String("service"),
+				Value: pulumi.String("database"),
+			},
+			&docker.ContainerLabelArgs{
+				Label: pulumi.String("managed-by"),
+				Value: pulumi.String("pulumi"),
+			},
 		},
 		
 		LogDriver: pulumi.String("json-file"),

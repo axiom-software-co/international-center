@@ -67,10 +67,19 @@ func (ss *StorageStack) createStorageNetwork() (*docker.Network, error) {
 		Options: pulumi.StringMap{
 			"com.docker.network.driver.mtu": pulumi.String("1500"),
 		},
-		Labels: pulumi.StringMap{
-			"environment": pulumi.String(ss.environment),
-			"component":   pulumi.String("storage"),
-			"managed-by":  pulumi.String("pulumi"),
+		Labels: docker.NetworkLabelArray{
+			&docker.NetworkLabelArgs{
+				Label: pulumi.String("environment"),
+				Value: pulumi.String(ss.environment),
+			},
+			&docker.NetworkLabelArgs{
+				Label: pulumi.String("component"),
+				Value: pulumi.String("storage"),
+			},
+			&docker.NetworkLabelArgs{
+				Label: pulumi.String("managed-by"),
+				Value: pulumi.String("pulumi"),
+			},
 		},
 	})
 	if err != nil {
@@ -84,10 +93,19 @@ func (ss *StorageStack) createAzuriteDataVolume() (*docker.Volume, error) {
 	volume, err := docker.NewVolume(ss.ctx, "azurite-data", &docker.VolumeArgs{
 		Name:   pulumi.Sprintf("%s-azurite-data", ss.environment),
 		Driver: pulumi.String("local"),
-		Labels: pulumi.StringMap{
-			"environment": pulumi.String(ss.environment),
-			"component":   pulumi.String("azurite"),
-			"data-type":   pulumi.String("persistent"),
+		Labels: docker.VolumeLabelArray{
+			&docker.VolumeLabelArgs{
+				Label: pulumi.String("environment"),
+				Value: pulumi.String(ss.environment),
+			},
+			&docker.VolumeLabelArgs{
+				Label: pulumi.String("component"),
+				Value: pulumi.String("azurite"),
+			},
+			&docker.VolumeLabelArgs{
+				Label: pulumi.String("data-type"),
+				Value: pulumi.String("persistent"),
+			},
 		},
 	})
 	if err != nil {
@@ -101,10 +119,19 @@ func (ss *StorageStack) createAzuriteConfigVolume() (*docker.Volume, error) {
 	volume, err := docker.NewVolume(ss.ctx, "azurite-config", &docker.VolumeArgs{
 		Name:   pulumi.Sprintf("%s-azurite-config", ss.environment),
 		Driver: pulumi.String("local"),
-		Labels: pulumi.StringMap{
-			"environment": pulumi.String(ss.environment),
-			"component":   pulumi.String("azurite"),
-			"data-type":   pulumi.String("configuration"),
+		Labels: docker.VolumeLabelArray{
+			&docker.VolumeLabelArgs{
+				Label: pulumi.String("environment"),
+				Value: pulumi.String(ss.environment),
+			},
+			&docker.VolumeLabelArgs{
+				Label: pulumi.String("component"),
+				Value: pulumi.String("azurite"),
+			},
+			&docker.VolumeLabelArgs{
+				Label: pulumi.String("data-type"),
+				Value: pulumi.String("configuration"),
+			},
 		},
 	})
 	if err != nil {
@@ -191,11 +218,23 @@ func (ss *StorageStack) deployAzuriteContainer(deployment *StorageDeployment) (*
 			StartPeriod: pulumi.String("30s"),
 		},
 
-		Labels: pulumi.StringMap{
-			"environment": pulumi.String(ss.environment),
-			"component":   pulumi.String("azurite"),
-			"service":     pulumi.String("storage"),
-			"managed-by":  pulumi.String("pulumi"),
+		Labels: docker.ContainerLabelArray{
+			&docker.ContainerLabelArgs{
+				Label: pulumi.String("environment"),
+				Value: pulumi.String(ss.environment),
+			},
+			&docker.ContainerLabelArgs{
+				Label: pulumi.String("component"),
+				Value: pulumi.String("azurite"),
+			},
+			&docker.ContainerLabelArgs{
+				Label: pulumi.String("service"),
+				Value: pulumi.String("storage"),
+			},
+			&docker.ContainerLabelArgs{
+				Label: pulumi.String("managed-by"),
+				Value: pulumi.String("pulumi"),
+			},
 		},
 
 		LogDriver: pulumi.String("json-file"),

@@ -73,10 +73,19 @@ func (vs *VaultStack) createVaultNetwork() (*docker.Network, error) {
 		Options: pulumi.StringMap{
 			"com.docker.network.driver.mtu": pulumi.String("1500"),
 		},
-		Labels: pulumi.StringMap{
-			"environment": pulumi.String(vs.environment),
-			"component":   pulumi.String("vault"),
-			"managed-by":  pulumi.String("pulumi"),
+		Labels: docker.NetworkLabelArray{
+			&docker.NetworkLabelArgs{
+				Label: pulumi.String("environment"),
+				Value: pulumi.String(vs.environment),
+			},
+			&docker.NetworkLabelArgs{
+				Label: pulumi.String("component"),
+				Value: pulumi.String("vault"),
+			},
+			&docker.NetworkLabelArgs{
+				Label: pulumi.String("managed-by"),
+				Value: pulumi.String("pulumi"),
+			},
 		},
 	})
 	if err != nil {
@@ -90,10 +99,19 @@ func (vs *VaultStack) createVaultDataVolume() (*docker.Volume, error) {
 	volume, err := docker.NewVolume(vs.ctx, "vault-data", &docker.VolumeArgs{
 		Name:   pulumi.Sprintf("%s-vault-data", vs.environment),
 		Driver: pulumi.String("local"),
-		Labels: pulumi.StringMap{
-			"environment": pulumi.String(vs.environment),
-			"component":   pulumi.String("vault"),
-			"data-type":   pulumi.String("persistent"),
+		Labels: docker.VolumeLabelArray{
+			&docker.VolumeLabelArgs{
+				Label: pulumi.String("environment"),
+				Value: pulumi.String(vs.environment),
+			},
+			&docker.VolumeLabelArgs{
+				Label: pulumi.String("component"),
+				Value: pulumi.String("vault"),
+			},
+			&docker.VolumeLabelArgs{
+				Label: pulumi.String("data-type"),
+				Value: pulumi.String("persistent"),
+			},
 		},
 	})
 	if err != nil {
@@ -107,10 +125,19 @@ func (vs *VaultStack) createVaultConfigVolume() (*docker.Volume, error) {
 	volume, err := docker.NewVolume(vs.ctx, "vault-config", &docker.VolumeArgs{
 		Name:   pulumi.Sprintf("%s-vault-config", vs.environment),
 		Driver: pulumi.String("local"),
-		Labels: pulumi.StringMap{
-			"environment": pulumi.String(vs.environment),
-			"component":   pulumi.String("vault"),
-			"data-type":   pulumi.String("configuration"),
+		Labels: docker.VolumeLabelArray{
+			&docker.VolumeLabelArgs{
+				Label: pulumi.String("environment"),
+				Value: pulumi.String(vs.environment),
+			},
+			&docker.VolumeLabelArgs{
+				Label: pulumi.String("component"),
+				Value: pulumi.String("vault"),
+			},
+			&docker.VolumeLabelArgs{
+				Label: pulumi.String("data-type"),
+				Value: pulumi.String("configuration"),
+			},
 		},
 	})
 	if err != nil {
@@ -124,10 +151,19 @@ func (vs *VaultStack) createVaultPoliciesVolume() (*docker.Volume, error) {
 	volume, err := docker.NewVolume(vs.ctx, "vault-policies", &docker.VolumeArgs{
 		Name:   pulumi.Sprintf("%s-vault-policies", vs.environment),
 		Driver: pulumi.String("local"),
-		Labels: pulumi.StringMap{
-			"environment": pulumi.String(vs.environment),
-			"component":   pulumi.String("vault"),
-			"data-type":   pulumi.String("policies"),
+		Labels: docker.VolumeLabelArray{
+			&docker.VolumeLabelArgs{
+				Label: pulumi.String("environment"),
+				Value: pulumi.String(vs.environment),
+			},
+			&docker.VolumeLabelArgs{
+				Label: pulumi.String("component"),
+				Value: pulumi.String("vault"),
+			},
+			&docker.VolumeLabelArgs{
+				Label: pulumi.String("data-type"),
+				Value: pulumi.String("policies"),
+			},
 		},
 	})
 	if err != nil {
@@ -215,11 +251,23 @@ func (vs *VaultStack) deployVaultContainer(deployment *VaultDeployment) (*docker
 			StartPeriod: pulumi.String("30s"),
 		},
 
-		Labels: pulumi.StringMap{
-			"environment": pulumi.String(vs.environment),
-			"component":   pulumi.String("vault"),
-			"service":     pulumi.String("secrets"),
-			"managed-by":  pulumi.String("pulumi"),
+		Labels: docker.ContainerLabelArray{
+			&docker.ContainerLabelArgs{
+				Label: pulumi.String("environment"),
+				Value: pulumi.String(vs.environment),
+			},
+			&docker.ContainerLabelArgs{
+				Label: pulumi.String("component"),
+				Value: pulumi.String("vault"),
+			},
+			&docker.ContainerLabelArgs{
+				Label: pulumi.String("service"),
+				Value: pulumi.String("secrets"),
+			},
+			&docker.ContainerLabelArgs{
+				Label: pulumi.String("managed-by"),
+				Value: pulumi.String("pulumi"),
+			},
 		},
 
 		LogDriver: pulumi.String("json-file"),
@@ -229,7 +277,7 @@ func (vs *VaultStack) deployVaultContainer(deployment *VaultDeployment) (*docker
 		},
 
 		Capabilities: &docker.ContainerCapabilitiesArgs{
-			Add: pulumi.StringArray{
+			Adds: pulumi.StringArray{
 				pulumi.String("IPC_LOCK"),
 			},
 		},

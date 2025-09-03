@@ -105,10 +105,19 @@ func (os *ObservabilityStack) createObservabilityNetwork() (*docker.Network, err
 		Options: pulumi.StringMap{
 			"com.docker.network.driver.mtu": pulumi.String("1500"),
 		},
-		Labels: pulumi.StringMap{
-			"environment": pulumi.String(os.environment),
-			"component":   pulumi.String("observability"),
-			"managed-by":  pulumi.String("pulumi"),
+		Labels: docker.NetworkLabelArray{
+			&docker.NetworkLabelArgs{
+				Label: pulumi.String("environment"),
+				Value: pulumi.String(os.environment),
+			},
+			&docker.NetworkLabelArgs{
+				Label: pulumi.String("component"),
+				Value: pulumi.String("observability"),
+			},
+			&docker.NetworkLabelArgs{
+				Label: pulumi.String("managed-by"),
+				Value: pulumi.String("pulumi"),
+			},
 		},
 	})
 	if err != nil {
@@ -122,10 +131,19 @@ func (os *ObservabilityStack) createGrafanaDataVolume() (*docker.Volume, error) 
 	volume, err := docker.NewVolume(os.ctx, "grafana-data", &docker.VolumeArgs{
 		Name:   pulumi.Sprintf("%s-grafana-data", os.environment),
 		Driver: pulumi.String("local"),
-		Labels: pulumi.StringMap{
-			"environment": pulumi.String(os.environment),
-			"component":   pulumi.String("grafana"),
-			"data-type":   pulumi.String("persistent"),
+		Labels: docker.VolumeLabelArray{
+			&docker.VolumeLabelArgs{
+				Label: pulumi.String("environment"),
+				Value: pulumi.String(os.environment),
+			},
+			&docker.VolumeLabelArgs{
+				Label: pulumi.String("component"),
+				Value: pulumi.String("grafana"),
+			},
+			&docker.VolumeLabelArgs{
+				Label: pulumi.String("data-type"),
+				Value: pulumi.String("persistent"),
+			},
 		},
 	})
 	if err != nil {
@@ -139,10 +157,19 @@ func (os *ObservabilityStack) createGrafanaConfigVolume() (*docker.Volume, error
 	volume, err := docker.NewVolume(os.ctx, "grafana-config", &docker.VolumeArgs{
 		Name:   pulumi.Sprintf("%s-grafana-config", os.environment),
 		Driver: pulumi.String("local"),
-		Labels: pulumi.StringMap{
-			"environment": pulumi.String(os.environment),
-			"component":   pulumi.String("grafana"),
-			"data-type":   pulumi.String("configuration"),
+		Labels: docker.VolumeLabelArray{
+			&docker.VolumeLabelArgs{
+				Label: pulumi.String("environment"),
+				Value: pulumi.String(os.environment),
+			},
+			&docker.VolumeLabelArgs{
+				Label: pulumi.String("component"),
+				Value: pulumi.String("grafana"),
+			},
+			&docker.VolumeLabelArgs{
+				Label: pulumi.String("data-type"),
+				Value: pulumi.String("configuration"),
+			},
 		},
 	})
 	if err != nil {
@@ -156,10 +183,19 @@ func (os *ObservabilityStack) createLokiDataVolume() (*docker.Volume, error) {
 	volume, err := docker.NewVolume(os.ctx, "loki-data", &docker.VolumeArgs{
 		Name:   pulumi.Sprintf("%s-loki-data", os.environment),
 		Driver: pulumi.String("local"),
-		Labels: pulumi.StringMap{
-			"environment": pulumi.String(os.environment),
-			"component":   pulumi.String("loki"),
-			"data-type":   pulumi.String("persistent"),
+		Labels: docker.VolumeLabelArray{
+			&docker.VolumeLabelArgs{
+				Label: pulumi.String("environment"),
+				Value: pulumi.String(os.environment),
+			},
+			&docker.VolumeLabelArgs{
+				Label: pulumi.String("component"),
+				Value: pulumi.String("loki"),
+			},
+			&docker.VolumeLabelArgs{
+				Label: pulumi.String("data-type"),
+				Value: pulumi.String("persistent"),
+			},
 		},
 	})
 	if err != nil {
@@ -173,10 +209,19 @@ func (os *ObservabilityStack) createLokiConfigVolume() (*docker.Volume, error) {
 	volume, err := docker.NewVolume(os.ctx, "loki-config", &docker.VolumeArgs{
 		Name:   pulumi.Sprintf("%s-loki-config", os.environment),
 		Driver: pulumi.String("local"),
-		Labels: pulumi.StringMap{
-			"environment": pulumi.String(os.environment),
-			"component":   pulumi.String("loki"),
-			"data-type":   pulumi.String("configuration"),
+		Labels: docker.VolumeLabelArray{
+			&docker.VolumeLabelArgs{
+				Label: pulumi.String("environment"),
+				Value: pulumi.String(os.environment),
+			},
+			&docker.VolumeLabelArgs{
+				Label: pulumi.String("component"),
+				Value: pulumi.String("loki"),
+			},
+			&docker.VolumeLabelArgs{
+				Label: pulumi.String("data-type"),
+				Value: pulumi.String("configuration"),
+			},
 		},
 	})
 	if err != nil {
@@ -190,10 +235,19 @@ func (os *ObservabilityStack) createPrometheusDataVolume() (*docker.Volume, erro
 	volume, err := docker.NewVolume(os.ctx, "prometheus-data", &docker.VolumeArgs{
 		Name:   pulumi.Sprintf("%s-prometheus-data", os.environment),
 		Driver: pulumi.String("local"),
-		Labels: pulumi.StringMap{
-			"environment": pulumi.String(os.environment),
-			"component":   pulumi.String("prometheus"),
-			"data-type":   pulumi.String("persistent"),
+		Labels: docker.VolumeLabelArray{
+			&docker.VolumeLabelArgs{
+				Label: pulumi.String("environment"),
+				Value: pulumi.String(os.environment),
+			},
+			&docker.VolumeLabelArgs{
+				Label: pulumi.String("component"),
+				Value: pulumi.String("prometheus"),
+			},
+			&docker.VolumeLabelArgs{
+				Label: pulumi.String("data-type"),
+				Value: pulumi.String("persistent"),
+			},
 		},
 	})
 	if err != nil {
@@ -207,10 +261,19 @@ func (os *ObservabilityStack) createPrometheusConfigVolume() (*docker.Volume, er
 	volume, err := docker.NewVolume(os.ctx, "prometheus-config", &docker.VolumeArgs{
 		Name:   pulumi.Sprintf("%s-prometheus-config", os.environment),
 		Driver: pulumi.String("local"),
-		Labels: pulumi.StringMap{
-			"environment": pulumi.String(os.environment),
-			"component":   pulumi.String("prometheus"),
-			"data-type":   pulumi.String("configuration"),
+		Labels: docker.VolumeLabelArray{
+			&docker.VolumeLabelArgs{
+				Label: pulumi.String("environment"),
+				Value: pulumi.String(os.environment),
+			},
+			&docker.VolumeLabelArgs{
+				Label: pulumi.String("component"),
+				Value: pulumi.String("prometheus"),
+			},
+			&docker.VolumeLabelArgs{
+				Label: pulumi.String("data-type"),
+				Value: pulumi.String("configuration"),
+			},
 		},
 	})
 	if err != nil {
@@ -277,11 +340,23 @@ func (os *ObservabilityStack) deployLokiContainer(deployment *ObservabilityDeplo
 			StartPeriod: pulumi.String("60s"),
 		},
 
-		Labels: pulumi.StringMap{
-			"environment": pulumi.String(os.environment),
-			"component":   pulumi.String("loki"),
-			"service":     pulumi.String("logging"),
-			"managed-by":  pulumi.String("pulumi"),
+		Labels: docker.ContainerLabelArray{
+			&docker.ContainerLabelArgs{
+				Label: pulumi.String("environment"),
+				Value: pulumi.String(os.environment),
+			},
+			&docker.ContainerLabelArgs{
+				Label: pulumi.String("component"),
+				Value: pulumi.String("loki"),
+			},
+			&docker.ContainerLabelArgs{
+				Label: pulumi.String("service"),
+				Value: pulumi.String("logging"),
+			},
+			&docker.ContainerLabelArgs{
+				Label: pulumi.String("managed-by"),
+				Value: pulumi.String("pulumi"),
+			},
 		},
 
 		LogDriver: pulumi.String("json-file"),
@@ -356,11 +431,23 @@ func (os *ObservabilityStack) deployPrometheusContainer(deployment *Observabilit
 			Retries:  pulumi.Int(3),
 		},
 
-		Labels: pulumi.StringMap{
-			"environment": pulumi.String(os.environment),
-			"component":   pulumi.String("prometheus"),
-			"service":     pulumi.String("metrics"),
-			"managed-by":  pulumi.String("pulumi"),
+		Labels: docker.ContainerLabelArray{
+			&docker.ContainerLabelArgs{
+				Label: pulumi.String("environment"),
+				Value: pulumi.String(os.environment),
+			},
+			&docker.ContainerLabelArgs{
+				Label: pulumi.String("component"),
+				Value: pulumi.String("prometheus"),
+			},
+			&docker.ContainerLabelArgs{
+				Label: pulumi.String("service"),
+				Value: pulumi.String("metrics"),
+			},
+			&docker.ContainerLabelArgs{
+				Label: pulumi.String("managed-by"),
+				Value: pulumi.String("pulumi"),
+			},
 		},
 
 		LogDriver: pulumi.String("json-file"),
@@ -448,11 +535,23 @@ func (os *ObservabilityStack) deployGrafanaContainer(deployment *ObservabilityDe
 			StartPeriod: pulumi.String("60s"),
 		},
 
-		Labels: pulumi.StringMap{
-			"environment": pulumi.String(os.environment),
-			"component":   pulumi.String("grafana"),
-			"service":     pulumi.String("dashboard"),
-			"managed-by":  pulumi.String("pulumi"),
+		Labels: docker.ContainerLabelArray{
+			&docker.ContainerLabelArgs{
+				Label: pulumi.String("environment"),
+				Value: pulumi.String(os.environment),
+			},
+			&docker.ContainerLabelArgs{
+				Label: pulumi.String("component"),
+				Value: pulumi.String("grafana"),
+			},
+			&docker.ContainerLabelArgs{
+				Label: pulumi.String("service"),
+				Value: pulumi.String("dashboard"),
+			},
+			&docker.ContainerLabelArgs{
+				Label: pulumi.String("managed-by"),
+				Value: pulumi.String("pulumi"),
+			},
 		},
 
 		LogDriver: pulumi.String("json-file"),
