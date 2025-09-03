@@ -28,7 +28,7 @@ func main() {
 	log.Println("Dapr client connection established")
 	
 	// Initialize layers
-	repository := services.NewDaprStateStoreRepository(daprClient, stateStoreName)
+	repository := services.NewServicesRepository(daprClient, stateStoreName)
 	service := services.NewServicesService(repository)
 	handler := services.NewServicesHandler(service)
 	

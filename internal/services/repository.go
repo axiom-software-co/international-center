@@ -2,7 +2,6 @@ package services
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"time"
@@ -22,249 +21,20 @@ type ServicesRepository interface {
 	ListPublished(offset, limit int) ([]*Service, error)
 }
 
-type PostgreSQLServicesRepository struct {
-	db *sql.DB
-}
 
-func NewPostgreSQLServicesRepository(db *sql.DB) *PostgreSQLServicesRepository {
-	return &PostgreSQLServicesRepository{db: db}
-}
-
-func (r *PostgreSQLServicesRepository) Create(service *Service) error {
-	query := `
-		INSERT INTO services (
-			service_id, title, description, slug, category_id, 
-			delivery_mode, publishing_status, created_on, is_deleted
-		) VALUES (
-			gen_random_uuid(), $1, $2, $3, COALESCE($4, (
-				SELECT category_id FROM service_categories 
-				WHERE is_default_unassigned = true AND is_deleted = false 
-				LIMIT 1
-			)), $5, $6, $7, false
-		) RETURNING service_id, created_on`
-	
-	err := r.db.QueryRow(query, 
-		service.Title, 
-		service.Description, 
-		service.Slug, 
-		nullString(service.CategoryID),
-		service.DeliveryMode, 
-		service.PublishingStatus,
-		time.Now(),
-	).Scan(&service.ServiceID, &service.CreatedOn)
-	
-	return err
-}
-
-func (r *PostgreSQLServicesRepository) GetByID(serviceID string) (*Service, error) {
-	query := `
-		SELECT service_id, title, description, slug, category_id, 
-			   delivery_mode, publishing_status, is_deleted, created_on, 
-			   modified_on, COALESCE(modified_by, '')
-		FROM services 
-		WHERE service_id = $1 AND is_deleted = false`
-	
-	service := &Service{}
-	var categoryID sql.NullString
-	var modifiedOn sql.NullTime
-	
-	err := r.db.QueryRow(query, serviceID).Scan(
-		&service.ServiceID,
-		&service.Title,
-		&service.Description,
-		&service.Slug,
-		&categoryID,
-		&service.DeliveryMode,
-		&service.PublishingStatus,
-		&service.IsDeleted,
-		&service.CreatedOn,
-		&modifiedOn,
-		&service.ModifiedBy,
-	)
-	
-	if categoryID.Valid {
-		service.CategoryID = categoryID.String
-	}
-	
-	if modifiedOn.Valid {
-		service.ModifiedOn = modifiedOn.Time
-	}
-	
-	return service, err
-}
-
-func (r *PostgreSQLServicesRepository) GetBySlug(slug string) (*Service, error) {
-	query := `
-		SELECT service_id, title, description, slug, category_id, 
-			   delivery_mode, publishing_status, is_deleted, created_on, 
-			   modified_on, COALESCE(modified_by, '')
-		FROM services 
-		WHERE slug = $1 AND is_deleted = false`
-	
-	service := &Service{}
-	var categoryID sql.NullString
-	var modifiedOn sql.NullTime
-	
-	err := r.db.QueryRow(query, slug).Scan(
-		&service.ServiceID,
-		&service.Title,
-		&service.Description,
-		&service.Slug,
-		&categoryID,
-		&service.DeliveryMode,
-		&service.PublishingStatus,
-		&service.IsDeleted,
-		&service.CreatedOn,
-		&modifiedOn,
-		&service.ModifiedBy,
-	)
-	
-	if categoryID.Valid {
-		service.CategoryID = categoryID.String
-	}
-	
-	if modifiedOn.Valid {
-		service.ModifiedOn = modifiedOn.Time
-	}
-	
-	return service, err
-}
-
-func (r *PostgreSQLServicesRepository) Update(service *Service) error {
-	query := `
-		UPDATE services 
-		SET title = $1, description = $2, slug = $3, category_id = $4,
-			delivery_mode = $5, publishing_status = $6, modified_on = $7, modified_by = $8
-		WHERE service_id = $9 AND is_deleted = false`
-	
-	_, err := r.db.Exec(query,
-		service.Title,
-		service.Description,
-		service.Slug,
-		nullString(service.CategoryID),
-		service.DeliveryMode,
-		service.PublishingStatus,
-		time.Now(),
-		service.ModifiedBy,
-		service.ServiceID,
-	)
-	
-	return err
-}
-
-func (r *PostgreSQLServicesRepository) Delete(serviceID, userID string) error {
-	query := `
-		UPDATE services 
-		SET is_deleted = true, deleted_on = $1, deleted_by = $2
-		WHERE service_id = $3 AND is_deleted = false`
-	
-	_, err := r.db.Exec(query, time.Now(), userID, serviceID)
-	return err
-}
-
-func (r *PostgreSQLServicesRepository) List(offset, limit int) ([]*Service, error) {
-	query := `
-		SELECT service_id, title, description, slug, category_id, 
-			   delivery_mode, publishing_status, is_deleted, created_on, 
-			   modified_on, COALESCE(modified_by, '')
-		FROM services 
-		WHERE is_deleted = false
-		ORDER BY created_on DESC
-		LIMIT $1 OFFSET $2`
-	
-	return r.scanServices(query, limit, offset)
-}
-
-func (r *PostgreSQLServicesRepository) ListByCategory(categoryID string, offset, limit int) ([]*Service, error) {
-	query := `
-		SELECT service_id, title, description, slug, category_id, 
-			   delivery_mode, publishing_status, is_deleted, created_on, 
-			   modified_on, COALESCE(modified_by, '')
-		FROM services 
-		WHERE category_id = $1 AND is_deleted = false
-		ORDER BY order_number ASC, created_on DESC
-		LIMIT $2 OFFSET $3`
-	
-	return r.scanServices(query, categoryID, limit, offset)
-}
-
-func (r *PostgreSQLServicesRepository) ListPublished(offset, limit int) ([]*Service, error) {
-	query := `
-		SELECT service_id, title, description, slug, category_id, 
-			   delivery_mode, publishing_status, is_deleted, created_on, 
-			   modified_on, COALESCE(modified_by, '')
-		FROM services 
-		WHERE publishing_status = 'published' AND is_deleted = false
-		ORDER BY order_number ASC, created_on DESC
-		LIMIT $1 OFFSET $2`
-	
-	return r.scanServices(query, limit, offset)
-}
-
-func (r *PostgreSQLServicesRepository) scanServices(query string, args ...interface{}) ([]*Service, error) {
-	rows, err := r.db.Query(query, args...)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	
-	var services []*Service
-	for rows.Next() {
-		service := &Service{}
-		var categoryID sql.NullString
-		var modifiedOn sql.NullTime
-		
-		err := rows.Scan(
-			&service.ServiceID,
-			&service.Title,
-			&service.Description,
-			&service.Slug,
-			&categoryID,
-			&service.DeliveryMode,
-			&service.PublishingStatus,
-			&service.IsDeleted,
-			&service.CreatedOn,
-			&modifiedOn,
-			&service.ModifiedBy,
-		)
-		if err != nil {
-			return nil, err
-		}
-		
-		if categoryID.Valid {
-			service.CategoryID = categoryID.String
-		}
-		
-		if modifiedOn.Valid {
-			service.ModifiedOn = modifiedOn.Time
-		}
-		
-		services = append(services, service)
-	}
-	
-	return services, rows.Err()
-}
-
-func nullString(s string) interface{} {
-	if s == "" {
-		return nil
-	}
-	return s
-}
-
-type DaprStateStoreRepository struct {
+type servicesRepository struct {
 	client    client.Client
 	storeName string
 }
 
-func NewDaprStateStoreRepository(daprClient client.Client, storeName string) *DaprStateStoreRepository {
-	return &DaprStateStoreRepository{
+func NewServicesRepository(daprClient client.Client, storeName string) ServicesRepository {
+	return &servicesRepository{
 		client:    daprClient,
 		storeName: storeName,
 	}
 }
 
-func (r *DaprStateStoreRepository) Create(service *Service) error {
+func (r *servicesRepository) Create(service *Service) error {
 	ctx := context.Background()
 	
 	service.ServiceID = uuid.New().String()
@@ -301,7 +71,7 @@ func (r *DaprStateStoreRepository) Create(service *Service) error {
 	return nil
 }
 
-func (r *DaprStateStoreRepository) GetByID(serviceID string) (*Service, error) {
+func (r *servicesRepository) GetByID(serviceID string) (*Service, error) {
 	ctx := context.Background()
 	
 	item, err := r.client.GetState(ctx, r.storeName, serviceID, nil)
@@ -326,7 +96,7 @@ func (r *DaprStateStoreRepository) GetByID(serviceID string) (*Service, error) {
 	return &service, nil
 }
 
-func (r *DaprStateStoreRepository) GetBySlug(slug string) (*Service, error) {
+func (r *servicesRepository) GetBySlug(slug string) (*Service, error) {
 	ctx := context.Background()
 	
 	slugKey := fmt.Sprintf("slug:%s", slug)
@@ -353,7 +123,7 @@ func (r *DaprStateStoreRepository) GetBySlug(slug string) (*Service, error) {
 	return r.GetByID(serviceID)
 }
 
-func (r *DaprStateStoreRepository) Update(service *Service) error {
+func (r *servicesRepository) Update(service *Service) error {
 	ctx := context.Background()
 	
 	service.ModifiedOn = time.Now()
@@ -379,7 +149,7 @@ func (r *DaprStateStoreRepository) Update(service *Service) error {
 	return nil
 }
 
-func (r *DaprStateStoreRepository) Delete(serviceID, userID string) error {
+func (r *servicesRepository) Delete(serviceID, userID string) error {
 	service, err := r.GetByID(serviceID)
 	if err != nil {
 		return err
@@ -394,7 +164,7 @@ func (r *DaprStateStoreRepository) Delete(serviceID, userID string) error {
 	return r.Update(service)
 }
 
-func (r *DaprStateStoreRepository) List(offset, limit int) ([]*Service, error) {
+func (r *servicesRepository) List(offset, limit int) ([]*Service, error) {
 	ctx := context.Background()
 	
 	// For state store, we'll use a query operation
@@ -430,7 +200,7 @@ func (r *DaprStateStoreRepository) List(offset, limit int) ([]*Service, error) {
 	return services, nil
 }
 
-func (r *DaprStateStoreRepository) ListByCategory(categoryID string, offset, limit int) ([]*Service, error) {
+func (r *servicesRepository) ListByCategory(categoryID string, offset, limit int) ([]*Service, error) {
 	ctx := context.Background()
 	
 	query := fmt.Sprintf(`{
@@ -469,7 +239,7 @@ func (r *DaprStateStoreRepository) ListByCategory(categoryID string, offset, lim
 	return services, nil
 }
 
-func (r *DaprStateStoreRepository) ListPublished(offset, limit int) ([]*Service, error) {
+func (r *servicesRepository) ListPublished(offset, limit int) ([]*Service, error) {
 	ctx := context.Background()
 	
 	query := fmt.Sprintf(`{
@@ -508,7 +278,7 @@ func (r *DaprStateStoreRepository) ListPublished(offset, limit int) ([]*Service,
 	return services, nil
 }
 
-func (r *DaprStateStoreRepository) getDefaultCategory(ctx context.Context) (*ServiceCategory, error) {
+func (r *servicesRepository) getDefaultCategory(ctx context.Context) (*ServiceCategory, error) {
 	// Query for default unassigned category
 	query := `{
 		"filter": {
