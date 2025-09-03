@@ -7,6 +7,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/axiom-software-co/international-center/src/backend/internal/shared/domain"
 	"github.com/dapr/go-sdk/client"
 )
 
@@ -68,12 +69,12 @@ func (p *PubSub) PublishEvent(ctx context.Context, topic string, event *EventMes
 
 	data, err := json.Marshal(event)
 	if err != nil {
-		return fmt.Errorf("failed to marshal event for topic %s: %w", topic, err)
+		return domain.WrapError(err, fmt.Sprintf("failed to marshal event for pub/sub topic %s", topic))
 	}
 
 	err = p.client.GetClient().PublishEvent(ctx, p.pubsub, topic, data)
 	if err != nil {
-		return fmt.Errorf("failed to publish event to topic %s: %w", topic, err)
+		return domain.NewDependencyError("pub/sub", domain.WrapError(err, fmt.Sprintf("failed to publish event to topic %s", topic)))
 	}
 
 	return nil

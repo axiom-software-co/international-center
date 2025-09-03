@@ -8,8 +8,8 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/axiom-software-co/international-center/src/internal/gateway"
-	"github.com/axiom-software-co/international-center/src/internal/shared/dapr"
+	"github.com/axiom-software-co/international-center/src/backend/internal/gateway"
+	"github.com/axiom-software-co/international-center/src/backend/internal/shared/dapr"
 )
 
 // PublicGatewayApplication represents the public gateway application

@@ -9,8 +9,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/international-center/src/deployer/internal/shared/config"
-	"github.com/international-center/src/deployer/internal/shared/validation"
+	"github.com/axiom-software-co/international-center/src/deployer/internal/shared/config"
+	"github.com/axiom-software-co/international-center/src/deployer/internal/shared/validation"
 )
 
 const (
@@ -197,7 +197,7 @@ func main() {
 		log.Fatalf("Pre-deployment checks failed: %v", err)
 	}
 
-	deployerOrchestrator, err := orchestrator.NewDeployerOrchestrator(config.OrchestratorConfig, config.RedisConfig)
+	deployerOrchestrator, err := NewDeployerOrchestrator(config.OrchestratorConfig, config.RedisConfig)
 	if err != nil {
 		log.Fatalf("Failed to initialize staging deployer: %v", err)
 	}

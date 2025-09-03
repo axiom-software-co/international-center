@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"time"
 
+	"github.com/axiom-software-co/international-center/src/backend/internal/shared/domain"
 	"github.com/dapr/go-sdk/client"
 )
 
@@ -33,9 +35,13 @@ func NewStateStore(client *Client) *StateStore {
 
 // Save saves an entity to the state store
 func (s *StateStore) Save(ctx context.Context, key string, value interface{}, options *StateOptions) error {
+	// Add operation-specific timeout
+	timeoutCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
 	data, err := json.Marshal(value)
 	if err != nil {
-		return fmt.Errorf("failed to marshal value for key %s: %w", key, err)
+		return domain.WrapError(err, fmt.Sprintf("failed to marshal value for state store key %s", key))
 	}
 
 	item := &client.SetStateItem{
@@ -50,9 +56,12 @@ func (s *StateStore) Save(ctx context.Context, key string, value interface{}, op
 		}
 	}
 
-	err = s.client.GetClient().SaveState(ctx, s.storeName, item)
+	err = s.client.GetClient().SaveState(timeoutCtx, s.storeName, item)
 	if err != nil {
-		return fmt.Errorf("failed to save state for key %s: %w", key, err)
+		if timeoutCtx.Err() == context.DeadlineExceeded {
+			return domain.NewTimeoutError(fmt.Sprintf("state store save operation for key %s", key))
+		}
+		return domain.NewDependencyError("state store", domain.WrapError(err, fmt.Sprintf("failed to save state for key %s", key)))
 	}
 
 	return nil
@@ -60,9 +69,16 @@ func (s *StateStore) Save(ctx context.Context, key string, value interface{}, op
 
 // Get retrieves an entity from the state store
 func (s *StateStore) Get(ctx context.Context, key string, target interface{}) (bool, error) {
-	result, err := s.client.GetClient().GetState(ctx, s.storeName, key, nil)
+	// Add operation-specific timeout
+	timeoutCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	result, err := s.client.GetClient().GetState(timeoutCtx, s.storeName, key, nil)
 	if err != nil {
-		return false, fmt.Errorf("failed to get state for key %s: %w", key, err)
+		if timeoutCtx.Err() == context.DeadlineExceeded {
+			return false, domain.NewTimeoutError(fmt.Sprintf("state store get operation for key %s", key))
+		}
+		return false, domain.NewDependencyError("state store", domain.WrapError(err, fmt.Sprintf("failed to get state for key %s", key)))
 	}
 
 	if result.Value == nil || len(result.Value) == 0 {
@@ -71,7 +87,7 @@ func (s *StateStore) Get(ctx context.Context, key string, target interface{}) (b
 
 	err = json.Unmarshal(result.Value, target)
 	if err != nil {
-		return false, fmt.Errorf("failed to unmarshal state for key %s: %w", key, err)
+		return false, domain.WrapError(err, fmt.Sprintf("failed to unmarshal state for key %s", key))
 	}
 
 	return true, nil

@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/axiom-software-co/international-center/src/internal/shared/domain"
+	"github.com/axiom-software-co/international-center/src/backend/internal/shared/domain"
 	"github.com/gorilla/mux"
 )
 

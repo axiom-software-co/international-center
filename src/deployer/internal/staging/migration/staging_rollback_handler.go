@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/international-center/src/deployer/internal/shared/migration"
-	"github.com/international-center/src/deployer/internal/shared/validation"
+	"github.com/axiom-software-co/international-center/src/deployer/internal/shared/migration"
+	"github.com/axiom-software-co/international-center/src/deployer/internal/shared/validation"
 )
 
 type StagingRollbackHandler struct {

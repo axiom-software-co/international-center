@@ -2,6 +2,10 @@ package gateway
 
 import (
 	"fmt"
+	"log"
+	"os"
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -118,20 +122,35 @@ type ObservabilityConfig struct {
 
 // NewPublicGatewayConfiguration creates configuration for public gateway
 func NewPublicGatewayConfiguration() *GatewayConfiguration {
+	port := os.Getenv("PUBLIC_GATEWAY_PORT")
+	if port == "" {
+		log.Fatalf("PUBLIC_GATEWAY_PORT environment variable is required")
+	}
+	portInt, err := strconv.Atoi(port)
+	if err != nil {
+		log.Fatalf("PUBLIC_GATEWAY_PORT must be a valid integer: %v", err)
+	}
+
+	environment := os.Getenv("ENVIRONMENT")
+	if environment == "" {
+		log.Fatalf("ENVIRONMENT environment variable is required")
+	}
+
+	allowedOrigins := os.Getenv("PUBLIC_ALLOWED_ORIGINS")
+	if allowedOrigins == "" {
+		log.Fatalf("PUBLIC_ALLOWED_ORIGINS environment variable is required")
+	}
+
 	return &GatewayConfiguration{
 		Name:        "public-gateway",
 		Type:        GatewayTypePublic,
-		Port:        8080,
-		Environment: "development",
+		Port:        portInt,
+		Environment: environment,
 		Version:     "1.0.0",
 		
 		Security: SecurityConfig{
 			RequireAuthentication: false, // Public gateway allows anonymous access
-			AllowedOrigins: []string{
-				"http://localhost:3000",
-				"http://localhost:4321",
-				"https://*.pages.dev",
-			},
+			AllowedOrigins:        strings.Split(allowedOrigins, ","),
 			SecurityHeaders: SecurityHeadersConfig{
 				Enabled:                  true,
 				ContentTypeOptions:       "nosniff",
@@ -153,12 +172,8 @@ func NewPublicGatewayConfiguration() *GatewayConfiguration {
 		},
 		
 		CORS: CORSConfig{
-			Enabled: true,
-			AllowedOrigins: []string{
-				"http://localhost:3000",
-				"http://localhost:4321",
-				"https://*.pages.dev",
-			},
+			Enabled:          true,
+			AllowedOrigins:   strings.Split(allowedOrigins, ","),
 			AllowedMethods:   []string{"GET", "OPTIONS"},
 			AllowedHeaders:   []string{"Content-Type", "Authorization", "X-Requested-With"},
 			ExposedHeaders:   []string{"X-Correlation-ID"},
@@ -200,19 +215,35 @@ func NewPublicGatewayConfiguration() *GatewayConfiguration {
 
 // NewAdminGatewayConfiguration creates configuration for admin gateway
 func NewAdminGatewayConfiguration() *GatewayConfiguration {
+	port := os.Getenv("ADMIN_GATEWAY_PORT")
+	if port == "" {
+		log.Fatalf("ADMIN_GATEWAY_PORT environment variable is required")
+	}
+	portInt, err := strconv.Atoi(port)
+	if err != nil {
+		log.Fatalf("ADMIN_GATEWAY_PORT must be a valid integer: %v", err)
+	}
+
+	environment := os.Getenv("ENVIRONMENT")
+	if environment == "" {
+		log.Fatalf("ENVIRONMENT environment variable is required")
+	}
+
+	allowedOrigins := os.Getenv("ADMIN_ALLOWED_ORIGINS")
+	if allowedOrigins == "" {
+		log.Fatalf("ADMIN_ALLOWED_ORIGINS environment variable is required")
+	}
+
 	return &GatewayConfiguration{
 		Name:        "admin-gateway",
 		Type:        GatewayTypeAdmin,
-		Port:        8081,
-		Environment: "development",
+		Port:        portInt,
+		Environment: environment,
 		Version:     "1.0.0",
 		
 		Security: SecurityConfig{
 			RequireAuthentication: true, // Admin gateway requires authentication
-			AllowedOrigins: []string{
-				"http://localhost:3001",
-				"https://admin.*.pages.dev",
-			},
+			AllowedOrigins:        strings.Split(allowedOrigins, ","),
 			SecurityHeaders: SecurityHeadersConfig{
 				Enabled:                  true,
 				ContentTypeOptions:       "nosniff",
@@ -234,11 +265,8 @@ func NewAdminGatewayConfiguration() *GatewayConfiguration {
 		},
 		
 		CORS: CORSConfig{
-			Enabled: true,
-			AllowedOrigins: []string{
-				"http://localhost:3001",
-				"https://admin.*.pages.dev",
-			},
+			Enabled:          true,
+			AllowedOrigins:   strings.Split(allowedOrigins, ","),
 			AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 			AllowedHeaders:   []string{"Content-Type", "Authorization", "X-Requested-With", "X-User-ID"},
 			ExposedHeaders:   []string{"X-Correlation-ID"},

@@ -8,7 +8,7 @@ import (
 	"github.com/pulumi/pulumi-azure-native/sdk/v2/go/azurenative/resources"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 
-	"github.com/international-center/src/deployer/internal/staging/infrastructure"
+	"github.com/axiom-software-co/international-center/src/deployer/internal/staging/infrastructure"
 )
 
 type ContainerAppsDeployment struct {

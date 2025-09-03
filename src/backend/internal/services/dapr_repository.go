@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/axiom-software-co/international-center/src/internal/shared/dapr"
-	"github.com/axiom-software-co/international-center/src/internal/shared/domain"
+	"github.com/axiom-software-co/international-center/src/backend/internal/shared/dapr"
+	"github.com/axiom-software-co/international-center/src/backend/internal/shared/domain"
 )
 
 // ServicesRepository implements services data access using Dapr state store and bindings

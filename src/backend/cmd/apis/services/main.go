@@ -10,8 +10,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/axiom-software-co/international-center/src/internal/services"
-	"github.com/axiom-software-co/international-center/src/internal/shared/dapr"
+	"github.com/axiom-software-co/international-center/src/backend/internal/services"
+	"github.com/axiom-software-co/international-center/src/backend/internal/shared/dapr"
 	"github.com/gorilla/mux"
 )
 
@@ -191,26 +191,29 @@ func handleShutdownSignals(cancel context.CancelFunc) {
 
 // Configuration helpers
 
-// getServerAddress returns the server address from environment or default
+// getServerAddress returns the server address from environment
 func getServerAddress() string {
-	if addr := os.Getenv("SERVICES_API_ADDR"); addr != "" {
-		return addr
+	addr := os.Getenv("SERVICES_API_ADDR")
+	if addr == "" {
+		log.Fatalf("SERVICES_API_ADDR environment variable is required")
 	}
-	return ":8081"
+	return addr
 }
 
-// getEnvironment returns the environment from environment variable or default
+// getEnvironment returns the environment from environment variable
 func getEnvironment() string {
-	if env := os.Getenv("ENVIRONMENT"); env != "" {
-		return env
+	env := os.Getenv("ENVIRONMENT")
+	if env == "" {
+		log.Fatalf("ENVIRONMENT environment variable is required")
 	}
-	return "development"
+	return env
 }
 
-// getVersion returns the application version from environment variable or default
+// getVersion returns the application version from environment variable
 func getVersion() string {
-	if version := os.Getenv("APP_VERSION"); version != "" {
-		return version
+	version := os.Getenv("APP_VERSION")
+	if version == "" {
+		log.Fatalf("APP_VERSION environment variable is required")
 	}
-	return "1.0.0"
+	return version
 }

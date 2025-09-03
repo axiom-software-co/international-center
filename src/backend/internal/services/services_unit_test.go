@@ -1,0 +1,723 @@
+package services
+
+import (
+	"context"
+	"testing"
+	"time"
+
+	"github.com/axiom-software-co/international-center/src/backend/internal/shared/domain"
+	"github.com/axiom-software-co/international-center/src/backend/internal/shared/testing"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+// MockServicesRepository provides mock implementation for unit tests
+type MockServicesRepository struct {
+	services         map[string]*Service
+	categories       map[string]*ServiceCategory
+	featuredCategories map[int]*FeaturedCategory
+	auditEvents      []MockAuditEvent
+	failures         map[string]error
+}
+
+type MockAuditEvent struct {
+	EntityType    domain.EntityType
+	EntityID      string
+	OperationType domain.AuditEventType
+	UserID        string
+	Before        interface{}
+	After         interface{}
+}
+
+func NewMockServicesRepository() *MockServicesRepository {
+	return &MockServicesRepository{
+		services:         make(map[string]*Service),
+		categories:       make(map[string]*ServiceCategory),
+		featuredCategories: make(map[int]*FeaturedCategory),
+		auditEvents:      make([]MockAuditEvent, 0),
+		failures:         make(map[string]error),
+	}
+}
+
+// SetFailure sets a mock failure for specific operations
+func (m *MockServicesRepository) SetFailure(operation string, err error) {
+	m.failures[operation] = err
+}
+
+// GetAuditEvents returns all mock audit events
+func (m *MockServicesRepository) GetAuditEvents() []MockAuditEvent {
+	return m.auditEvents
+}
+
+// Service repository methods
+func (m *MockServicesRepository) SaveService(ctx context.Context, service *Service) error {
+	if err, exists := m.failures["SaveService"]; exists {
+		return err
+	}
+	m.services[service.ServiceID] = service
+	return nil
+}
+
+func (m *MockServicesRepository) GetService(ctx context.Context, serviceID string) (*Service, error) {
+	if err, exists := m.failures["GetService"]; exists {
+		return nil, err
+	}
+	service, exists := m.services[serviceID]
+	if !exists || service.IsDeleted {
+		return nil, domain.NewNotFoundError("service", serviceID)
+	}
+	return service, nil
+}
+
+func (m *MockServicesRepository) GetServiceBySlug(ctx context.Context, slug string) (*Service, error) {
+	if err, exists := m.failures["GetServiceBySlug"]; exists {
+		return nil, err
+	}
+	for _, service := range m.services {
+		if service.Slug == slug && !service.IsDeleted {
+			return service, nil
+		}
+	}
+	return nil, domain.NewNotFoundError("service", slug)
+}
+
+func (m *MockServicesRepository) GetAllServices(ctx context.Context) ([]*Service, error) {
+	if err, exists := m.failures["GetAllServices"]; exists {
+		return nil, err
+	}
+	var services []*Service
+	for _, service := range m.services {
+		if !service.IsDeleted {
+			services = append(services, service)
+		}
+	}
+	return services, nil
+}
+
+func (m *MockServicesRepository) GetServicesByCategory(ctx context.Context, categoryID string) ([]*Service, error) {
+	if err, exists := m.failures["GetServicesByCategory"]; exists {
+		return nil, err
+	}
+	var services []*Service
+	for _, service := range m.services {
+		if service.CategoryID == categoryID && !service.IsDeleted {
+			services = append(services, service)
+		}
+	}
+	return services, nil
+}
+
+func (m *MockServicesRepository) GetServicesByPublishingStatus(ctx context.Context, status PublishingStatus) ([]*Service, error) {
+	if err, exists := m.failures["GetServicesByPublishingStatus"]; exists {
+		return nil, err
+	}
+	var services []*Service
+	for _, service := range m.services {
+		if service.PublishingStatus == status && !service.IsDeleted {
+			services = append(services, service)
+		}
+	}
+	return services, nil
+}
+
+func (m *MockServicesRepository) SearchServices(ctx context.Context, searchTerm string) ([]*Service, error) {
+	if err, exists := m.failures["SearchServices"]; exists {
+		return nil, err
+	}
+	var services []*Service
+	for _, service := range m.services {
+		if !service.IsDeleted {
+			services = append(services, service)
+		}
+	}
+	return services, nil
+}
+
+func (m *MockServicesRepository) DeleteService(ctx context.Context, serviceID string, userID string) error {
+	if err, exists := m.failures["DeleteService"]; exists {
+		return err
+	}
+	service, exists := m.services[serviceID]
+	if !exists {
+		return domain.NewNotFoundError("service", serviceID)
+	}
+	service.Delete(userID)
+	return nil
+}
+
+// Category repository methods
+func (m *MockServicesRepository) GetServiceCategory(ctx context.Context, categoryID string) (*ServiceCategory, error) {
+	if err, exists := m.failures["GetServiceCategory"]; exists {
+		return nil, err
+	}
+	category, exists := m.categories[categoryID]
+	if !exists || category.IsDeleted {
+		return nil, domain.NewNotFoundError("category", categoryID)
+	}
+	return category, nil
+}
+
+func (m *MockServicesRepository) GetServiceCategoryBySlug(ctx context.Context, slug string) (*ServiceCategory, error) {
+	if err, exists := m.failures["GetServiceCategoryBySlug"]; exists {
+		return nil, err
+	}
+	for _, category := range m.categories {
+		if category.Slug == slug && !category.IsDeleted {
+			return category, nil
+		}
+	}
+	return nil, domain.NewNotFoundError("category", slug)
+}
+
+func (m *MockServicesRepository) GetAllServiceCategories(ctx context.Context) ([]*ServiceCategory, error) {
+	if err, exists := m.failures["GetAllServiceCategories"]; exists {
+		return nil, err
+	}
+	var categories []*ServiceCategory
+	for _, category := range m.categories {
+		if !category.IsDeleted {
+			categories = append(categories, category)
+		}
+	}
+	return categories, nil
+}
+
+// Featured category repository methods
+func (m *MockServicesRepository) GetAllFeaturedCategories(ctx context.Context) ([]*FeaturedCategory, error) {
+	if err, exists := m.failures["GetAllFeaturedCategories"]; exists {
+		return nil, err
+	}
+	var featured []*FeaturedCategory
+	for _, fc := range m.featuredCategories {
+		featured = append(featured, fc)
+	}
+	return featured, nil
+}
+
+func (m *MockServicesRepository) GetFeaturedCategoryByPosition(ctx context.Context, position int) (*FeaturedCategory, error) {
+	if err, exists := m.failures["GetFeaturedCategoryByPosition"]; exists {
+		return nil, err
+	}
+	fc, exists := m.featuredCategories[position]
+	if !exists {
+		return nil, domain.NewNotFoundError("featured_category", string(rune(position)))
+	}
+	return fc, nil
+}
+
+// Content repository methods
+func (m *MockServicesRepository) CreateServiceContentBlobURL(ctx context.Context, contentURL string, expirationMinutes int) (string, error) {
+	if err, exists := m.failures["CreateServiceContentBlobURL"]; exists {
+		return "", err
+	}
+	return "https://mock-blob-storage.com/download/" + contentURL, nil
+}
+
+func (m *MockServicesRepository) UploadServiceContentBlob(ctx context.Context, storagePath string, content []byte, contentType string) error {
+	if err, exists := m.failures["UploadServiceContentBlob"]; exists {
+		return err
+	}
+	return nil
+}
+
+// Audit repository methods
+func (m *MockServicesRepository) PublishAuditEvent(ctx context.Context, entityType domain.EntityType, entityID string, operationType domain.AuditEventType, userID string, before interface{}, after interface{}) error {
+	if err, exists := m.failures["PublishAuditEvent"]; exists {
+		return err
+	}
+	m.auditEvents = append(m.auditEvents, MockAuditEvent{
+		EntityType:    entityType,
+		EntityID:      entityID,
+		OperationType: operationType,
+		UserID:        userID,
+		Before:        before,
+		After:         after,
+	})
+	return nil
+}
+
+// Test helper functions
+func createTestService(userID string) *Service {
+	service, _ := NewService("Test Service", "Test Description", "test-service", "category-1", DeliveryModeMobile, userID)
+	return service
+}
+
+func createTestCategory(userID string) *ServiceCategory {
+	category, _ := NewServiceCategory("Test Category", "test-category", false, userID)
+	return category
+}
+
+// Unit Tests for ServicesService
+
+func TestServicesService_GetService(t *testing.T) {
+	tests := []struct {
+		name          string
+		serviceID     string
+		userID        string
+		setupMock     func(*MockServicesRepository)
+		expectedError string
+		validateResult func(*testing.T, *Service)
+	}{
+		{
+			name:      "successfully get published service without auth",
+			serviceID: "service-1",
+			userID:    "",
+			setupMock: func(repo *MockServicesRepository) {
+				service := createTestService("creator-1")
+				service.ServiceID = "service-1"
+				service.PublishingStatus = PublishingStatusPublished
+				repo.services["service-1"] = service
+			},
+			validateResult: func(t *testing.T, service *Service) {
+				assert.Equal(t, "service-1", service.ServiceID)
+				assert.Equal(t, PublishingStatusPublished, service.PublishingStatus)
+			},
+		},
+		{
+			name:      "successfully get draft service with creator auth",
+			serviceID: "service-2",
+			userID:    "creator-1",
+			setupMock: func(repo *MockServicesRepository) {
+				service := createTestService("creator-1")
+				service.ServiceID = "service-2"
+				service.PublishingStatus = PublishingStatusDraft
+				repo.services["service-2"] = service
+			},
+			validateResult: func(t *testing.T, service *Service) {
+				assert.Equal(t, "service-2", service.ServiceID)
+				assert.Equal(t, PublishingStatusDraft, service.PublishingStatus)
+			},
+		},
+		{
+			name:          "fail with empty service ID",
+			serviceID:     "",
+			userID:        "user-1",
+			setupMock:     func(repo *MockServicesRepository) {},
+			expectedError: "service ID cannot be empty",
+		},
+		{
+			name:      "fail accessing draft service without auth",
+			serviceID: "service-3",
+			userID:    "",
+			setupMock: func(repo *MockServicesRepository) {
+				service := createTestService("creator-1")
+				service.ServiceID = "service-3"
+				service.PublishingStatus = PublishingStatusDraft
+				repo.services["service-3"] = service
+			},
+			expectedError: "authentication required",
+		},
+		{
+			name:      "fail accessing draft service with wrong user",
+			serviceID: "service-4",
+			userID:    "different-user",
+			setupMock: func(repo *MockServicesRepository) {
+				service := createTestService("creator-1")
+				service.ServiceID = "service-4"
+				service.PublishingStatus = PublishingStatusDraft
+				repo.services["service-4"] = service
+			},
+			expectedError: "insufficient permissions",
+		},
+		{
+			name:      "fail when service not found",
+			serviceID: "nonexistent",
+			userID:    "user-1",
+			setupMock: func(repo *MockServicesRepository) {},
+			expectedError: "not found",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Arrange
+			ctx, cancel := testing.CreateUnitTestContext()
+			defer cancel()
+			
+			mockRepo := NewMockServicesRepository()
+			tt.setupMock(mockRepo)
+			service := NewServicesService(mockRepo)
+
+			// Act
+			result, err := service.GetService(ctx, tt.serviceID, tt.userID)
+
+			// Assert
+			if tt.expectedError != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedError)
+				assert.Nil(t, result)
+			} else {
+				require.NoError(t, err)
+				require.NotNil(t, result)
+				if tt.validateResult != nil {
+					tt.validateResult(t, result)
+				}
+			}
+		})
+	}
+}
+
+func TestServicesService_CreateService(t *testing.T) {
+	tests := []struct {
+		name           string
+		title          string
+		description    string
+		slug           string
+		categoryID     string
+		deliveryMode   DeliveryMode
+		userID         string
+		setupMock      func(*MockServicesRepository)
+		expectedError  string
+		validateResult func(*testing.T, *Service, *MockServicesRepository)
+	}{
+		{
+			name:         "successfully create service",
+			title:        "New Service",
+			description:  "New Description",
+			slug:         "new-service",
+			categoryID:   "category-1",
+			deliveryMode: DeliveryModeMobile,
+			userID:       "creator-1",
+			setupMock: func(repo *MockServicesRepository) {
+				category := createTestCategory("admin")
+				category.CategoryID = "category-1"
+				repo.categories["category-1"] = category
+			},
+			validateResult: func(t *testing.T, service *Service, repo *MockServicesRepository) {
+				assert.Equal(t, "New Service", service.Title)
+				assert.Equal(t, "New Description", service.Description)
+				assert.Equal(t, "new-service", service.Slug)
+				assert.Equal(t, "category-1", service.CategoryID)
+				assert.Equal(t, DeliveryModeMobile, service.DeliveryMode)
+				assert.Equal(t, "creator-1", service.CreatedBy)
+				assert.Equal(t, PublishingStatusDraft, service.PublishingStatus)
+				
+				// Verify service was saved
+				savedService, exists := repo.services[service.ServiceID]
+				assert.True(t, exists)
+				assert.Equal(t, service.ServiceID, savedService.ServiceID)
+				
+				// Verify audit event was published
+				auditEvents := repo.GetAuditEvents()
+				assert.Len(t, auditEvents, 1)
+				assert.Equal(t, domain.EntityTypeService, auditEvents[0].EntityType)
+				assert.Equal(t, service.ServiceID, auditEvents[0].EntityID)
+				assert.Equal(t, domain.AuditEventInsert, auditEvents[0].OperationType)
+				assert.Equal(t, "creator-1", auditEvents[0].UserID)
+			},
+		},
+		{
+			name:          "fail with empty title",
+			title:         "",
+			description:   "Description",
+			slug:          "slug",
+			categoryID:    "category-1",
+			deliveryMode:  DeliveryModeMobile,
+			userID:        "user-1",
+			setupMock:     func(repo *MockServicesRepository) {},
+			expectedError: "title cannot be empty",
+		},
+		{
+			name:          "fail with empty description",
+			title:         "Title",
+			description:   "",
+			slug:          "slug",
+			categoryID:    "category-1",
+			deliveryMode:  DeliveryModeMobile,
+			userID:        "user-1",
+			setupMock:     func(repo *MockServicesRepository) {},
+			expectedError: "description cannot be empty",
+		},
+		{
+			name:          "fail with invalid slug",
+			title:         "Title",
+			description:   "Description",
+			slug:          "INVALID SLUG!",
+			categoryID:    "category-1",
+			deliveryMode:  DeliveryModeMobile,
+			userID:        "user-1",
+			setupMock:     func(repo *MockServicesRepository) {},
+			expectedError: "slug must contain only lowercase letters, numbers, and hyphens",
+		},
+		{
+			name:         "fail when category not found",
+			title:        "Title",
+			description:  "Description",
+			slug:         "slug",
+			categoryID:   "nonexistent",
+			deliveryMode: DeliveryModeMobile,
+			userID:       "user-1",
+			setupMock:    func(repo *MockServicesRepository) {},
+			expectedError: "not found",
+		},
+		{
+			name:         "fail when slug already exists",
+			title:        "Title",
+			description:  "Description",
+			slug:         "existing-slug",
+			categoryID:   "category-1",
+			deliveryMode: DeliveryModeMobile,
+			userID:       "user-1",
+			setupMock: func(repo *MockServicesRepository) {
+				category := createTestCategory("admin")
+				category.CategoryID = "category-1"
+				repo.categories["category-1"] = category
+				
+				existingService := createTestService("other-user")
+				existingService.Slug = "existing-slug"
+				repo.services["existing"] = existingService
+			},
+			expectedError: "already exists",
+		},
+		{
+			name:          "fail with invalid delivery mode",
+			title:         "Title",
+			description:   "Description",
+			slug:          "slug",
+			categoryID:    "category-1",
+			deliveryMode:  "invalid_mode",
+			userID:        "user-1",
+			setupMock:     func(repo *MockServicesRepository) {},
+			expectedError: "invalid delivery mode",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Arrange
+			ctx, cancel := testing.CreateUnitTestContext()
+			defer cancel()
+			
+			mockRepo := NewMockServicesRepository()
+			tt.setupMock(mockRepo)
+			service := NewServicesService(mockRepo)
+
+			// Act
+			result, err := service.CreateService(ctx, tt.title, tt.description, tt.slug, tt.categoryID, tt.deliveryMode, tt.userID)
+
+			// Assert
+			if tt.expectedError != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedError)
+				assert.Nil(t, result)
+			} else {
+				require.NoError(t, err)
+				require.NotNil(t, result)
+				if tt.validateResult != nil {
+					tt.validateResult(t, result, mockRepo)
+				}
+			}
+		})
+	}
+}
+
+func TestServicesService_PublishService(t *testing.T) {
+	tests := []struct {
+		name           string
+		serviceID      string
+		userID         string
+		setupMock      func(*MockServicesRepository)
+		expectedError  string
+		validateResult func(*testing.T, *Service, *MockServicesRepository)
+	}{
+		{
+			name:      "successfully publish draft service",
+			serviceID: "service-1",
+			userID:    "creator-1",
+			setupMock: func(repo *MockServicesRepository) {
+				service := createTestService("creator-1")
+				service.ServiceID = "service-1"
+				service.PublishingStatus = PublishingStatusDraft
+				repo.services["service-1"] = service
+			},
+			validateResult: func(t *testing.T, service *Service, repo *MockServicesRepository) {
+				assert.Equal(t, PublishingStatusPublished, service.PublishingStatus)
+				assert.Equal(t, "creator-1", service.ModifiedBy)
+				assert.NotNil(t, service.ModifiedOn)
+				
+				// Verify audit event was published
+				auditEvents := repo.GetAuditEvents()
+				assert.Len(t, auditEvents, 1)
+				assert.Equal(t, domain.AuditEventUpdate, auditEvents[0].OperationType)
+			},
+		},
+		{
+			name:      "fail when service not found",
+			serviceID: "nonexistent",
+			userID:    "user-1",
+			setupMock: func(repo *MockServicesRepository) {},
+			expectedError: "not found",
+		},
+		{
+			name:      "fail when user lacks permission",
+			serviceID: "service-2",
+			userID:    "different-user",
+			setupMock: func(repo *MockServicesRepository) {
+				service := createTestService("creator-1")
+				service.ServiceID = "service-2"
+				service.PublishingStatus = PublishingStatusDraft
+				repo.services["service-2"] = service
+			},
+			expectedError: "insufficient permissions",
+		},
+		{
+			name:      "fail when service already published",
+			serviceID: "service-3",
+			userID:    "creator-1",
+			setupMock: func(repo *MockServicesRepository) {
+				service := createTestService("creator-1")
+				service.ServiceID = "service-3"
+				service.PublishingStatus = PublishingStatusPublished
+				repo.services["service-3"] = service
+			},
+			expectedError: "can only publish services with draft status",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Arrange
+			ctx, cancel := testing.CreateUnitTestContext()
+			defer cancel()
+			
+			mockRepo := NewMockServicesRepository()
+			tt.setupMock(mockRepo)
+			service := NewServicesService(mockRepo)
+
+			// Act
+			result, err := service.PublishService(ctx, tt.serviceID, tt.userID)
+
+			// Assert
+			if tt.expectedError != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedError)
+				assert.Nil(t, result)
+			} else {
+				require.NoError(t, err)
+				require.NotNil(t, result)
+				if tt.validateResult != nil {
+					tt.validateResult(t, result, mockRepo)
+				}
+			}
+		})
+	}
+}
+
+func TestServicesService_GetAllServices(t *testing.T) {
+	tests := []struct {
+		name           string
+		userID         string
+		setupMock      func(*MockServicesRepository)
+		expectedError  string
+		validateResult func(*testing.T, []*Service)
+	}{
+		{
+			name:   "successfully get published services for anonymous user",
+			userID: "",
+			setupMock: func(repo *MockServicesRepository) {
+				// Published service - should be accessible
+				publishedService := createTestService("creator-1")
+				publishedService.ServiceID = "published"
+				publishedService.PublishingStatus = PublishingStatusPublished
+				repo.services["published"] = publishedService
+				
+				// Draft service - should not be accessible anonymously
+				draftService := createTestService("creator-1")
+				draftService.ServiceID = "draft"
+				draftService.PublishingStatus = PublishingStatusDraft
+				repo.services["draft"] = draftService
+			},
+			validateResult: func(t *testing.T, services []*Service) {
+				assert.Len(t, services, 1)
+				assert.Equal(t, "published", services[0].ServiceID)
+				assert.Equal(t, PublishingStatusPublished, services[0].PublishingStatus)
+			},
+		},
+		{
+			name:   "successfully get all accessible services for authenticated user",
+			userID: "creator-1",
+			setupMock: func(repo *MockServicesRepository) {
+				// Published service - should be accessible
+				publishedService := createTestService("creator-1")
+				publishedService.ServiceID = "published"
+				publishedService.PublishingStatus = PublishingStatusPublished
+				repo.services["published"] = publishedService
+				
+				// Own draft service - should be accessible
+				ownDraftService := createTestService("creator-1")
+				ownDraftService.ServiceID = "own-draft"
+				ownDraftService.PublishingStatus = PublishingStatusDraft
+				repo.services["own-draft"] = ownDraftService
+				
+				// Other user's draft service - should not be accessible
+				otherDraftService := createTestService("other-creator")
+				otherDraftService.ServiceID = "other-draft"
+				otherDraftService.PublishingStatus = PublishingStatusDraft
+				repo.services["other-draft"] = otherDraftService
+			},
+			validateResult: func(t *testing.T, services []*Service) {
+				assert.Len(t, services, 2)
+				serviceIDs := make([]string, len(services))
+				for i, svc := range services {
+					serviceIDs[i] = svc.ServiceID
+				}
+				assert.Contains(t, serviceIDs, "published")
+				assert.Contains(t, serviceIDs, "own-draft")
+			},
+		},
+		{
+			name:   "return empty array when no accessible services",
+			userID: "",
+			setupMock: func(repo *MockServicesRepository) {
+				// Only draft service - not accessible anonymously
+				draftService := createTestService("creator-1")
+				draftService.ServiceID = "draft"
+				draftService.PublishingStatus = PublishingStatusDraft
+				repo.services["draft"] = draftService
+			},
+			validateResult: func(t *testing.T, services []*Service) {
+				assert.Len(t, services, 0)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Arrange
+			ctx, cancel := testing.CreateUnitTestContext()
+			defer cancel()
+			
+			mockRepo := NewMockServicesRepository()
+			tt.setupMock(mockRepo)
+			service := NewServicesService(mockRepo)
+
+			// Act
+			result, err := service.GetAllServices(ctx, tt.userID)
+
+			// Assert
+			if tt.expectedError != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedError)
+				assert.Nil(t, result)
+			} else {
+				require.NoError(t, err)
+				require.NotNil(t, result)
+				if tt.validateResult != nil {
+					tt.validateResult(t, result)
+				}
+			}
+		})
+	}
+}
+
+func TestServicesService_Timeout(t *testing.T) {
+	// Test that context timeout is respected (5 seconds for unit tests)
+	ctx, cancel := testing.CreateUnitTestContext()
+	defer cancel()
+	
+	// Verify context has 5 second timeout
+	deadline, hasDeadline := ctx.Deadline()
+	require.True(t, hasDeadline)
+	assert.True(t, time.Until(deadline) <= 5*time.Second)
+	assert.True(t, time.Until(deadline) > 4*time.Second) // Allow some margin
+}

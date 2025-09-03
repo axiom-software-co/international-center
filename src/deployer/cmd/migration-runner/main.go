@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/international-center/src/deployer/internal/shared/config"
-	"github.com/international-center/src/deployer/internal/shared/validation"
+	"github.com/axiom-software-co/international-center/src/deployer/internal/shared/config"
+	"github.com/axiom-software-co/international-center/src/deployer/internal/shared/validation"
 )
 
 const (
@@ -259,11 +259,11 @@ func runMigrations(ctx context.Context, environment string, orchestrator interfa
 
 	switch environment {
 	case "development":
-		return runDevelopmentMigrations(ctx, orchestrator.(*DevelopmentMigrationOrchestrator), pubsub)
+		return runDevelopmentMigrations(ctx, (*DevelopmentMigrationOrchestrator), pubsub)
 	case "staging":
-		return runStagingMigrations(ctx, orchestrator.(*StagingMigrationOrchestrator), pubsub)
+		return runStagingMigrations(ctx, (*StagingMigrationOrchestrator), pubsub)
 	case "production":
-		return runProductionMigrations(ctx, orchestrator.(*ProductionMigrationOrchestrator), pubsub)
+		return runProductionMigrations(ctx, (*ProductionMigrationOrchestrator), pubsub)
 	default:
 		return fmt.Errorf("unsupported environment: %s", environment)
 	}
@@ -289,11 +289,11 @@ func runRollback(ctx context.Context, environment string, orchestrator interface
 
 	switch environment {
 	case "development":
-		return rollbackDevelopmentMigrations(ctx, orchestrator.(*DevelopmentMigrationOrchestrator), rollbackSteps, pubsub)
+		return rollbackDevelopmentMigrations(ctx, (*DevelopmentMigrationOrchestrator), rollbackSteps, pubsub)
 	case "staging":
-		return rollbackStagingMigrations(ctx, orchestrator.(*StagingMigrationOrchestrator), rollbackSteps, pubsub)
+		return rollbackStagingMigrations(ctx, (*StagingMigrationOrchestrator), rollbackSteps, pubsub)
 	case "production":
-		return rollbackProductionMigrations(ctx, orchestrator.(*ProductionMigrationOrchestrator), rollbackSteps, pubsub)
+		return rollbackProductionMigrations(ctx, (*ProductionMigrationOrchestrator), rollbackSteps, pubsub)
 	default:
 		return fmt.Errorf("unsupported environment: %s", environment)
 	}
@@ -304,11 +304,11 @@ func showMigrationStatus(ctx context.Context, environment string, orchestrator i
 
 	switch environment {
 	case "development":
-		return showDevelopmentMigrationStatus(ctx, orchestrator.(*DevelopmentMigrationOrchestrator))
+		return showDevelopmentMigrationStatus(ctx, (*DevelopmentMigrationOrchestrator))
 	case "staging":
-		return showStagingMigrationStatus(ctx, orchestrator.(*StagingMigrationOrchestrator))
+		return showStagingMigrationStatus(ctx, (*StagingMigrationOrchestrator))
 	case "production":
-		return showProductionMigrationStatus(ctx, orchestrator.(*ProductionMigrationOrchestrator))
+		return showProductionMigrationStatus(ctx, (*ProductionMigrationOrchestrator))
 	default:
 		return fmt.Errorf("unsupported environment: %s", environment)
 	}
@@ -319,11 +319,11 @@ func validateMigrations(ctx context.Context, environment string, orchestrator in
 
 	switch environment {
 	case "development":
-		return validateDevelopmentMigrations(ctx, orchestrator.(*DevelopmentMigrationOrchestrator))
+		return validateDevelopmentMigrations(ctx, (*DevelopmentMigrationOrchestrator))
 	case "staging":
-		return validateStagingMigrations(ctx, orchestrator.(*StagingMigrationOrchestrator))
+		return validateStagingMigrations(ctx, (*StagingMigrationOrchestrator))
 	case "production":
-		return validateProductionMigrations(ctx, orchestrator.(*ProductionMigrationOrchestrator))
+		return validateProductionMigrations(ctx, (*ProductionMigrationOrchestrator))
 	default:
 		return fmt.Errorf("unsupported environment: %s", environment)
 	}

@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/axiom-software-co/international-center/src/internal/shared/domain"
+	"github.com/axiom-software-co/international-center/src/backend/internal/shared/domain"
 )
 
 // ContentService implements business logic for content operations
@@ -31,7 +31,7 @@ func (s *ContentService) GetContent(ctx context.Context, contentID string, userI
 
 	content, err := s.repository.GetContent(ctx, contentID)
 	if err != nil {
-		return nil, err
+		return nil, domain.WrapError(err, fmt.Sprintf("failed to get content %s for user %s", contentID, userID))
 	}
 
 	// Check access permissions
@@ -49,7 +49,7 @@ func (s *ContentService) GetContent(ctx context.Context, contentID string, userI
 func (s *ContentService) GetAllContent(ctx context.Context, userID string) ([]*Content, error) {
 	allContent, err := s.repository.GetAllContent(ctx)
 	if err != nil {
-		return nil, err
+		return nil, domain.WrapError(err, fmt.Sprintf("failed to get all content for user %s", userID))
 	}
 
 	// Filter based on access permissions
@@ -71,7 +71,7 @@ func (s *ContentService) GetContentByCategory(ctx context.Context, category Cont
 
 	allContent, err := s.repository.GetContentByCategory(ctx, category)
 	if err != nil {
-		return nil, err
+		return nil, domain.WrapError(err, fmt.Sprintf("failed to get content by category %s for user %s", category, userID))
 	}
 
 	// Filter based on access permissions

@@ -82,6 +82,12 @@ func (c *Client) HealthCheck(ctx context.Context) error {
 	return nil
 }
 
+// IsHealthy returns true if the Dapr client is healthy
+func (c *Client) IsHealthy(ctx context.Context) bool {
+	err := c.HealthCheck(ctx)
+	return err == nil
+}
+
 // getEnv gets an environment variable with a default value
 func getEnv(key, defaultValue string) string {
 	if value := os.Getenv(key); value != "" {

@@ -11,6 +11,10 @@ require (
 	github.com/stretchr/testify v1.8.4
 	github.com/pulumi/pulumi/sdk/v3 v3.89.0
 	github.com/pulumi/pulumi-command/sdk v0.7.2
+	github.com/pulumi/pulumi-azure-native/sdk/v2 v2.66.0
+	github.com/pulumi/pulumi-docker/sdk/v4 v4.8.2
+	github.com/go-redis/redis/v8 v8.11.5
+	github.com/redis/go-redis/v9 v9.13.0
 )
 
 require (

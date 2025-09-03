@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/axiom-software-co/international-center/src/backend/internal/shared/domain"
 	"github.com/dapr/go-sdk/client"
 )
 
@@ -76,7 +77,10 @@ func (s *ServiceInvocation) InvokeService(ctx context.Context, req *ServiceReque
 
 	resp, err := s.client.GetClient().InvokeMethodWithContent(ctx, invokeReq)
 	if err != nil {
-		return nil, fmt.Errorf("failed to invoke %s/%s: %w", req.AppID, req.MethodName, err)
+		if ctx.Err() == context.DeadlineExceeded {
+			return nil, domain.NewTimeoutError(fmt.Sprintf("service invocation %s/%s", req.AppID, req.MethodName))
+		}
+		return nil, domain.NewDependencyError("service invocation", domain.WrapError(err, fmt.Sprintf("failed to invoke %s/%s", req.AppID, req.MethodName)))
 	}
 
 	return &ServiceResponse{

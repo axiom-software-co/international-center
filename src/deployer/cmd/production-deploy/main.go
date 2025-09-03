@@ -9,8 +9,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/international-center/src/deployer/internal/shared/config"
-	"github.com/international-center/src/deployer/internal/shared/validation"
+	"github.com/axiom-software-co/international-center/src/deployer/internal/shared/config"
+	"github.com/axiom-software-co/international-center/src/deployer/internal/shared/validation"
 )
 
 const (
@@ -242,7 +242,7 @@ func main() {
 		log.Fatalf("Production deployment confirmation failed: %v", err)
 	}
 
-	deployerOrchestrator, err := orchestrator.NewDeployerOrchestrator(config.OrchestratorConfig, config.RedisConfig)
+	deployerOrchestrator, err := NewDeployerOrchestrator(config.OrchestratorConfig, config.RedisConfig)
 	if err != nil {
 		log.Fatalf("Failed to initialize production deployer: %v", err)
 	}
@@ -368,7 +368,7 @@ func createProductionConfig() *DeploymentConfig {
 			HealthCheck:   15 * time.Second,
 			BufferSize:    1000,
 		},
-		OrchestratorConfig: &orchestrator.OrchestratorConfig{
+		OrchestratorConfig: &OrchestratorConfig{
 			Environment:            ProductionEnvironment,
 			MaxConcurrentDeploys:   1,
 			DeploymentTimeout:      2 * time.Hour,

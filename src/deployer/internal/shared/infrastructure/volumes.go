@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/international-center/src/deployer/internal/shared/config"
+	"github.com/axiom-software-co/international-center/src/deployer/internal/shared/config"
 	"github.com/pulumi/pulumi-azure-native/sdk/v2/go/azurenative/storage"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 )

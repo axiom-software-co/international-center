@@ -4,7 +4,7 @@
 
 - IMPORTANT AXIOM RULE TO FOLLOW : when you read a compact conversation summary , the first thing you should do is read all the markdown files in the project to get context .
 
-- IMPORTANT AXIOM RULE TO FOLLOW : we should not create new files outside of our current folders and files structure ( this is deliberate ) . ensure you stop and ask for permission if you believe we should alter our folder and files structure .
+- IMPORTANT AXIOM RULE TO FOLLOW : we cannot create new files outside of our current folders and files structure ( this is deliberate ) . you may alter implmentation details . 
 
 - IMPORTANT AXIOM RULE TO FOLLOW : do not edit any markdown files without permission . ensure you stop and ask for permission and provide your reasoning
 
@@ -229,7 +229,6 @@
 
 - github version control
 - github container registry
-- github actions workflows
 
 - pulumi cli and go sdk
 

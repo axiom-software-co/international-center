@@ -7,7 +7,7 @@ import (
 	"github.com/pulumi/pulumi-azure-native/sdk/v2/go/azurenative/app"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 
-	"github.com/international-center/src/deployer/internal/production/infrastructure"
+	"github.com/axiom-software-co/international-center/src/deployer/internal/production/infrastructure"
 )
 
 type ProductionDeployment struct {
