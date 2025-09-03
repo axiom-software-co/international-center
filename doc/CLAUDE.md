@@ -12,7 +12,7 @@
 
 - IMPORTANT AXIOM RULE TO FOLLOW : consider stubs the worst anti-pattern ( we should use propper infrastructure and fix root issues as they arise ) ( we should not fall back to stubs in integration tests ) 
 
-- IMPORTANT AXIOM RULE TO FOLLOW : only run integration tests when the entire podman compose development environment is up
+- IMPORTANT AXIOM RULE TO FOLLOW : only run integration tests when the entire development environment is up
 
 - IMPORTANT AXIOM RULE TO FOLLOW : environment variables are defined only in the env files ( networking configuration , including ports  , should not be hardcoded , it should always come from the environment ) ( we should not have fallback networking configuration in implementation nor integration tests ) 
 
@@ -32,7 +32,7 @@
 
 - test-driven development ( red phase , green phase , refactor phase ) ( tests drive and validate the design of our architecture ) ( creating new methods from refactoring should not require us to write new tests , this violates the contract-first testing principle ) ( you are allowed to modify the project and tests implementations as you see fit , since project and/or tests abstractions and/or implementations sometimes need to be updated ) ( when planning a new TDD cycle , provide a list of all the files you intend to edit and what you intend to do in each phase )
 
-- use podman compose with containerd runtime to provision our local development environment ( resources and services ) ( do not mention docker ) ( 'podman-compose --env-file .env.development' should be used to manage podman containers in local development ) 
+- use pulumi for local development environment ( using podman instead of docker ) 
 
 # architecture patterns
 
@@ -42,11 +42,12 @@
 - best practices in our stack
 - idiomatic go patterns
 
-- health check patterns
-- environment configuration pattern 
+- infrastructure as code pattern 
+- environment-driven infrastructure
+
 - http server patterns 
 - handler , service , repository pattern, dapr-centric
-- dependency inversion ( interfaces for variable concerns, dependency injection with interfaces ) ( concrete types for stable concerns ) 
+- dependency inversion ( this does not mean interfaces everywhere )
 - synchronous and asynchronous patterns were appropriate
 
 - warnings as errors
@@ -207,7 +208,7 @@
     approach : Aggressive - always migrate to latest
     rollback : Easy - can destroy and recreate
     safety_checks : Minimal
-    automation : Full automation via Podman Compose
+    automation : Full automation
     
 - staging:
     approach : Careful - migrate with validation
@@ -251,13 +252,13 @@
 
 # Task Management Context Guidelines
 
-- when a plan gets approved , add all the tasks to your tasks list . 
 
 - task descriptions must include WHY ( business reason , compliance requirement , architectural decision , so forth )
 - task descriptions must include SCOPE ( which APIs , which components , which environments , so forth )
 - task descriptions must include DEPENDENCIES ( what must complete first , integration points , so forth )
 - task descriptions must include CONTEXT ( gateway architecture , medical compliance , environment specifics , so forth )
 
+- critical : when a plan gets approved with the word 'approved' , add all the tasks to your tasks list . 
 - critical : in the event context compression happens in the middle of a task , your task list is your primary source of context between context compressions , so it needs to be well managed 
 
 ( continue working ) ( get to work ) 
