@@ -2,11 +2,12 @@ package content
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
 	"github.com/axiom-software-co/international-center/src/backend/internal/shared/domain"
-	"github.com/axiom-software-co/international-center/src/backend/internal/shared/testing"
+	sharedtesting "github.com/axiom-software-co/international-center/src/backend/internal/shared/testing"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -132,7 +133,7 @@ func (m *MockContentRepository) DeleteContent(ctx context.Context, contentID str
 }
 
 // Blob storage methods
-func (m *MockContentRepository) UploadContentBlob(ctx context.Context, storagePath string, data []byte, mimeType string) error {
+func (m *MockContentRepository) UploadContentBlob(ctx context.Context, storagePath string, data []byte, contentType string) error {
 	if err, exists := m.failures["UploadContentBlob"]; exists {
 		return err
 	}
@@ -148,7 +149,7 @@ func (m *MockContentRepository) DeleteContentBlob(ctx context.Context, storagePa
 	return nil
 }
 
-func (m *MockContentRepository) CreateContentBlobURL(ctx context.Context, storagePath string, expirationMinutes int) (string, error) {
+func (m *MockContentRepository) CreateContentBlobURL(ctx context.Context, storagePath string, expiryMinutes int) (string, error) {
 	if err, exists := m.failures["CreateContentBlobURL"]; exists {
 		return "", err
 	}
@@ -183,9 +184,83 @@ func (m *MockContentRepository) LogContentAccess(ctx context.Context, contentID 
 	return nil
 }
 
+// Additional repository methods to match interface
+
+func (m *MockContentRepository) GetContentByAccessLevel(ctx context.Context, accessLevel AccessLevel) ([]*Content, error) {
+	if err, exists := m.failures["GetContentByAccessLevel"]; exists {
+		return nil, err
+	}
+	var results []*Content
+	for _, content := range m.content {
+		if content.AccessLevel == accessLevel {
+			results = append(results, content)
+		}
+	}
+	if results == nil {
+		results = make([]*Content, 0)
+	}
+	return results, nil
+}
+
+func (m *MockContentRepository) DownloadContentBlob(ctx context.Context, storagePath string) ([]byte, error) {
+	if err, exists := m.failures["DownloadContentBlob"]; exists {
+		return nil, err
+	}
+	if data, exists := m.blobStorage[storagePath]; exists {
+		return data, nil
+	}
+	return nil, fmt.Errorf("blob not found: %s", storagePath)
+}
+
+func (m *MockContentRepository) GetContentBlobMetadata(ctx context.Context, storagePath string) (map[string]string, error) {
+	if err, exists := m.failures["GetContentBlobMetadata"]; exists {
+		return nil, err
+	}
+	if _, exists := m.blobStorage[storagePath]; exists {
+		return map[string]string{
+			"content-type": "application/octet-stream",
+			"size":         fmt.Sprintf("%d", len(m.blobStorage[storagePath])),
+		}, nil
+	}
+	return nil, fmt.Errorf("blob not found: %s", storagePath)
+}
+
+func (m *MockContentRepository) SaveContentAccessLog(ctx context.Context, accessLog *ContentAccessLog) error {
+	if err, exists := m.failures["SaveContentAccessLog"]; exists {
+		return err
+	}
+	m.accessLogs = append(m.accessLogs, MockAccessLog{
+		ContentID:  accessLog.ContentID,
+		UserID:     accessLog.UserID,
+		AccessType: string(accessLog.AccessType),
+	})
+	return nil
+}
+
+func (m *MockContentRepository) SaveContentVirusScan(ctx context.Context, virusScan *ContentVirusScan) error {
+	if err, exists := m.failures["SaveContentVirusScan"]; exists {
+		return err
+	}
+	// Mock implementation - just return success
+	return nil
+}
+
+func (m *MockContentRepository) GetContentVirusScan(ctx context.Context, contentID string) ([]*ContentVirusScan, error) {
+	if err, exists := m.failures["GetContentVirusScan"]; exists {
+		return nil, err
+	}
+	// Mock implementation - return empty slice
+	return make([]*ContentVirusScan, 0), nil
+}
+
 // Test helper functions
 func createTestContent(userID string) *Content {
-	content, _ := NewContent("test.pdf", 1024, "application/pdf", "testhash123", ContentCategoryDocument, userID)
+	// Valid SHA-256 hash (64 hex characters)
+	validHash := "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+	content, err := NewContent("test.pdf", 1024, "application/pdf", validHash, ContentCategoryDocument, userID)
+	if err != nil {
+		panic(fmt.Sprintf("Failed to create test content: %v", err))
+	}
 	return content
 }
 
@@ -295,7 +370,7 @@ func TestContentService_GetContent(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Arrange
-			ctx, cancel := testing.CreateUnitTestContext()
+			ctx, cancel := sharedtesting.CreateUnitTestContext()
 			defer cancel()
 			
 			mockRepo := NewMockContentRepository()
@@ -441,7 +516,7 @@ func TestContentService_CreateContent(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Arrange
-			ctx, cancel := testing.CreateUnitTestContext()
+			ctx, cancel := sharedtesting.CreateUnitTestContext()
 			defer cancel()
 			
 			mockRepo := NewMockContentRepository()
@@ -536,7 +611,7 @@ func TestContentService_GetContentDownload(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Arrange
-			ctx, cancel := testing.CreateUnitTestContext()
+			ctx, cancel := sharedtesting.CreateUnitTestContext()
 			defer cancel()
 			
 			mockRepo := NewMockContentRepository()
@@ -627,7 +702,7 @@ func TestContentService_UpdateContentMetadata(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Arrange
-			ctx, cancel := testing.CreateUnitTestContext()
+			ctx, cancel := sharedtesting.CreateUnitTestContext()
 			defer cancel()
 			
 			mockRepo := NewMockContentRepository()
@@ -741,7 +816,7 @@ func TestContentService_GetAllContent(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Arrange
-			ctx, cancel := testing.CreateUnitTestContext()
+			ctx, cancel := sharedtesting.CreateUnitTestContext()
 			defer cancel()
 			
 			mockRepo := NewMockContentRepository()
@@ -769,7 +844,7 @@ func TestContentService_GetAllContent(t *testing.T) {
 
 func TestContentService_Timeout(t *testing.T) {
 	// Test that context timeout is respected (5 seconds for unit tests)
-	ctx, cancel := testing.CreateUnitTestContext()
+	ctx, cancel := sharedtesting.CreateUnitTestContext()
 	defer cancel()
 	
 	// Verify context has 5 second timeout

@@ -9,13 +9,49 @@ import (
 	"github.com/axiom-software-co/international-center/src/backend/internal/shared/domain"
 )
 
+// ServicesRepositoryInterface defines the contract for services data access
+type ServicesRepositoryInterface interface {
+	// Service operations
+	SaveService(ctx context.Context, service *Service) error
+	GetService(ctx context.Context, serviceID string) (*Service, error)
+	GetServiceBySlug(ctx context.Context, slug string) (*Service, error)
+	GetAllServices(ctx context.Context) ([]*Service, error)
+	GetServicesByCategory(ctx context.Context, categoryID string) ([]*Service, error)
+	GetServicesByPublishingStatus(ctx context.Context, status PublishingStatus) ([]*Service, error)
+	DeleteService(ctx context.Context, serviceID string, userID string) error
+	SearchServices(ctx context.Context, searchTerm string) ([]*Service, error)
+
+	// Service category operations
+	SaveServiceCategory(ctx context.Context, category *ServiceCategory) error
+	GetServiceCategory(ctx context.Context, categoryID string) (*ServiceCategory, error)
+	GetServiceCategoryBySlug(ctx context.Context, slug string) (*ServiceCategory, error)
+	GetAllServiceCategories(ctx context.Context) ([]*ServiceCategory, error)
+	GetDefaultUnassignedCategory(ctx context.Context) (*ServiceCategory, error)
+	DeleteServiceCategory(ctx context.Context, categoryID string, userID string) error
+
+	// Featured category operations
+	SaveFeaturedCategory(ctx context.Context, featured *FeaturedCategory) error
+	GetFeaturedCategory(ctx context.Context, featuredCategoryID string) (*FeaturedCategory, error)
+	GetAllFeaturedCategories(ctx context.Context) ([]*FeaturedCategory, error)
+	GetFeaturedCategoryByPosition(ctx context.Context, position int) (*FeaturedCategory, error)
+	DeleteFeaturedCategory(ctx context.Context, featuredCategoryID string) error
+
+	// Blob storage operations
+	UploadServiceContentBlob(ctx context.Context, storagePath string, data []byte, contentType string) error
+	DownloadServiceContentBlob(ctx context.Context, storagePath string) ([]byte, error)
+	CreateServiceContentBlobURL(ctx context.Context, storagePath string, expiryMinutes int) (string, error)
+
+	// Audit operations
+	PublishAuditEvent(ctx context.Context, entityType domain.EntityType, entityID string, operationType domain.AuditEventType, userID string, beforeData, afterData interface{}) error
+}
+
 // ServicesService implements business logic for services operations
 type ServicesService struct {
-	repository *ServicesRepository
+	repository ServicesRepositoryInterface
 }
 
 // NewServicesService creates a new services service
-func NewServicesService(repository *ServicesRepository) *ServicesService {
+func NewServicesService(repository ServicesRepositoryInterface) *ServicesService {
 	return &ServicesService{
 		repository: repository,
 	}
@@ -69,7 +105,7 @@ func (s *ServicesService) GetAllServices(ctx context.Context, userID string) ([]
 	}
 
 	// Filter based on access permissions
-	var accessibleServices []*Service
+	accessibleServices := make([]*Service, 0)
 	for _, service := range allServices {
 		if s.checkServiceAccess(service, userID) == nil {
 			accessibleServices = append(accessibleServices, service)
@@ -97,7 +133,7 @@ func (s *ServicesService) GetServicesByCategory(ctx context.Context, categoryID 
 	}
 
 	// Filter based on access permissions
-	var accessibleServices []*Service
+	accessibleServices := make([]*Service, 0)
 	for _, service := range services {
 		if s.checkServiceAccess(service, userID) == nil {
 			accessibleServices = append(accessibleServices, service)
@@ -250,7 +286,7 @@ func (s *ServicesService) PublishService(ctx context.Context, serviceID string, 
 	// Publish service
 	err = service.Publish(userID)
 	if err != nil {
-		return nil, domain.NewInternalError("failed to publish service", err)
+		return nil, err
 	}
 
 	// Save updated service

@@ -76,7 +76,7 @@ func (m *MockStateStore) Save(ctx context.Context, key string, value interface{}
 
 // Get mocks getting state
 func (m *MockStateStore) Get(ctx context.Context, key string, target interface{}) (bool, error) {
-	if value, exists := m.data[key]; exists {
+	if _, exists := m.data[key]; exists {
 		// Simple mock implementation - in real tests you'd do proper unmarshaling
 		return true, nil
 	}

@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/axiom-software-co/international-center/src/backend/internal/shared/dapr"
-	"github.com/axiom-software-co/international-center/src/backend/internal/shared/domain"
 )
 
 // GatewayService provides the main gateway service implementation

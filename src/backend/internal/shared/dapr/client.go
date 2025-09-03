@@ -3,7 +3,6 @@ package dapr
 import (
 	"context"
 	"fmt"
-	"os"
 	"sync"
 
 	"github.com/dapr/go-sdk/client"
@@ -66,7 +65,7 @@ func (c *Client) GetAppID() string {
 // Close closes the Dapr client connection
 func (c *Client) Close() error {
 	if c.client != nil {
-		return c.client.Close()
+		c.client.Close()
 	}
 	return nil
 }
@@ -88,10 +87,3 @@ func (c *Client) IsHealthy(ctx context.Context) bool {
 	return err == nil
 }
 
-// getEnv gets an environment variable with a default value
-func getEnv(key, defaultValue string) string {
-	if value := os.Getenv(key); value != "" {
-		return value
-	}
-	return defaultValue
-}

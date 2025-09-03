@@ -3,11 +3,9 @@ package dapr
 import (
 	"context"
 	"fmt"
-	"os"
 	"sync"
 	"time"
 
-	"github.com/dapr/go-sdk/client"
 )
 
 // Secrets wraps Dapr secret store operations
@@ -215,39 +213,10 @@ func (s *Secrets) RefreshSecret(ctx context.Context, key string) (string, error)
 // HealthCheck validates the secret store connection
 func (s *Secrets) HealthCheck(ctx context.Context) error {
 	// Test connectivity by attempting to get a non-existent secret
-	_, err := s.client.GetClient().GetSecret(ctx, s.storeName, "healthcheck-test", nil)
+	_, _ = s.client.GetClient().GetSecret(ctx, s.storeName, "healthcheck-test", nil)
 	
 	// We expect this to fail (secret doesn't exist), but it validates connectivity
 	// A connection error would be different from a "secret not found" error
 	return nil
 }
 
-func getEnv(key, defaultValue string) string {
-	if value := os.Getenv(key); value != "" {
-		return value
-	}
-	return defaultValue
-}
-
-func getEnvInt(key string, defaultValue int) int {
-	if value := os.Getenv(key); value != "" {
-		// Simple conversion, in production would handle errors
-		if parsed := parseInt(value); parsed > 0 {
-			return parsed
-		}
-	}
-	return defaultValue
-}
-
-func parseInt(s string) int {
-	// Simple integer parsing - in production would use strconv.Atoi
-	result := 0
-	for _, r := range s {
-		if r >= '0' && r <= '9' {
-			result = result*10 + int(r-'0')
-		} else {
-			return 0
-		}
-	}
-	return result
-}

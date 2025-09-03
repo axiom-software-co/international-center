@@ -3,7 +3,6 @@ package dapr
 import (
 	"context"
 	"fmt"
-	"os"
 
 	"github.com/dapr/go-sdk/client"
 )
@@ -140,7 +139,7 @@ func (b *Bindings) ListBlobs(ctx context.Context, prefix string) ([]string, erro
 		Metadata:  metadata,
 	}
 
-	resp, err := b.InvokeBinding(ctx, req)
+	_, err := b.InvokeBinding(ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list blobs: %w", err)
 	}
@@ -208,9 +207,3 @@ func (b *Bindings) CreateStoragePath(domain, year, month, contentID, hash, exten
 		environment, domain, year, month, contentID, hash, extension)
 }
 
-func getEnv(key, defaultValue string) string {
-	if value := os.Getenv(key); value != "" {
-		return value
-	}
-	return defaultValue
-}

@@ -1,7 +1,6 @@
 package gateway
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -9,6 +8,7 @@ import (
 	"time"
 
 	"github.com/axiom-software-co/international-center/src/backend/internal/shared/domain"
+	"github.com/google/uuid"
 	"golang.org/x/time/rate"
 )
 
@@ -69,7 +69,7 @@ func (m *Middleware) correlationContextMiddleware(next http.Handler) http.Handle
 		// Create or extract correlation context
 		correlationCtx := domain.FromContext(ctx)
 		if correlationCtx.CorrelationID == "" {
-			correlationCtx.CorrelationID = domain.GenerateCorrelationID()
+			correlationCtx.CorrelationID = uuid.New().String()
 		}
 		
 		// Set trace ID if present in headers
@@ -235,7 +235,7 @@ func (m *Middleware) observabilityMiddleware(next http.Handler) http.Handler {
 		// Add tracing headers if enabled
 		if m.config.Observability.TracingEnabled {
 			if traceID := r.Header.Get("X-Trace-ID"); traceID == "" {
-				w.Header().Set("X-Trace-ID", domain.GenerateTraceID())
+				w.Header().Set("X-Trace-ID", domain.GetTraceID(r.Context()))
 			}
 		}
 		

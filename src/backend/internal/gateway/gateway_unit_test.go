@@ -2,15 +2,16 @@ package gateway
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 	"time"
 
 	"github.com/axiom-software-co/international-center/src/backend/internal/shared/dapr"
 	"github.com/axiom-software-co/international-center/src/backend/internal/shared/domain"
-	"github.com/axiom-software-co/international-center/src/backend/internal/shared/testing"
+	sharedtesting "github.com/axiom-software-co/international-center/src/backend/internal/shared/testing"
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -92,8 +93,12 @@ func (m *MockServiceInvocation) InvokeService(ctx context.Context, req *dapr.Ser
 	// Check for mock response
 	key := req.AppID + "/" + req.MethodName
 	if response, exists := m.responses[key]; exists {
+		responseData, err := json.Marshal(response)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal mock response: %w", err)
+		}
 		return &dapr.ServiceResponse{
-			Data:        []byte("mock response data"),
+			Data:        responseData,
 			ContentType: "application/json",
 			StatusCode:  200,
 			Headers:     make(map[string]string),
@@ -190,6 +195,58 @@ func (m *MockServiceInvocation) CheckAllServicesReadiness(ctx context.Context) e
 	return m.CheckAllServicesHealth(ctx)
 }
 
+// CheckContentAPIHealth checks if the content API service is healthy
+func (m *MockServiceInvocation) CheckContentAPIHealth(ctx context.Context) (bool, error) {
+	if err, exists := m.failures["CheckContentAPIHealth"]; exists {
+		return false, err
+	}
+	
+	if healthy, exists := m.healthChecks[m.endpoints.ContentAPI]; exists {
+		return healthy, nil
+	}
+	
+	return true, nil // default to healthy
+}
+
+// CheckServicesAPIHealth checks if the services API service is healthy
+func (m *MockServiceInvocation) CheckServicesAPIHealth(ctx context.Context) (bool, error) {
+	if err, exists := m.failures["CheckServicesAPIHealth"]; exists {
+		return false, err
+	}
+	
+	if healthy, exists := m.healthChecks[m.endpoints.ServicesAPI]; exists {
+		return healthy, nil
+	}
+	
+	return true, nil // default to healthy
+}
+
+// GetContentAPIMetrics retrieves metrics from the content API service
+func (m *MockServiceInvocation) GetContentAPIMetrics(ctx context.Context) (map[string]interface{}, error) {
+	if err, exists := m.failures["GetContentAPIMetrics"]; exists {
+		return nil, err
+	}
+	
+	return map[string]interface{}{
+		"status": "healthy",
+		"uptime": "1h30m",
+		"requests": 150,
+	}, nil
+}
+
+// GetServicesAPIMetrics retrieves metrics from the services API service
+func (m *MockServiceInvocation) GetServicesAPIMetrics(ctx context.Context) (map[string]interface{}, error) {
+	if err, exists := m.failures["GetServicesAPIMetrics"]; exists {
+		return nil, err
+	}
+	
+	return map[string]interface{}{
+		"status": "healthy",
+		"uptime": "1h25m", 
+		"requests": 200,
+	}, nil
+}
+
 // Test helper functions
 func createTestGatewayConfiguration() *GatewayConfiguration {
 	return &GatewayConfiguration{
@@ -258,10 +315,7 @@ func createTestGatewayConfiguration() *GatewayConfiguration {
 
 func createTestServiceProxy(mockInvocation *MockServiceInvocation) *ServiceProxy {
 	config := createTestGatewayConfiguration()
-	return &ServiceProxy{
-		serviceInvocation: mockInvocation,
-		configuration:     config,
-	}
+	return NewServiceProxyWithInvocation(mockInvocation, config)
 }
 
 func createTestMiddleware() *Middleware {
@@ -331,7 +385,7 @@ func TestGatewayHandler_ProxyToContentAPI(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Arrange
-			ctx, cancel := testing.CreateUnitTestContext()
+			ctx, cancel := sharedtesting.CreateUnitTestContext()
 			defer cancel()
 			
 			mockInvocation := NewMockServiceInvocation()
@@ -414,7 +468,7 @@ func TestGatewayHandler_ProxyToServicesAPI(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Arrange
-			ctx, cancel := testing.CreateUnitTestContext()
+			ctx, cancel := sharedtesting.CreateUnitTestContext()
 			defer cancel()
 			
 			mockInvocation := NewMockServiceInvocation()
@@ -480,7 +534,7 @@ func TestGatewayHandler_HealthCheck(t *testing.T) {
 		{
 			name: "return unhealthy when health check fails",
 			setupMock: func(mock *MockServiceInvocation) {
-				mock.SetFailure("CheckAllServicesHealth", domain.NewDependencyError("health check failed", nil))
+				mock.SetFailure("CheckContentAPIHealth", domain.NewDependencyError("health check failed", nil))
 			},
 			expectedStatus: http.StatusServiceUnavailable,
 			expectedHealth: "unhealthy",
@@ -490,7 +544,7 @@ func TestGatewayHandler_HealthCheck(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Arrange
-			ctx, cancel := testing.CreateUnitTestContext()
+			ctx, cancel := sharedtesting.CreateUnitTestContext()
 			defer cancel()
 			
 			mockInvocation := NewMockServiceInvocation()
@@ -560,17 +614,17 @@ func TestServiceProxy_ProxyRequest(t *testing.T) {
 		},
 		{
 			name:          "fail with unknown target service",
-			path:          "/api/v1/content",
-			targetService: "unknown-service",
+			path:          "/api/v1/unknown",
+			targetService: "content-api",
 			setupMock:     func(mock *MockServiceInvocation) {},
-			expectedError: "unknown target service",
+			expectedError: "unknown service",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Arrange
-			ctx, cancel := testing.CreateUnitTestContext()
+			ctx, cancel := sharedtesting.CreateUnitTestContext()
 			defer cancel()
 			
 			mockInvocation := NewMockServiceInvocation()
@@ -742,7 +796,7 @@ func TestGatewayHandler_RegisterRoutes(t *testing.T) {
 
 func TestGatewayHandler_Timeout(t *testing.T) {
 	// Test that context timeout is respected (5 seconds for unit tests)
-	ctx, cancel := testing.CreateUnitTestContext()
+	ctx, cancel := sharedtesting.CreateUnitTestContext()
 	defer cancel()
 	
 	// Verify context has 5 second timeout
@@ -786,7 +840,7 @@ func TestGatewayHandler_MiddlewareIntegration(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Arrange
-			ctx, cancel := testing.CreateUnitTestContext()
+			ctx, cancel := sharedtesting.CreateUnitTestContext()
 			defer cancel()
 			
 			mockInvocation := NewMockServiceInvocation()

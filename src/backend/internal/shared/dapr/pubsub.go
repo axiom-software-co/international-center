@@ -4,11 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
 	"time"
 
 	"github.com/axiom-software-co/international-center/src/backend/internal/shared/domain"
-	"github.com/dapr/go-sdk/client"
 )
 
 // PubSub wraps Dapr pub/sub operations
@@ -206,9 +204,3 @@ func (p *PubSub) CreateCorrelationID() string {
 	return fmt.Sprintf("%s-%d", p.appID, time.Now().UnixNano())
 }
 
-func getEnv(key, defaultValue string) string {
-	if value := os.Getenv(key); value != "" {
-		return value
-	}
-	return defaultValue
-}

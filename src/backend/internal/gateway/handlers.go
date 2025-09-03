@@ -58,9 +58,6 @@ func (h *GatewayHandler) RegisterRoutes(router *mux.Router) {
 	
 	// Gateway information endpoint
 	router.HandleFunc("/gateway/info", h.GatewayInfo).Methods("GET")
-	
-	// Catch-all for undefined routes
-	router.PathPrefix("/").HandlerFunc(h.NotFoundHandler)
 }
 
 // ProxyToContentAPI proxies requests to content API service
@@ -113,12 +110,12 @@ func (h *GatewayHandler) HealthCheck(w http.ResponseWriter, r *http.Request) {
 		health["backend_services"] = "unhealthy"
 		health["error"] = err.Error()
 		
-		h.writeJSONResponse(w, http.StatusServiceUnavailable, health)
+		h.writeJSONResponse(w, r, http.StatusServiceUnavailable, health)
 		return
 	}
 	
 	health["backend_services"] = "healthy"
-	h.writeJSONResponse(w, http.StatusOK, health)
+	h.writeJSONResponse(w, r, http.StatusOK, health)
 }
 
 // ReadinessCheck provides a readiness check endpoint
@@ -151,11 +148,11 @@ func (h *GatewayHandler) ReadinessCheck(w http.ResponseWriter, r *http.Request) 
 	if !ready {
 		readiness["status"] = "not_ready"
 		readiness["reasons"] = reasons
-		h.writeJSONResponse(w, http.StatusServiceUnavailable, readiness)
+		h.writeJSONResponse(w, r, http.StatusServiceUnavailable, readiness)
 		return
 	}
 	
-	h.writeJSONResponse(w, http.StatusOK, readiness)
+	h.writeJSONResponse(w, r, http.StatusOK, readiness)
 }
 
 // MetricsEndpoint provides metrics information
@@ -188,7 +185,7 @@ func (h *GatewayHandler) MetricsEndpoint(w http.ResponseWriter, r *http.Request)
 		"services": serviceMetrics,
 	}
 	
-	h.writeJSONResponse(w, http.StatusOK, metrics)
+	h.writeJSONResponse(w, r, http.StatusOK, metrics)
 }
 
 // GatewayInfo provides gateway information
@@ -220,7 +217,7 @@ func (h *GatewayHandler) GatewayInfo(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	
-	h.writeJSONResponse(w, http.StatusOK, info)
+	h.writeJSONResponse(w, r, http.StatusOK, info)
 }
 
 // NotFoundHandler handles undefined routes
@@ -241,7 +238,7 @@ func (h *GatewayHandler) NotFoundHandler(w http.ResponseWriter, r *http.Request)
 		},
 	}
 	
-	h.writeJSONResponse(w, http.StatusNotFound, errorResponse)
+	h.writeJSONResponse(w, r, http.StatusNotFound, errorResponse)
 }
 
 // Helper methods
@@ -280,6 +277,10 @@ func (h *GatewayHandler) handleError(w http.ResponseWriter, r *http.Request, err
 		statusCode = http.StatusTooManyRequests
 		errorCode = "RATE_LIMIT_EXCEEDED"
 		message = err.Error()
+	case domain.IsDependencyError(err):
+		statusCode = http.StatusBadGateway
+		errorCode = "DEPENDENCY_ERROR"
+		message = err.Error()
 	default:
 		statusCode = http.StatusBadGateway
 		errorCode = "GATEWAY_ERROR"
@@ -298,12 +299,21 @@ func (h *GatewayHandler) handleError(w http.ResponseWriter, r *http.Request, err
 		},
 	}
 
-	h.writeJSONResponse(w, statusCode, errorResponse)
+	h.writeJSONResponse(w, r, statusCode, errorResponse)
 }
 
 // writeJSONResponse writes a JSON response with proper headers
-func (h *GatewayHandler) writeJSONResponse(w http.ResponseWriter, statusCode int, data interface{}) {
+func (h *GatewayHandler) writeJSONResponse(w http.ResponseWriter, r *http.Request, statusCode int, data interface{}) {
+	// Set correlation ID header
+	if correlationID := domain.GetCorrelationID(r.Context()); correlationID != "" {
+		w.Header().Set("X-Correlation-ID", correlationID)
+	}
 	w.Header().Set("Content-Type", "application/json")
+	
+	// Add security headers
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("X-Frame-Options", "DENY")
+	w.Header().Set("X-XSS-Protection", "1; mode=block")
 	
 	// Set cache control based on gateway configuration
 	if h.config.CacheControl.Enabled && statusCode == http.StatusOK {

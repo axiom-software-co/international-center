@@ -2,11 +2,12 @@ package services
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
 	"github.com/axiom-software-co/international-center/src/backend/internal/shared/domain"
-	"github.com/axiom-software-co/international-center/src/backend/internal/shared/testing"
+	sharedtesting "github.com/axiom-software-co/international-center/src/backend/internal/shared/testing"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -15,9 +16,10 @@ import (
 type MockServicesRepository struct {
 	services         map[string]*Service
 	categories       map[string]*ServiceCategory
-	featuredCategories map[int]*FeaturedCategory
+	featuredCategories map[string]*FeaturedCategory
 	auditEvents      []MockAuditEvent
 	failures         map[string]error
+	blobs            map[string][]byte
 }
 
 type MockAuditEvent struct {
@@ -33,9 +35,10 @@ func NewMockServicesRepository() *MockServicesRepository {
 	return &MockServicesRepository{
 		services:         make(map[string]*Service),
 		categories:       make(map[string]*ServiceCategory),
-		featuredCategories: make(map[int]*FeaturedCategory),
+		featuredCategories: make(map[string]*FeaturedCategory),
 		auditEvents:      make([]MockAuditEvent, 0),
 		failures:         make(map[string]error),
+		blobs:            make(map[string][]byte),
 	}
 }
 
@@ -198,11 +201,12 @@ func (m *MockServicesRepository) GetFeaturedCategoryByPosition(ctx context.Conte
 	if err, exists := m.failures["GetFeaturedCategoryByPosition"]; exists {
 		return nil, err
 	}
-	fc, exists := m.featuredCategories[position]
-	if !exists {
-		return nil, domain.NewNotFoundError("featured_category", string(rune(position)))
+	for _, fc := range m.featuredCategories {
+		if fc.FeaturePosition == position {
+			return fc, nil
+		}
 	}
-	return fc, nil
+	return nil, domain.NewNotFoundError("featured_category", fmt.Sprintf("position-%d", position))
 }
 
 // Content repository methods
@@ -234,6 +238,88 @@ func (m *MockServicesRepository) PublishAuditEvent(ctx context.Context, entityTy
 		After:         after,
 	})
 	return nil
+}
+
+// SaveServiceCategory mocks saving a service category
+func (m *MockServicesRepository) SaveServiceCategory(ctx context.Context, category *ServiceCategory) error {
+	if err, exists := m.failures["SaveServiceCategory"]; exists {
+		return err
+	}
+	m.categories[category.CategoryID] = category
+	return nil
+}
+
+// GetDefaultUnassignedCategory mocks getting default unassigned category
+func (m *MockServicesRepository) GetDefaultUnassignedCategory(ctx context.Context) (*ServiceCategory, error) {
+	if err, exists := m.failures["GetDefaultUnassignedCategory"]; exists {
+		return nil, err
+	}
+	for _, category := range m.categories {
+		if category.IsDefaultUnassigned {
+			return category, nil
+		}
+	}
+	// Return a default category if none exists
+	defaultCat, _ := NewServiceCategory("Unassigned", "unassigned", true, "system")
+	return defaultCat, nil
+}
+
+// DeleteServiceCategory mocks deleting a service category
+func (m *MockServicesRepository) DeleteServiceCategory(ctx context.Context, categoryID string, userID string) error {
+	if err, exists := m.failures["DeleteServiceCategory"]; exists {
+		return err
+	}
+	category, exists := m.categories[categoryID]
+	if !exists {
+		return domain.NewNotFoundError("service_category", categoryID)
+	}
+	category.Delete(userID)
+	return nil
+}
+
+// SaveFeaturedCategory mocks saving a featured category
+func (m *MockServicesRepository) SaveFeaturedCategory(ctx context.Context, featured *FeaturedCategory) error {
+	if err, exists := m.failures["SaveFeaturedCategory"]; exists {
+		return err
+	}
+	m.featuredCategories[featured.FeaturedCategoryID] = featured
+	return nil
+}
+
+// GetFeaturedCategory mocks getting a featured category by ID
+func (m *MockServicesRepository) GetFeaturedCategory(ctx context.Context, featuredCategoryID string) (*FeaturedCategory, error) {
+	if err, exists := m.failures["GetFeaturedCategory"]; exists {
+		return nil, err
+	}
+	featured, exists := m.featuredCategories[featuredCategoryID]
+	if !exists {
+		return nil, domain.NewNotFoundError("featured_category", featuredCategoryID)
+	}
+	return featured, nil
+}
+
+// DeleteFeaturedCategory mocks deleting a featured category
+func (m *MockServicesRepository) DeleteFeaturedCategory(ctx context.Context, featuredCategoryID string) error {
+	if err, exists := m.failures["DeleteFeaturedCategory"]; exists {
+		return err
+	}
+	_, exists := m.featuredCategories[featuredCategoryID]
+	if !exists {
+		return domain.NewNotFoundError("featured_category", featuredCategoryID)
+	}
+	delete(m.featuredCategories, featuredCategoryID)
+	return nil
+}
+
+// DownloadServiceContentBlob mocks downloading a blob
+func (m *MockServicesRepository) DownloadServiceContentBlob(ctx context.Context, storagePath string) ([]byte, error) {
+	if err, exists := m.failures["DownloadServiceContentBlob"]; exists {
+		return nil, err
+	}
+	if blob, exists := m.blobs[storagePath]; exists {
+		return blob, nil
+	}
+	return nil, domain.NewNotFoundError("blob", storagePath)
 }
 
 // Test helper functions
@@ -331,7 +417,7 @@ func TestServicesService_GetService(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Arrange
-			ctx, cancel := testing.CreateUnitTestContext()
+			ctx, cancel := sharedtesting.CreateUnitTestContext()
 			defer cancel()
 			
 			mockRepo := NewMockServicesRepository()
@@ -485,7 +571,7 @@ func TestServicesService_CreateService(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Arrange
-			ctx, cancel := testing.CreateUnitTestContext()
+			ctx, cancel := sharedtesting.CreateUnitTestContext()
 			defer cancel()
 			
 			mockRepo := NewMockServicesRepository()
@@ -577,7 +663,7 @@ func TestServicesService_PublishService(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Arrange
-			ctx, cancel := testing.CreateUnitTestContext()
+			ctx, cancel := sharedtesting.CreateUnitTestContext()
 			defer cancel()
 			
 			mockRepo := NewMockServicesRepository()
@@ -684,7 +770,7 @@ func TestServicesService_GetAllServices(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Arrange
-			ctx, cancel := testing.CreateUnitTestContext()
+			ctx, cancel := sharedtesting.CreateUnitTestContext()
 			defer cancel()
 			
 			mockRepo := NewMockServicesRepository()
@@ -712,7 +798,7 @@ func TestServicesService_GetAllServices(t *testing.T) {
 
 func TestServicesService_Timeout(t *testing.T) {
 	// Test that context timeout is respected (5 seconds for unit tests)
-	ctx, cancel := testing.CreateUnitTestContext()
+	ctx, cancel := sharedtesting.CreateUnitTestContext()
 	defer cancel()
 	
 	// Verify context has 5 second timeout

@@ -584,7 +584,30 @@ func (r *ServicesRepository) PublishAuditEvent(ctx context.Context, entityType d
 	auditEvent.SetEnvironmentContext("development", "1.0.0")
 	auditEvent.SetDataSnapshot(beforeData, afterData)
 
-	err := r.pubsub.PublishAuditEvent(ctx, auditEvent)
+	// Convert domain.AuditEvent to dapr.AuditEvent
+	daprAuditEvent := &dapr.AuditEvent{
+		AuditID:       auditEvent.AuditID,
+		EntityType:    string(auditEvent.EntityType),
+		EntityID:      auditEvent.EntityID,
+		OperationType: string(auditEvent.OperationType),
+		AuditTime:     auditEvent.AuditTime,
+		UserID:        auditEvent.UserID,
+		CorrelationID: auditEvent.CorrelationID,
+		TraceID:       auditEvent.TraceID,
+		Environment:   auditEvent.Environment,
+		AppVersion:    auditEvent.AppVersion,
+		RequestURL:    auditEvent.RequestURL,
+	}
+	
+	// Convert data snapshot to map[string]interface{}
+	if auditEvent.DataSnapshot != nil {
+		daprAuditEvent.DataSnapshot = map[string]interface{}{
+			"before": auditEvent.DataSnapshot.Before,
+			"after":  auditEvent.DataSnapshot.After,
+		}
+	}
+
+	err := r.pubsub.PublishAuditEvent(ctx, daprAuditEvent)
 	if err != nil {
 		return fmt.Errorf("failed to publish audit event for %s %s: %w", entityType, entityID, err)
 	}

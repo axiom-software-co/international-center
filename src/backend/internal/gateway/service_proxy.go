@@ -10,11 +10,22 @@ import (
 
 	"github.com/axiom-software-co/international-center/src/backend/internal/shared/dapr"
 	"github.com/axiom-software-co/international-center/src/backend/internal/shared/domain"
+	"github.com/google/uuid"
 )
+
+// ServiceInvocationInterface defines the contract for service invocation operations
+type ServiceInvocationInterface interface {
+	InvokeContentAPI(ctx context.Context, method, httpVerb string, data []byte) (*dapr.ServiceResponse, error)
+	InvokeServicesAPI(ctx context.Context, method, httpVerb string, data []byte) (*dapr.ServiceResponse, error)
+	CheckContentAPIHealth(ctx context.Context) (bool, error)
+	CheckServicesAPIHealth(ctx context.Context) (bool, error)
+	GetContentAPIMetrics(ctx context.Context) (map[string]interface{}, error)
+	GetServicesAPIMetrics(ctx context.Context) (map[string]interface{}, error)
+}
 
 // ServiceProxy handles proxying requests to backend services via Dapr service invocation
 type ServiceProxy struct {
-	serviceInvocation *dapr.ServiceInvocation
+	serviceInvocation ServiceInvocationInterface
 	configuration     *GatewayConfiguration
 }
 
@@ -22,6 +33,14 @@ type ServiceProxy struct {
 func NewServiceProxy(client *dapr.Client, config *GatewayConfiguration) *ServiceProxy {
 	return &ServiceProxy{
 		serviceInvocation: dapr.NewServiceInvocation(client),
+		configuration:     config,
+	}
+}
+
+// NewServiceProxyWithInvocation creates a service proxy with a specific service invocation implementation (for testing)
+func NewServiceProxyWithInvocation(serviceInvocation ServiceInvocationInterface, config *GatewayConfiguration) *ServiceProxy {
+	return &ServiceProxy{
+		serviceInvocation: serviceInvocation,
 		configuration:     config,
 	}
 }
@@ -37,7 +56,7 @@ func (p *ServiceProxy) ProxyRequest(ctx context.Context, w http.ResponseWriter, 
 	// Add correlation context to request
 	correlationCtx := domain.FromContext(ctx)
 	if correlationCtx.CorrelationID == "" {
-		correlationCtx.CorrelationID = domain.GenerateCorrelationID()
+		correlationCtx.CorrelationID = uuid.New().String()
 	}
 
 	// Prepare request data
@@ -95,7 +114,7 @@ func (p *ServiceProxy) parseTargetService(path, targetService string) (string, s
 	}
 
 	// Extract version and service from path
-	version := parts[1] // e.g., "v1"
+	_ = parts[1] // version - e.g., "v1" (currently unused)
 	service := parts[2] // e.g., "content" or "services"
 	
 	// Determine service name and remaining path
@@ -119,7 +138,27 @@ func (p *ServiceProxy) parseTargetService(path, targetService string) (string, s
 func (p *ServiceProxy) invokeContentAPI(ctx context.Context, method, path string, data interface{}, headers map[string]string) (interface{}, error) {
 	switch {
 	case strings.HasPrefix(path, "/api/v1/content"):
-		return p.serviceInvocation.InvokeContentAPI(ctx, method, path, data, headers)
+		// Convert data to []byte if needed
+		var requestData []byte
+		if data != nil {
+			var err error
+			requestData, err = json.Marshal(data)
+			if err != nil {
+				return nil, domain.NewValidationError("failed to marshal request data")
+			}
+		}
+		response, err := p.serviceInvocation.InvokeContentAPI(ctx, path, method, requestData)
+		if err != nil {
+			return nil, err
+		}
+		// Parse response data back to interface{}
+		var result interface{}
+		if len(response.Data) > 0 {
+			if err := json.Unmarshal(response.Data, &result); err != nil {
+				return nil, domain.NewInternalError("failed to unmarshal response", err)
+			}
+		}
+		return result, nil
 	default:
 		return nil, domain.NewNotFoundError("content API endpoint", path)
 	}
@@ -129,7 +168,27 @@ func (p *ServiceProxy) invokeContentAPI(ctx context.Context, method, path string
 func (p *ServiceProxy) invokeServicesAPI(ctx context.Context, method, path string, data interface{}, headers map[string]string) (interface{}, error) {
 	switch {
 	case strings.HasPrefix(path, "/api/v1/services"):
-		return p.serviceInvocation.InvokeServicesAPI(ctx, method, path, data, headers)
+		// Convert data to []byte if needed
+		var requestData []byte
+		if data != nil {
+			var err error
+			requestData, err = json.Marshal(data)
+			if err != nil {
+				return nil, domain.NewValidationError("failed to marshal request data")
+			}
+		}
+		response, err := p.serviceInvocation.InvokeServicesAPI(ctx, path, method, requestData)
+		if err != nil {
+			return nil, err
+		}
+		// Parse response data back to interface{}
+		var result interface{}
+		if len(response.Data) > 0 {
+			if err := json.Unmarshal(response.Data, &result); err != nil {
+				return nil, domain.NewInternalError("failed to unmarshal response", err)
+			}
+		}
+		return result, nil
 	default:
 		return nil, domain.NewNotFoundError("services API endpoint", path)
 	}

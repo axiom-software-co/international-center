@@ -11,13 +11,33 @@ import (
 	"github.com/axiom-software-co/international-center/src/backend/internal/shared/domain"
 )
 
+// ContentRepositoryInterface defines the repository contract for content operations
+type ContentRepositoryInterface interface {
+	SaveContent(ctx context.Context, content *Content) error
+	GetContent(ctx context.Context, contentID string) (*Content, error)
+	GetAllContent(ctx context.Context) ([]*Content, error)
+	GetContentByCategory(ctx context.Context, category ContentCategory) ([]*Content, error)
+	GetContentByAccessLevel(ctx context.Context, accessLevel AccessLevel) ([]*Content, error)
+	DeleteContent(ctx context.Context, contentID string, userID string) error
+	UploadContentBlob(ctx context.Context, storagePath string, data []byte, contentType string) error
+	DownloadContentBlob(ctx context.Context, storagePath string) ([]byte, error)
+	DeleteContentBlob(ctx context.Context, storagePath string) error
+	GetContentBlobMetadata(ctx context.Context, storagePath string) (map[string]string, error)
+	CreateContentBlobURL(ctx context.Context, storagePath string, expiryMinutes int) (string, error)
+	SaveContentAccessLog(ctx context.Context, accessLog *ContentAccessLog) error
+	SaveContentVirusScan(ctx context.Context, virusScan *ContentVirusScan) error
+	GetContentVirusScan(ctx context.Context, contentID string) ([]*ContentVirusScan, error)
+	PublishAuditEvent(ctx context.Context, entityType domain.EntityType, entityID string, operationType domain.AuditEventType, userID string, beforeData, afterData interface{}) error
+	SearchContent(ctx context.Context, searchTerm string) ([]*Content, error)
+}
+
 // ContentService implements business logic for content operations
 type ContentService struct {
-	repository *ContentRepository
+	repository ContentRepositoryInterface
 }
 
 // NewContentService creates a new content service
-func NewContentService(repository *ContentRepository) *ContentService {
+func NewContentService(repository ContentRepositoryInterface) *ContentService {
 	return &ContentService{
 		repository: repository,
 	}
@@ -31,6 +51,10 @@ func (s *ContentService) GetContent(ctx context.Context, contentID string, userI
 
 	content, err := s.repository.GetContent(ctx, contentID)
 	if err != nil {
+		// Don't wrap domain errors that are already properly categorized
+		if domain.IsNotFoundError(err) {
+			return nil, err
+		}
 		return nil, domain.WrapError(err, fmt.Sprintf("failed to get content %s for user %s", contentID, userID))
 	}
 
@@ -40,7 +64,7 @@ func (s *ContentService) GetContent(ctx context.Context, contentID string, userI
 	}
 
 	// Log access for analytics
-	go s.logContentAccess(context.Background(), content, userID, "view")
+	s.logContentAccess(context.Background(), content, userID, "view")
 
 	return content, nil
 }
@@ -53,7 +77,7 @@ func (s *ContentService) GetAllContent(ctx context.Context, userID string) ([]*C
 	}
 
 	// Filter based on access permissions
-	var accessibleContent []*Content
+	accessibleContent := make([]*Content, 0)
 	for _, content := range allContent {
 		if s.checkContentAccess(content, userID) == nil {
 			accessibleContent = append(accessibleContent, content)
@@ -85,9 +109,32 @@ func (s *ContentService) GetContentByCategory(ctx context.Context, category Cont
 	return accessibleContent, nil
 }
 
+// getContentInternal retrieves content without logging (for internal use)
+func (s *ContentService) getContentInternal(ctx context.Context, contentID string, userID string) (*Content, error) {
+	if contentID == "" {
+		return nil, domain.NewValidationError("content ID cannot be empty")
+	}
+
+	content, err := s.repository.GetContent(ctx, contentID)
+	if err != nil {
+		// Don't wrap domain errors that are already properly categorized
+		if domain.IsNotFoundError(err) {
+			return nil, err
+		}
+		return nil, domain.WrapError(err, fmt.Sprintf("failed to get content %s for user %s", contentID, userID))
+	}
+
+	// Check access permissions
+	if err := s.checkContentAccess(content, userID); err != nil {
+		return nil, err
+	}
+
+	return content, nil
+}
+
 // GetContentDownload retrieves content download URL
 func (s *ContentService) GetContentDownload(ctx context.Context, contentID string, userID string) (string, error) {
-	content, err := s.GetContent(ctx, contentID, userID)
+	content, err := s.getContentInternal(ctx, contentID, userID)
 	if err != nil {
 		return "", err
 	}
@@ -104,7 +151,7 @@ func (s *ContentService) GetContentDownload(ctx context.Context, contentID strin
 	}
 
 	// Log download access
-	go s.logContentAccess(context.Background(), content, userID, "download")
+	s.logContentAccess(context.Background(), content, userID, "download")
 
 	return downloadURL, nil
 }
@@ -128,7 +175,7 @@ func (s *ContentService) GetContentPreview(ctx context.Context, contentID string
 	}
 
 	// Log preview access
-	go s.logContentAccess(context.Background(), content, userID, "preview")
+	s.logContentAccess(context.Background(), content, userID, "preview")
 
 	return previewURL, nil
 }
