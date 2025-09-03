@@ -164,3 +164,78 @@ Frontend Layer (Highest)
 - **Short-Lived Features**: Minimal branch lifetime and scope
 - **Continuous Integration**: Automated validation of all changes
 - **Feature Flags**: Runtime behavior control instead of branching
+
+# End-to-End Deployment Pipeline - Multi-Environment Orchestration
+
+## Architecture Overview
+
+**Development Environment**: Podman Compose with containerd runtime for complete local development
+**Staging Environment**: Azure Container Apps with Dapr integration via Pulumi orchestration (careful migration approach)
+**Production Environment**: Azure Container Apps with Dapr integration via Pulumi orchestration (conservative migration approach)
+**Version Control**: Trunk-based development with GitHub and GitHub Container Registry
+**Infrastructure as Code**: Single Pulumi Go SDK program orchestrating multi-cloud deployment
+**State Management**: Azure Blob Storage for Pulumi state backend with environment isolation
+**Migration Management**: Go migration tools built and executed via Pulumi Command resources
+**Observability**: Grafana Cloud integration for staging/production, local Grafana stack for development
+**Security**: HashiCorp Vault Cloud for production secrets, local Vault for development
+
+## Environment-Specific Deployment Strategies
+
+### Development Environment (Aggressive Migration Approach)
+- **Runtime**: Podman Compose with containerd
+- **Purpose**: Complete local development environment with production parity
+- **Migration Strategy**: Aggressive - always migrate to latest version with automatic rollback via environment reset
+- **Rollback**: Easy - destroy and recreate database and volumes
+- **Safety Checks**: Minimal validation for fast iteration
+- **Automation**: Full automation via Podman Compose init containers
+- **Timeout**: 30 seconds maximum for migration operations
+
+### Staging Environment (Careful Migration Approach)
+- **Runtime**: Azure Container Apps with Dapr service mesh
+- **Purpose**: Production-like validation environment for integration testing
+- **Migration Strategy**: Careful - migrate with validation and confirmation prompts
+- **Rollback**: Supported with automated confirmation via Pulumi orchestration
+- **Safety Checks**: Moderate validation of schema integrity and compliance
+- **Automation**: Pulumi orchestrated via GitHub Actions on develop branch
+- **Backup**: Incremental backup before migration operations
+- **Timeout**: 300 seconds maximum for migration operations
+
+### Production Environment (Conservative Migration Approach)
+- **Runtime**: Azure Container Apps with Dapr service mesh and compliance controls
+- **Purpose**: Production deployment with extensive validation and audit requirements
+- **Migration Strategy**: Conservative - extensive validation before any schema changes
+- **Rollback**: Manual approval required for rollback operations via GitHub environment
+- **Safety Checks**: Full validation, backup verification, and compliance validation
+- **Automation**: Pulumi orchestrated with human approval gates on main branch
+- **Backup**: Full backup with verification before any schema changes
+- **Timeout**: 900 seconds maximum for migration operations
+
+## Development Environment Configuration
+
+This integrated approach ensures:
+- **Single Source of Truth**: All infrastructure, migrations, and applications defined in one program
+- **Proper Dependencies**: Pulumi manages resource creation order and dependencies across environments
+- **Environment-Specific Behavior**: Configuration-driven approach for development/staging/production
+- **Compliance and Audit**: Built-in audit logging and compliance validation for all environments
+- **State Consistency**: All changes tracked in single Pulumi state file per environment
+- **Migration Integration**: Database migrations executed as Pulumi Command resources with proper orchestration
+
+## Compliance and Audit Requirements
+
+### Multi-Environment Audit Trail
+- **Development**: Basic logging to local Grafana stack for debugging and development workflow
+- **Staging**: Enhanced audit logging to Grafana Cloud Loki for validation and integration testing
+- **Production**: Full compliance audit logging to Grafana Cloud Loki with immutable event sourcing
+- **Cross-Environment**: All deployment operations logged with correlation IDs and environment context
+
+### Schema Compliance Validation
+- **Development**: Minimal validation for fast iteration with aggressive rollback via environment reset
+- **Staging**: Moderate schema validation ensuring database matches specification files exactly
+- **Production**: Extensive schema validation with full backup verification and compliance checking
+- **No Audit Tables**: Compliance requirement enforced across all environments - no audit data in databases
+
+### Migration Backup and Recovery Strategy
+- **Development**: No backup required - aggressive rollback via complete environment recreation
+- **Staging**: Incremental backup before migration operations with automated rollback capability
+- **Production**: Full backup with verification before any schema changes, manual approval for rollbacks
+- **Cross-Environment**: All backup operations logged to Grafana Cloud for audit trail compliance

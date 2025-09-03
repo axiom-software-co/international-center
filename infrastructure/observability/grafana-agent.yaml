@@ -1,0 +1,74 @@
+# Grafana Agent configuration for development
+server:
+  log_level: info
+
+metrics:
+  global:
+    scrape_interval: 15s
+    external_labels:
+      cluster: 'international-center-dev'
+  configs:
+  - name: integrations
+    remote_write:
+    - url: http://mimir:9009/api/v1/push
+      headers:
+        X-Scope-OrgID: demo
+    scrape_configs:
+    - job_name: 'infrastructure'
+      static_configs:
+      - targets: 
+        - postgresql:5432
+        - redis-dapr:6379
+        - grafana:3000
+        - mimir:9009
+        - loki:3100
+        - tempo:3200
+        - pyroscope:4040
+        - vault:8200
+        - opa:8181
+        - authentik:9000
+    - job_name: 'dapr-control-plane'
+      static_configs:
+      - targets:
+        - dapr-placement:6050
+        - dapr-sentry:6051
+
+logs:
+  configs:
+  - name: integrations
+    clients:
+    - url: http://loki:3100/loki/api/v1/push
+      external_labels:
+        cluster: 'international-center-dev'
+    positions:
+      filename: /tmp/positions.yaml
+    scrape_configs:
+    - job_name: containers
+      static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: containers
+          __path__: /var/log/containers/*.log
+
+traces:
+  configs:
+  - name: default
+    receivers:
+      otlp:
+        protocols:
+          grpc:
+            endpoint: 0.0.0.0:4317
+          http:
+            endpoint: 0.0.0.0:4318
+      jaeger:
+        protocols:
+          grpc:
+            endpoint: 0.0.0.0:14250
+          thrift_http:
+            endpoint: 0.0.0.0:14268
+      zipkin:
+        endpoint: 0.0.0.0:9411
+    remote_write:
+    - endpoint: tempo:4317
+      insecure: true

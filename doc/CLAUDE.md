@@ -12,7 +12,9 @@
 
 - IMPORTANT AXIOM RULE TO FOLLOW : consider stubs the worst anti-pattern ( we should use propper infrastructure and fix root issues as they arise ) ( we should not fall back to stubs in integration tests ) 
 
-- IMPORTANT AXIOM RULE TO FOLLOW : environment variables are defined only in the container files ( networking configuration , including ports  , should not be hardcoded , it should always come from the environment ) ( we should not have fallback networking configuration in implementation nor integration tests ) 
+- IMPORTANT AXIOM RULE TO FOLLOW : only run integration tests when the entire podman compose development environment is up
+
+- IMPORTANT AXIOM RULE TO FOLLOW : environment variables are defined only in the env files ( networking configuration , including ports  , should not be hardcoded , it should always come from the environment ) ( we should not have fallback networking configuration in implementation nor integration tests ) 
 
 
 - note : we will not work on the public and admin website frontend at the moment ( once we confirm our infrastructure and api gateways CICD is working , we will consider working on the website )
@@ -21,6 +23,8 @@
 
 - note : we do not need cloudfalre CDN for now
 
+- note : we will only work on the simple GET endpoints for now , while we validate our development environment and deployment
+
 
 [ important project related rules to follow ]
 
@@ -28,22 +32,22 @@
 
 - test-driven development ( red phase , green phase , refactor phase ) ( tests drive and validate the design of our architecture ) ( creating new methods from refactoring should not require us to write new tests , this violates the contract-first testing principle ) ( you are allowed to modify the project and tests implementations as you see fit , since project and/or tests abstractions and/or implementations sometimes need to be updated ) ( when planning a new TDD cycle , provide a list of all the files you intend to edit and what you intend to do in each phase )
 
-- use podman compose with containerd runtime to provision our local development environment ( resources and services ) ( do not mention docker )
+- use podman compose with containerd runtime to provision our local development environment ( resources and services ) ( do not mention docker ) ( 'podman-compose --env-file .env.development' should be used to manage podman containers in local development ) 
 
 # architecture patterns
 
 - cohesion over coupling
+- seperation of concerns
+
 - best practices in our stack
 - idiomatic go patterns
 
-- handler , service , repository pattern, dapr-centric
-
-- dependency inversion ( interfaces for variable concerns, dependency injection with interfaces ) ( concrete types for stable concerns ) 
-- http server patterns 
-- health check pattern 
-- synchronous and asynchronous patterns were appropriate
-
+- health check patterns
 - environment configuration pattern 
+- http server patterns 
+- handler , service , repository pattern, dapr-centric
+- dependency inversion ( interfaces for variable concerns, dependency injection with interfaces ) ( concrete types for stable concerns ) 
+- synchronous and asynchronous patterns were appropriate
 
 - warnings as errors
 - singletons can only depend on singletons
@@ -63,12 +67,12 @@
 
 ## api gateways
 
+- handle cross cutting concerns
+
 - reverse proxy
 - rate limiting
 - security headers
 - cors policies
-
-- handle cross cutting concerns
 
 ### public apis gateway
 
@@ -145,9 +149,13 @@
 
 ## apis and events and public and admin api gateways
 
-- go
+- golang
+- golang-migrate
+
 - sql
+
 - dapr apis
+
 - feature flags
 
 ## dapr stateless services
@@ -174,23 +182,22 @@
 - oauth2 client credentials : dapr oauth2 client credentials in production ( dapr oauth2 client credentials for local development )
 - opa policies : dapr opa policies in production ( dapr opa policies for local development )
 
-## azure managed stateful resources
+## managed stateful resources
 
+- pub/sub and authenticated sessions : upstash redis hosted for production ( redis container for local development ) 
 - secret store : hashicorp vault cloud hosted for production ( hashicorp vault and vault data containers for local development )
 
+- relational database ( includes configuration store and state store and identity storage and services storage ) : azure manged postgre hosted for production ( postgre container for local development ) 
 - file storage : azure blob storage hosted for production ( azurite blob storage emulator and azurite-data containers for local development https://github.com/Azure/Azurite )
-- non-relational database : azure cosmosdb hosted for production ( azure cosmos db emulator and cosmos-data containers for local development https://github.com/Azure/azure-cosmos-db-emulator-docker )
-
-- pub/sub ( includes bindings ) : azure service bus hosted for production ( service bus emulator and sql edge data containers for local development https://github.com/Azure/azure-service-bus-emulator-installer https://hub.docker.com/r/microsoft/azure-sql-edge )
-- relational database ( includes configuration store and state store ) : azure manged postgre hosted for production ( postgre container for local development ) 
 
 ## grafana cloud observability 
 
 - objeservability : grafana , mimir , loki , tempo , pyroscope in container with their respective data volumes containers ( grafana-data , mimir-data , loki-data , tempo-data , pyroscope-data ) for production and local development 
 
-## content delivery optimization
+## content delivery
 
-- cloudflare cdn
+- website hosting : cloudflare pages
+- content delivery netowkr : cloudflare cdn
 
 ## persistent storage migrations
 
@@ -237,21 +244,20 @@
 - do not create documentation
 - do not preserve legacy implementations
 - do not implement experimental architectures not part of industry
-- do not change the UI of our website unless explicitly asked to
+- do not create script files for projects ( this is an anti-pattern )
 - do not create simple ephimeral validation implementations in /temp/ directories to avoid disorder in source files
-- do not creaate script files for projects ( this is an anti-pattern )
+- do not change the UI of our website unless explicitly asked to
 - do not stage and commit and push unless I explicitly ask you to
 
 # Task Management Context Guidelines
+
+- when a plan gets approved , add all the tasks to your tasks list . 
 
 - task descriptions must include WHY ( business reason , compliance requirement , architectural decision , so forth )
 - task descriptions must include SCOPE ( which APIs , which components , which environments , so forth )
 - task descriptions must include DEPENDENCIES ( what must complete first , integration points , so forth )
 - task descriptions must include CONTEXT ( gateway architecture , medical compliance , environment specifics , so forth )
 
-- critical : ensure you add proper context to your task list items , in the event context compression happens in the middle of a task , so you have a better idea of what you were working ( your task list is your primary source of context between context compressions , so it needs to be we managed )
-- show the tasks list after completing a task
-- ensure you update your context before working on the next task
-
+- critical : in the event context compression happens in the middle of a task , your task list is your primary source of context between context compressions , so it needs to be well managed 
 
 ( continue working ) ( get to work ) 

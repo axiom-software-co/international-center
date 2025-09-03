@@ -1,0 +1,47 @@
+# Mimir single-process mode configuration for development  
+target: all,alertmanager
+
+server:
+  http_listen_port: 9009
+  grpc_listen_port: 9095
+  log_level: info
+
+common:
+  storage:
+    backend: filesystem
+    filesystem:
+      dir: /data
+
+blocks_storage:
+  backend: filesystem
+  filesystem:
+    dir: /data/blocks
+
+compactor:
+  data_dir: /data/compactor
+
+distributor:
+  ring:
+    kvstore:
+      store: memberlist
+
+ingester:
+  ring:
+    kvstore:
+      store: memberlist
+
+ruler_storage:
+  backend: filesystem
+  filesystem:
+    dir: /data/ruler-storage
+
+ruler:
+  rule_path: /data/ruler-rules
+
+store_gateway:
+  sharding_ring:
+    kvstore:
+      store: memberlist
+
+memberlist:
+  bind_port: 7946
