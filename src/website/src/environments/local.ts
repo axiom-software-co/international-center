@@ -45,7 +45,7 @@ export const localConfig = {
         retryAttempts: 2,
       },
       events: {
-        baseUrl: getBaseUrl('events-domain', 8085),
+        baseUrl: getPublicGatewayUrl(), // Route through Public Gateway for security and rate limiting
         timeout: 5000,
         retryAttempts: 2,
       },

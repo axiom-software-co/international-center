@@ -24,10 +24,12 @@ export { BaseRestClient, RestError as ClientRestError } from './BaseRestClient';
 export type { RestClientConfig, RestResponse, PaginatedRestResponse } from './BaseRestClient';
 
 // Services domain (REST-enabled)
-export { ServicesRestClient } from './ServicesRestClient';
+import { ServicesRestClient } from './ServicesRestClient';
+export { ServicesRestClient };
 
 // News domain (REST-enabled)
-export { NewsRestClient } from './NewsRestClient';
+import { NewsRestClient } from './NewsRestClient';
+export { NewsRestClient };
 
 // Re-export services types
 export type {

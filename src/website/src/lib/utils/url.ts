@@ -83,6 +83,37 @@ export function getServiceSlugFromUrl(): string {
 }
 
 /**
+ * Extract event slug from event URLs
+ * Expected format: /community/events/event-slug
+ * Returns empty string if URL is just /community/events/ (no event)
+ */
+export function getEventSlugFromUrl(): string {
+  if (typeof window === 'undefined') {
+    return '';
+  }
+  
+  const path = window.location.pathname;
+  
+  // Check if this is an events path
+  if (!path.startsWith('/community/events/')) {
+    return '';
+  }
+  
+  // Extract the part after /community/events/
+  const afterEvents = path.replace('/community/events/', '');
+  const slug = afterEvents.replace(/\/$/, ''); // Remove trailing slash
+  
+  // If it's empty or just contains slashes, return empty
+  if (!slug || slug.match(/^\/+$/)) {
+    return '';
+  }
+  
+  // Return the first segment after /community/events/
+  const segments = slug.split('/').filter(s => s.length > 0);
+  return segments[0] || '';
+}
+
+/**
  * Build a clean URL slug from a title
  */
 export function createSlugFromTitle(title: string): string {

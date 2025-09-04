@@ -75,6 +75,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
+import { formatEventDate, parseEventStatus } from '../../lib/utils/content';
 import Separator from '@/components/vue-ui/Separator.vue';
 
 interface Props {
@@ -88,23 +89,11 @@ interface Props {
 
 const props = defineProps<Props>();
 
-const isEventFull = computed(() => {
-  if (!props.capacity || props.registered === undefined) return false;
-  return props.registered >= props.capacity;
-});
+// Use centralized event status parsing
+const eventStatusInfo = computed(() => 
+  parseEventStatus(props.status, props.capacity, props.registered)
+);
 
-const buttonText = computed(() => {
-  if (isEventFull.value) return 'Event Full';
-  if (props.status === 'Registration Required') return 'Register Now';
-  return 'Join Event';
-});
-
-const formatEventDate = (dateString: string): string => {
-  return new Date(dateString).toLocaleDateString('en-US', {
-    weekday: 'long',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  });
-};
+const isEventFull = computed(() => eventStatusInfo.value.isEventFull);
+const buttonText = computed(() => eventStatusInfo.value.buttonText);
 </script>

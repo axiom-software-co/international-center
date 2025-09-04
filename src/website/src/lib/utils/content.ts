@@ -251,3 +251,115 @@ export function parseServiceDeliveryModes(slug: string): string[] {
   // Default to outpatient if no modes determined
   return modes.length > 0 ? modes : ['outpatient'];
 }
+
+/**
+ * Format event date for display
+ * @param dateString - ISO date string (e.g., "2024-03-15")
+ * @returns Formatted date string (e.g., "Friday, March 15, 2024")
+ */
+export function formatEventDate(dateString: string): string {
+  if (!dateString) return '';
+  
+  try {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    });
+  } catch (error) {
+    console.warn('Invalid date string provided to formatEventDate:', dateString);
+    return dateString; // Return original string if parsing fails
+  }
+}
+
+/**
+ * Generate event image URL with fallback placeholder
+ * @param imageUrl - Original featured image URL
+ * @param eventTitle - Event title for fallback placeholder
+ * @returns Image URL with fallback
+ */
+export function generateEventImageUrl(
+  imageUrl: string | null | undefined,
+  eventTitle: string
+): string {
+  // If we have a valid image URL, use it
+  if (imageUrl && imageUrl.trim()) {
+    return imageUrl;
+  }
+  
+  // Generate fallback placeholder URL with event title
+  const encodedTitle = encodeURIComponent(eventTitle);
+  return `https://placehold.co/800x600/e5e7eb/6b7280/png?text=${encodedTitle}`;
+}
+
+/**
+ * Parse event status and determine appropriate display information
+ * @param status - Event status string
+ * @param capacity - Event capacity (optional)
+ * @param registered - Number of registered attendees (optional)
+ * @returns Object with parsed status information
+ */
+export function parseEventStatus(
+  status: string,
+  capacity?: number,
+  registered?: number
+): {
+  displayStatus: string;
+  buttonText: string;
+  isEventFull: boolean;
+  canRegister: boolean;
+} {
+  const isEventFull = capacity && registered !== undefined ? registered >= capacity : false;
+  
+  // Handle different status cases
+  switch (status.toLowerCase()) {
+    case 'published':
+      return {
+        displayStatus: 'Open for Registration',
+        buttonText: isEventFull ? 'Event Full' : 'Join Event',
+        isEventFull,
+        canRegister: !isEventFull,
+      };
+      
+    case 'registration required':
+      return {
+        displayStatus: 'Registration Required',
+        buttonText: isEventFull ? 'Event Full' : 'Register Now',
+        isEventFull,
+        canRegister: !isEventFull,
+      };
+      
+    case 'draft':
+      return {
+        displayStatus: 'Draft',
+        buttonText: 'Not Available',
+        isEventFull: false,
+        canRegister: false,
+      };
+      
+    case 'archived':
+      return {
+        displayStatus: 'Archived',
+        buttonText: 'Event Ended',
+        isEventFull: false,
+        canRegister: false,
+      };
+      
+    case 'cancelled':
+      return {
+        displayStatus: 'Cancelled',
+        buttonText: 'Event Cancelled',
+        isEventFull: false,
+        canRegister: false,
+      };
+      
+    default:
+      return {
+        displayStatus: status,
+        buttonText: isEventFull ? 'Event Full' : 'Join Event',
+        isEventFull,
+        canRegister: !isEventFull,
+      };
+  }
+}

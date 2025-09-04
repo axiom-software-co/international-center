@@ -117,7 +117,7 @@
         </div>
 
         <!-- Related Events Section -->
-        <div v-if="!isLoading && !error && relatedEvents.length > 0" class="pt-16 lg:pt-20 pb-8 lg:pb-12">
+        <div v-if="!isLoading && !error && relatedEventsFiltered.length > 0" class="pt-16 lg:pt-20 pb-8 lg:pb-12">
           <div class="container">
             <div class="mb-4 lg:mb-6">
               <h2 class="text-xl lg:text-2xl font-semibold text-gray-900 dark:text-white">
@@ -127,9 +127,9 @@
 
             <div class="grid gap-4 md:gap-6 lg:gap-8 md:grid-cols-2 lg:grid-cols-3">
               <EventCard
-                v-for="(event, index) in relatedEvents"
-                :key="event.id"
-                :event="event"
+                v-for="(relatedEvent, index) in relatedEventsFiltered"
+                :key="relatedEvent.id"
+                :event="relatedEvent"
                 :index="index"
               />
             </div>
@@ -146,29 +146,17 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed } from 'vue';
+import { useEvent, useEvents } from '../../composables/useEvents';
+import { getEventSlugFromUrl } from '../../lib/utils/url';
+import { generateEventImageUrl } from '../../lib/utils/content';
 import EventBreadcrumb from './EventBreadcrumb.vue';
 import EventContent from './EventContent.vue';
 import EventDetails from './EventDetails.vue';
 import EventContact from './EventContact.vue';
 import UnifiedContentCTA from '../UnifiedContentCTA.vue';
 import EventCard from '../EventCard.vue';
-
-interface CommunityEvent {
-  id: string;
-  title: string;
-  slug: string;
-  description: string;
-  content?: string;
-  category: string;
-  date: string;
-  time: string;
-  location: string;
-  status: 'Open' | 'Registration Required' | 'Full' | 'Cancelled';
-  featured_image?: string;
-  capacity?: number;
-  registered?: number;
-}
+import type { Event } from '../../lib/clients';
 
 interface EventPageData {
   id: string;
@@ -191,16 +179,24 @@ interface EventPageData {
   category?: string;
 }
 
-// Reactive state
-const event = ref<CommunityEvent | null>(null);
-const relatedEvents = ref<CommunityEvent[]>([]);
-const isLoading = ref(false);
-const error = ref<string | null>(null);
-const relatedLoading = ref(false);
+// Use composables for data fetching
+const currentSlug = ref(getEventSlugFromUrl());
+const { event, loading: eventLoading, error: eventError } = useEvent(currentSlug);
+const { events: relatedEvents, loading: relatedLoading, error: relatedError } = useEvents({
+  category: computed(() => event.value?.category),
+  pageSize: 3,
+  enabled: computed(() => !!event.value?.category),
+  immediate: false
+});
 
-// Removed static data - now using API
+// Computed loading and error states
+const isLoading = computed(() => eventLoading.value);
+const error = computed(() => eventError.value);
+const relatedEventsFiltered = computed(() => 
+  relatedEvents.value.filter(e => e.id !== event.value?.id)
+);
 
-// Computed properties - Transform API event data for template
+// Transform event data to match the expected structure
 const eventData = computed<EventPageData | null>(() => {
   if (!event.value) return null;
   
@@ -208,18 +204,18 @@ const eventData = computed<EventPageData | null>(() => {
     id: event.value.id,
     title: event.value.title,
     slug: event.value.slug,
-    description: event.value.description,
+    description: event.value.excerpt || event.value.meta_description || '',
     content: event.value.content,
     heroImage: {
-      src: event.value.featured_image || 'https://placehold.co/800x600/e5e7eb/6b7280/png?text=Event+Image',
+      src: generateEventImageUrl(event.value.featured_image, event.value.title),
       alt: event.value.title
     },
     eventDetails: {
-      eventDate: event.value.date,
-      eventTime: event.value.time,
+      eventDate: event.value.event_date,
+      eventTime: event.value.event_time,
       location: event.value.location,
       capacity: event.value.capacity,
-      registered: event.value.registered,
+      registered: undefined, // Add if available in your schema
       status: event.value.status
     },
     category: event.value.category
@@ -228,134 +224,6 @@ const eventData = computed<EventPageData | null>(() => {
 
 const relatedEventsTitle = computed(() => {
   return eventData.value?.category ? `More ${eventData.value.category} Events` : 'Related Events';
-});
-
-// Get slug from current URL
-const getSlugFromUrl = (): string => {
-  if (typeof window === 'undefined') return '';
-  const pathParts = window.location.pathname.split('/');
-  return pathParts[pathParts.length - 1] || '';
-};
-
-// Client-side data loading following API pattern
-onMounted(async () => {
-  try {
-    isLoading.value = true;
-    error.value = null;
-
-    const slug = getSlugFromUrl();
-    if (!slug) {
-      throw new Error('Event slug not found');
-    }
-
-    console.log(`🔍 [DynamicEventPage] Loading event: ${slug}`);
-
-    // Dynamic import for client-side code splitting
-    const { eventsClient } = await import('../../lib/clients');
-    
-    const eventResult = await eventsClient.getEventBySlug(slug);
-    
-    if (eventResult) {
-      // Transform API event data to match component interface
-      event.value = {
-        id: eventResult.id.toString(),
-        title: eventResult.title,
-        slug: eventResult.slug,
-        description: eventResult.excerpt || eventResult.meta_description || '',
-        content: eventResult.content || '',
-        category: eventResult.category || 'Event',
-        date: eventResult.event_date,
-        time: eventResult.event_time || '',
-        location: eventResult.location || '',
-        status: 'Open', // Default status, adjust based on your event schema
-        featured_image: eventResult.featured_image || '',
-        capacity: eventResult.capacity || undefined,
-        registered: undefined // Add if available in your schema
-      };
-      
-      console.log('✅ [DynamicEventPage] Event loaded:', eventResult);
-
-      // Fetch related events from same category (excluding current event)
-      if (eventResult.category) {
-        try {
-          relatedLoading.value = true;
-          console.log(`🔍 [DynamicEventPage] Loading related events for category: ${eventResult.category}`);
-          
-          // Get all events and filter client-side for more reliable results  
-          const relatedResult = await eventsClient.getEvents({
-            pageSize: 50, // Get more events to filter from
-            sortBy: 'date-asc' // Show upcoming events first
-          });
-          
-          console.log(`🔍 [DynamicEventPage] Related events API response:`, relatedResult);
-          
-          if (relatedResult.data) {
-            // Filter by category and exclude current event
-            const filteredRelated = relatedResult.data
-              .filter(relatedEvent => 
-                relatedEvent.id !== eventResult.id && 
-                relatedEvent.category === eventResult.category
-              )
-              .slice(0, 3);
-            
-            // If no events in same category, show recent events instead
-            if (filteredRelated.length === 0) {
-              const recentEvents = relatedResult.data
-                .filter(relatedEvent => relatedEvent.id !== eventResult.id)
-                .slice(0, 3);
-              relatedEvents.value = recentEvents.map(e => ({
-                id: e.id.toString(),
-                title: e.title,
-                slug: e.slug,
-                description: e.excerpt || e.meta_description || '',
-                category: e.category || 'Event',
-                date: e.event_date,
-                time: e.event_time || '',
-                location: e.location || '',
-                status: 'Open' as any,
-                featured_image: e.featured_image || '',
-                capacity: e.capacity || undefined,
-                registered: undefined
-              }));
-              console.log(`✅ [DynamicEventPage] No same-category events, showing recent: ${recentEvents.length}`);
-            } else {
-              relatedEvents.value = filteredRelated.map(e => ({
-                id: e.id.toString(),
-                title: e.title,
-                slug: e.slug,
-                description: e.excerpt || e.meta_description || '',
-                category: e.category || 'Event',
-                date: e.event_date,
-                time: e.event_time || '',
-                location: e.location || '',
-                status: 'Open' as any,
-                featured_image: e.featured_image || '',
-                capacity: e.capacity || undefined,
-                registered: undefined
-              }));
-              console.log(`✅ [DynamicEventPage] Related events loaded: ${filteredRelated.length}`, filteredRelated);
-            }
-          } else {
-            console.warn('⚠️ [DynamicEventPage] No data in related events response');
-          }
-        } catch (relatedErr) {
-          console.warn('⚠️ [DynamicEventPage] Failed to load related events:', relatedErr);
-          // Don't set error, just continue without related events
-        } finally {
-          relatedLoading.value = false;
-        }
-      } else {
-        console.log('ℹ️ [DynamicEventPage] No category found for current event, skipping related events');
-      }
-    } else {
-      throw new Error(`Event not found: ${slug}`);
-    }
-  } catch (err: any) {
-    console.error('❌ [DynamicEventPage] Failed to load event:', err.message);
-    error.value = err.message || 'Failed to load event data';
-  } finally {
-    isLoading.value = false;
-  }
 });
 </script>
 

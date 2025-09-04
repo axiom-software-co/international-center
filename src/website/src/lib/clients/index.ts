@@ -42,6 +42,22 @@ export type {
   SearchNewsParams,
 } from './rest';
 
+// Events domain (REST-enabled through Public Gateway)
+import { EventsRestClient } from './events/EventsRestClient';
+export { EventsRestClient };
+export type {
+  Event,
+  EventCategory,
+  EventsResponse,
+  EventResponse,
+  GetEventsParams,
+  SearchEventsParams,
+} from './events/types';
+
+// Create events client instance
+const eventsClientInstance = new EventsRestClient();
+export { eventsClientInstance as eventsClient };
+
 // ====================================================================================
 // APIS ON HOLD - These will be migrated to REST architecture when development resumes
 // ====================================================================================
