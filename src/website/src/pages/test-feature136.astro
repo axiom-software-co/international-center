@@ -1,0 +1,19 @@
+---
+import Layout from '../layouts/Layout.astro';
+import Feature136Simple from '../components/blocks/Feature136Simple.vue';
+import { loadHeroServicesData } from '../lib/navigation-data';
+
+// Load hero services data during SSR
+const heroServicesData = await loadHeroServicesData();
+console.log('Test page - loaded hero data:', heroServicesData);
+---
+
+<Layout title="Test Feature136">
+  <main>
+    <h1>Testing Feature136 Component</h1>
+    <Feature136Simple
+      :heroServicesData={JSON.parse(JSON.stringify(heroServicesData))}
+      client:load
+    />
+  </main>
+</Layout>

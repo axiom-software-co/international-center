@@ -96,6 +96,7 @@ type CacheControlConfig struct {
 type ServiceRoutingConfig struct {
 	ContentAPIEnabled  bool   `json:"content_api_enabled"`
 	ServicesAPIEnabled bool   `json:"services_api_enabled"`
+	NewsAPIEnabled     bool   `json:"news_api_enabled"`
 	HealthCheckPath    string `json:"health_check_path"`
 	MetricsPath        string `json:"metrics_path"`
 }
@@ -189,6 +190,7 @@ func NewPublicGatewayConfiguration() *GatewayConfiguration {
 		ServiceRouting: ServiceRoutingConfig{
 			ContentAPIEnabled:  true,
 			ServicesAPIEnabled: true,
+			NewsAPIEnabled:     true,
 			HealthCheckPath:    "/health",
 			MetricsPath:        "/metrics",
 		},
@@ -282,6 +284,7 @@ func NewAdminGatewayConfiguration() *GatewayConfiguration {
 		ServiceRouting: ServiceRoutingConfig{
 			ContentAPIEnabled:  true,
 			ServicesAPIEnabled: true,
+			NewsAPIEnabled:     true,
 			HealthCheckPath:    "/health",
 			MetricsPath:        "/metrics",
 		},

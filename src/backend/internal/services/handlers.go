@@ -437,6 +437,100 @@ func (h *ServicesHandler) writeJSONResponse(w http.ResponseWriter, statusCode in
 	}
 }
 
+// Admin Audit and Analytics Handlers
+
+// GetServiceAudit handles GET /admin/api/v1/services/{id}/audit
+func (h *ServicesHandler) GetServiceAudit(w http.ResponseWriter, r *http.Request) {
+	// Extract service ID from URL path
+	vars := mux.Vars(r)
+	serviceID := vars["id"]
+	
+	if serviceID == "" {
+		h.writeErrorResponse(w, http.StatusBadRequest, "Service ID is required")
+		return
+	}
+
+	// Extract pagination parameters
+	limit, offset := h.extractPaginationParams(r)
+	
+	// Extract user ID from context (would come from authentication middleware)
+	userID := r.Header.Get("X-User-ID")
+
+	// Call service method
+	auditEvents, err := h.service.GetServiceAudit(r.Context(), serviceID, userID, limit, offset)
+	if err != nil {
+		h.handleServiceError(w, err)
+		return
+	}
+
+	// Return audit events
+	response := map[string]interface{}{
+		"audit_events": auditEvents,
+		"pagination": map[string]interface{}{
+			"limit":  limit,
+			"offset": offset,
+			"total":  len(auditEvents),
+		},
+	}
+	
+	h.writeJSONResponse(w, http.StatusOK, response)
+}
+
+// GetServiceCategoryAudit handles GET /admin/api/v1/services/categories/{id}/audit
+func (h *ServicesHandler) GetServiceCategoryAudit(w http.ResponseWriter, r *http.Request) {
+	// Extract category ID from URL path
+	vars := mux.Vars(r)
+	categoryID := vars["id"]
+	
+	if categoryID == "" {
+		h.writeErrorResponse(w, http.StatusBadRequest, "Category ID is required")
+		return
+	}
+
+	// Extract pagination parameters
+	limit, offset := h.extractPaginationParams(r)
+	
+	// Extract user ID from context (would come from authentication middleware)
+	userID := r.Header.Get("X-User-ID")
+
+	// Call service method
+	auditEvents, err := h.service.GetServiceCategoryAudit(r.Context(), categoryID, userID, limit, offset)
+	if err != nil {
+		h.handleServiceError(w, err)
+		return
+	}
+
+	// Return audit events
+	response := map[string]interface{}{
+		"audit_events": auditEvents,
+		"pagination": map[string]interface{}{
+			"limit":  limit,
+			"offset": offset,
+			"total":  len(auditEvents),
+		},
+	}
+	
+	h.writeJSONResponse(w, http.StatusOK, response)
+}
+
+// GetAdminFeaturedCategories handles GET /admin/api/v1/services/featured-categories
+func (h *ServicesHandler) GetAdminFeaturedCategories(w http.ResponseWriter, r *http.Request) {
+	// Extract user ID from context (would come from authentication middleware)
+	userID := r.Header.Get("X-User-ID")
+
+	// Call service method
+	featuredCategories, err := h.service.GetAdminFeaturedCategories(r.Context(), userID)
+	if err != nil {
+		h.handleServiceError(w, err)
+		return
+	}
+
+	// Return featured categories with admin details
+	h.writeJSONResponse(w, http.StatusOK, map[string]interface{}{
+		"featured_categories": featuredCategories,
+	})
+}
+
 // HealthCheck provides a health check endpoint
 func (h *ServicesHandler) HealthCheck(w http.ResponseWriter, r *http.Request) {
 	h.writeJSONResponse(w, http.StatusOK, map[string]interface{}{
@@ -458,4 +552,45 @@ func (h *ServicesHandler) ReadinessCheck(w http.ResponseWriter, r *http.Request)
 		"status":  "ready",
 		"service": "services-api",
 	})
+}
+
+// Additional helper methods
+
+// writeErrorResponse writes a simple error response
+func (h *ServicesHandler) writeErrorResponse(w http.ResponseWriter, statusCode int, message string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(statusCode)
+	
+	response := map[string]interface{}{
+		"error": map[string]interface{}{
+			"message": message,
+		},
+	}
+	
+	json.NewEncoder(w).Encode(response)
+}
+
+// extractPaginationParams extracts limit and offset from query parameters
+func (h *ServicesHandler) extractPaginationParams(r *http.Request) (limit int, offset int) {
+	limit = 20 // default limit
+	offset = 0 // default offset
+	
+	if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
+		if l, err := strconv.Atoi(limitStr); err == nil && l > 0 && l <= 100 {
+			limit = l
+		}
+	}
+	
+	if offsetStr := r.URL.Query().Get("offset"); offsetStr != "" {
+		if o, err := strconv.Atoi(offsetStr); err == nil && o >= 0 {
+			offset = o
+		}
+	}
+	
+	return limit, offset
+}
+
+// handleServiceError handles service errors (alias for handleError for consistency)
+func (h *ServicesHandler) handleServiceError(w http.ResponseWriter, err error) {
+	h.handleError(w, &http.Request{}, err)
 }

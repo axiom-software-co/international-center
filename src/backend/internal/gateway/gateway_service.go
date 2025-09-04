@@ -158,6 +158,7 @@ func (g *GatewayService) GetMetrics(ctx context.Context) (map[string]interface{}
 				"auth_required":        g.config.ShouldRequireAuth(),
 				"content_api_enabled":  g.config.ServiceRouting.ContentAPIEnabled,
 				"services_api_enabled": g.config.ServiceRouting.ServicesAPIEnabled,
+				"news_api_enabled":     g.config.ServiceRouting.NewsAPIEnabled,
 			},
 		},
 		"services": serviceMetrics,
@@ -271,6 +272,7 @@ func (g *GatewayService) logConfiguration() {
 	fmt.Printf("  - Authentication Required: %v\n", g.config.ShouldRequireAuth())
 	fmt.Printf("  - Content API: %v\n", g.config.ServiceRouting.ContentAPIEnabled)
 	fmt.Printf("  - Services API: %v\n", g.config.ServiceRouting.ServicesAPIEnabled)
+	fmt.Printf("  - News API: %v\n", g.config.ServiceRouting.NewsAPIEnabled)
 	fmt.Printf("  - Security Headers: %v\n", g.config.Security.SecurityHeaders.Enabled)
 	fmt.Printf("  - Observability: %v\n", g.config.Observability.Enabled)
 	

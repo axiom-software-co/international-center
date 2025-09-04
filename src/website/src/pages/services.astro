@@ -1,0 +1,22 @@
+---
+import Layout from '../layouts/Layout.astro';
+import PageHero from '../components/PageHero.astro';
+import ServicesHub from '../components/blocks/ServicesHub.vue';
+// Components now handle their own data loading via client:only
+---
+
+<Layout
+  title="Services & Treatments - International Center | Primary Care & Regenerative Medicine"
+  description="Comprehensive primary care and regenerative medicine services delivered to your location. Annual wellness exams, chronic disease management, PRP therapy, exosome treatments, and more throughout South Florida."
+>
+  <main>
+    <!-- Hero Section -->
+    <PageHero
+      title="Our Services & Treatments"
+      showBottomMargin={true}
+    />
+
+    <!-- Services Hub - Critical interactive content, load immediately -->
+    <ServicesHub client:load />
+  </main>
+</Layout>

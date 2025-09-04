@@ -46,8 +46,8 @@ func (s *StateStore) Save(ctx context.Context, key string, value interface{}, op
 	var metadata map[string]string
 	if options != nil {
 		metadata = map[string]string{
-			"consistency": string(options.Consistency),
-			"concurrency": string(options.Concurrency),
+			"consistency": fmt.Sprintf("%d", options.Consistency),
+			"concurrency": fmt.Sprintf("%d", options.Concurrency),
 		}
 	}
 
@@ -93,7 +93,7 @@ func (s *StateStore) Delete(ctx context.Context, key string, options *StateOptio
 	var metadata map[string]string
 	if options != nil {
 		metadata = map[string]string{
-			"concurrency": string(options.Concurrency),
+			"concurrency": fmt.Sprintf("%d", options.Concurrency),
 		}
 	}
 

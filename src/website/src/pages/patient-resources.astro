@@ -1,0 +1,155 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { Badge } from '../components/vue-ui/Badge.vue';
+import ServicesBackgroundLogo from '../components/ServicesBackgroundLogo.vue';
+import PageHero from '../components/PageHero.astro';
+
+// Patient Resources sections organized by category
+const patientResourceCategories = [
+  {
+    title: 'Patient Portal',
+    description: 'Secure online access to your healthcare information',
+    items: [
+      {
+        name: 'Patient Portal',
+        href: '/patient-resources/portal',
+        description: 'Secure access to your medical records, test results, and appointments',
+        icon: '🔐',
+      },
+    ],
+  },
+  {
+    title: 'Treatment Care',
+    description: 'Essential information for before and after your treatments',
+    items: [
+      {
+        name: 'Pre-Treatment Preparation',
+        href: '/patient-resources/pre-treatment',
+        description: 'Guidelines and instructions to prepare for your treatments',
+        icon: '📋',
+      },
+      {
+        name: 'Post-Treatment Care',
+        href: '/patient-resources/post-treatment',
+        description: 'Recovery protocols and aftercare instructions',
+        icon: '🩹',
+      },
+    ],
+  },
+  {
+    title: 'Patient Support',
+    description: 'Forms, support networks, and community resources',
+    items: [
+      {
+        name: 'Patient Forms',
+        href: '/patient-resources/forms',
+        description: 'Download and complete necessary medical forms',
+        icon: '📄',
+      },
+      {
+        name: 'Support Groups',
+        href: '/patient-resources/support-groups',
+        description: 'Connect with other patients and support resources',
+        icon: '👥',
+      },
+    ],
+  },
+  {
+    title: 'Financial Services',
+    description: 'Pricing transparency and payment options',
+    items: [
+      {
+        name: 'Standard Charges',
+        href: '/patient-resources/standard-charges',
+        description: 'Transparent pricing information for all services and procedures',
+        icon: '💰',
+      },
+      {
+        name: 'Insurance & Billing',
+        href: '/patient-resources/insurance-billing',
+        description: 'Insurance coverage information and billing assistance',
+        icon: '🏥',
+      },
+      {
+        name: 'Financial Options',
+        href: '/patient-resources/financial-options',
+        description: 'Payment plans and financing options for treatments',
+        icon: '💳',
+      },
+    ],
+  },
+];
+---
+
+<Layout
+  title="Patient Resources - International Center | Portal, Forms & Support"
+  description="Access essential patient resources including your portal, treatment preparation, forms, support groups, and financial information for regenerative medicine treatments."
+>
+  <main>
+    <!-- Hero Section -->
+    <PageHero
+      title="Patient Resources"
+      description="Everything you need for your regenerative medicine journey, from preparation to recovery"
+      showBottomMargin={true}
+    />
+
+    <!-- Patient Resources Categories -->
+    <section class="py-8 lg:py-12">
+      <div class="container mx-auto px-4">
+        <div class="space-y-8 lg:space-y-12">
+          {
+            patientResourceCategories.map(category => (
+              <div class="patient-resource-category bg-white dark:bg-gray-900 rounded border border-gray-200 dark:border-gray-700 p-4 lg:p-6">
+                <div class="mb-4 lg:mb-6">
+                  <h2 class="text-xl lg:text-2xl font-semibold text-gray-900 dark:text-white mb-2">
+                    {category.title}
+                  </h2>
+                  <p class="text-sm lg:text-base text-gray-600 dark:text-gray-300">
+                    {category.description}
+                  </p>
+                </div>
+
+                <div class="grid gap-4 md:gap-6 lg:gap-8 md:grid-cols-2 lg:grid-cols-3">
+                  {category.items.map(item => (
+                    <a
+                      href={item.href}
+                      class="block group patient-resource-card border border-gray-200 dark:border-gray-700 rounded overflow-hidden transition-all duration-200 bg-white dark:bg-gray-800 hover:shadow-lg hover:border-green-300 dark:hover:border-green-600"
+                    >
+                      <div class="p-4 lg:p-5 h-full flex flex-col">
+                        <div class="flex items-center gap-3 mb-3">
+                          <span class="text-2xl">{item.icon}</span>
+                          <h3 class="text-lg font-semibold text-gray-900 dark:text-white group-hover:text-green-600 dark:group-hover:text-green-400 transition-colors">
+                            {item.name}
+                          </h3>
+                        </div>
+                        <p class="text-gray-600 dark:text-gray-300 text-sm flex-1">
+                          {item.description}
+                        </p>
+                        <div class="mt-4 flex items-center text-green-600 dark:text-green-400 text-sm font-medium">
+                          Access →
+                        </div>
+                      </div>
+                    </a>
+                  ))}
+                </div>
+              </div>
+            ))
+          }
+        </div>
+      </div>
+    </section>
+
+    <!-- Background Logo -->
+    <ServicesBackgroundLogo client:load />
+  </main>
+
+  <style>
+    .patient-resource-card {
+      transition: all 0.3s ease;
+    }
+
+    .patient-resource-card:hover {
+      transform: translateY(-2px);
+    }
+  </style>
+</Layout>

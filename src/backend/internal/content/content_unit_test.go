@@ -253,6 +253,125 @@ func (m *MockContentRepository) GetContentVirusScan(ctx context.Context, content
 	return make([]*ContentVirusScan, 0), nil
 }
 
+// Admin audit repository methods - these will be implemented in the Green phase
+
+// GetContentAudit mocks getting audit trail for content
+func (m *MockContentRepository) GetContentAudit(ctx context.Context, contentID string, userID string, limit int, offset int) ([]*ContentAuditEvent, error) {
+	if err, exists := m.failures["GetContentAudit"]; exists {
+		return nil, err
+	}
+	// Return mock audit events for this content
+	var events []*ContentAuditEvent
+	for _, auditEvent := range m.auditEvents {
+		if auditEvent.EntityID == contentID && auditEvent.EntityType == domain.EntityTypeContent {
+			events = append(events, &ContentAuditEvent{
+				AuditID:       fmt.Sprintf("audit-%s-%d", contentID, len(events)+1),
+				EntityType:    string(auditEvent.EntityType),
+				EntityID:      auditEvent.EntityID,
+				OperationType: string(auditEvent.OperationType),
+				AuditTimestamp: time.Now().UTC().Add(-time.Duration(len(events)) * time.Hour),
+				UserID:        auditEvent.UserID,
+				DataSnapshot: AuditDataSnapshot{
+					Before: auditEvent.Before,
+					After:  auditEvent.After,
+				},
+				Environment: "development",
+			})
+		}
+	}
+	return events, nil
+}
+
+// GetContentProcessingQueue mocks getting processing queue
+func (m *MockContentRepository) GetContentProcessingQueue(ctx context.Context, userID string, limit int, offset int) ([]*ContentProcessingQueueItem, error) {
+	if err, exists := m.failures["GetContentProcessingQueue"]; exists {
+		return nil, err
+	}
+	// Return mock processing queue items
+	var queueItems []*ContentProcessingQueueItem
+	position := 1
+	for _, content := range m.content {
+		if content.UploadStatus == UploadStatusProcessing {
+			queueItems = append(queueItems, &ContentProcessingQueueItem{
+				ContentID:             content.ContentID,
+				OriginalFilename:      content.OriginalFilename,
+				FileSize:              content.FileSize,
+				ContentCategory:       string(content.ContentCategory),
+				UploadStatus:          string(content.UploadStatus),
+				ProcessingAttempts:    content.ProcessingAttempts,
+				LastProcessedAt:       content.LastProcessedAt,
+				UploadCorrelationID:   content.UploadCorrelationID,
+				CreatedOn:             content.CreatedOn,
+				QueuePosition:         position,
+				EstimatedProcessTime:  30,
+			})
+			position++
+		}
+	}
+	return queueItems, nil
+}
+
+// GetContentAnalytics mocks getting content analytics
+func (m *MockContentRepository) GetContentAnalytics(ctx context.Context, userID string) (*ContentAnalytics, error) {
+	if err, exists := m.failures["GetContentAnalytics"]; exists {
+		return nil, err
+	}
+	// Return mock analytics
+	return &ContentAnalytics{
+		TotalContent: int64(len(m.content)),
+		ContentByCategory: map[string]int64{
+			"document": 5,
+			"image":    3,
+			"video":    1,
+		},
+		ContentByAccessLevel: map[string]int64{
+			"public":     2,
+			"internal":   5,
+			"restricted": 2,
+		},
+		UploadsByDay: map[string]int64{
+			"2024-01-01": 3,
+			"2024-01-02": 5,
+			"2024-01-03": 1,
+		},
+		ProcessingMetrics: ProcessingMetrics{
+			AverageProcessingTime: 2500,
+			ProcessingQueue:       2,
+			ProcessedToday:        8,
+			FailedProcessing:      1,
+			ProcessingSuccessRate: 0.89,
+		},
+		AccessMetrics: AccessMetrics{
+			TotalAccesses:       1250,
+			UniqueUsers:         45,
+			AccessesToday:       125,
+			TopContentByAccess:  []ContentAccessStat{},
+			AverageResponseTime: 150,
+			CacheHitRate:        0.75,
+		},
+		StorageMetrics: StorageMetrics{
+			TotalStorageBytes: 1024 * 1024 * 100, // 100MB
+			StorageByBackend: map[string]int64{
+				"azure-blob": 1024 * 1024 * 100,
+			},
+			StorageByCategory: map[string]int64{
+				"document": 1024 * 1024 * 80,
+				"image":    1024 * 1024 * 20,
+			},
+			StorageGrowthRate: 0.05,
+		},
+		VirusScanningMetrics: VirusScanningMetrics{
+			TotalScans:      9,
+			InfectedFiles:   0,
+			SuspiciousFiles: 0,
+			ScanFailures:    1,
+			AverageScanTime: 1200,
+			ScanSuccessRate: 0.89,
+		},
+		GeneratedAt: time.Now().UTC(),
+	}, nil
+}
+
 // Test helper functions
 func createTestContent(userID string) *Content {
 	// Valid SHA-256 hash (64 hex characters)
@@ -852,4 +971,308 @@ func TestContentService_Timeout(t *testing.T) {
 	require.True(t, hasDeadline)
 	assert.True(t, time.Until(deadline) <= 5*time.Second)
 	assert.True(t, time.Until(deadline) > 4*time.Second) // Allow some margin
+}
+
+// Admin Content Audit Endpoint Unit Tests - RED PHASE (Failing Tests)
+
+func TestContentService_GetContentAudit(t *testing.T) {
+	tests := []struct {
+		name           string
+		contentID      string
+		userID         string
+		limit          int
+		offset         int
+		setupMock      func(*MockContentRepository)
+		expectedError  string
+		validateResult func(*testing.T, []*ContentAuditEvent)
+	}{
+		{
+			name:      "successfully get content audit trail",
+			contentID: "content-1",
+			userID:    "admin-1",
+			limit:     10,
+			offset:    0,
+			setupMock: func(repo *MockContentRepository) {
+				// Create content with some audit events
+				content := createTestContent("creator-1")
+				content.ContentID = "content-1"
+				repo.content["content-1"] = content
+				
+				// Add audit events
+				repo.auditEvents = []MockAuditEvent{
+					{
+						EntityType:    domain.EntityTypeContent,
+						EntityID:      "content-1",
+						OperationType: domain.AuditEventInsert,
+						UserID:        "creator-1",
+						Before:        nil,
+						After:         content,
+					},
+					{
+						EntityType:    domain.EntityTypeContent,
+						EntityID:      "content-1",
+						OperationType: domain.AuditEventUpdate,
+						UserID:        "creator-1",
+						Before:        content,
+						After:         content,
+					},
+				}
+			},
+			validateResult: func(t *testing.T, events []*ContentAuditEvent) {
+				assert.Len(t, events, 2)
+				assert.Equal(t, "content-1", events[0].EntityID)
+				assert.Equal(t, "content", events[0].EntityType)
+				assert.Equal(t, "creator-1", events[0].UserID)
+				assert.Equal(t, "development", events[0].Environment)
+			},
+		},
+		{
+			name:          "fail with empty content ID",
+			contentID:     "",
+			userID:        "admin-1",
+			limit:         10,
+			offset:        0,
+			setupMock:     func(repo *MockContentRepository) {},
+			expectedError: "content ID cannot be empty",
+		},
+		{
+			name:          "fail without admin authentication",
+			contentID:     "content-1",
+			userID:        "",
+			limit:         10,
+			offset:        0,
+			setupMock:     func(repo *MockContentRepository) {},
+			expectedError: "admin authentication required",
+		},
+		{
+			name:      "return empty array for content with no audit events",
+			contentID: "content-2",
+			userID:    "admin-1",
+			limit:     10,
+			offset:    0,
+			setupMock: func(repo *MockContentRepository) {
+				content := createTestContent("creator-1")
+				content.ContentID = "content-2"
+				repo.content["content-2"] = content
+			},
+			validateResult: func(t *testing.T, events []*ContentAuditEvent) {
+				assert.Len(t, events, 0)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Arrange
+			ctx, cancel := sharedtesting.CreateUnitTestContext()
+			defer cancel()
+			
+			mockRepo := NewMockContentRepository()
+			tt.setupMock(mockRepo)
+			service := NewContentService(mockRepo)
+
+			// Act - this will fail until we implement GetContentAudit method
+			result, err := service.GetContentAudit(ctx, tt.contentID, tt.userID, tt.limit, tt.offset)
+
+			// Assert
+			if tt.expectedError != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedError)
+				assert.Nil(t, result)
+			} else {
+				require.NoError(t, err)
+				require.NotNil(t, result)
+				if tt.validateResult != nil {
+					tt.validateResult(t, result)
+				}
+			}
+		})
+	}
+}
+
+func TestContentService_GetContentProcessingQueue(t *testing.T) {
+	tests := []struct {
+		name           string
+		userID         string
+		limit          int
+		offset         int
+		setupMock      func(*MockContentRepository)
+		expectedError  string
+		validateResult func(*testing.T, []*ContentProcessingQueueItem)
+	}{
+		{
+			name:   "successfully get processing queue",
+			userID: "admin-1",
+			limit:  10,
+			offset: 0,
+			setupMock: func(repo *MockContentRepository) {
+				// Create content in processing status
+				processingContent1 := createTestContent("creator-1")
+				processingContent1.ContentID = "processing-1"
+				processingContent1.UploadStatus = UploadStatusProcessing
+				processingContent1.ProcessingAttempts = 1
+				repo.content["processing-1"] = processingContent1
+				
+				processingContent2 := createTestContent("creator-2")
+				processingContent2.ContentID = "processing-2"
+				processingContent2.UploadStatus = UploadStatusProcessing
+				processingContent2.ProcessingAttempts = 2
+				repo.content["processing-2"] = processingContent2
+				
+				// Create available content (should not appear in queue)
+				availableContent := createTestContent("creator-1")
+				availableContent.ContentID = "available-1"
+				availableContent.UploadStatus = UploadStatusAvailable
+				repo.content["available-1"] = availableContent
+			},
+			validateResult: func(t *testing.T, items []*ContentProcessingQueueItem) {
+				assert.Len(t, items, 2)
+				assert.Equal(t, "processing", items[0].UploadStatus)
+				assert.Greater(t, items[0].QueuePosition, 0)
+				assert.Greater(t, items[0].EstimatedProcessTime, 0)
+			},
+		},
+		{
+			name:          "fail without admin authentication",
+			userID:        "",
+			limit:         10,
+			offset:        0,
+			setupMock:     func(repo *MockContentRepository) {},
+			expectedError: "admin authentication required",
+		},
+		{
+			name:   "return empty queue when no processing content",
+			userID: "admin-1",
+			limit:  10,
+			offset: 0,
+			setupMock: func(repo *MockContentRepository) {
+				// Only available content
+				availableContent := createTestContent("creator-1")
+				availableContent.ContentID = "available-1"
+				availableContent.UploadStatus = UploadStatusAvailable
+				repo.content["available-1"] = availableContent
+			},
+			validateResult: func(t *testing.T, items []*ContentProcessingQueueItem) {
+				assert.Len(t, items, 0)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Arrange
+			ctx, cancel := sharedtesting.CreateUnitTestContext()
+			defer cancel()
+			
+			mockRepo := NewMockContentRepository()
+			tt.setupMock(mockRepo)
+			service := NewContentService(mockRepo)
+
+			// Act - this will fail until we implement GetContentProcessingQueue method
+			result, err := service.GetContentProcessingQueue(ctx, tt.userID, tt.limit, tt.offset)
+
+			// Assert
+			if tt.expectedError != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedError)
+				assert.Nil(t, result)
+			} else {
+				require.NoError(t, err)
+				require.NotNil(t, result)
+				if tt.validateResult != nil {
+					tt.validateResult(t, result)
+				}
+			}
+		})
+	}
+}
+
+func TestContentService_GetContentAnalytics(t *testing.T) {
+	tests := []struct {
+		name           string
+		userID         string
+		setupMock      func(*MockContentRepository)
+		expectedError  string
+		validateResult func(*testing.T, *ContentAnalytics)
+	}{
+		{
+			name:   "successfully get content analytics",
+			userID: "admin-1",
+			setupMock: func(repo *MockContentRepository) {
+				// Create various content types
+				docContent := createTestContent("creator-1")
+				docContent.ContentCategory = ContentCategoryDocument
+				docContent.AccessLevel = AccessLevelPublic
+				repo.content["doc-1"] = docContent
+				
+				imgContent := createTestContent("creator-2")
+				imgContent.ContentCategory = ContentCategoryImage
+				imgContent.AccessLevel = AccessLevelInternal
+				repo.content["img-1"] = imgContent
+				
+				videoContent := createTestContent("creator-3")
+				videoContent.ContentCategory = ContentCategoryVideo
+				videoContent.AccessLevel = AccessLevelRestricted
+				repo.content["video-1"] = videoContent
+			},
+			validateResult: func(t *testing.T, analytics *ContentAnalytics) {
+				assert.Greater(t, analytics.TotalContent, int64(0))
+				assert.NotEmpty(t, analytics.ContentByCategory)
+				assert.NotEmpty(t, analytics.ContentByAccessLevel)
+				assert.NotEmpty(t, analytics.UploadsByDay)
+				assert.Greater(t, analytics.ProcessingMetrics.AverageProcessingTime, 0)
+				assert.GreaterOrEqual(t, analytics.ProcessingMetrics.ProcessingSuccessRate, 0.0)
+				assert.LessOrEqual(t, analytics.ProcessingMetrics.ProcessingSuccessRate, 1.0)
+				assert.GreaterOrEqual(t, analytics.AccessMetrics.CacheHitRate, 0.0)
+				assert.LessOrEqual(t, analytics.AccessMetrics.CacheHitRate, 1.0)
+				assert.Greater(t, analytics.StorageMetrics.TotalStorageBytes, int64(0))
+				assert.NotNil(t, analytics.GeneratedAt)
+			},
+		},
+		{
+			name:          "fail without admin authentication",
+			userID:        "",
+			setupMock:     func(repo *MockContentRepository) {},
+			expectedError: "admin authentication required",
+		},
+		{
+			name:   "successfully get analytics with no content",
+			userID: "admin-1",
+			setupMock: func(repo *MockContentRepository) {
+				// No content in repository
+			},
+			validateResult: func(t *testing.T, analytics *ContentAnalytics) {
+				assert.Equal(t, int64(0), analytics.TotalContent)
+				assert.NotNil(t, analytics.GeneratedAt)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Arrange
+			ctx, cancel := sharedtesting.CreateUnitTestContext()
+			defer cancel()
+			
+			mockRepo := NewMockContentRepository()
+			tt.setupMock(mockRepo)
+			service := NewContentService(mockRepo)
+
+			// Act - this will fail until we implement GetContentAnalytics method
+			result, err := service.GetContentAnalytics(ctx, tt.userID)
+
+			// Assert
+			if tt.expectedError != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedError)
+				assert.Nil(t, result)
+			} else {
+				require.NoError(t, err)
+				require.NotNil(t, result)
+				if tt.validateResult != nil {
+					tt.validateResult(t, result)
+				}
+			}
+		})
+	}
 }

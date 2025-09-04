@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/axiom-software-co/international-center/src/backend/internal/shared/dapr"
 	"github.com/axiom-software-co/international-center/src/backend/internal/shared/domain"
@@ -504,6 +506,13 @@ func (r *ServicesRepository) GetAllFeaturedCategories(ctx context.Context) ([]*F
 	return featured, nil
 }
 
+// GetAdminFeaturedCategories retrieves featured categories with admin details
+func (r *ServicesRepository) GetAdminFeaturedCategories(ctx context.Context) ([]*FeaturedCategory, error) {
+	// For admin endpoint, return all featured categories (same as GetAllFeaturedCategories for now)
+	// In a real implementation, this might include additional admin fields
+	return r.GetAllFeaturedCategories(ctx)
+}
+
 // GetFeaturedCategoryByPosition retrieves featured category by position
 func (r *ServicesRepository) GetFeaturedCategoryByPosition(ctx context.Context, position int) (*FeaturedCategory, error) {
 	query := fmt.Sprintf(`{
@@ -656,4 +665,174 @@ func (r *ServicesRepository) serviceMatchesSearch(service *Service, searchTerm s
 	}
 
 	return false
+}
+
+// Admin Audit Repository Methods
+
+// GetServiceAudit retrieves audit events for a service via Dapr bindings
+func (r *ServicesRepository) GetServiceAudit(ctx context.Context, serviceID string, limit int, offset int) ([]*ServiceAuditEvent, error) {
+	// Query Grafana Loki via Dapr bindings for audit events
+	query := fmt.Sprintf(`{
+		"query": "{app=\"services-api\"} | json | entity_id=\"%s\" | entity_type=\"service\"",
+		"limit": %d,
+		"start": %d
+	}`, serviceID, limit, offset)
+
+	response, err := r.bindings.QueryLoki(ctx, "grafana-loki", query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query audit events for service %s: %w", serviceID, err)
+	}
+
+	// Parse JSON response
+	var lokiResponse map[string]interface{}
+	if err := json.Unmarshal(response, &lokiResponse); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal Loki response for service %s: %w", serviceID, err)
+	}
+
+	// Parse Loki response into audit events
+	auditEvents, err := r.parseLokiAuditResponse(lokiResponse)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse audit events for service %s: %w", serviceID, err)
+	}
+
+	return auditEvents, nil
+}
+
+// GetServiceCategoryAudit retrieves audit events for a service category via Dapr bindings
+func (r *ServicesRepository) GetServiceCategoryAudit(ctx context.Context, categoryID string, limit int, offset int) ([]*ServiceAuditEvent, error) {
+	// Query Grafana Loki via Dapr bindings for audit events
+	query := fmt.Sprintf(`{
+		"query": "{app=\"services-api\"} | json | entity_id=\"%s\" | entity_type=\"service_category\"",
+		"limit": %d,
+		"start": %d
+	}`, categoryID, limit, offset)
+
+	response, err := r.bindings.QueryLoki(ctx, "grafana-loki", query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query audit events for category %s: %w", categoryID, err)
+	}
+
+	// Parse JSON response
+	var lokiResponse map[string]interface{}
+	if err := json.Unmarshal(response, &lokiResponse); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal Loki response for category %s: %w", categoryID, err)
+	}
+
+	// Parse Loki response into audit events
+	auditEvents, err := r.parseLokiAuditResponse(lokiResponse)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse audit events for category %s: %w", categoryID, err)
+	}
+
+	return auditEvents, nil
+}
+
+// parseLokiAuditResponse parses Grafana Loki response into ServiceAuditEvent objects
+func (r *ServicesRepository) parseLokiAuditResponse(response map[string]interface{}) ([]*ServiceAuditEvent, error) {
+	var auditEvents []*ServiceAuditEvent
+
+	// Parse Loki response structure
+	if data, ok := response["data"].(map[string]interface{}); ok {
+		if result, ok := data["result"].([]interface{}); ok {
+			for _, item := range result {
+				if itemMap, ok := item.(map[string]interface{}); ok {
+					if values, ok := itemMap["values"].([]interface{}); ok {
+						for _, value := range values {
+							if valueArr, ok := value.([]interface{}); ok && len(valueArr) >= 2 {
+								// Parse timestamp and log entry
+								timestampStr, _ := valueArr[0].(string)
+								logEntry, _ := valueArr[1].(string)
+
+								auditEvent, err := r.parseLogEntryToAuditEvent(timestampStr, logEntry)
+								if err == nil && auditEvent != nil {
+									auditEvents = append(auditEvents, auditEvent)
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	return auditEvents, nil
+}
+
+// parseLogEntryToAuditEvent parses a Loki log entry into a ServiceAuditEvent
+func (r *ServicesRepository) parseLogEntryToAuditEvent(timestampStr, logEntry string) (*ServiceAuditEvent, error) {
+	// Parse timestamp
+	timestamp, err := parseTimestampFromLoki(timestampStr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse timestamp: %w", err)
+	}
+
+	// Parse JSON log entry
+	var logData map[string]interface{}
+	err = json.Unmarshal([]byte(logEntry), &logData)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse log entry JSON: %w", err)
+	}
+
+	// Extract audit event fields
+	auditEvent := &ServiceAuditEvent{
+		AuditTimestamp: timestamp,
+		Environment:    getStringFromLog(logData, "environment", "development"),
+	}
+
+	if auditID, ok := logData["audit_id"].(string); ok {
+		auditEvent.AuditID = auditID
+	}
+
+	if entityType, ok := logData["entity_type"].(string); ok {
+		auditEvent.EntityType = entityType
+	}
+
+	if entityID, ok := logData["entity_id"].(string); ok {
+		auditEvent.EntityID = entityID
+	}
+
+	if operationType, ok := logData["operation_type"].(string); ok {
+		auditEvent.OperationType = operationType
+	}
+
+	if userID, ok := logData["user_id"].(string); ok {
+		auditEvent.UserID = userID
+	}
+
+	if correlationID, ok := logData["correlation_id"].(string); ok {
+		auditEvent.CorrelationID = correlationID
+	}
+
+	if traceID, ok := logData["trace_id"].(string); ok {
+		auditEvent.TraceID = traceID
+	}
+
+	// Parse data snapshot
+	if dataSnapshot, ok := logData["data_snapshot"].(map[string]interface{}); ok {
+		auditEvent.DataSnapshot = AuditDataSnapshot{
+			Before: dataSnapshot["before"],
+			After:  dataSnapshot["after"],
+		}
+	}
+
+	return auditEvent, nil
+}
+
+// Helper functions
+
+func parseTimestampFromLoki(timestampStr string) (time.Time, error) {
+	// Loki timestamps are in nanoseconds since Unix epoch
+	timestampNanos, err := strconv.ParseInt(timestampStr, 10, 64)
+	if err != nil {
+		return time.Time{}, err
+	}
+	
+	return time.Unix(0, timestampNanos), nil
+}
+
+func getStringFromLog(logData map[string]interface{}, key string, defaultValue string) string {
+	if value, ok := logData[key].(string); ok {
+		return value
+	}
+	return defaultValue
 }

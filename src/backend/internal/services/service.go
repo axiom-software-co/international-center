@@ -43,6 +43,9 @@ type ServicesRepositoryInterface interface {
 
 	// Audit operations
 	PublishAuditEvent(ctx context.Context, entityType domain.EntityType, entityID string, operationType domain.AuditEventType, userID string, beforeData, afterData interface{}) error
+	GetServiceAudit(ctx context.Context, serviceID string, limit int, offset int) ([]*ServiceAuditEvent, error)
+	GetServiceCategoryAudit(ctx context.Context, categoryID string, limit int, offset int) ([]*ServiceAuditEvent, error)
+	GetAdminFeaturedCategories(ctx context.Context) ([]*FeaturedCategory, error)
 }
 
 // ServicesService implements business logic for services operations
@@ -549,4 +552,77 @@ func (s *ServicesService) canModifyService(service *Service, userID string) bool
 	// Only the creator can modify service
 	// In a real implementation, this would check for admin roles too
 	return service.CreatedBy == userID
+}
+
+// Admin Audit and Analytics Methods
+
+// GetServiceAudit retrieves audit trail for a specific service (admin only)
+func (s *ServicesService) GetServiceAudit(ctx context.Context, serviceID string, userID string, limit int, offset int) ([]*ServiceAuditEvent, error) {
+	// Validate input parameters
+	if serviceID == "" {
+		return nil, domain.NewValidationError("service ID cannot be empty")
+	}
+
+	if userID == "" {
+		return nil, domain.NewUnauthorizedError("admin authentication required")
+	}
+
+	// In a real implementation, check if user has admin role
+	// For now, just check if user ID is provided
+
+	// Verify service exists
+	_, err := s.repository.GetService(ctx, serviceID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get audit events from repository
+	auditEvents, err := s.repository.GetServiceAudit(ctx, serviceID, limit, offset)
+	if err != nil {
+		return nil, domain.WrapError(err, fmt.Sprintf("failed to get audit trail for service %s", serviceID))
+	}
+
+	return auditEvents, nil
+}
+
+// GetServiceCategoryAudit retrieves audit trail for a specific service category (admin only)
+func (s *ServicesService) GetServiceCategoryAudit(ctx context.Context, categoryID string, userID string, limit int, offset int) ([]*ServiceAuditEvent, error) {
+	// Validate input parameters
+	if categoryID == "" {
+		return nil, domain.NewValidationError("category ID cannot be empty")
+	}
+
+	if userID == "" {
+		return nil, domain.NewUnauthorizedError("admin authentication required")
+	}
+
+	// Verify category exists
+	_, err := s.repository.GetServiceCategory(ctx, categoryID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get audit events from repository
+	auditEvents, err := s.repository.GetServiceCategoryAudit(ctx, categoryID, limit, offset)
+	if err != nil {
+		return nil, domain.WrapError(err, fmt.Sprintf("failed to get audit trail for category %s", categoryID))
+	}
+
+	return auditEvents, nil
+}
+
+// GetAdminFeaturedCategories retrieves featured categories with admin details (admin only)
+func (s *ServicesService) GetAdminFeaturedCategories(ctx context.Context, userID string) ([]*FeaturedCategory, error) {
+	// Validate admin authentication
+	if userID == "" {
+		return nil, domain.NewUnauthorizedError("admin authentication required")
+	}
+
+	// Get all featured categories (admin view includes all details)
+	featuredCategories, err := s.repository.GetAllFeaturedCategories(ctx)
+	if err != nil {
+		return nil, domain.WrapError(err, "failed to get featured categories for admin")
+	}
+
+	return featuredCategories, nil
 }

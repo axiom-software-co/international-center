@@ -3,6 +3,7 @@ package content
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/axiom-software-co/international-center/src/backend/internal/shared/domain"
@@ -228,6 +229,91 @@ func (h *ContentHandler) writeJSONResponse(w http.ResponseWriter, statusCode int
 	}
 }
 
+// Admin Content Audit and Analytics Handlers
+
+// GetContentAudit handles GET /admin/api/v1/content/{id}/audit
+func (h *ContentHandler) GetContentAudit(w http.ResponseWriter, r *http.Request) {
+	// Extract content ID from URL path
+	vars := mux.Vars(r)
+	contentID := vars["id"]
+	
+	if contentID == "" {
+		h.writeErrorResponse(w, http.StatusBadRequest, "Content ID is required")
+		return
+	}
+
+	// Extract pagination parameters
+	limit, offset := h.extractPaginationParams(r)
+	
+	// Extract user ID from context (would come from authentication middleware)
+	userID := r.Header.Get("X-User-ID")
+
+	// Call service method
+	auditEvents, err := h.service.GetContentAudit(r.Context(), contentID, userID, limit, offset)
+	if err != nil {
+		h.handleServiceError(w, err)
+		return
+	}
+
+	// Return audit events
+	response := map[string]interface{}{
+		"audit_events": auditEvents,
+		"pagination": map[string]interface{}{
+			"limit":  limit,
+			"offset": offset,
+			"total":  len(auditEvents),
+		},
+	}
+	
+	h.writeJSONResponse(w, http.StatusOK, response)
+}
+
+// GetContentProcessingQueue handles GET /admin/api/v1/content/processing-queue
+func (h *ContentHandler) GetContentProcessingQueue(w http.ResponseWriter, r *http.Request) {
+	// Extract pagination parameters
+	limit, offset := h.extractPaginationParams(r)
+	
+	// Extract user ID from context (would come from authentication middleware)
+	userID := r.Header.Get("X-User-ID")
+
+	// Call service method
+	queueItems, err := h.service.GetContentProcessingQueue(r.Context(), userID, limit, offset)
+	if err != nil {
+		h.handleServiceError(w, err)
+		return
+	}
+
+	// Return processing queue
+	response := map[string]interface{}{
+		"processing_queue": queueItems,
+		"pagination": map[string]interface{}{
+			"limit":  limit,
+			"offset": offset,
+			"total":  len(queueItems),
+		},
+	}
+	
+	h.writeJSONResponse(w, http.StatusOK, response)
+}
+
+// GetContentAnalytics handles GET /admin/api/v1/content/analytics
+func (h *ContentHandler) GetContentAnalytics(w http.ResponseWriter, r *http.Request) {
+	// Extract user ID from context (would come from authentication middleware)
+	userID := r.Header.Get("X-User-ID")
+
+	// Call service method
+	analytics, err := h.service.GetContentAnalytics(r.Context(), userID)
+	if err != nil {
+		h.handleServiceError(w, err)
+		return
+	}
+
+	// Return analytics
+	h.writeJSONResponse(w, http.StatusOK, map[string]interface{}{
+		"analytics": analytics,
+	})
+}
+
 // HealthCheck provides a health check endpoint
 func (h *ContentHandler) HealthCheck(w http.ResponseWriter, r *http.Request) {
 	h.writeJSONResponse(w, http.StatusOK, map[string]interface{}{
@@ -249,4 +335,45 @@ func (h *ContentHandler) ReadinessCheck(w http.ResponseWriter, r *http.Request) 
 		"status":  "ready",
 		"service": "content-api",
 	})
+}
+
+// Additional helper methods
+
+// writeErrorResponse writes a simple error response
+func (h *ContentHandler) writeErrorResponse(w http.ResponseWriter, statusCode int, message string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(statusCode)
+	
+	response := map[string]interface{}{
+		"error": map[string]interface{}{
+			"message": message,
+		},
+	}
+	
+	json.NewEncoder(w).Encode(response)
+}
+
+// extractPaginationParams extracts limit and offset from query parameters
+func (h *ContentHandler) extractPaginationParams(r *http.Request) (limit int, offset int) {
+	limit = 20 // default limit
+	offset = 0 // default offset
+	
+	if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
+		if l, err := strconv.Atoi(limitStr); err == nil && l > 0 && l <= 100 {
+			limit = l
+		}
+	}
+	
+	if offsetStr := r.URL.Query().Get("offset"); offsetStr != "" {
+		if o, err := strconv.Atoi(offsetStr); err == nil && o >= 0 {
+			offset = o
+		}
+	}
+	
+	return limit, offset
+}
+
+// handleServiceError handles service errors (alias for handleError for consistency)
+func (h *ContentHandler) handleServiceError(w http.ResponseWriter, err error) {
+	h.handleError(w, &http.Request{}, err)
 }

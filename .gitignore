@@ -504,5 +504,194 @@ service-registry.local.json
 consul.local.json
 
 # =============================================================================
+# Project Source Directory Specific Ignores
+# =============================================================================
+# Backend build artifacts
+src/backend/bin/
+src/backend/build/
+src/backend/dist/
+src/backend/*.exe
+src/backend/debug
+src/backend/debug.test
+
+# Website build outputs and dependencies
+src/website/dist/
+src/website/node_modules/
+src/website/.astro/
+src/website/.cache/
+src/website/.firebase/
+src/website/build/
+src/website/.output/
+src/website/.vercel/
+src/website/.netlify/
+
+# Bun runtime files
+src/website/.bun/
+src/website/bun.lockb
+
+# Admin portal build artifacts
+src/admin-portal/dist/
+src/admin-portal/node_modules/
+src/admin-portal/.astro/
+src/admin-portal/.cache/
+src/admin-portal/build/
+
+# Deployer build artifacts and local state
+src/deployer/bin/
+src/deployer/build/
+src/deployer/dist/
+src/deployer/.pulumi/
+src/deployer/pulumi-state/.pulumi/
+src/deployer/shared/automation/bin/
+src/deployer/shared/automation/build/
+
+# Testing artifacts
+src/backend/coverage.out
+src/backend/coverage.html
+src/backend/test-results/
+src/website/coverage/
+src/website/test-results/
+src/website/playwright-report/
+
+# Website development files
+src/website/*.log
+src/website/.env.local
+src/website/.env.development.local
+src/website/.env.test.local
+src/website/.env.production.local
+src/website/.pnpm-debug.log*
+src/website/.eslintcache
+src/website/.vite/
+src/website/.turbo/
+src/website/.rush/
+src/website/.stylelintcache
+src/website/.nyc_output
+
+# Astro specific
+src/website/.astro/
+src/website/astro.config.*.js
+src/website/astro.config.*.mjs
+src/website/astro.config.*.ts
+
+# Vue specific
+src/website/.vue/
+src/website/components.d.ts
+src/website/auto-imports.d.ts
+
+# Tailwind CSS
+src/website/tailwind.config.*.js
+src/website/tailwind.config.*.mjs
+src/website/tailwind.config.*.ts
+
+# Vite specific
+src/website/vite.config.*.js
+src/website/vite.config.*.mjs
+src/website/vite.config.*.ts
+src/website/.vite-cache/
+
+# Vitest
+src/website/vitest.config.*.js
+src/website/vitest.config.*.mjs
+src/website/vitest.config.*.ts
+
+# Website images and media (generated/temporary)
+src/website/public/images/temp/
+src/website/public/images/generated/
+src/website/public/images/cache/
+src/website/src/assets/temp/
+src/website/src/assets/generated/
+
+# Large or temporary image files (preserve website assets in public/)
+**/temp/*.png
+**/temp/*.jpg
+**/temp/*.jpeg
+**/temp/*.gif
+**/temp/*.svg
+**/cache/*.png
+**/cache/*.jpg
+**/cache/*.jpeg
+**/cache/*.gif
+**/cache/*.svg
+**/generated/*.png
+**/generated/*.jpg
+**/generated/*.jpeg
+**/generated/*.gif
+**/generated/*.svg
+
+# Source image files and editing formats
+*.psd
+*.ai
+*.eps
+*.raw
+*.cr2
+*.nef
+*.arw
+*.dng
+*.xcf
+*.sketch
+
+# Large image files (over typical web size)
+*-large.png
+*-large.jpg
+*-large.jpeg
+*_large.png
+*_large.jpg
+*_large.jpeg
+*-original.png
+*-original.jpg
+*-original.jpeg
+*_original.png
+*_original.jpg
+*_original.jpeg
+
+# Video and audio files
+*.mp4
+*.avi
+*.mov
+*.wmv
+*.flv
+*.mkv
+*.webm
+*.mp3
+*.wav
+*.aac
+*.ogg
+*.flac
+*.m4a
+
+# Document files (large)
+*.pdf
+*.doc
+*.docx
+*.ppt
+*.pptx
+*.xls
+*.xlsx
+
+# Development runtime files
+src/backend/.air/
+src/backend/tmp/
+src/backend/hot-reload/
+
+# IDE specific files in source directories
+src/**/.vscode/
+src/**/.idea/
+src/**/*.code-workspace
+
+# Backup and temporary files
+src/website/**/*.backup
+src/website/**/*.bak
+src/website/**/*.orig
+src/website/**/*.swp
+src/website/**/*.swo
+src/website/**/*~
+src/website/**/.#*
+
+# OS-specific files in source directories
+src/website/**/.DS_Store
+src/website/**/Thumbs.db
+src/website/**/*.lnk
+
+# =============================================================================
 # End of .gitignore
 # =============================================================================

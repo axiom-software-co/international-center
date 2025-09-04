@@ -1,0 +1,80 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { Badge } from '../components/vue-ui/Badge.vue';
+import PageHero from '../components/PageHero.astro';
+import ScrollRevealValues from '../components/ScrollRevealValues.vue';
+import { Users, Heart, Shield, FileText, GraduationCap } from 'lucide-vue-next';
+
+
+// Core values data - reimagined for community outreach
+const coreValues = {
+  elevate: {
+    icon: '🕊️',
+    title: 'Elevate',
+    story:
+      "You weren't meant to stay where pain and limitation have placed you—you were meant to soar.",
+    promise: 'We meet you where you are and lift you to where you want to be.',
+  },
+  educate: {
+    icon: '💡',
+    title: 'Educate',
+    story: "Knowledge shouldn't be locked away in medical journals or behind closed doors.",
+    promise:
+      'We believe in empowering you with understanding, because informed patients become empowered healers.',
+  },
+  innovate: {
+    icon: '⚡',
+    title: 'Innovate',
+    story: "Tomorrow's breakthroughs start with today's bold questions and relentless curiosity.",
+    promise: "We're not just following the future of medicine—we're helping to write it.",
+  },
+};
+---
+
+<Layout
+  title="Community - International Center | Our Core Values & Patient Stories"
+  description="Discover our community of patients, practitioners, and advocates united by our core values: Elevate patient outcomes, Educate through knowledge sharing, and Innovate with cutting-edge treatments."
+>
+  <main>
+    <!-- Core Values Section -->
+    <section class="py-8 lg:py-12">
+      <div class="container mx-auto px-4">
+        <div class="space-y-8 lg:space-y-12">
+          <!-- Community Values Story with Scroll Animations -->
+          <ScrollRevealValues client:load coreValues={coreValues} />
+
+          <!-- Community Action Section -->
+          <div
+            class="bg-white dark:bg-gray-900 rounded border border-gray-200 dark:border-gray-700 p-6 lg:p-8 max-w-4xl mx-auto"
+          >
+            <div class="text-center">
+              <h3 class="text-xl lg:text-2xl font-semibold text-gray-900 dark:text-white mb-6">
+                Join Our Community
+              </h3>
+
+              <!-- Community Links -->
+              <div class="flex flex-col sm:flex-row gap-4 justify-center">
+                <a
+                  href="/community/case-studies"
+                  class="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-md bg-black dark:bg-gray-900 text-white hover:bg-gray-800 dark:hover:bg-gray-700 transition-all duration-200 font-medium"
+                >
+                  <FileText class="w-4 h-4" />
+                  View Case Studies
+                </a>
+                <a
+                  href="/community/learning-portal"
+                  class="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-foreground hover:bg-gray-100 dark:hover:bg-gray-700 hover:border-gray-300 dark:hover:border-gray-600 transition-all duration-200 font-medium"
+                >
+                  <GraduationCap class="w-4 h-4" />
+                  Learning Portal
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <style></style>
+</Layout>

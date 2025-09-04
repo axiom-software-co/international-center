@@ -207,3 +207,22 @@ func (b *Bindings) CreateStoragePath(domain, year, month, contentID, hash, exten
 		environment, domain, year, month, contentID, hash, extension)
 }
 
+// QueryLoki queries Grafana Loki for log data
+func (b *Bindings) QueryLoki(ctx context.Context, bindingName, query string) ([]byte, error) {
+	req := &BindingRequest{
+		Name:      bindingName,
+		Operation: "query",
+		Data:      []byte(query),
+		Metadata: map[string]string{
+			"query": query,
+		},
+	}
+
+	resp, err := b.InvokeBinding(ctx, req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query Loki: %w", err)
+	}
+
+	return resp.Data, nil
+}
+

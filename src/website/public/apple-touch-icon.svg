@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180">
+    <!-- Apple Touch Icon - Modern rounded design -->
+    <defs>
+        <style>
+            .bg { fill: #fefefe; }
+            .icon { fill: #2563eb; }
+            .shadow { fill: #f1f5f9; }
+        </style>
+        <!-- Subtle gradient for iOS sophistication -->
+        <radialGradient id="bgGrad" cx="50%" cy="30%">
+            <stop offset="0%" stop-color="#ffffff"/>
+            <stop offset="100%" stop-color="#f8fafc"/>
+        </radialGradient>
+    </defs>
+    
+    <!-- iOS rounded background with gradient -->
+    <rect width="180" height="180" rx="40" fill="url(#bgGrad)"/>
+    
+    <!-- Subtle inner shadow for depth -->
+    <rect x="2" y="2" width="176" height="176" rx="38" class="shadow" opacity="0.1"/>
+    
+    <!-- Large blue medical cross with rounded corners -->
+    <rect x="75" y="30" width="30" height="120" rx="12" class="icon"/>
+    <rect x="30" y="75" width="120" height="30" rx="12" class="icon"/>
+    
+    <!-- Optional center highlight for iOS polish -->
+    <rect x="82" y="82" width="16" height="16" rx="4" fill="white" opacity="0.2"/>
+</svg>

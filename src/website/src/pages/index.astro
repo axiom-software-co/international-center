@@ -1,0 +1,39 @@
+---
+import Layout from '../layouts/Layout.astro';
+import Testimonials from '../components/blocks/Testimonials.vue';
+// import { Timeline11 } from '../components/Timeline11';
+import Feature136 from '../components/blocks/Feature136.vue';
+import ServiceDelivery from '../components/blocks/ServiceDelivery.vue';
+import ComprehensiveCare from '../components/blocks/ComprehensiveCare.vue';
+import FacilityDevelopment from '../components/blocks/FacilityDevelopment.vue';
+import RecentContentCycler from '../components/blocks/RecentContentCycler.vue';
+// Components now handle their own data loading via client:only
+---
+
+<Layout
+  title="International Center - Mobile, Outpatient & Inpatient Regenerative Medicine | South Florida"
+  description="Comprehensive regenerative medicine services throughout South Florida. Mobile treatments, outpatient procedures, and inpatient care. PRP therapy, exosome treatments, peptide consultations, and IV therapy delivered by board-certified physicians."
+>
+  <!-- Excellence in Regenerative Medicine - Above fold, load immediately -->
+  <Feature136 client:load />
+
+  <!-- Facility Development - Below fold, load when visible -->
+  <FacilityDevelopment client:visible />
+
+  <!-- Comprehensive Care Integration - Below fold, load when visible -->
+  <ComprehensiveCare client:visible />
+
+  <!-- Service Delivery Models - Static content, load when idle -->
+  <ServiceDelivery client:idle />
+
+  <!-- Our Growth Roadmap - Hidden for now -->
+  <!-- <Timeline11 client:visible /> -->
+
+  <!-- Recent Content Cycler - Interactive but below fold, load when visible -->
+  <RecentContentCycler client:visible />
+
+  <!-- Patient Testimonials - Hidden -->
+  <div class="hidden">
+    <Testimonials client:load />
+  </div>
+</Layout>

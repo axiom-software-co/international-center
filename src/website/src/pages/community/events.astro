@@ -1,0 +1,23 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import PageHero from '../../components/PageHero.astro';
+import ContentHub from '../../components/blocks/ContentHub.vue';
+// Components now handle their own data loading via client:only
+
+---
+
+<Layout
+  title="Community Events - International Center | Regenerative Medicine Education & Outreach"
+  description="Join our community events including educational workshops, research presentations, health seminars, and wellness programs focused on regenerative medicine and community health."
+>
+  <main>
+    <!-- Hero Section -->
+    <PageHero
+      title="Community Events"
+      showBottomMargin={true}
+    />
+
+    <!-- Events Hub with Client-Side Loading -->
+    <ContentHub contentType="events" client:only="vue" />
+  </main>
+</Layout>

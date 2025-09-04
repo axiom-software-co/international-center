@@ -1,0 +1,32 @@
+<template>
+  <input
+    :class="
+      cn(
+        'flex h-9 w-full rounded border-2 border-input bg-background px-3 py-1 text-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50',
+        props.class
+      )
+    "
+    :type="type"
+    :value="modelValue"
+    @input="$emit('update:modelValue', ($event.target as HTMLInputElement).value)"
+    v-bind="$attrs"
+  />
+</template>
+
+<script setup lang="ts">
+import { cn } from '@/lib/utils';
+
+export interface InputProps {
+  type?: string;
+  class?: string;
+  modelValue?: string | number;
+}
+
+const props = withDefaults(defineProps<InputProps>(), {
+  type: 'text',
+});
+
+defineEmits<{
+  'update:modelValue': [value: string];
+}>();
+</script>

@@ -1,0 +1,81 @@
+---
+import InformationPage from '../components/InformationPage.astro';
+import { getLegalPageBySlug } from '../data/legal';
+
+const legalData = getLegalPageBySlug('privacy-policy');
+if (!legalData) {
+  throw new Error('Legal page data not found');
+}
+---
+
+<InformationPage
+  title={legalData.title}
+  description={legalData.description}
+  heroTitle="Privacy Policy"
+  heroDescription="HIPAA-compliant privacy policy for International Center's regenerative medicine services"
+>
+            <p>
+              At International Center, we are committed to protecting your privacy and maintaining the confidentiality of your personal health information in accordance with HIPAA regulations and applicable state laws.
+            </p>
+
+            <h2>Information We Collect</h2>
+            <p>We collect information necessary to provide you with quality regenerative medicine services, including:</p>
+            <ul>
+              <li>Personal identification information (name, address, phone number, email)</li>
+              <li>Medical history and current health status</li>
+              <li>Treatment information and progress notes</li>
+              <li>Insurance and billing information</li>
+              <li>Emergency contact information</li>
+            </ul>
+
+            <h2>How We Use Your Information</h2>
+            <p>Your health information is used exclusively for:</p>
+            <ul>
+              <li>Providing medical treatment and care</li>
+              <li>Processing payments and insurance claims</li>
+              <li>Healthcare operations and quality improvement</li>
+              <li>Legal compliance and regulatory requirements</li>
+              <li>Emergency situations involving your care</li>
+            </ul>
+
+            <h2>Information Sharing</h2>
+            <p>
+              We do not sell, rent, or share your personal health information except as required for treatment, payment, healthcare operations, or as required by law. This may include sharing with healthcare providers involved in your care, insurance companies for claims processing, legal authorities when required by law, and emergency responders in medical emergencies.
+            </p>
+
+            <h2>Your Rights Under HIPAA</h2>
+            <p>Under HIPAA, you have the right to:</p>
+            <ul>
+              <li>Request access to your medical records</li>
+              <li>Request corrections to your health information</li>
+              <li>Request restrictions on use and disclosure</li>
+              <li>Request confidential communications</li>
+              <li>File a complaint regarding privacy practices</li>
+            </ul>
+
+            <h2>Data Security</h2>
+            <p>
+              We implement appropriate administrative, physical, and technical safeguards to protect your health information from unauthorized access, use, or disclosure.
+            </p>
+
+            <h2>Changes to This Policy</h2>
+            <p>
+              We may update this privacy policy to reflect changes in our practices or applicable law. We will notify you of material changes as required by HIPAA.
+            </p>
+
+            <blockquote class="border-l-4 border-blue-600 pl-6 italic bg-blue-50 p-4 rounded-sm">
+              <p class="font-semibold">Questions or Concerns?</p>
+              <p>
+                If you have questions about our privacy practices or wish to exercise your rights, please contact our Privacy Officer:
+              </p>
+              <p>
+                <strong>International Center</strong><br>
+                Email: privacy@internationalcenter.com<br>
+                Phone: (561) 555-5555
+              </p>
+            </blockquote>
+
+            <p class="font-semibold">
+              By using our services, you acknowledge that you have read and understand this Privacy Policy and consent to the collection, use, and disclosure of your information as described herein.
+            </p>
+</InformationPage>

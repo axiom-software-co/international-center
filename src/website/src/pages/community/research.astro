@@ -1,0 +1,23 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import PageHero from '../../components/PageHero.astro';
+import ContentHub from '../../components/blocks/ContentHub.vue';
+// Components now handle their own data loading via client:only
+
+---
+
+<Layout
+  title="Research & Innovation - International Center | Advanced Regenerative Medicine Research"
+  description="Explore cutting-edge research and innovation in regenerative medicine across clinical studies, specialized medicine, and research articles showcasing breakthrough treatments and patient outcomes."
+>
+  <main>
+    <!-- Hero Section -->
+    <PageHero
+      title="Research & Innovation"
+      showBottomMargin={true}
+    />
+
+    <!-- Research Hub with Client-Side Loading -->
+    <ContentHub contentType="research" client:only="vue" />
+  </main>
+</Layout>

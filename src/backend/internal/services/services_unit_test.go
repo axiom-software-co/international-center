@@ -197,6 +197,14 @@ func (m *MockServicesRepository) GetAllFeaturedCategories(ctx context.Context) (
 	return featured, nil
 }
 
+func (m *MockServicesRepository) GetAdminFeaturedCategories(ctx context.Context) ([]*FeaturedCategory, error) {
+	if err, exists := m.failures["GetAdminFeaturedCategories"]; exists {
+		return nil, err
+	}
+	// For admin, return same as GetAllFeaturedCategories
+	return m.GetAllFeaturedCategories(ctx)
+}
+
 func (m *MockServicesRepository) GetFeaturedCategoryByPosition(ctx context.Context, position int) (*FeaturedCategory, error) {
 	if err, exists := m.failures["GetFeaturedCategoryByPosition"]; exists {
 		return nil, err
@@ -320,6 +328,62 @@ func (m *MockServicesRepository) DownloadServiceContentBlob(ctx context.Context,
 		return blob, nil
 	}
 	return nil, domain.NewNotFoundError("blob", storagePath)
+}
+
+// Admin audit repository methods - these will be implemented in the Green phase
+
+// GetServiceAudit mocks getting audit trail for a service
+func (m *MockServicesRepository) GetServiceAudit(ctx context.Context, serviceID string, limit int, offset int) ([]*ServiceAuditEvent, error) {
+	if err, exists := m.failures["GetServiceAudit"]; exists {
+		return nil, err
+	}
+	// Return mock audit events for this service
+	var events []*ServiceAuditEvent
+	for _, auditEvent := range m.auditEvents {
+		if auditEvent.EntityID == serviceID && auditEvent.EntityType == domain.EntityTypeService {
+			events = append(events, &ServiceAuditEvent{
+				AuditID:       fmt.Sprintf("audit-%s-%d", serviceID, len(events)+1),
+				EntityType:    string(auditEvent.EntityType),
+				EntityID:      auditEvent.EntityID,
+				OperationType: string(auditEvent.OperationType),
+				AuditTimestamp: time.Now().UTC().Add(-time.Duration(len(events)) * time.Hour),
+				UserID:        auditEvent.UserID,
+				DataSnapshot: AuditDataSnapshot{
+					Before: auditEvent.Before,
+					After:  auditEvent.After,
+				},
+				Environment: "development",
+			})
+		}
+	}
+	return events, nil
+}
+
+// GetServiceCategoryAudit mocks getting audit trail for a service category
+func (m *MockServicesRepository) GetServiceCategoryAudit(ctx context.Context, categoryID string, limit int, offset int) ([]*ServiceAuditEvent, error) {
+	if err, exists := m.failures["GetServiceCategoryAudit"]; exists {
+		return nil, err
+	}
+	// Return mock audit events for this category
+	var events []*ServiceAuditEvent
+	for _, auditEvent := range m.auditEvents {
+		if auditEvent.EntityID == categoryID && auditEvent.EntityType == domain.EntityTypeCategory {
+			events = append(events, &ServiceAuditEvent{
+				AuditID:       fmt.Sprintf("audit-%s-%d", categoryID, len(events)+1),
+				EntityType:    string(auditEvent.EntityType),
+				EntityID:      auditEvent.EntityID,
+				OperationType: string(auditEvent.OperationType),
+				AuditTimestamp: time.Now().UTC().Add(-time.Duration(len(events)) * time.Hour),
+				UserID:        auditEvent.UserID,
+				DataSnapshot: AuditDataSnapshot{
+					Before: auditEvent.Before,
+					After:  auditEvent.After,
+				},
+				Environment: "development",
+			})
+		}
+	}
+	return events, nil
 }
 
 // Test helper functions
@@ -806,4 +870,281 @@ func TestServicesService_Timeout(t *testing.T) {
 	require.True(t, hasDeadline)
 	assert.True(t, time.Until(deadline) <= 5*time.Second)
 	assert.True(t, time.Until(deadline) > 4*time.Second) // Allow some margin
+}
+
+// Admin Audit Endpoint Unit Tests - RED PHASE (Failing Tests)
+
+func TestServicesService_GetServiceAudit(t *testing.T) {
+	tests := []struct {
+		name           string
+		serviceID      string
+		userID         string
+		limit          int
+		offset         int
+		setupMock      func(*MockServicesRepository)
+		expectedError  string
+		validateResult func(*testing.T, []*ServiceAuditEvent)
+	}{
+		{
+			name:      "successfully get service audit trail",
+			serviceID: "service-1",
+			userID:    "admin-1",
+			limit:     10,
+			offset:    0,
+			setupMock: func(repo *MockServicesRepository) {
+				// Create a service with some audit events
+				service := createTestService("creator-1")
+				service.ServiceID = "service-1"
+				repo.services["service-1"] = service
+				
+				// Add audit events
+				repo.auditEvents = []MockAuditEvent{
+					{
+						EntityType:    domain.EntityTypeService,
+						EntityID:      "service-1",
+						OperationType: domain.AuditEventInsert,
+						UserID:        "creator-1",
+						Before:        nil,
+						After:         service,
+					},
+					{
+						EntityType:    domain.EntityTypeService,
+						EntityID:      "service-1",
+						OperationType: domain.AuditEventUpdate,
+						UserID:        "creator-1",
+						Before:        service,
+						After:         service,
+					},
+				}
+			},
+			validateResult: func(t *testing.T, events []*ServiceAuditEvent) {
+				assert.Len(t, events, 2)
+				assert.Equal(t, "service-1", events[0].EntityID)
+				assert.Equal(t, "service", events[0].EntityType)
+				assert.Equal(t, "creator-1", events[0].UserID)
+				assert.Equal(t, "development", events[0].Environment)
+			},
+		},
+		{
+			name:          "fail with empty service ID",
+			serviceID:     "",
+			userID:        "admin-1",
+			limit:         10,
+			offset:        0,
+			setupMock:     func(repo *MockServicesRepository) {},
+			expectedError: "service ID cannot be empty",
+		},
+		{
+			name:          "fail without admin authentication",
+			serviceID:     "service-1",
+			userID:        "",
+			limit:         10,
+			offset:        0,
+			setupMock:     func(repo *MockServicesRepository) {},
+			expectedError: "admin authentication required",
+		},
+		{
+			name:      "return empty array for service with no audit events",
+			serviceID: "service-2",
+			userID:    "admin-1",
+			limit:     10,
+			offset:    0,
+			setupMock: func(repo *MockServicesRepository) {
+				service := createTestService("creator-1")
+				service.ServiceID = "service-2"
+				repo.services["service-2"] = service
+			},
+			validateResult: func(t *testing.T, events []*ServiceAuditEvent) {
+				assert.Len(t, events, 0)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Arrange
+			ctx, cancel := sharedtesting.CreateUnitTestContext()
+			defer cancel()
+			
+			mockRepo := NewMockServicesRepository()
+			tt.setupMock(mockRepo)
+			service := NewServicesService(mockRepo)
+
+			// Act - this will fail until we implement GetServiceAudit method
+			result, err := service.GetServiceAudit(ctx, tt.serviceID, tt.userID, tt.limit, tt.offset)
+
+			// Assert
+			if tt.expectedError != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedError)
+				assert.Nil(t, result)
+			} else {
+				require.NoError(t, err)
+				require.NotNil(t, result)
+				if tt.validateResult != nil {
+					tt.validateResult(t, result)
+				}
+			}
+		})
+	}
+}
+
+func TestServicesService_GetServiceCategoryAudit(t *testing.T) {
+	tests := []struct {
+		name           string
+		categoryID     string
+		userID         string
+		limit          int
+		offset         int
+		setupMock      func(*MockServicesRepository)
+		expectedError  string
+		validateResult func(*testing.T, []*ServiceAuditEvent)
+	}{
+		{
+			name:       "successfully get category audit trail",
+			categoryID: "category-1",
+			userID:     "admin-1",
+			limit:      10,
+			offset:     0,
+			setupMock: func(repo *MockServicesRepository) {
+				category := createTestCategory("creator-1")
+				category.CategoryID = "category-1"
+				repo.categories["category-1"] = category
+				
+				// Add audit events
+				repo.auditEvents = []MockAuditEvent{
+					{
+						EntityType:    domain.EntityTypeCategory,
+						EntityID:      "category-1",
+						OperationType: domain.AuditEventInsert,
+						UserID:        "creator-1",
+						Before:        nil,
+						After:         category,
+					},
+				}
+			},
+			validateResult: func(t *testing.T, events []*ServiceAuditEvent) {
+				assert.Len(t, events, 1)
+				assert.Equal(t, "category-1", events[0].EntityID)
+				assert.Equal(t, "service_category", events[0].EntityType)
+				assert.Equal(t, "creator-1", events[0].UserID)
+			},
+		},
+		{
+			name:          "fail with empty category ID",
+			categoryID:    "",
+			userID:        "admin-1",
+			limit:         10,
+			offset:        0,
+			setupMock:     func(repo *MockServicesRepository) {},
+			expectedError: "category ID cannot be empty",
+		},
+		{
+			name:          "fail without admin authentication",
+			categoryID:    "category-1",
+			userID:        "",
+			limit:         10,
+			offset:        0,
+			setupMock:     func(repo *MockServicesRepository) {},
+			expectedError: "admin authentication required",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Arrange
+			ctx, cancel := sharedtesting.CreateUnitTestContext()
+			defer cancel()
+			
+			mockRepo := NewMockServicesRepository()
+			tt.setupMock(mockRepo)
+			service := NewServicesService(mockRepo)
+
+			// Act - this will fail until we implement GetServiceCategoryAudit method
+			result, err := service.GetServiceCategoryAudit(ctx, tt.categoryID, tt.userID, tt.limit, tt.offset)
+
+			// Assert
+			if tt.expectedError != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedError)
+				assert.Nil(t, result)
+			} else {
+				require.NoError(t, err)
+				require.NotNil(t, result)
+				if tt.validateResult != nil {
+					tt.validateResult(t, result)
+				}
+			}
+		})
+	}
+}
+
+func TestServicesService_GetAdminFeaturedCategories(t *testing.T) {
+	tests := []struct {
+		name           string
+		userID         string
+		setupMock      func(*MockServicesRepository)
+		expectedError  string
+		validateResult func(*testing.T, []*FeaturedCategory)
+	}{
+		{
+			name:   "successfully get admin view of featured categories",
+			userID: "admin-1",
+			setupMock: func(repo *MockServicesRepository) {
+				category1 := createTestCategory("admin")
+				category1.CategoryID = "cat-1"
+				repo.categories["cat-1"] = category1
+				
+				category2 := createTestCategory("admin")
+				category2.CategoryID = "cat-2"
+				repo.categories["cat-2"] = category2
+				
+				featured1, _ := NewFeaturedCategory("cat-1", 1, "admin")
+				featured2, _ := NewFeaturedCategory("cat-2", 2, "admin")
+				
+				repo.featuredCategories[featured1.FeaturedCategoryID] = featured1
+				repo.featuredCategories[featured2.FeaturedCategoryID] = featured2
+			},
+			validateResult: func(t *testing.T, featured []*FeaturedCategory) {
+				assert.Len(t, featured, 2)
+				// Should include detailed admin information
+				assert.NotEmpty(t, featured[0].CreatedBy)
+				assert.NotNil(t, featured[0].CreatedOn)
+			},
+		},
+		{
+			name:          "fail without admin authentication",
+			userID:        "",
+			setupMock:     func(repo *MockServicesRepository) {},
+			expectedError: "admin authentication required",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Arrange
+			ctx, cancel := sharedtesting.CreateUnitTestContext()
+			defer cancel()
+			
+			mockRepo := NewMockServicesRepository()
+			tt.setupMock(mockRepo)
+			service := NewServicesService(mockRepo)
+
+			// Act - this will fail until we implement GetAdminFeaturedCategories method
+			result, err := service.GetAdminFeaturedCategories(ctx, tt.userID)
+
+			// Assert
+			if tt.expectedError != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedError)
+				assert.Nil(t, result)
+			} else {
+				require.NoError(t, err)
+				require.NotNil(t, result)
+				if tt.validateResult != nil {
+					tt.validateResult(t, result)
+				}
+			}
+		})
+	}
 }

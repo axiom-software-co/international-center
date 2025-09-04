@@ -113,6 +113,100 @@ type ContentStorageBackend struct {
 	ModifiedBy                string                 `json:"modified_by,omitempty"`
 }
 
+// ContentAuditEvent represents audit events for content domain
+type ContentAuditEvent struct {
+	AuditID        string            `json:"audit_id"`
+	EntityType     string            `json:"entity_type"`
+	EntityID       string            `json:"entity_id"`
+	OperationType  string            `json:"operation_type"`
+	AuditTimestamp time.Time         `json:"audit_timestamp"`
+	UserID         string            `json:"user_id"`
+	CorrelationID  string            `json:"correlation_id"`
+	TraceID        string            `json:"trace_id"`
+	DataSnapshot   AuditDataSnapshot `json:"data_snapshot"`
+	Environment    string            `json:"environment"`
+}
+
+// AuditDataSnapshot represents before/after data in audit events
+type AuditDataSnapshot struct {
+	Before interface{} `json:"before"`
+	After  interface{} `json:"after"`
+}
+
+// ContentProcessingQueueItem represents items in the processing queue
+type ContentProcessingQueueItem struct {
+	ContentID             string      `json:"content_id"`
+	OriginalFilename      string      `json:"original_filename"`
+	FileSize              int64       `json:"file_size"`
+	ContentCategory       string      `json:"content_category"`
+	UploadStatus          string      `json:"upload_status"`
+	ProcessingAttempts    int         `json:"processing_attempts"`
+	LastProcessedAt       *time.Time  `json:"last_processed_at,omitempty"`
+	UploadCorrelationID   string      `json:"upload_correlation_id"`
+	CreatedOn             time.Time   `json:"created_on"`
+	QueuePosition         int         `json:"queue_position"`
+	EstimatedProcessTime  int         `json:"estimated_process_time_seconds"`
+}
+
+// ContentAnalytics represents content usage analytics
+type ContentAnalytics struct {
+	TotalContent            int64                   `json:"total_content"`
+	ContentByCategory       map[string]int64        `json:"content_by_category"`
+	ContentByAccessLevel    map[string]int64        `json:"content_by_access_level"`
+	UploadsByDay           map[string]int64        `json:"uploads_by_day"`
+	ProcessingMetrics      ProcessingMetrics       `json:"processing_metrics"`
+	AccessMetrics          AccessMetrics           `json:"access_metrics"`
+	StorageMetrics         StorageMetrics          `json:"storage_metrics"`
+	VirusScanningMetrics   VirusScanningMetrics    `json:"virus_scanning_metrics"`
+	GeneratedAt            time.Time               `json:"generated_at"`
+}
+
+// ProcessingMetrics represents processing performance metrics
+type ProcessingMetrics struct {
+	AverageProcessingTime   int         `json:"average_processing_time_ms"`
+	ProcessingQueue         int         `json:"processing_queue_size"`
+	ProcessedToday          int64       `json:"processed_today"`
+	FailedProcessing        int64       `json:"failed_processing"`
+	ProcessingSuccessRate   float64     `json:"processing_success_rate"`
+}
+
+// AccessMetrics represents content access metrics
+type AccessMetrics struct {
+	TotalAccesses          int64       `json:"total_accesses"`
+	UniqueUsers            int64       `json:"unique_users"`
+	AccessesToday          int64       `json:"accesses_today"`
+	TopContentByAccess     []ContentAccessStat `json:"top_content_by_access"`
+	AverageResponseTime    int         `json:"average_response_time_ms"`
+	CacheHitRate          float64     `json:"cache_hit_rate"`
+}
+
+// StorageMetrics represents storage usage metrics
+type StorageMetrics struct {
+	TotalStorageBytes     int64       `json:"total_storage_bytes"`
+	StorageByBackend      map[string]int64 `json:"storage_by_backend"`
+	StorageByCategory     map[string]int64 `json:"storage_by_category"`
+	StorageGrowthRate     float64     `json:"storage_growth_rate_daily"`
+}
+
+// VirusScanningMetrics represents virus scanning metrics
+type VirusScanningMetrics struct {
+	TotalScans           int64       `json:"total_scans"`
+	InfectedFiles        int64       `json:"infected_files"`
+	SuspiciousFiles      int64       `json:"suspicious_files"`
+	ScanFailures         int64       `json:"scan_failures"`
+	AverageScanTime      int         `json:"average_scan_time_ms"`
+	ScanSuccessRate      float64     `json:"scan_success_rate"`
+}
+
+// ContentAccessStat represents statistics for content access
+type ContentAccessStat struct {
+	ContentID          string    `json:"content_id"`
+	OriginalFilename   string    `json:"original_filename"`
+	AccessCount        int64     `json:"access_count"`
+	UniqueUsers        int64     `json:"unique_users"`
+	LastAccess         time.Time `json:"last_access"`
+}
+
 // Domain validation patterns
 var (
 	filenameRegex = regexp.MustCompile(`^[a-zA-Z0-9._-]+$`)

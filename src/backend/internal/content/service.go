@@ -29,6 +29,9 @@ type ContentRepositoryInterface interface {
 	GetContentVirusScan(ctx context.Context, contentID string) ([]*ContentVirusScan, error)
 	PublishAuditEvent(ctx context.Context, entityType domain.EntityType, entityID string, operationType domain.AuditEventType, userID string, beforeData, afterData interface{}) error
 	SearchContent(ctx context.Context, searchTerm string) ([]*Content, error)
+	GetContentAudit(ctx context.Context, contentID string, userID string, limit int, offset int) ([]*ContentAuditEvent, error)
+	GetContentProcessingQueue(ctx context.Context, userID string, limit int, offset int) ([]*ContentProcessingQueueItem, error)
+	GetContentAnalytics(ctx context.Context, userID string) (*ContentAnalytics, error)
 }
 
 // ContentService implements business logic for content operations
@@ -467,4 +470,73 @@ func (s *ContentService) triggerAsyncProcessing(ctx context.Context, content *Co
 	// In production, this would be handled by separate services
 	content.MarkAsAvailable("system")
 	_ = s.repository.SaveContent(ctx, content)
+}
+
+// Admin Content Audit and Analytics Methods
+
+// GetContentAudit retrieves audit trail for a specific content (admin only)
+func (s *ContentService) GetContentAudit(ctx context.Context, contentID string, userID string, limit int, offset int) ([]*ContentAuditEvent, error) {
+	// Validate input parameters
+	if contentID == "" {
+		return nil, domain.NewValidationError("content ID cannot be empty")
+	}
+
+	if userID == "" {
+		return nil, domain.NewUnauthorizedError("admin authentication required")
+	}
+
+	// In a real implementation, check if user has admin role
+	// For now, just check if user ID is provided
+
+	// Verify content exists
+	_, err := s.repository.GetContent(ctx, contentID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get audit events from repository
+	auditEvents, err := s.repository.GetContentAudit(ctx, contentID, userID, limit, offset)
+	if err != nil {
+		return nil, domain.WrapError(err, fmt.Sprintf("failed to get audit trail for content %s", contentID))
+	}
+
+	return auditEvents, nil
+}
+
+// GetContentProcessingQueue retrieves content processing queue status (admin only)
+func (s *ContentService) GetContentProcessingQueue(ctx context.Context, userID string, limit int, offset int) ([]*ContentProcessingQueueItem, error) {
+	// Validate admin authentication
+	if userID == "" {
+		return nil, domain.NewUnauthorizedError("admin authentication required")
+	}
+
+	// In a real implementation, check if user has admin role
+	// For now, just check if user ID is provided
+
+	// Get processing queue from repository
+	queueItems, err := s.repository.GetContentProcessingQueue(ctx, userID, limit, offset)
+	if err != nil {
+		return nil, domain.WrapError(err, "failed to get content processing queue")
+	}
+
+	return queueItems, nil
+}
+
+// GetContentAnalytics retrieves content usage analytics (admin only)
+func (s *ContentService) GetContentAnalytics(ctx context.Context, userID string) (*ContentAnalytics, error) {
+	// Validate admin authentication
+	if userID == "" {
+		return nil, domain.NewUnauthorizedError("admin authentication required")
+	}
+
+	// In a real implementation, check if user has admin role
+	// For now, just check if user ID is provided
+
+	// Get analytics from repository
+	analytics, err := s.repository.GetContentAnalytics(ctx, userID)
+	if err != nil {
+		return nil, domain.WrapError(err, "failed to get content analytics")
+	}
+
+	return analytics, nil
 }

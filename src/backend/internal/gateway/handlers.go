@@ -56,6 +56,11 @@ func (h *GatewayHandler) RegisterRoutes(router *mux.Router) {
 		router.PathPrefix("/api/v1/services").HandlerFunc(h.ProxyToServicesAPI).Methods("GET")
 	}
 	
+	if h.config.ServiceRouting.NewsAPIEnabled {
+		// News API routes
+		router.PathPrefix("/api/v1/news").HandlerFunc(h.ProxyToNewsAPI).Methods("GET", "POST", "PUT", "DELETE")
+	}
+	
 	// Gateway information endpoint
 	router.HandleFunc("/gateway/info", h.GatewayInfo).Methods("GET")
 }
@@ -86,6 +91,22 @@ func (h *GatewayHandler) ProxyToServicesAPI(w http.ResponseWriter, r *http.Reque
 	
 	// Proxy request to services API
 	err := h.serviceProxy.ProxyRequest(ctx, w, r, "services-api")
+	if err != nil {
+		h.handleError(w, r, err)
+		return
+	}
+}
+
+// ProxyToNewsAPI proxies requests to news API service
+func (h *GatewayHandler) ProxyToNewsAPI(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	
+	// Add request timeout
+	ctx, cancel := context.WithTimeout(ctx, h.config.Timeouts.RequestTimeout)
+	defer cancel()
+	
+	// Proxy request to news API
+	err := h.serviceProxy.ProxyRequest(ctx, w, r, "news-api")
 	if err != nil {
 		h.handleError(w, r, err)
 		return

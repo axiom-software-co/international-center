@@ -74,6 +74,26 @@ type FeaturedCategory struct {
 	ModifiedBy         string     `json:"modified_by,omitempty"`
 }
 
+// ServiceAuditEvent represents audit events for services domain
+type ServiceAuditEvent struct {
+	AuditID        string            `json:"audit_id"`
+	EntityType     string            `json:"entity_type"`
+	EntityID       string            `json:"entity_id"`
+	OperationType  string            `json:"operation_type"`
+	AuditTimestamp time.Time         `json:"audit_timestamp"`
+	UserID         string            `json:"user_id"`
+	CorrelationID  string            `json:"correlation_id"`
+	TraceID        string            `json:"trace_id"`
+	DataSnapshot   AuditDataSnapshot `json:"data_snapshot"`
+	Environment    string            `json:"environment"`
+}
+
+// AuditDataSnapshot represents before/after data in audit events
+type AuditDataSnapshot struct {
+	Before interface{} `json:"before"`
+	After  interface{} `json:"after"`
+}
+
 // Domain validation patterns
 var (
 	slugRegex = regexp.MustCompile(`^[a-z0-9-]+$`)
