@@ -329,15 +329,15 @@ func TestNewsService_GetNews(t *testing.T) {
 	}{
 		{
 			name:   "successfully retrieve existing news",
-			newsID: "news-1", 
-			userID: "user-1",
+			newsID: "550e8400-e29b-41d4-a716-446655440001", 
+			userID: "550e8400-e29b-41d4-a716-446655440004",
 			setupFn: func(repo *MockNewsRepository) {
-				repo.news["news-1"] = &News{
-					NewsID:           "news-1",
+				repo.news["550e8400-e29b-41d4-a716-446655440001"] = &News{
+					NewsID:           "550e8400-e29b-41d4-a716-446655440001",
 					Title:            "Test News",
 					Summary:          "Test summary",
 					Slug:             "test-news",
-					CategoryID:       "cat-1",
+					CategoryID:       "550e8400-e29b-41d4-a716-446655440002",
 					PublishingStatus: PublishingStatusPublished,
 					NewsType:         NewsTypeAnnouncement,
 					PriorityLevel:    PriorityLevelNormal,
@@ -348,7 +348,7 @@ func TestNewsService_GetNews(t *testing.T) {
 		{
 			name:    "return not found error for non-existent news",
 			newsID:  "non-existent",
-			userID:  "user-1", 
+			userID:  "550e8400-e29b-41d4-a716-446655440004", 
 			setupFn: func(repo *MockNewsRepository) {},
 			wantErr: true,
 			errType: "not_found",
@@ -356,7 +356,7 @@ func TestNewsService_GetNews(t *testing.T) {
 		{
 			name:   "return not found error for soft deleted news", 
 			newsID: "deleted-news",
-			userID: "user-1",
+			userID: "550e8400-e29b-41d4-a716-446655440004",
 			setupFn: func(repo *MockNewsRepository) {
 				now := time.Now()
 				repo.news["deleted-news"] = &News{
@@ -411,16 +411,16 @@ func TestNewsService_GetAllNews(t *testing.T) {
 	}{
 		{
 			name:   "successfully retrieve all news",
-			userID: "user-1",
+			userID: "550e8400-e29b-41d4-a716-446655440004",
 			setupFn: func(repo *MockNewsRepository) {
-				repo.news["news-1"] = &News{
-					NewsID:           "news-1",
+				repo.news["550e8400-e29b-41d4-a716-446655440001"] = &News{
+					NewsID:           "550e8400-e29b-41d4-a716-446655440001",
 					Title:            "News 1",
 					Summary:          "Summary 1", 
 					PublishingStatus: PublishingStatusPublished,
 				}
-				repo.news["news-2"] = &News{
-					NewsID:           "news-2",
+				repo.news["550e8400-e29b-41d4-a716-446655440006"] = &News{
+					NewsID:           "550e8400-e29b-41d4-a716-446655440006",
 					Title:            "News 2", 
 					Summary:          "Summary 2",
 					PublishingStatus: PublishingStatusDraft,
@@ -431,24 +431,24 @@ func TestNewsService_GetAllNews(t *testing.T) {
 		},
 		{
 			name:   "return empty array when no news exists",
-			userID: "user-1", 
+			userID: "550e8400-e29b-41d4-a716-446655440004", 
 			setupFn: func(repo *MockNewsRepository) {},
 			wantCount: 0,
 			wantErr:   false,
 		},
 		{
 			name:   "exclude soft deleted news from results",
-			userID: "user-1",
+			userID: "550e8400-e29b-41d4-a716-446655440004",
 			setupFn: func(repo *MockNewsRepository) {
 				now := time.Now()
-				repo.news["news-1"] = &News{
-					NewsID:           "news-1",
+				repo.news["550e8400-e29b-41d4-a716-446655440001"] = &News{
+					NewsID:           "550e8400-e29b-41d4-a716-446655440001",
 					Title:            "Active News",
 					Summary:          "Active summary",
 					PublishingStatus: PublishingStatusPublished,
 				}
-				repo.news["news-2"] = &News{
-					NewsID:           "news-2", 
+				repo.news["550e8400-e29b-41d4-a716-446655440006"] = &News{
+					NewsID:           "550e8400-e29b-41d4-a716-446655440006", 
 					Title:            "Deleted News",
 					Summary:          "Deleted summary",
 					PublishingStatus: PublishingStatusPublished,
@@ -499,15 +499,15 @@ func TestNewsService_SearchNews(t *testing.T) {
 		{
 			name:       "successfully search news by title",
 			searchTerm: "breaking",
-			userID:     "user-1",
+			userID:     "550e8400-e29b-41d4-a716-446655440004",
 			setupFn: func(repo *MockNewsRepository) {
-				repo.news["news-1"] = &News{
-					NewsID:  "news-1",
+				repo.news["550e8400-e29b-41d4-a716-446655440001"] = &News{
+					NewsID:  "550e8400-e29b-41d4-a716-446655440001",
 					Title:   "Breaking News Today",
 					Summary: "Summary 1",
 				}
-				repo.news["news-2"] = &News{
-					NewsID:  "news-2", 
+				repo.news["550e8400-e29b-41d4-a716-446655440006"] = &News{
+					NewsID:  "550e8400-e29b-41d4-a716-446655440006", 
 					Title:   "Regular Update",
 					Summary: "Summary 2",
 				}
@@ -518,15 +518,15 @@ func TestNewsService_SearchNews(t *testing.T) {
 		{
 			name:       "successfully search news by summary",
 			searchTerm: "important",
-			userID:     "user-1",
+			userID:     "550e8400-e29b-41d4-a716-446655440004",
 			setupFn: func(repo *MockNewsRepository) {
-				repo.news["news-1"] = &News{
-					NewsID:  "news-1",
+				repo.news["550e8400-e29b-41d4-a716-446655440001"] = &News{
+					NewsID:  "550e8400-e29b-41d4-a716-446655440001",
 					Title:   "News Title",
 					Summary: "This is an important announcement",
 				}
-				repo.news["news-2"] = &News{
-					NewsID:  "news-2",
+				repo.news["550e8400-e29b-41d4-a716-446655440006"] = &News{
+					NewsID:  "550e8400-e29b-41d4-a716-446655440006",
 					Title:   "Other News", 
 					Summary: "Regular summary",
 				}
@@ -537,10 +537,10 @@ func TestNewsService_SearchNews(t *testing.T) {
 		{
 			name:       "return empty results when no matches found",
 			searchTerm: "nonexistent",
-			userID:     "user-1",
+			userID:     "550e8400-e29b-41d4-a716-446655440004",
 			setupFn: func(repo *MockNewsRepository) {
-				repo.news["news-1"] = &News{
-					NewsID:  "news-1",
+				repo.news["550e8400-e29b-41d4-a716-446655440001"] = &News{
+					NewsID:  "550e8400-e29b-41d4-a716-446655440001",
 					Title:   "News Title",
 					Summary: "Summary",
 				}
@@ -586,24 +586,24 @@ func TestNewsService_GetFeaturedNews(t *testing.T) {
 	}{
 		{
 			name:   "successfully retrieve featured news",
-			userID: "user-1",
+			userID: "550e8400-e29b-41d4-a716-446655440004",
 			setupFn: func(repo *MockNewsRepository) {
-				repo.news["news-1"] = &News{
-					NewsID:           "news-1",
+				repo.news["550e8400-e29b-41d4-a716-446655440001"] = &News{
+					NewsID:           "550e8400-e29b-41d4-a716-446655440001",
 					Title:            "Featured News",
 					Summary:          "Featured summary",
 					PublishingStatus: PublishingStatusPublished,
 				}
-				repo.featuredNews["featured-1"] = &FeaturedNews{
-					FeaturedNewsID: "featured-1",
-					NewsID:         "news-1",
+				repo.featuredNews["550e8400-e29b-41d4-a716-446655440005"] = &FeaturedNews{
+					FeaturedNewsID: "550e8400-e29b-41d4-a716-446655440005",
+					NewsID:         "550e8400-e29b-41d4-a716-446655440001",
 				}
 			},
 			wantErr: false,
 		},
 		{
 			name:   "return not found when no featured news exists",
-			userID: "user-1",
+			userID: "550e8400-e29b-41d4-a716-446655440004",
 			setupFn: func(repo *MockNewsRepository) {},
 			wantErr: true,
 			errType: "not_found",
@@ -653,17 +653,17 @@ func TestNewsService_GetNewsAudit(t *testing.T) {
 	}{
 		{
 			name:   "successfully retrieve news audit events",
-			newsID: "news-1",
-			userID: "admin-1",
+			newsID: "550e8400-e29b-41d4-a716-446655440001",
+			userID: "admin-550e8400-e29b-41d4-a716-446655440003",
 			limit:  10,
 			offset: 0,
 			setupFn: func(repo *MockNewsRepository) {
 				// Add audit event
 				repo.auditEvents = append(repo.auditEvents, MockAuditEvent{
 					EntityType:    domain.EntityType("news"),
-					EntityID:      "news-1",
+					EntityID:      "550e8400-e29b-41d4-a716-446655440001",
 					OperationType: domain.AuditEventInsert,
-					UserID:        "admin-1",
+					UserID:        "admin-550e8400-e29b-41d4-a716-446655440003",
 				})
 			},
 			wantErr: false,
@@ -671,7 +671,7 @@ func TestNewsService_GetNewsAudit(t *testing.T) {
 		{
 			name:   "return empty array for news with no audit events",
 			newsID: "news-without-audit",
-			userID: "admin-1", 
+			userID: "admin-550e8400-e29b-41d4-a716-446655440003", 
 			limit:  10,
 			offset: 0,
 			setupFn: func(repo *MockNewsRepository) {},
@@ -679,7 +679,7 @@ func TestNewsService_GetNewsAudit(t *testing.T) {
 		},
 		{
 			name:   "return unauthorized error for non-admin user",
-			newsID: "news-1",
+			newsID: "550e8400-e29b-41d4-a716-446655440001",
 			userID: "",
 			limit:  10,
 			offset: 0,
@@ -730,24 +730,24 @@ func TestNewsService_GetNewsCategoryAudit(t *testing.T) {
 	}{
 		{
 			name:       "successfully retrieve news category audit events", 
-			categoryID: "cat-1",
-			userID:     "admin-1",
+			categoryID: "550e8400-e29b-41d4-a716-446655440002",
+			userID:     "admin-550e8400-e29b-41d4-a716-446655440003",
 			limit:      10,
 			offset:     0,
 			setupFn: func(repo *MockNewsRepository) {
 				// Add audit event for category
 				repo.auditEvents = append(repo.auditEvents, MockAuditEvent{
 					EntityType:    domain.EntityTypeCategory,
-					EntityID:      "cat-1", 
+					EntityID:      "550e8400-e29b-41d4-a716-446655440002", 
 					OperationType: domain.AuditEventUpdate,
-					UserID:        "admin-1",
+					UserID:        "admin-550e8400-e29b-41d4-a716-446655440003",
 				})
 			},
 			wantErr: false,
 		},
 		{
 			name:       "return unauthorized error for non-admin user",
-			categoryID: "cat-1",
+			categoryID: "550e8400-e29b-41d4-a716-446655440002",
 			userID:     "",
 			limit:      10,
 			offset:     0,
@@ -777,6 +777,574 @@ func TestNewsService_GetNewsCategoryAudit(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 				assert.NotNil(t, result)
+			}
+		})
+	}
+}
+
+// Admin CRUD Operations Tests
+
+func TestNewsService_CreateNews(t *testing.T) {
+	ctx, cancel := sharedtesting.CreateUnitTestContext()
+	defer cancel()
+
+	tests := []struct {
+		name      string
+		news      *News
+		userID    string
+		setupFunc func(*MockNewsRepository)
+		wantErr   bool
+	}{
+		{
+			name: "successfully create new news",
+			news: &News{
+				Title:            "Breaking News Story",
+				Content:          "Content for breaking news story with sufficient length to meet validation requirements",
+				Summary:          "Breaking news summary",
+				Slug:             "breaking-news-story",
+				CategoryID:       "550e8400-e29b-41d4-a716-446655440002",
+				AuthorName:       "John Doe",
+				PublishingStatus: PublishingStatusDraft,
+				NewsType:         NewsTypeAnnouncement,
+				PriorityLevel:    PriorityLevelNormal,
+			},
+			userID:    "admin-550e8400-e29b-41d4-a716-446655440003",
+			setupFunc: func(repo *MockNewsRepository) {},
+			wantErr:   false,
+		},
+		{
+			name: "return validation error for invalid news",
+			news: &News{
+				Title: "", // Invalid: empty title
+			},
+			userID:    "admin-550e8400-e29b-41d4-a716-446655440003",
+			setupFunc: func(repo *MockNewsRepository) {},
+			wantErr:   true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repo := NewMockNewsRepository()
+			tt.setupFunc(repo)
+			service := NewNewsService(repo)
+
+			err := service.CreateNews(ctx, tt.news, tt.userID)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Len(t, repo.auditEvents, 1)
+				assert.Equal(t, domain.AuditEventInsert, repo.auditEvents[0].OperationType)
+			}
+		})
+	}
+}
+
+func TestNewsService_UpdateNews(t *testing.T) {
+	ctx, cancel := sharedtesting.CreateUnitTestContext()
+	defer cancel()
+
+	tests := []struct {
+		name      string
+		news      *News
+		userID    string
+		setupFunc func(*MockNewsRepository)
+		wantErr   bool
+	}{
+		{
+			name: "successfully update existing news",
+			news: &News{
+				NewsID:           "550e8400-e29b-41d4-a716-446655440001",
+				Title:            "Updated News Title",
+				Content:          "Updated content for news article with sufficient length to meet validation requirements",
+				Summary:          "Updated summary",
+				Slug:             "updated-news-title",
+				CategoryID:       "550e8400-e29b-41d4-a716-446655440002",
+				AuthorName:       "John Doe",
+				PublishingStatus: PublishingStatusDraft,
+				NewsType:         NewsTypeAnnouncement,
+				PriorityLevel:    PriorityLevelNormal,
+			},
+			userID: "admin-550e8400-e29b-41d4-a716-446655440003",
+			setupFunc: func(repo *MockNewsRepository) {
+				repo.news["550e8400-e29b-41d4-a716-446655440001"] = &News{
+					NewsID:           "550e8400-e29b-41d4-a716-446655440001",
+					Title:            "Original Title",
+					Content:          "Original content",
+					Summary:          "Original summary",
+					PublishingStatus: PublishingStatusDraft,
+				}
+			},
+			wantErr: false,
+		},
+		{
+			name: "return not found error for non-existent news",
+			news: &News{
+				NewsID: "550e8400-e29b-41d4-a716-446655440999",
+			},
+			userID:    "admin-550e8400-e29b-41d4-a716-446655440003",
+			setupFunc: func(repo *MockNewsRepository) {},
+			wantErr:   true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repo := NewMockNewsRepository()
+			tt.setupFunc(repo)
+			service := NewNewsService(repo)
+
+			err := service.UpdateNews(ctx, tt.news, tt.userID)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Len(t, repo.auditEvents, 1)
+				assert.Equal(t, domain.AuditEventUpdate, repo.auditEvents[0].OperationType)
+			}
+		})
+	}
+}
+
+func TestNewsService_DeleteNews(t *testing.T) {
+	ctx, cancel := sharedtesting.CreateUnitTestContext()
+	defer cancel()
+
+	tests := []struct {
+		name      string
+		newsID    string
+		userID    string
+		setupFunc func(*MockNewsRepository)
+		wantErr   bool
+	}{
+		{
+			name:   "successfully delete existing news",
+			newsID: "550e8400-e29b-41d4-a716-446655440001",
+			userID: "admin-550e8400-e29b-41d4-a716-446655440003",
+			setupFunc: func(repo *MockNewsRepository) {
+				repo.news["550e8400-e29b-41d4-a716-446655440001"] = &News{
+					NewsID:           "550e8400-e29b-41d4-a716-446655440001",
+					Title:            "News to Delete",
+					PublishingStatus: PublishingStatusDraft,
+				}
+			},
+			wantErr: false,
+		},
+		{
+			name:      "return not found error for non-existent news",
+			newsID:    "550e8400-e29b-41d4-a716-446655440999",
+			userID:    "admin-550e8400-e29b-41d4-a716-446655440003",
+			setupFunc: func(repo *MockNewsRepository) {},
+			wantErr:   true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repo := NewMockNewsRepository()
+			tt.setupFunc(repo)
+			service := NewNewsService(repo)
+
+			err := service.DeleteNews(ctx, tt.newsID, tt.userID)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Len(t, repo.auditEvents, 1)
+				assert.Equal(t, domain.AuditEventDelete, repo.auditEvents[0].OperationType)
+			}
+		})
+	}
+}
+
+func TestNewsService_PublishNews(t *testing.T) {
+	ctx, cancel := sharedtesting.CreateUnitTestContext()
+	defer cancel()
+
+	tests := []struct {
+		name      string
+		newsID    string
+		userID    string
+		setupFunc func(*MockNewsRepository)
+		wantErr   bool
+	}{
+		{
+			name:   "successfully publish draft news",
+			newsID: "550e8400-e29b-41d4-a716-446655440001",
+			userID: "admin-550e8400-e29b-41d4-a716-446655440003",
+			setupFunc: func(repo *MockNewsRepository) {
+				repo.news["550e8400-e29b-41d4-a716-446655440001"] = &News{
+					NewsID:           "550e8400-e29b-41d4-a716-446655440001",
+					Title:            "Complete News Article",
+					Content:          "Complete content for publication",
+					Summary:          "Complete summary",
+					AuthorName:       "Author Name",
+					PublishingStatus: PublishingStatusDraft,
+				}
+			},
+			wantErr: false,
+		},
+		{
+			name:   "return validation error for news without required fields",
+			newsID: "550e8400-e29b-41d4-a716-446655440001",
+			userID: "admin-550e8400-e29b-41d4-a716-446655440003",
+			setupFunc: func(repo *MockNewsRepository) {
+				repo.news["550e8400-e29b-41d4-a716-446655440001"] = &News{
+					NewsID:           "550e8400-e29b-41d4-a716-446655440001",
+					Title:            "Incomplete News",
+					Content:          "", // Missing content
+					PublishingStatus: PublishingStatusDraft,
+				}
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repo := NewMockNewsRepository()
+			tt.setupFunc(repo)
+			service := NewNewsService(repo)
+
+			err := service.PublishNews(ctx, tt.newsID, tt.userID)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Len(t, repo.auditEvents, 1)
+				assert.Equal(t, domain.AuditEventPublish, repo.auditEvents[0].OperationType)
+			}
+		})
+	}
+}
+
+func TestNewsService_ArchiveNews(t *testing.T) {
+	ctx, cancel := sharedtesting.CreateUnitTestContext()
+	defer cancel()
+
+	tests := []struct {
+		name      string
+		newsID    string
+		userID    string
+		setupFunc func(*MockNewsRepository)
+		wantErr   bool
+	}{
+		{
+			name:   "successfully archive published news",
+			newsID: "550e8400-e29b-41d4-a716-446655440001",
+			userID: "admin-550e8400-e29b-41d4-a716-446655440003",
+			setupFunc: func(repo *MockNewsRepository) {
+				repo.news["550e8400-e29b-41d4-a716-446655440001"] = &News{
+					NewsID:           "550e8400-e29b-41d4-a716-446655440001",
+					Title:            "Published News",
+					PublishingStatus: PublishingStatusPublished,
+				}
+			},
+			wantErr: false,
+		},
+		{
+			name:      "return not found error for non-existent news",
+			newsID:    "550e8400-e29b-41d4-a716-446655440999",
+			userID:    "admin-550e8400-e29b-41d4-a716-446655440003",
+			setupFunc: func(repo *MockNewsRepository) {},
+			wantErr:   true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repo := NewMockNewsRepository()
+			tt.setupFunc(repo)
+			service := NewNewsService(repo)
+
+			err := service.ArchiveNews(ctx, tt.newsID, tt.userID)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Len(t, repo.auditEvents, 1)
+				assert.Equal(t, domain.AuditEventArchive, repo.auditEvents[0].OperationType)
+			}
+		})
+	}
+}
+
+func TestNewsService_CreateNewsCategory(t *testing.T) {
+	ctx, cancel := sharedtesting.CreateUnitTestContext()
+	defer cancel()
+
+	tests := []struct {
+		name      string
+		category  *NewsCategory
+		userID    string
+		setupFunc func(*MockNewsRepository)
+		wantErr   bool
+	}{
+		{
+			name: "successfully create new news category",
+			category: &NewsCategory{
+				Name:        "Breaking News",
+				Slug:        "breaking-news",
+				Description: "Category for breaking news articles",
+			},
+			userID:    "admin-550e8400-e29b-41d4-a716-446655440003",
+			setupFunc: func(repo *MockNewsRepository) {},
+			wantErr:   false,
+		},
+		{
+			name: "return validation error for invalid category",
+			category: &NewsCategory{
+				Name: "", // Invalid: empty name
+			},
+			userID:    "admin-550e8400-e29b-41d4-a716-446655440003",
+			setupFunc: func(repo *MockNewsRepository) {},
+			wantErr:   true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repo := NewMockNewsRepository()
+			tt.setupFunc(repo)
+			service := NewNewsService(repo)
+
+			err := service.CreateNewsCategory(ctx, tt.category, tt.userID)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Len(t, repo.auditEvents, 1)
+				assert.Equal(t, domain.AuditEventInsert, repo.auditEvents[0].OperationType)
+			}
+		})
+	}
+}
+
+func TestNewsService_UpdateNewsCategory(t *testing.T) {
+	ctx, cancel := sharedtesting.CreateUnitTestContext()
+	defer cancel()
+
+	tests := []struct {
+		name      string
+		category  *NewsCategory
+		userID    string
+		setupFunc func(*MockNewsRepository)
+		wantErr   bool
+	}{
+		{
+			name: "successfully update existing news category",
+			category: &NewsCategory{
+				CategoryID:  "550e8400-e29b-41d4-a716-446655440002",
+				Name:        "Updated Category Name",
+				Slug:        "updated-category-name",
+				Description: "Updated description",
+			},
+			userID: "admin-550e8400-e29b-41d4-a716-446655440003",
+			setupFunc: func(repo *MockNewsRepository) {
+				repo.categories["550e8400-e29b-41d4-a716-446655440002"] = &NewsCategory{
+					CategoryID:  "550e8400-e29b-41d4-a716-446655440002",
+					Name:        "Original Category",
+					Description: "Original description",
+				}
+			},
+			wantErr: false,
+		},
+		{
+			name: "return not found error for non-existent category",
+			category: &NewsCategory{
+				CategoryID: "550e8400-e29b-41d4-a716-446655440999",
+			},
+			userID:    "admin-550e8400-e29b-41d4-a716-446655440003",
+			setupFunc: func(repo *MockNewsRepository) {},
+			wantErr:   true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repo := NewMockNewsRepository()
+			tt.setupFunc(repo)
+			service := NewNewsService(repo)
+
+			err := service.UpdateNewsCategory(ctx, tt.category, tt.userID)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Len(t, repo.auditEvents, 1)
+				assert.Equal(t, domain.AuditEventUpdate, repo.auditEvents[0].OperationType)
+			}
+		})
+	}
+}
+
+func TestNewsService_DeleteNewsCategory(t *testing.T) {
+	ctx, cancel := sharedtesting.CreateUnitTestContext()
+	defer cancel()
+
+	tests := []struct {
+		name       string
+		categoryID string
+		userID     string
+		setupFunc  func(*MockNewsRepository)
+		wantErr    bool
+	}{
+		{
+			name:       "successfully delete existing news category",
+			categoryID: "550e8400-e29b-41d4-a716-446655440002",
+			userID:     "admin-550e8400-e29b-41d4-a716-446655440003",
+			setupFunc: func(repo *MockNewsRepository) {
+				repo.categories["550e8400-e29b-41d4-a716-446655440002"] = &NewsCategory{
+					CategoryID:            "550e8400-e29b-41d4-a716-446655440002",
+					Name:                  "Category to Delete",
+					IsDefaultUnassigned:   false,
+				}
+			},
+			wantErr: false,
+		},
+		{
+			name:       "return validation error for default unassigned category",
+			categoryID: "550e8400-e29b-41d4-a716-446655440002",
+			userID:     "admin-550e8400-e29b-41d4-a716-446655440003",
+			setupFunc: func(repo *MockNewsRepository) {
+				repo.categories["550e8400-e29b-41d4-a716-446655440002"] = &NewsCategory{
+					CategoryID:            "550e8400-e29b-41d4-a716-446655440002",
+					Name:                  "Unassigned",
+					IsDefaultUnassigned:   true,
+				}
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repo := NewMockNewsRepository()
+			tt.setupFunc(repo)
+			service := NewNewsService(repo)
+
+			err := service.DeleteNewsCategory(ctx, tt.categoryID, tt.userID)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Len(t, repo.auditEvents, 1)
+				assert.Equal(t, domain.AuditEventDelete, repo.auditEvents[0].OperationType)
+			}
+		})
+	}
+}
+
+func TestNewsService_SetFeaturedNews(t *testing.T) {
+	ctx, cancel := sharedtesting.CreateUnitTestContext()
+	defer cancel()
+
+	tests := []struct {
+		name      string
+		newsID    string
+		userID    string
+		setupFunc func(*MockNewsRepository)
+		wantErr   bool
+	}{
+		{
+			name:   "successfully set featured news",
+			newsID: "550e8400-e29b-41d4-a716-446655440001",
+			userID: "admin-550e8400-e29b-41d4-a716-446655440003",
+			setupFunc: func(repo *MockNewsRepository) {
+				repo.news["550e8400-e29b-41d4-a716-446655440001"] = &News{
+					NewsID:           "550e8400-e29b-41d4-a716-446655440001",
+					Title:            "Featured News Article",
+					PublishingStatus: PublishingStatusPublished,
+				}
+			},
+			wantErr: false,
+		},
+		{
+			name:   "return validation error for unpublished news",
+			newsID: "550e8400-e29b-41d4-a716-446655440001",
+			userID: "admin-550e8400-e29b-41d4-a716-446655440003",
+			setupFunc: func(repo *MockNewsRepository) {
+				repo.news["550e8400-e29b-41d4-a716-446655440001"] = &News{
+					NewsID:           "550e8400-e29b-41d4-a716-446655440001",
+					Title:            "Draft News Article",
+					PublishingStatus: PublishingStatusDraft,
+				}
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repo := NewMockNewsRepository()
+			tt.setupFunc(repo)
+			service := NewNewsService(repo)
+
+			err := service.SetFeaturedNews(ctx, tt.newsID, tt.userID)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Len(t, repo.auditEvents, 1)
+				assert.Equal(t, domain.AuditEventInsert, repo.auditEvents[0].OperationType)
+			}
+		})
+	}
+}
+
+func TestNewsService_RemoveFeaturedNews(t *testing.T) {
+	ctx, cancel := sharedtesting.CreateUnitTestContext()
+	defer cancel()
+
+	tests := []struct {
+		name      string
+		userID    string
+		setupFunc func(*MockNewsRepository)
+		wantErr   bool
+	}{
+		{
+			name:   "successfully remove featured news",
+			userID: "admin-550e8400-e29b-41d4-a716-446655440003",
+			setupFunc: func(repo *MockNewsRepository) {
+				repo.featuredNews["550e8400-e29b-41d4-a716-446655440005"] = &FeaturedNews{
+					FeaturedNewsID: "550e8400-e29b-41d4-a716-446655440005",
+					NewsID:         "550e8400-e29b-41d4-a716-446655440001",
+				}
+			},
+			wantErr: false,
+		},
+		{
+			name:      "return not found error when no featured news exists",
+			userID:    "admin-550e8400-e29b-41d4-a716-446655440003",
+			setupFunc: func(repo *MockNewsRepository) {},
+			wantErr:   true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repo := NewMockNewsRepository()
+			tt.setupFunc(repo)
+			service := NewNewsService(repo)
+
+			err := service.RemoveFeaturedNews(ctx, tt.userID)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Len(t, repo.auditEvents, 1)
+				assert.Equal(t, domain.AuditEventDelete, repo.auditEvents[0].OperationType)
 			}
 		})
 	}

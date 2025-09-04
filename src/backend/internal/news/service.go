@@ -237,3 +237,228 @@ func (s *NewsService) GetNewsCategoryAudit(ctx context.Context, categoryID strin
 
 	return auditEvents, nil
 }
+
+// Admin CRUD Operations
+
+func (s *NewsService) CreateNews(ctx context.Context, news *News, userID string) error {
+	// Set defaults and validate
+	news.SetDefaults()
+	news.CreatedBy = userID
+	
+	if err := news.Validate(); err != nil {
+		return err
+	}
+
+	// Save news
+	if err := s.repository.SaveNews(ctx, news); err != nil {
+		return err
+	}
+
+	// Publish audit event
+	return s.repository.PublishAuditEvent(ctx, domain.EntityTypeNews, news.NewsID, domain.AuditEventInsert, userID, nil, news)
+}
+
+func (s *NewsService) UpdateNews(ctx context.Context, news *News, userID string) error {
+	// Get existing news for audit
+	existing, err := s.repository.GetNews(ctx, news.NewsID)
+	if err != nil {
+		return err
+	}
+
+	// Set modification fields and validate
+	news.ModifiedBy = userID
+	now := news.CreatedOn
+	news.ModifiedOn = &now
+	
+	if err := news.Validate(); err != nil {
+		return err
+	}
+
+	// Save updated news
+	if err := s.repository.SaveNews(ctx, news); err != nil {
+		return err
+	}
+
+	// Publish audit event
+	return s.repository.PublishAuditEvent(ctx, domain.EntityTypeNews, news.NewsID, domain.AuditEventUpdate, userID, existing, news)
+}
+
+func (s *NewsService) PublishNews(ctx context.Context, newsID string, userID string) error {
+	// Get existing news
+	news, err := s.repository.GetNews(ctx, newsID)
+	if err != nil {
+		return err
+	}
+
+	existing := *news // Copy for audit
+
+	// Validate can be published
+	if err := news.CanBePublished(); err != nil {
+		return err
+	}
+
+	// Update publishing status
+	news.PublishingStatus = PublishingStatusPublished
+	news.ModifiedBy = userID
+	now := news.CreatedOn
+	news.ModifiedOn = &now
+
+	// Save updated news
+	if err := s.repository.SaveNews(ctx, news); err != nil {
+		return err
+	}
+
+	// Publish audit event
+	return s.repository.PublishAuditEvent(ctx, domain.EntityTypeNews, newsID, domain.AuditEventPublish, userID, &existing, news)
+}
+
+func (s *NewsService) ArchiveNews(ctx context.Context, newsID string, userID string) error {
+	// Get existing news
+	news, err := s.repository.GetNews(ctx, newsID)
+	if err != nil {
+		return err
+	}
+
+	existing := *news // Copy for audit
+
+	// Update publishing status
+	news.PublishingStatus = PublishingStatusArchived
+	news.ModifiedBy = userID
+	now := news.CreatedOn
+	news.ModifiedOn = &now
+
+	// Save updated news
+	if err := s.repository.SaveNews(ctx, news); err != nil {
+		return err
+	}
+
+	// Publish audit event
+	return s.repository.PublishAuditEvent(ctx, domain.EntityTypeNews, newsID, domain.AuditEventArchive, userID, &existing, news)
+}
+
+func (s *NewsService) DeleteNews(ctx context.Context, newsID string, userID string) error {
+	// Get existing news for audit
+	existing, err := s.repository.GetNews(ctx, newsID)
+	if err != nil {
+		return err
+	}
+
+	// Soft delete news
+	if err := s.repository.DeleteNews(ctx, newsID, userID); err != nil {
+		return err
+	}
+
+	// Publish audit event
+	return s.repository.PublishAuditEvent(ctx, domain.EntityTypeNews, newsID, domain.AuditEventDelete, userID, existing, nil)
+}
+
+// News Category CRUD Operations
+
+func (s *NewsService) CreateNewsCategory(ctx context.Context, category *NewsCategory, userID string) error {
+	// Set defaults and validate
+	category.SetDefaults()
+	category.CreatedBy = userID
+	
+	if err := category.Validate(); err != nil {
+		return err
+	}
+
+	// Save category
+	if err := s.repository.SaveNewsCategory(ctx, category); err != nil {
+		return err
+	}
+
+	// Publish audit event
+	return s.repository.PublishAuditEvent(ctx, domain.EntityTypeNewsCategory, category.CategoryID, domain.AuditEventInsert, userID, nil, category)
+}
+
+func (s *NewsService) UpdateNewsCategory(ctx context.Context, category *NewsCategory, userID string) error {
+	// Get existing category for audit
+	existing, err := s.repository.GetNewsCategory(ctx, category.CategoryID)
+	if err != nil {
+		return err
+	}
+
+	// Set modification fields and validate
+	category.ModifiedBy = userID
+	now := category.CreatedOn
+	category.ModifiedOn = &now
+	
+	if err := category.Validate(); err != nil {
+		return err
+	}
+
+	// Save updated category
+	if err := s.repository.SaveNewsCategory(ctx, category); err != nil {
+		return err
+	}
+
+	// Publish audit event
+	return s.repository.PublishAuditEvent(ctx, domain.EntityTypeNewsCategory, category.CategoryID, domain.AuditEventUpdate, userID, existing, category)
+}
+
+func (s *NewsService) DeleteNewsCategory(ctx context.Context, categoryID string, userID string) error {
+	// Get existing category for audit
+	existing, err := s.repository.GetNewsCategory(ctx, categoryID)
+	if err != nil {
+		return err
+	}
+
+	// Cannot delete default unassigned category
+	if existing.IsDefaultUnassigned {
+		return domain.NewValidationError("cannot delete default unassigned category")
+	}
+
+	// Soft delete category
+	if err := s.repository.DeleteNewsCategory(ctx, categoryID, userID); err != nil {
+		return err
+	}
+
+	// Publish audit event
+	return s.repository.PublishAuditEvent(ctx, domain.EntityTypeNewsCategory, categoryID, domain.AuditEventDelete, userID, existing, nil)
+}
+
+// Featured News Operations
+
+func (s *NewsService) SetFeaturedNews(ctx context.Context, newsID string, userID string) error {
+	// Validate news exists and can be featured
+	news, err := s.repository.GetNews(ctx, newsID)
+	if err != nil {
+		return err
+	}
+
+	if news.PublishingStatus != PublishingStatusPublished {
+		return domain.NewValidationError("can only feature published news")
+	}
+
+	// Create featured news
+	featured := &FeaturedNews{
+		NewsID:    newsID,
+		CreatedBy: userID,
+	}
+	featured.SetDefaults()
+
+	// Save featured news (will replace existing due to constraint)
+	if err := s.repository.SaveFeaturedNews(ctx, featured); err != nil {
+		return err
+	}
+
+	// Publish audit event
+	return s.repository.PublishAuditEvent(ctx, domain.EntityTypeFeaturedNews, featured.FeaturedNewsID, domain.AuditEventInsert, userID, nil, featured)
+}
+
+func (s *NewsService) RemoveFeaturedNews(ctx context.Context, userID string) error {
+	// Get existing featured news
+	existing, err := s.repository.GetFeaturedNews(ctx)
+	if err != nil {
+		return err
+	}
+
+	// Delete featured news
+	if err := s.repository.DeleteFeaturedNews(ctx, existing.FeaturedNewsID); err != nil {
+		return err
+	}
+
+	// Publish audit event
+	return s.repository.PublishAuditEvent(ctx, domain.EntityTypeFeaturedNews, existing.FeaturedNewsID, domain.AuditEventDelete, userID, existing, nil)
+}

@@ -337,16 +337,16 @@ func TestResearchService_GetResearch(t *testing.T) {
 	}{
 		{
 			name:       "successfully retrieve existing research",
-			researchID: "research-1",
+			researchID: "550e8400-e29b-41d4-a716-446655440001",
 			setupFunc: func(repo *MockResearchRepository) {
 				research := &Research{
-					ResearchID: "research-1",
+					ResearchID: "550e8400-e29b-41d4-a716-446655440001",
 					Title:      "Clinical Study Results",
 					Abstract:   "This study examines clinical outcomes",
 					Slug:       "clinical-study-results",
 					IsDeleted:  false,
 				}
-				repo.research["research-1"] = research
+				repo.research["550e8400-e29b-41d4-a716-446655440001"] = research
 			},
 			wantErr:   false,
 			wantTitle: "Clinical Study Results",
@@ -382,7 +382,7 @@ func TestResearchService_GetResearch(t *testing.T) {
 			
 			service := NewResearchService(repo)
 			
-			result, err := service.GetResearch(ctx, tt.researchID, "user-1")
+			result, err := service.GetResearch(ctx, tt.researchID, "550e8400-e29b-41d4-a716-446655440004")
 			
 			if tt.wantErr {
 				assert.Error(t, err)
@@ -406,7 +406,7 @@ func TestResearchService_GetAllResearch(t *testing.T) {
 		{
 			name: "successfully retrieve all research",
 			setupFunc: func(repo *MockResearchRepository) {
-				repo.research["research-1"] = &Research{ResearchID: "research-1", Title: "Research 1", IsDeleted: false}
+				repo.research["550e8400-e29b-41d4-a716-446655440001"] = &Research{ResearchID: "550e8400-e29b-41d4-a716-446655440001", Title: "Research 1", IsDeleted: false}
 				repo.research["research-2"] = &Research{ResearchID: "research-2", Title: "Research 2", IsDeleted: false}
 			},
 			wantCount: 2,
@@ -421,7 +421,7 @@ func TestResearchService_GetAllResearch(t *testing.T) {
 		{
 			name: "exclude soft deleted research from results",
 			setupFunc: func(repo *MockResearchRepository) {
-				repo.research["research-1"] = &Research{ResearchID: "research-1", Title: "Active Research", IsDeleted: false}
+				repo.research["550e8400-e29b-41d4-a716-446655440001"] = &Research{ResearchID: "550e8400-e29b-41d4-a716-446655440001", Title: "Active Research", IsDeleted: false}
 				repo.research["research-2"] = &Research{ResearchID: "research-2", Title: "Deleted Research", IsDeleted: true}
 			},
 			wantCount: 1,
@@ -464,8 +464,8 @@ func TestResearchService_SearchResearch(t *testing.T) {
 			name:  "successfully search research by title",
 			query: "clinical",
 			setupFunc: func(repo *MockResearchRepository) {
-				repo.research["research-1"] = &Research{
-					ResearchID: "research-1",
+				repo.research["550e8400-e29b-41d4-a716-446655440001"] = &Research{
+					ResearchID: "550e8400-e29b-41d4-a716-446655440001",
 					Title:      "Clinical Study Results",
 					Abstract:   "Study abstract",
 					IsDeleted:  false,
@@ -484,8 +484,8 @@ func TestResearchService_SearchResearch(t *testing.T) {
 			name:  "successfully search research by abstract",
 			query: "outcomes",
 			setupFunc: func(repo *MockResearchRepository) {
-				repo.research["research-1"] = &Research{
-					ResearchID: "research-1",
+				repo.research["550e8400-e29b-41d4-a716-446655440001"] = &Research{
+					ResearchID: "550e8400-e29b-41d4-a716-446655440001",
 					Title:      "Study Report", 
 					Abstract:   "This study examines patient outcomes",
 					IsDeleted:  false,
@@ -498,8 +498,8 @@ func TestResearchService_SearchResearch(t *testing.T) {
 			name:  "return empty results when no matches found",
 			query: "nonexistent",
 			setupFunc: func(repo *MockResearchRepository) {
-				repo.research["research-1"] = &Research{
-					ResearchID: "research-1",
+				repo.research["550e8400-e29b-41d4-a716-446655440001"] = &Research{
+					ResearchID: "550e8400-e29b-41d4-a716-446655440001",
 					Title:      "Clinical Study",
 					Abstract:   "Study abstract",
 					IsDeleted:  false,
@@ -544,7 +544,7 @@ func TestResearchService_GetFeaturedResearch(t *testing.T) {
 			setupFunc: func(repo *MockResearchRepository) {
 				featured := &FeaturedResearch{
 					FeaturedResearchID: "featured-1",
-					ResearchID:         "research-1", 
+					ResearchID:         "550e8400-e29b-41d4-a716-446655440001", 
 				}
 				repo.featuredResearch["featured-1"] = featured
 			},
@@ -591,14 +591,14 @@ func TestResearchService_GetResearchAudit(t *testing.T) {
 	}{
 		{
 			name:       "successfully retrieve research audit events",
-			researchID: "research-1",
-			userID:     "admin-1",
+			researchID: "550e8400-e29b-41d4-a716-446655440001",
+			userID:     "admin-550e8400-e29b-41d4-a716-446655440003",
 			setupFunc: func(repo *MockResearchRepository) {
 				repo.auditEvents = append(repo.auditEvents, MockAuditEvent{
 					EntityType:    domain.EntityTypeResearch,
-					EntityID:      "research-1",
+					EntityID:      "550e8400-e29b-41d4-a716-446655440001",
 					OperationType: domain.AuditEventInsert,
-					UserID:        "admin-1",
+					UserID:        "admin-550e8400-e29b-41d4-a716-446655440003",
 				})
 			},
 			wantErr:   false,
@@ -607,15 +607,15 @@ func TestResearchService_GetResearchAudit(t *testing.T) {
 		{
 			name:       "return empty array for research with no audit events",
 			researchID: "research-2",
-			userID:     "admin-1",
+			userID:     "admin-550e8400-e29b-41d4-a716-446655440003",
 			setupFunc:  func(repo *MockResearchRepository) {},
 			wantErr:    false,
 			wantCount:  0,
 		},
 		{
 			name:       "return unauthorized error for non-admin user",
-			researchID: "research-1",
-			userID:     "user-1",
+			researchID: "550e8400-e29b-41d4-a716-446655440001",
+			userID:     "550e8400-e29b-41d4-a716-446655440004",
 			setupFunc:  func(repo *MockResearchRepository) {},
 			wantErr:    true,
 		},
@@ -654,22 +654,22 @@ func TestResearchService_GetResearchCategoryAudit(t *testing.T) {
 	}{
 		{
 			name:       "successfully retrieve research category audit events",
-			categoryID: "category-1",
-			userID:     "admin-1",
+			categoryID: "550e8400-e29b-41d4-a716-446655440002",
+			userID:     "admin-550e8400-e29b-41d4-a716-446655440003",
 			setupFunc: func(repo *MockResearchRepository) {
 				repo.auditEvents = append(repo.auditEvents, MockAuditEvent{
 					EntityType:    domain.EntityTypeCategory,
-					EntityID:      "category-1",
+					EntityID:      "550e8400-e29b-41d4-a716-446655440002",
 					OperationType: domain.AuditEventUpdate,
-					UserID:        "admin-1",
+					UserID:        "admin-550e8400-e29b-41d4-a716-446655440003",
 				})
 			},
 			wantErr: false,
 		},
 		{
 			name:       "return unauthorized error for non-admin user",
-			categoryID: "category-1",
-			userID:     "user-1",
+			categoryID: "550e8400-e29b-41d4-a716-446655440002",
+			userID:     "550e8400-e29b-41d4-a716-446655440004",
 			setupFunc:  func(repo *MockResearchRepository) {},
 			wantErr:    true,
 		},
@@ -692,6 +692,679 @@ func TestResearchService_GetResearchCategoryAudit(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 				assert.NotNil(t, result)
+			}
+		})
+	}
+}
+
+// Admin CRUD Operation Tests
+
+func TestResearchService_CreateResearch(t *testing.T) {
+	tests := []struct {
+		name      string
+		research  *Research
+		userID    string
+		setupFunc func(*MockResearchRepository)
+		wantErr   bool
+	}{
+		{
+			name: "successfully create new research",
+			research: &Research{
+				Title:            "New Clinical Study",
+				Abstract:         "Abstract for new clinical study with sufficient length to meet validation requirements",
+				Slug:             "new-clinical-study",
+				CategoryID:       "550e8400-e29b-41d4-a716-446655440002",
+				AuthorNames:      "Dr. Smith, Dr. Johnson",
+				PublishingStatus: PublishingStatusDraft,
+				ResearchType:     ResearchTypeClinicalStudy,
+			},
+			userID:    "admin-550e8400-e29b-41d4-a716-446655440003",
+			setupFunc: func(repo *MockResearchRepository) {},
+			wantErr:   false,
+		},
+		{
+			name: "return validation error for invalid research",
+			research: &Research{
+				Title: "", // Invalid: empty title
+			},
+			userID:    "admin-550e8400-e29b-41d4-a716-446655440003",
+			setupFunc: func(repo *MockResearchRepository) {},
+			wantErr:   true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx, cancel := sharedtesting.CreateUnitTestContext()
+			defer cancel()
+
+			repo := NewMockResearchRepository()
+			tt.setupFunc(repo)
+			
+			service := NewResearchService(repo)
+			
+			err := service.CreateResearch(ctx, tt.research, tt.userID)
+			
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				// Verify audit event was published
+				events := repo.GetAuditEvents()
+				assert.Len(t, events, 1)
+				assert.Equal(t, domain.EntityTypeResearch, events[0].EntityType)
+				assert.Equal(t, domain.AuditEventInsert, events[0].OperationType)
+			}
+		})
+	}
+}
+
+func TestResearchService_UpdateResearch(t *testing.T) {
+	tests := []struct {
+		name      string
+		research  *Research
+		userID    string
+		setupFunc func(*MockResearchRepository)
+		wantErr   bool
+	}{
+		{
+			name: "successfully update existing research",
+			research: &Research{
+				ResearchID:       "550e8400-e29b-41d4-a716-446655440001",
+				Title:            "Updated Clinical Study",
+				Abstract:         "Updated abstract for clinical study with sufficient length to meet validation requirements",
+				Slug:             "updated-clinical-study", 
+				CategoryID:       "550e8400-e29b-41d4-a716-446655440002",
+				AuthorNames:      "Dr. Smith, Dr. Johnson",
+				PublishingStatus: PublishingStatusDraft,
+				ResearchType:     ResearchTypeClinicalStudy,
+			},
+			userID: "admin-550e8400-e29b-41d4-a716-446655440003",
+			setupFunc: func(repo *MockResearchRepository) {
+				existing := &Research{
+					ResearchID:       "550e8400-e29b-41d4-a716-446655440001",
+					Title:            "Original Clinical Study",
+					Abstract:         "Original abstract for clinical study with sufficient length to meet validation requirements",
+					Slug:             "original-clinical-study",
+					CategoryID:       "550e8400-e29b-41d4-a716-446655440002", 
+					AuthorNames:      "Dr. Smith",
+					PublishingStatus: PublishingStatusDraft,
+					ResearchType:     ResearchTypeClinicalStudy,
+					CreatedOn:        time.Now(),
+				}
+				repo.research["550e8400-e29b-41d4-a716-446655440001"] = existing
+			},
+			wantErr: false,
+		},
+		{
+			name: "return not found error for non-existent research",
+			research: &Research{
+				ResearchID: "nonexistent",
+			},
+			userID:    "admin-550e8400-e29b-41d4-a716-446655440003",
+			setupFunc: func(repo *MockResearchRepository) {},
+			wantErr:   true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx, cancel := sharedtesting.CreateUnitTestContext()
+			defer cancel()
+
+			repo := NewMockResearchRepository()
+			tt.setupFunc(repo)
+			
+			service := NewResearchService(repo)
+			
+			err := service.UpdateResearch(ctx, tt.research, tt.userID)
+			
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				// Verify audit event was published
+				events := repo.GetAuditEvents()
+				assert.Len(t, events, 1)
+				assert.Equal(t, domain.EntityTypeResearch, events[0].EntityType)
+				assert.Equal(t, domain.AuditEventUpdate, events[0].OperationType)
+			}
+		})
+	}
+}
+
+func TestResearchService_DeleteResearch(t *testing.T) {
+	tests := []struct {
+		name       string
+		researchID string
+		userID     string
+		setupFunc  func(*MockResearchRepository)
+		wantErr    bool
+	}{
+		{
+			name:       "successfully delete existing research",
+			researchID: "550e8400-e29b-41d4-a716-446655440001",
+			userID:     "admin-550e8400-e29b-41d4-a716-446655440003",
+			setupFunc: func(repo *MockResearchRepository) {
+				research := &Research{
+					ResearchID:       "550e8400-e29b-41d4-a716-446655440001",
+					Title:            "Test Research",
+					Abstract:         "Abstract for test research with sufficient length to meet validation requirements",
+					Slug:             "test-research",
+					CategoryID:       "550e8400-e29b-41d4-a716-446655440002",
+					AuthorNames:      "Dr. Test",
+					PublishingStatus: PublishingStatusDraft,
+					ResearchType:     ResearchTypeClinicalStudy,
+					CreatedOn:        time.Now(),
+				}
+				repo.research["550e8400-e29b-41d4-a716-446655440001"] = research
+			},
+			wantErr: false,
+		},
+		{
+			name:       "return not found error for non-existent research",
+			researchID: "nonexistent",
+			userID:     "admin-550e8400-e29b-41d4-a716-446655440003",
+			setupFunc:  func(repo *MockResearchRepository) {},
+			wantErr:    true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx, cancel := sharedtesting.CreateUnitTestContext()
+			defer cancel()
+
+			repo := NewMockResearchRepository()
+			tt.setupFunc(repo)
+			
+			service := NewResearchService(repo)
+			
+			err := service.DeleteResearch(ctx, tt.researchID, tt.userID)
+			
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				// Verify research is soft deleted
+				if research, exists := repo.research[tt.researchID]; exists {
+					assert.True(t, research.IsDeleted)
+				}
+				// Verify audit event was published
+				events := repo.GetAuditEvents()
+				assert.Len(t, events, 1)
+				assert.Equal(t, domain.EntityTypeResearch, events[0].EntityType)
+				assert.Equal(t, domain.AuditEventDelete, events[0].OperationType)
+			}
+		})
+	}
+}
+
+func TestResearchService_PublishResearch(t *testing.T) {
+	tests := []struct {
+		name       string
+		researchID string
+		userID     string
+		setupFunc  func(*MockResearchRepository)
+		wantErr    bool
+	}{
+		{
+			name:       "successfully publish draft research",
+			researchID: "550e8400-e29b-41d4-a716-446655440001",
+			userID:     "admin-550e8400-e29b-41d4-a716-446655440003",
+			setupFunc: func(repo *MockResearchRepository) {
+				research := &Research{
+					ResearchID:       "550e8400-e29b-41d4-a716-446655440001",
+					Title:            "Test Research", 
+					Abstract:         "Abstract for test research with sufficient length to meet validation requirements",
+					Slug:             "test-research",
+					CategoryID:       "550e8400-e29b-41d4-a716-446655440002",
+					AuthorNames:      "Dr. Test",
+					PublishingStatus: PublishingStatusDraft,
+					ResearchType:     ResearchTypeClinicalStudy,
+					CreatedOn:        time.Now(),
+				}
+				repo.research["550e8400-e29b-41d4-a716-446655440001"] = research
+			},
+			wantErr: false,
+		},
+		{
+			name:       "return validation error for research without required fields",
+			researchID: "research-2",
+			userID:     "admin-550e8400-e29b-41d4-a716-446655440003",
+			setupFunc: func(repo *MockResearchRepository) {
+				research := &Research{
+					ResearchID:       "research-2",
+					Title:            "", // Missing required field
+					PublishingStatus: PublishingStatusDraft,
+					ResearchType:     ResearchTypeClinicalStudy,
+					CreatedOn:        time.Now(),
+				}
+				repo.research["research-2"] = research
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx, cancel := sharedtesting.CreateUnitTestContext()
+			defer cancel()
+
+			repo := NewMockResearchRepository()
+			tt.setupFunc(repo)
+			
+			service := NewResearchService(repo)
+			
+			err := service.PublishResearch(ctx, tt.researchID, tt.userID)
+			
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				// Verify status changed to published
+				research := repo.research[tt.researchID]
+				assert.Equal(t, PublishingStatusPublished, research.PublishingStatus)
+				// Verify audit event was published
+				events := repo.GetAuditEvents()
+				assert.Len(t, events, 1)
+				assert.Equal(t, domain.EntityTypeResearch, events[0].EntityType)
+				assert.Equal(t, domain.AuditEventPublish, events[0].OperationType)
+			}
+		})
+	}
+}
+
+func TestResearchService_ArchiveResearch(t *testing.T) {
+	tests := []struct {
+		name       string
+		researchID string
+		userID     string
+		setupFunc  func(*MockResearchRepository)
+		wantErr    bool
+	}{
+		{
+			name:       "successfully archive published research",
+			researchID: "550e8400-e29b-41d4-a716-446655440001",
+			userID:     "admin-550e8400-e29b-41d4-a716-446655440003", 
+			setupFunc: func(repo *MockResearchRepository) {
+				research := &Research{
+					ResearchID:       "550e8400-e29b-41d4-a716-446655440001",
+					Title:            "Test Research",
+					Abstract:         "Abstract for test research with sufficient length to meet validation requirements",
+					Slug:             "test-research",
+					CategoryID:       "550e8400-e29b-41d4-a716-446655440002",
+					AuthorNames:      "Dr. Test",
+					PublishingStatus: PublishingStatusPublished,
+					ResearchType:     ResearchTypeClinicalStudy,
+					CreatedOn:        time.Now(),
+				}
+				repo.research["550e8400-e29b-41d4-a716-446655440001"] = research
+			},
+			wantErr: false,
+		},
+		{
+			name:       "return not found error for non-existent research",
+			researchID: "nonexistent",
+			userID:     "admin-550e8400-e29b-41d4-a716-446655440003",
+			setupFunc:  func(repo *MockResearchRepository) {},
+			wantErr:    true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx, cancel := sharedtesting.CreateUnitTestContext()
+			defer cancel()
+
+			repo := NewMockResearchRepository()
+			tt.setupFunc(repo)
+			
+			service := NewResearchService(repo)
+			
+			err := service.ArchiveResearch(ctx, tt.researchID, tt.userID)
+			
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				// Verify status changed to archived
+				research := repo.research[tt.researchID]
+				assert.Equal(t, PublishingStatusArchived, research.PublishingStatus)
+				// Verify audit event was published
+				events := repo.GetAuditEvents()
+				assert.Len(t, events, 1)
+				assert.Equal(t, domain.EntityTypeResearch, events[0].EntityType)
+				assert.Equal(t, domain.AuditEventArchive, events[0].OperationType)
+			}
+		})
+	}
+}
+
+func TestResearchService_CreateResearchCategory(t *testing.T) {
+	tests := []struct {
+		name      string
+		category  *ResearchCategory
+		userID    string
+		setupFunc func(*MockResearchRepository)
+		wantErr   bool
+	}{
+		{
+			name: "successfully create new research category",
+			category: &ResearchCategory{
+				Name:        "New Category",
+				Slug:        "new-category",
+				Description: "Description for new category",
+			},
+			userID:    "admin-550e8400-e29b-41d4-a716-446655440003",
+			setupFunc: func(repo *MockResearchRepository) {},
+			wantErr:   false,
+		},
+		{
+			name: "return validation error for invalid category",
+			category: &ResearchCategory{
+				Name: "", // Invalid: empty name
+			},
+			userID:    "admin-550e8400-e29b-41d4-a716-446655440003",
+			setupFunc: func(repo *MockResearchRepository) {},
+			wantErr:   true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx, cancel := sharedtesting.CreateUnitTestContext()
+			defer cancel()
+
+			repo := NewMockResearchRepository()
+			tt.setupFunc(repo)
+			
+			service := NewResearchService(repo)
+			
+			err := service.CreateResearchCategory(ctx, tt.category, tt.userID)
+			
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				// Verify audit event was published
+				events := repo.GetAuditEvents()
+				assert.Len(t, events, 1)
+				assert.Equal(t, domain.EntityTypeResearchCategory, events[0].EntityType)
+				assert.Equal(t, domain.AuditEventInsert, events[0].OperationType)
+			}
+		})
+	}
+}
+
+func TestResearchService_UpdateResearchCategory(t *testing.T) {
+	tests := []struct {
+		name      string
+		category  *ResearchCategory
+		userID    string
+		setupFunc func(*MockResearchRepository)
+		wantErr   bool
+	}{
+		{
+			name: "successfully update existing research category",
+			category: &ResearchCategory{
+				CategoryID:  "550e8400-e29b-41d4-a716-446655440002",
+				Name:        "Updated Category",
+				Slug:        "updated-category",
+				Description: "Updated description",
+			},
+			userID: "admin-550e8400-e29b-41d4-a716-446655440003",
+			setupFunc: func(repo *MockResearchRepository) {
+				existing := &ResearchCategory{
+					CategoryID:  "550e8400-e29b-41d4-a716-446655440002",
+					Name:        "Original Category",
+					Slug:        "original-category",
+					Description: "Original description",
+					CreatedOn:   time.Now(),
+				}
+				repo.categories["550e8400-e29b-41d4-a716-446655440002"] = existing
+			},
+			wantErr: false,
+		},
+		{
+			name: "return not found error for non-existent category",
+			category: &ResearchCategory{
+				CategoryID: "nonexistent",
+			},
+			userID:    "admin-550e8400-e29b-41d4-a716-446655440003",
+			setupFunc: func(repo *MockResearchRepository) {},
+			wantErr:   true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx, cancel := sharedtesting.CreateUnitTestContext()
+			defer cancel()
+
+			repo := NewMockResearchRepository()
+			tt.setupFunc(repo)
+			
+			service := NewResearchService(repo)
+			
+			err := service.UpdateResearchCategory(ctx, tt.category, tt.userID)
+			
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				// Verify audit event was published
+				events := repo.GetAuditEvents()
+				assert.Len(t, events, 1)
+				assert.Equal(t, domain.EntityTypeResearchCategory, events[0].EntityType)
+				assert.Equal(t, domain.AuditEventUpdate, events[0].OperationType)
+			}
+		})
+	}
+}
+
+func TestResearchService_DeleteResearchCategory(t *testing.T) {
+	tests := []struct {
+		name       string
+		categoryID string
+		userID     string
+		setupFunc  func(*MockResearchRepository)
+		wantErr    bool
+	}{
+		{
+			name:       "successfully delete existing research category",
+			categoryID: "550e8400-e29b-41d4-a716-446655440002",
+			userID:     "admin-550e8400-e29b-41d4-a716-446655440003",
+			setupFunc: func(repo *MockResearchRepository) {
+				category := &ResearchCategory{
+					CategoryID:            "550e8400-e29b-41d4-a716-446655440002",
+					Name:                  "Test Category",
+					Slug:                  "test-category",
+					Description:           "Test description",
+					IsDefaultUnassigned:   false,
+					CreatedOn:             time.Now(),
+				}
+				repo.categories["550e8400-e29b-41d4-a716-446655440002"] = category
+			},
+			wantErr: false,
+		},
+		{
+			name:       "return validation error for default unassigned category",
+			categoryID: "default-category",
+			userID:     "admin-550e8400-e29b-41d4-a716-446655440003",
+			setupFunc: func(repo *MockResearchRepository) {
+				category := &ResearchCategory{
+					CategoryID:            "default-category",
+					Name:                  "Unassigned",
+					Slug:                  "unassigned",
+					IsDefaultUnassigned:   true,
+					CreatedOn:             time.Now(),
+				}
+				repo.categories["default-category"] = category
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx, cancel := sharedtesting.CreateUnitTestContext()
+			defer cancel()
+
+			repo := NewMockResearchRepository()
+			tt.setupFunc(repo)
+			
+			service := NewResearchService(repo)
+			
+			err := service.DeleteResearchCategory(ctx, tt.categoryID, tt.userID)
+			
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				// Verify category is soft deleted
+				if category, exists := repo.categories[tt.categoryID]; exists {
+					assert.True(t, category.IsDeleted)
+				}
+				// Verify audit event was published
+				events := repo.GetAuditEvents()
+				assert.Len(t, events, 1)
+				assert.Equal(t, domain.EntityTypeResearchCategory, events[0].EntityType)
+				assert.Equal(t, domain.AuditEventDelete, events[0].OperationType)
+			}
+		})
+	}
+}
+
+func TestResearchService_SetFeaturedResearch(t *testing.T) {
+	tests := []struct {
+		name       string
+		researchID string
+		userID     string
+		setupFunc  func(*MockResearchRepository)
+		wantErr    bool
+	}{
+		{
+			name:       "successfully set featured research",
+			researchID: "550e8400-e29b-41d4-a716-446655440001",
+			userID:     "admin-550e8400-e29b-41d4-a716-446655440003",
+			setupFunc: func(repo *MockResearchRepository) {
+				research := &Research{
+					ResearchID:       "550e8400-e29b-41d4-a716-446655440001",
+					Title:            "Test Research",
+					Abstract:         "Abstract for test research with sufficient length to meet validation requirements",
+					Slug:             "test-research",
+					CategoryID:       "550e8400-e29b-41d4-a716-446655440002",
+					AuthorNames:      "Dr. Test",
+					PublishingStatus: PublishingStatusPublished,
+					ResearchType:     ResearchTypeClinicalStudy,
+					CreatedOn:        time.Now(),
+				}
+				repo.research["550e8400-e29b-41d4-a716-446655440001"] = research
+			},
+			wantErr: false,
+		},
+		{
+			name:       "return validation error for unpublished research",
+			researchID: "research-2", 
+			userID:     "admin-550e8400-e29b-41d4-a716-446655440003",
+			setupFunc: func(repo *MockResearchRepository) {
+				research := &Research{
+					ResearchID:       "research-2",
+					Title:            "Draft Research",
+					Abstract:         "Abstract for draft research with sufficient length to meet validation requirements",
+					Slug:             "draft-research",
+					CategoryID:       "550e8400-e29b-41d4-a716-446655440002",
+					AuthorNames:      "Dr. Test",
+					PublishingStatus: PublishingStatusDraft,
+					ResearchType:     ResearchTypeClinicalStudy,
+					CreatedOn:        time.Now(),
+				}
+				repo.research["research-2"] = research
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx, cancel := sharedtesting.CreateUnitTestContext()
+			defer cancel()
+
+			repo := NewMockResearchRepository()
+			tt.setupFunc(repo)
+			
+			service := NewResearchService(repo)
+			
+			err := service.SetFeaturedResearch(ctx, tt.researchID, tt.userID)
+			
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				// Verify featured research was created
+				assert.Len(t, repo.featuredResearch, 1)
+				// Verify audit event was published
+				events := repo.GetAuditEvents()
+				assert.Len(t, events, 1)
+				assert.Equal(t, domain.EntityTypeFeaturedResearch, events[0].EntityType)
+				assert.Equal(t, domain.AuditEventInsert, events[0].OperationType)
+			}
+		})
+	}
+}
+
+func TestResearchService_RemoveFeaturedResearch(t *testing.T) {
+	tests := []struct {
+		name      string
+		userID    string
+		setupFunc func(*MockResearchRepository)
+		wantErr   bool
+	}{
+		{
+			name:   "successfully remove featured research",
+			userID: "admin-550e8400-e29b-41d4-a716-446655440003",
+			setupFunc: func(repo *MockResearchRepository) {
+				featured := &FeaturedResearch{
+					FeaturedResearchID: "featured-1",
+					ResearchID:         "550e8400-e29b-41d4-a716-446655440001",
+					CreatedOn:          time.Now(),
+				}
+				repo.featuredResearch["featured-1"] = featured
+			},
+			wantErr: false,
+		},
+		{
+			name:      "return not found error when no featured research exists",
+			userID:    "admin-550e8400-e29b-41d4-a716-446655440003",
+			setupFunc: func(repo *MockResearchRepository) {},
+			wantErr:   true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx, cancel := sharedtesting.CreateUnitTestContext()
+			defer cancel()
+
+			repo := NewMockResearchRepository()
+			tt.setupFunc(repo)
+			
+			service := NewResearchService(repo)
+			
+			err := service.RemoveFeaturedResearch(ctx, tt.userID)
+			
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				// Verify featured research was removed
+				assert.Len(t, repo.featuredResearch, 0)
+				// Verify audit event was published
+				events := repo.GetAuditEvents()
+				assert.Len(t, events, 1)
+				assert.Equal(t, domain.EntityTypeFeaturedResearch, events[0].EntityType)
+				assert.Equal(t, domain.AuditEventDelete, events[0].OperationType)
 			}
 		})
 	}

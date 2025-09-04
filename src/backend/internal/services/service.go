@@ -5,8 +5,10 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/axiom-software-co/international-center/src/backend/internal/shared/domain"
+	"github.com/google/uuid"
 )
 
 // ServicesRepositoryInterface defines the contract for services data access
@@ -625,4 +627,316 @@ func (s *ServicesService) GetAdminFeaturedCategories(ctx context.Context, userID
 	}
 
 	return featuredCategories, nil
+}
+
+// Admin CRUD Operations
+
+// AdminCreateService creates a new service (admin only)
+func (s *ServicesService) AdminCreateService(ctx context.Context, service *Service, userID string) error {
+	// Validate admin authentication
+	if userID == "" {
+		return domain.NewUnauthorizedError("admin authentication required")
+	}
+
+	// Basic validation
+	if strings.TrimSpace(service.Title) == "" {
+		return domain.NewValidationError("title cannot be empty")
+	}
+
+	// Set default values for new service
+	if service.ServiceID == "" {
+		service.ServiceID = uuid.New().String()
+	}
+	if service.PublishingStatus == "" {
+		service.PublishingStatus = PublishingStatusDraft
+	}
+	if service.CreatedOn.IsZero() {
+		service.CreatedOn = time.Now().UTC()
+	}
+	service.CreatedBy = userID
+
+	// Save service
+	if err := s.repository.SaveService(ctx, service); err != nil {
+		return err
+	}
+
+	// Publish audit event
+	return s.repository.PublishAuditEvent(ctx, domain.EntityTypeService, service.ServiceID, domain.AuditEventInsert, userID, nil, service)
+}
+
+// AdminUpdateService updates an existing service (admin only)
+func (s *ServicesService) AdminUpdateService(ctx context.Context, service *Service, userID string) error {
+	// Validate admin authentication
+	if userID == "" {
+		return domain.NewUnauthorizedError("admin authentication required")
+	}
+
+	// Get existing service for audit
+	existing, err := s.repository.GetService(ctx, service.ServiceID)
+	if err != nil {
+		return err
+	}
+
+	// Set modification fields
+	service.ModifiedBy = userID
+	now := time.Now().UTC()
+	service.ModifiedOn = &now
+
+	// Save updated service
+	if err := s.repository.SaveService(ctx, service); err != nil {
+		return err
+	}
+
+	// Publish audit event
+	return s.repository.PublishAuditEvent(ctx, domain.EntityTypeService, service.ServiceID, domain.AuditEventUpdate, userID, existing, service)
+}
+
+// AdminDeleteService soft deletes a service (admin only)
+func (s *ServicesService) AdminDeleteService(ctx context.Context, serviceID string, userID string) error {
+	// Validate admin authentication
+	if userID == "" {
+		return domain.NewUnauthorizedError("admin authentication required")
+	}
+
+	if serviceID == "" {
+		return domain.NewValidationError("service ID cannot be empty")
+	}
+
+	// Get existing service for audit
+	existing, err := s.repository.GetService(ctx, serviceID)
+	if err != nil {
+		return err
+	}
+
+	// Perform soft delete
+	if err := s.repository.DeleteService(ctx, serviceID, userID); err != nil {
+		return err
+	}
+
+	// Publish audit event
+	return s.repository.PublishAuditEvent(ctx, domain.EntityTypeService, serviceID, domain.AuditEventDelete, userID, existing, nil)
+}
+
+// AdminPublishService publishes a draft service (admin only)
+func (s *ServicesService) AdminPublishService(ctx context.Context, serviceID string, userID string) error {
+	// Validate admin authentication
+	if userID == "" {
+		return domain.NewUnauthorizedError("admin authentication required")
+	}
+
+	if serviceID == "" {
+		return domain.NewValidationError("service ID cannot be empty")
+	}
+
+	// Get existing service for audit
+	existing, err := s.repository.GetService(ctx, serviceID)
+	if err != nil {
+		return err
+	}
+
+	// Check if service can be published
+	if existing.PublishingStatus == PublishingStatusPublished {
+		return domain.NewValidationError("service is already published")
+	}
+
+	// Validate required fields for publication
+	if strings.TrimSpace(existing.Title) == "" {
+		return domain.NewValidationError("cannot publish service without title")
+	}
+	if strings.TrimSpace(existing.Description) == "" {
+		return domain.NewValidationError("cannot publish service without description")
+	}
+
+	// Update publishing status
+	service := *existing
+	service.PublishingStatus = PublishingStatusPublished
+	service.ModifiedBy = userID
+	now := time.Now().UTC()
+	service.ModifiedOn = &now
+
+	if err := s.repository.SaveService(ctx, &service); err != nil {
+		return err
+	}
+
+	// Publish audit event
+	return s.repository.PublishAuditEvent(ctx, domain.EntityTypeService, serviceID, domain.AuditEventPublish, userID, existing, &service)
+}
+
+// AdminArchiveService archives a published service (admin only)
+func (s *ServicesService) AdminArchiveService(ctx context.Context, serviceID string, userID string) error {
+	// Validate admin authentication
+	if userID == "" {
+		return domain.NewUnauthorizedError("admin authentication required")
+	}
+
+	if serviceID == "" {
+		return domain.NewValidationError("service ID cannot be empty")
+	}
+
+	// Get existing service for audit
+	existing, err := s.repository.GetService(ctx, serviceID)
+	if err != nil {
+		return err
+	}
+
+	// Update publishing status
+	service := *existing
+	service.PublishingStatus = PublishingStatusArchived
+	service.ModifiedBy = userID
+	now := time.Now().UTC()
+	service.ModifiedOn = &now
+
+	if err := s.repository.SaveService(ctx, &service); err != nil {
+		return err
+	}
+
+	// Publish audit event
+	return s.repository.PublishAuditEvent(ctx, domain.EntityTypeService, serviceID, domain.AuditEventArchive, userID, existing, &service)
+}
+
+// AdminCreateServiceCategory creates a new service category (admin only)
+func (s *ServicesService) AdminCreateServiceCategory(ctx context.Context, category *ServiceCategory, userID string) error {
+	// Validate admin authentication
+	if userID == "" {
+		return domain.NewUnauthorizedError("admin authentication required")
+	}
+
+	// Basic validation
+	if strings.TrimSpace(category.Name) == "" {
+		return domain.NewValidationError("name cannot be empty")
+	}
+
+	// Set default values for new category
+	if category.CategoryID == "" {
+		category.CategoryID = uuid.New().String()
+	}
+	if category.CreatedOn.IsZero() {
+		category.CreatedOn = time.Now().UTC()
+	}
+	category.CreatedBy = userID
+
+	// Save category
+	if err := s.repository.SaveServiceCategory(ctx, category); err != nil {
+		return err
+	}
+
+	// Publish audit event
+	return s.repository.PublishAuditEvent(ctx, domain.EntityTypeCategory, category.CategoryID, domain.AuditEventInsert, userID, nil, category)
+}
+
+// AdminUpdateServiceCategory updates an existing service category (admin only)
+func (s *ServicesService) AdminUpdateServiceCategory(ctx context.Context, category *ServiceCategory, userID string) error {
+	// Validate admin authentication
+	if userID == "" {
+		return domain.NewUnauthorizedError("admin authentication required")
+	}
+
+	// Get existing category for audit
+	existing, err := s.repository.GetServiceCategory(ctx, category.CategoryID)
+	if err != nil {
+		return err
+	}
+
+	// Set modification fields
+	category.ModifiedBy = userID
+	now := time.Now().UTC()
+	category.ModifiedOn = &now
+
+	// Save updated category
+	if err := s.repository.SaveServiceCategory(ctx, category); err != nil {
+		return err
+	}
+
+	// Publish audit event
+	return s.repository.PublishAuditEvent(ctx, domain.EntityTypeCategory, category.CategoryID, domain.AuditEventUpdate, userID, existing, category)
+}
+
+// AdminDeleteServiceCategory soft deletes a service category (admin only)
+func (s *ServicesService) AdminDeleteServiceCategory(ctx context.Context, categoryID string, userID string) error {
+	// Validate admin authentication
+	if userID == "" {
+		return domain.NewUnauthorizedError("admin authentication required")
+	}
+
+	if categoryID == "" {
+		return domain.NewValidationError("category ID cannot be empty")
+	}
+
+	// Get existing category for audit
+	existing, err := s.repository.GetServiceCategory(ctx, categoryID)
+	if err != nil {
+		return err
+	}
+
+	// Check if category can be deleted (not default unassigned)
+	if existing.IsDefaultUnassigned {
+		return domain.NewValidationError("cannot delete default unassigned category")
+	}
+
+	// Perform soft delete
+	if err := s.repository.DeleteServiceCategory(ctx, categoryID, userID); err != nil {
+		return err
+	}
+
+	// Publish audit event
+	return s.repository.PublishAuditEvent(ctx, domain.EntityTypeCategory, categoryID, domain.AuditEventDelete, userID, existing, nil)
+}
+
+// AdminSetFeaturedCategories sets the featured categories list (admin only)
+func (s *ServicesService) AdminSetFeaturedCategories(ctx context.Context, categoryIDs []string, userID string) error {
+	// Validate admin authentication
+	if userID == "" {
+		return domain.NewUnauthorizedError("admin authentication required")
+	}
+
+	// Validate that we have at most 5 categories
+	if len(categoryIDs) > 5 {
+		return domain.NewValidationError("cannot feature more than 5 categories")
+	}
+
+	// Validate each category exists and is not deleted
+	for _, categoryID := range categoryIDs {
+		category, err := s.repository.GetServiceCategory(ctx, categoryID)
+		if err != nil {
+			return domain.NewValidationError(fmt.Sprintf("category not found: %s", categoryID))
+		}
+		if category.IsDeleted {
+			return domain.NewValidationError(fmt.Sprintf("cannot feature deleted category: %s", categoryID))
+		}
+	}
+
+	// Get existing featured categories for audit
+	existingFeatured, err := s.repository.GetAllFeaturedCategories(ctx)
+	if err != nil {
+		return err
+	}
+
+	// Remove all existing featured categories
+	for _, featured := range existingFeatured {
+		if err := s.repository.DeleteFeaturedCategory(ctx, featured.FeaturedCategoryID); err != nil {
+			return err
+		}
+	}
+
+	// Add new featured categories
+	for position, categoryID := range categoryIDs {
+		featured := &FeaturedCategory{
+			FeaturedCategoryID: uuid.New().String(),
+			CategoryID:         categoryID,
+			FeaturePosition:    position + 1,
+			CreatedOn:          time.Now().UTC(),
+			CreatedBy:          userID,
+		}
+
+		if err := s.repository.SaveFeaturedCategory(ctx, featured); err != nil {
+			return err
+		}
+
+		// Publish audit event for each featured category
+		if err := s.repository.PublishAuditEvent(ctx, domain.EntityTypeFeatured, featured.FeaturedCategoryID, domain.AuditEventInsert, userID, nil, featured); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

@@ -34,8 +34,21 @@ func (h *NewsHandler) RegisterRoutes(router *mux.Router) {
 	router.HandleFunc("/api/v1/news/search", h.SearchNews).Methods("GET")
 	
 	// Admin endpoints - will be handled by admin gateway
+	// News CRUD operations
+	router.HandleFunc("/admin/api/v1/news", h.CreateNews).Methods("POST")
+	router.HandleFunc("/admin/api/v1/news/{id}", h.UpdateNews).Methods("PUT")
+	router.HandleFunc("/admin/api/v1/news/{id}", h.DeleteNews).Methods("DELETE")
+	router.HandleFunc("/admin/api/v1/news/{id}/publish", h.PublishNews).Methods("POST")
+	router.HandleFunc("/admin/api/v1/news/{id}/archive", h.ArchiveNews).Methods("POST")
 	router.HandleFunc("/admin/api/v1/news/{id}/audit", h.GetNewsAudit).Methods("GET")
+	// News category CRUD operations
+	router.HandleFunc("/admin/api/v1/news/categories", h.CreateNewsCategory).Methods("POST")
+	router.HandleFunc("/admin/api/v1/news/categories/{id}", h.UpdateNewsCategory).Methods("PUT")
+	router.HandleFunc("/admin/api/v1/news/categories/{id}", h.DeleteNewsCategory).Methods("DELETE")
 	router.HandleFunc("/admin/api/v1/news/categories/{id}/audit", h.GetNewsCategoryAudit).Methods("GET")
+	// Featured news operations
+	router.HandleFunc("/admin/api/v1/news/featured", h.SetFeaturedNews).Methods("POST")
+	router.HandleFunc("/admin/api/v1/news/featured", h.RemoveFeaturedNews).Methods("DELETE")
 }
 
 // Public API endpoints
@@ -450,4 +463,373 @@ func (h *NewsHandler) extractPaginationParams(r *http.Request) (limit int, offse
 // handleServiceError handles service errors (alias for handleError for consistency)
 func (h *NewsHandler) handleServiceError(w http.ResponseWriter, err error) {
 	h.handleError(w, &http.Request{}, err)
+}
+
+// Admin CRUD handlers
+
+// CreateNews handles POST /admin/api/v1/news
+func (h *NewsHandler) CreateNews(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	
+	// Extract user ID from header (set by authentication middleware)
+	userID := r.Header.Get("X-User-ID")
+	if userID == "" {
+		h.writeErrorResponse(w, http.StatusUnauthorized, "User ID is required")
+		return
+	}
+
+	// Add correlation context
+	correlationCtx := domain.FromContext(ctx)
+	correlationCtx.SetUserContext(userID, "news-admin-api-1.0.0")
+	ctx = correlationCtx.ToContext(ctx)
+
+	// Parse request body
+	var news News
+	if err := json.NewDecoder(r.Body).Decode(&news); err != nil {
+		h.writeErrorResponse(w, http.StatusBadRequest, "Invalid JSON payload")
+		return
+	}
+
+	// Create news through service
+	if err := h.service.CreateNews(ctx, &news, userID); err != nil {
+		h.handleError(w, r, err)
+		return
+	}
+
+	h.writeJSONResponse(w, http.StatusCreated, map[string]interface{}{
+		"news":           &news,
+		"correlation_id": correlationCtx.CorrelationID,
+	})
+}
+
+// UpdateNews handles PUT /admin/api/v1/news/{id}
+func (h *NewsHandler) UpdateNews(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	vars := mux.Vars(r)
+	newsID := vars["id"]
+
+	if newsID == "" {
+		h.writeErrorResponse(w, http.StatusBadRequest, "News ID is required")
+		return
+	}
+
+	// Extract user ID from header
+	userID := r.Header.Get("X-User-ID")
+	if userID == "" {
+		h.writeErrorResponse(w, http.StatusUnauthorized, "User ID is required")
+		return
+	}
+
+	// Add correlation context
+	correlationCtx := domain.FromContext(ctx)
+	correlationCtx.SetUserContext(userID, "news-admin-api-1.0.0")
+	ctx = correlationCtx.ToContext(ctx)
+
+	// Parse request body
+	var news News
+	if err := json.NewDecoder(r.Body).Decode(&news); err != nil {
+		h.writeErrorResponse(w, http.StatusBadRequest, "Invalid JSON payload")
+		return
+	}
+
+	// Ensure the news ID matches the URL parameter
+	news.NewsID = newsID
+
+	// Update news through service
+	if err := h.service.UpdateNews(ctx, &news, userID); err != nil {
+		h.handleError(w, r, err)
+		return
+	}
+
+	h.writeJSONResponse(w, http.StatusOK, map[string]interface{}{
+		"news":           &news,
+		"correlation_id": correlationCtx.CorrelationID,
+	})
+}
+
+// DeleteNews handles DELETE /admin/api/v1/news/{id}
+func (h *NewsHandler) DeleteNews(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	vars := mux.Vars(r)
+	newsID := vars["id"]
+
+	if newsID == "" {
+		h.writeErrorResponse(w, http.StatusBadRequest, "News ID is required")
+		return
+	}
+
+	// Extract user ID from header
+	userID := r.Header.Get("X-User-ID")
+	if userID == "" {
+		h.writeErrorResponse(w, http.StatusUnauthorized, "User ID is required")
+		return
+	}
+
+	// Add correlation context
+	correlationCtx := domain.FromContext(ctx)
+	correlationCtx.SetUserContext(userID, "news-admin-api-1.0.0")
+	ctx = correlationCtx.ToContext(ctx)
+
+	// Delete news through service
+	if err := h.service.DeleteNews(ctx, newsID, userID); err != nil {
+		h.handleError(w, r, err)
+		return
+	}
+
+	h.writeJSONResponse(w, http.StatusNoContent, nil)
+}
+
+// PublishNews handles POST /admin/api/v1/news/{id}/publish
+func (h *NewsHandler) PublishNews(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	vars := mux.Vars(r)
+	newsID := vars["id"]
+
+	if newsID == "" {
+		h.writeErrorResponse(w, http.StatusBadRequest, "News ID is required")
+		return
+	}
+
+	// Extract user ID from header
+	userID := r.Header.Get("X-User-ID")
+	if userID == "" {
+		h.writeErrorResponse(w, http.StatusUnauthorized, "User ID is required")
+		return
+	}
+
+	// Add correlation context
+	correlationCtx := domain.FromContext(ctx)
+	correlationCtx.SetUserContext(userID, "news-admin-api-1.0.0")
+	ctx = correlationCtx.ToContext(ctx)
+
+	// Publish news through service
+	if err := h.service.PublishNews(ctx, newsID, userID); err != nil {
+		h.handleError(w, r, err)
+		return
+	}
+
+	h.writeJSONResponse(w, http.StatusOK, map[string]interface{}{
+		"message":        "News published successfully",
+		"news_id":        newsID,
+		"correlation_id": correlationCtx.CorrelationID,
+	})
+}
+
+// ArchiveNews handles POST /admin/api/v1/news/{id}/archive
+func (h *NewsHandler) ArchiveNews(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	vars := mux.Vars(r)
+	newsID := vars["id"]
+
+	if newsID == "" {
+		h.writeErrorResponse(w, http.StatusBadRequest, "News ID is required")
+		return
+	}
+
+	// Extract user ID from header
+	userID := r.Header.Get("X-User-ID")
+	if userID == "" {
+		h.writeErrorResponse(w, http.StatusUnauthorized, "User ID is required")
+		return
+	}
+
+	// Add correlation context
+	correlationCtx := domain.FromContext(ctx)
+	correlationCtx.SetUserContext(userID, "news-admin-api-1.0.0")
+	ctx = correlationCtx.ToContext(ctx)
+
+	// Archive news through service
+	if err := h.service.ArchiveNews(ctx, newsID, userID); err != nil {
+		h.handleError(w, r, err)
+		return
+	}
+
+	h.writeJSONResponse(w, http.StatusOK, map[string]interface{}{
+		"message":        "News archived successfully",
+		"news_id":        newsID,
+		"correlation_id": correlationCtx.CorrelationID,
+	})
+}
+
+// CreateNewsCategory handles POST /admin/api/v1/news/categories
+func (h *NewsHandler) CreateNewsCategory(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	
+	// Extract user ID from header
+	userID := r.Header.Get("X-User-ID")
+	if userID == "" {
+		h.writeErrorResponse(w, http.StatusUnauthorized, "User ID is required")
+		return
+	}
+
+	// Add correlation context
+	correlationCtx := domain.FromContext(ctx)
+	correlationCtx.SetUserContext(userID, "news-admin-api-1.0.0")
+	ctx = correlationCtx.ToContext(ctx)
+
+	// Parse request body
+	var category NewsCategory
+	if err := json.NewDecoder(r.Body).Decode(&category); err != nil {
+		h.writeErrorResponse(w, http.StatusBadRequest, "Invalid JSON payload")
+		return
+	}
+
+	// Create category through service
+	if err := h.service.CreateNewsCategory(ctx, &category, userID); err != nil {
+		h.handleError(w, r, err)
+		return
+	}
+
+	h.writeJSONResponse(w, http.StatusCreated, map[string]interface{}{
+		"category":       &category,
+		"correlation_id": correlationCtx.CorrelationID,
+	})
+}
+
+// UpdateNewsCategory handles PUT /admin/api/v1/news/categories/{id}
+func (h *NewsHandler) UpdateNewsCategory(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	vars := mux.Vars(r)
+	categoryID := vars["id"]
+
+	if categoryID == "" {
+		h.writeErrorResponse(w, http.StatusBadRequest, "Category ID is required")
+		return
+	}
+
+	// Extract user ID from header
+	userID := r.Header.Get("X-User-ID")
+	if userID == "" {
+		h.writeErrorResponse(w, http.StatusUnauthorized, "User ID is required")
+		return
+	}
+
+	// Add correlation context
+	correlationCtx := domain.FromContext(ctx)
+	correlationCtx.SetUserContext(userID, "news-admin-api-1.0.0")
+	ctx = correlationCtx.ToContext(ctx)
+
+	// Parse request body
+	var category NewsCategory
+	if err := json.NewDecoder(r.Body).Decode(&category); err != nil {
+		h.writeErrorResponse(w, http.StatusBadRequest, "Invalid JSON payload")
+		return
+	}
+
+	// Ensure the category ID matches the URL parameter
+	category.CategoryID = categoryID
+
+	// Update category through service
+	if err := h.service.UpdateNewsCategory(ctx, &category, userID); err != nil {
+		h.handleError(w, r, err)
+		return
+	}
+
+	h.writeJSONResponse(w, http.StatusOK, map[string]interface{}{
+		"category":       &category,
+		"correlation_id": correlationCtx.CorrelationID,
+	})
+}
+
+// DeleteNewsCategory handles DELETE /admin/api/v1/news/categories/{id}
+func (h *NewsHandler) DeleteNewsCategory(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	vars := mux.Vars(r)
+	categoryID := vars["id"]
+
+	if categoryID == "" {
+		h.writeErrorResponse(w, http.StatusBadRequest, "Category ID is required")
+		return
+	}
+
+	// Extract user ID from header
+	userID := r.Header.Get("X-User-ID")
+	if userID == "" {
+		h.writeErrorResponse(w, http.StatusUnauthorized, "User ID is required")
+		return
+	}
+
+	// Add correlation context
+	correlationCtx := domain.FromContext(ctx)
+	correlationCtx.SetUserContext(userID, "news-admin-api-1.0.0")
+	ctx = correlationCtx.ToContext(ctx)
+
+	// Delete category through service
+	if err := h.service.DeleteNewsCategory(ctx, categoryID, userID); err != nil {
+		h.handleError(w, r, err)
+		return
+	}
+
+	h.writeJSONResponse(w, http.StatusNoContent, nil)
+}
+
+// SetFeaturedNews handles POST /admin/api/v1/news/featured
+func (h *NewsHandler) SetFeaturedNews(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	
+	// Extract user ID from header
+	userID := r.Header.Get("X-User-ID")
+	if userID == "" {
+		h.writeErrorResponse(w, http.StatusUnauthorized, "User ID is required")
+		return
+	}
+
+	// Add correlation context
+	correlationCtx := domain.FromContext(ctx)
+	correlationCtx.SetUserContext(userID, "news-admin-api-1.0.0")
+	ctx = correlationCtx.ToContext(ctx)
+
+	// Parse request body to get news ID
+	var requestBody struct {
+		NewsID string `json:"news_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&requestBody); err != nil {
+		h.writeErrorResponse(w, http.StatusBadRequest, "Invalid JSON payload")
+		return
+	}
+
+	if requestBody.NewsID == "" {
+		h.writeErrorResponse(w, http.StatusBadRequest, "News ID is required")
+		return
+	}
+
+	// Set featured news through service
+	if err := h.service.SetFeaturedNews(ctx, requestBody.NewsID, userID); err != nil {
+		h.handleError(w, r, err)
+		return
+	}
+
+	h.writeJSONResponse(w, http.StatusOK, map[string]interface{}{
+		"message":        "Featured news set successfully",
+		"news_id":        requestBody.NewsID,
+		"correlation_id": correlationCtx.CorrelationID,
+	})
+}
+
+// RemoveFeaturedNews handles DELETE /admin/api/v1/news/featured
+func (h *NewsHandler) RemoveFeaturedNews(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	
+	// Extract user ID from header
+	userID := r.Header.Get("X-User-ID")
+	if userID == "" {
+		h.writeErrorResponse(w, http.StatusUnauthorized, "User ID is required")
+		return
+	}
+
+	// Add correlation context
+	correlationCtx := domain.FromContext(ctx)
+	correlationCtx.SetUserContext(userID, "news-admin-api-1.0.0")
+	ctx = correlationCtx.ToContext(ctx)
+
+	// Remove featured news through service
+	if err := h.service.RemoveFeaturedNews(ctx, userID); err != nil {
+		h.handleError(w, r, err)
+		return
+	}
+
+	h.writeJSONResponse(w, http.StatusOK, map[string]interface{}{
+		"message":        "Featured news removed successfully",
+		"correlation_id": correlationCtx.CorrelationID,
+	})
 }

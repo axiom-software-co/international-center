@@ -35,8 +35,22 @@ func (h *ResearchHandler) RegisterRoutes(router *mux.Router) {
 	router.HandleFunc("/api/v1/research/{id}/report", h.GetResearchReport).Methods("GET")
 	
 	// Admin endpoints - will be handled by admin gateway
+	// Research CRUD operations
+	router.HandleFunc("/admin/api/v1/research", h.CreateResearch).Methods("POST")
+	router.HandleFunc("/admin/api/v1/research/{id}", h.UpdateResearch).Methods("PUT")
+	router.HandleFunc("/admin/api/v1/research/{id}", h.DeleteResearch).Methods("DELETE")
+	router.HandleFunc("/admin/api/v1/research/{id}/publish", h.PublishResearch).Methods("POST")
+	router.HandleFunc("/admin/api/v1/research/{id}/archive", h.ArchiveResearch).Methods("POST")
 	router.HandleFunc("/admin/api/v1/research/{id}/audit", h.GetResearchAudit).Methods("GET")
+	router.HandleFunc("/admin/api/v1/research/{id}/report/upload", h.UploadResearchReport).Methods("POST")
+	// Research category CRUD operations
+	router.HandleFunc("/admin/api/v1/research/categories", h.CreateResearchCategory).Methods("POST")
+	router.HandleFunc("/admin/api/v1/research/categories/{id}", h.UpdateResearchCategory).Methods("PUT")
+	router.HandleFunc("/admin/api/v1/research/categories/{id}", h.DeleteResearchCategory).Methods("DELETE")
 	router.HandleFunc("/admin/api/v1/research/categories/{id}/audit", h.GetResearchCategoryAudit).Methods("GET")
+	// Featured research operations
+	router.HandleFunc("/admin/api/v1/research/featured", h.SetFeaturedResearch).Methods("POST")
+	router.HandleFunc("/admin/api/v1/research/featured", h.RemoveFeaturedResearch).Methods("DELETE")
 }
 
 // Public API endpoints
@@ -504,4 +518,405 @@ func (h *ResearchHandler) extractPaginationParams(r *http.Request) (limit int, o
 // handleServiceError handles service errors (alias for handleError for consistency)
 func (h *ResearchHandler) handleServiceError(w http.ResponseWriter, err error) {
 	h.handleError(w, &http.Request{}, err)
+}
+
+// Admin CRUD handlers
+
+// CreateResearch handles POST /admin/api/v1/research
+func (h *ResearchHandler) CreateResearch(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	
+	// Extract user ID from header (set by authentication middleware)
+	userID := r.Header.Get("X-User-ID")
+	if userID == "" {
+		h.writeErrorResponse(w, http.StatusUnauthorized, "User ID is required")
+		return
+	}
+
+	// Add correlation context
+	correlationCtx := domain.FromContext(ctx)
+	correlationCtx.SetUserContext(userID, "research-admin-api-1.0.0")
+	ctx = correlationCtx.ToContext(ctx)
+
+	// Parse request body
+	var research Research
+	if err := json.NewDecoder(r.Body).Decode(&research); err != nil {
+		h.writeErrorResponse(w, http.StatusBadRequest, "Invalid JSON payload")
+		return
+	}
+
+	// Create research through service
+	if err := h.service.CreateResearch(ctx, &research, userID); err != nil {
+		h.handleError(w, r, err)
+		return
+	}
+
+	h.writeJSONResponse(w, http.StatusCreated, map[string]interface{}{
+		"research":       &research,
+		"correlation_id": correlationCtx.CorrelationID,
+	})
+}
+
+// UpdateResearch handles PUT /admin/api/v1/research/{id}
+func (h *ResearchHandler) UpdateResearch(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	vars := mux.Vars(r)
+	researchID := vars["id"]
+
+	if researchID == "" {
+		h.writeErrorResponse(w, http.StatusBadRequest, "Research ID is required")
+		return
+	}
+
+	// Extract user ID from header
+	userID := r.Header.Get("X-User-ID")
+	if userID == "" {
+		h.writeErrorResponse(w, http.StatusUnauthorized, "User ID is required")
+		return
+	}
+
+	// Add correlation context
+	correlationCtx := domain.FromContext(ctx)
+	correlationCtx.SetUserContext(userID, "research-admin-api-1.0.0")
+	ctx = correlationCtx.ToContext(ctx)
+
+	// Parse request body
+	var research Research
+	if err := json.NewDecoder(r.Body).Decode(&research); err != nil {
+		h.writeErrorResponse(w, http.StatusBadRequest, "Invalid JSON payload")
+		return
+	}
+
+	// Ensure the research ID matches the URL parameter
+	research.ResearchID = researchID
+
+	// Update research through service
+	if err := h.service.UpdateResearch(ctx, &research, userID); err != nil {
+		h.handleError(w, r, err)
+		return
+	}
+
+	h.writeJSONResponse(w, http.StatusOK, map[string]interface{}{
+		"research":       &research,
+		"correlation_id": correlationCtx.CorrelationID,
+	})
+}
+
+// DeleteResearch handles DELETE /admin/api/v1/research/{id}
+func (h *ResearchHandler) DeleteResearch(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	vars := mux.Vars(r)
+	researchID := vars["id"]
+
+	if researchID == "" {
+		h.writeErrorResponse(w, http.StatusBadRequest, "Research ID is required")
+		return
+	}
+
+	// Extract user ID from header
+	userID := r.Header.Get("X-User-ID")
+	if userID == "" {
+		h.writeErrorResponse(w, http.StatusUnauthorized, "User ID is required")
+		return
+	}
+
+	// Add correlation context
+	correlationCtx := domain.FromContext(ctx)
+	correlationCtx.SetUserContext(userID, "research-admin-api-1.0.0")
+	ctx = correlationCtx.ToContext(ctx)
+
+	// Delete research through service
+	if err := h.service.DeleteResearch(ctx, researchID, userID); err != nil {
+		h.handleError(w, r, err)
+		return
+	}
+
+	h.writeJSONResponse(w, http.StatusNoContent, nil)
+}
+
+// PublishResearch handles POST /admin/api/v1/research/{id}/publish
+func (h *ResearchHandler) PublishResearch(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	vars := mux.Vars(r)
+	researchID := vars["id"]
+
+	if researchID == "" {
+		h.writeErrorResponse(w, http.StatusBadRequest, "Research ID is required")
+		return
+	}
+
+	// Extract user ID from header
+	userID := r.Header.Get("X-User-ID")
+	if userID == "" {
+		h.writeErrorResponse(w, http.StatusUnauthorized, "User ID is required")
+		return
+	}
+
+	// Add correlation context
+	correlationCtx := domain.FromContext(ctx)
+	correlationCtx.SetUserContext(userID, "research-admin-api-1.0.0")
+	ctx = correlationCtx.ToContext(ctx)
+
+	// Publish research through service
+	if err := h.service.PublishResearch(ctx, researchID, userID); err != nil {
+		h.handleError(w, r, err)
+		return
+	}
+
+	h.writeJSONResponse(w, http.StatusOK, map[string]interface{}{
+		"message":        "Research published successfully",
+		"research_id":    researchID,
+		"correlation_id": correlationCtx.CorrelationID,
+	})
+}
+
+// ArchiveResearch handles POST /admin/api/v1/research/{id}/archive
+func (h *ResearchHandler) ArchiveResearch(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	vars := mux.Vars(r)
+	researchID := vars["id"]
+
+	if researchID == "" {
+		h.writeErrorResponse(w, http.StatusBadRequest, "Research ID is required")
+		return
+	}
+
+	// Extract user ID from header
+	userID := r.Header.Get("X-User-ID")
+	if userID == "" {
+		h.writeErrorResponse(w, http.StatusUnauthorized, "User ID is required")
+		return
+	}
+
+	// Add correlation context
+	correlationCtx := domain.FromContext(ctx)
+	correlationCtx.SetUserContext(userID, "research-admin-api-1.0.0")
+	ctx = correlationCtx.ToContext(ctx)
+
+	// Archive research through service
+	if err := h.service.ArchiveResearch(ctx, researchID, userID); err != nil {
+		h.handleError(w, r, err)
+		return
+	}
+
+	h.writeJSONResponse(w, http.StatusOK, map[string]interface{}{
+		"message":        "Research archived successfully",
+		"research_id":    researchID,
+		"correlation_id": correlationCtx.CorrelationID,
+	})
+}
+
+// UploadResearchReport handles POST /admin/api/v1/research/{id}/report/upload
+func (h *ResearchHandler) UploadResearchReport(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	vars := mux.Vars(r)
+	researchID := vars["id"]
+
+	if researchID == "" {
+		h.writeErrorResponse(w, http.StatusBadRequest, "Research ID is required")
+		return
+	}
+
+	// Extract user ID from header
+	userID := r.Header.Get("X-User-ID")
+	if userID == "" {
+		h.writeErrorResponse(w, http.StatusUnauthorized, "User ID is required")
+		return
+	}
+
+	// Add correlation context
+	correlationCtx := domain.FromContext(ctx)
+	correlationCtx.SetUserContext(userID, "research-admin-api-1.0.0")
+	ctx = correlationCtx.ToContext(ctx)
+
+	// For now, return not implemented
+	// In a full implementation, this would:
+	// 1. Parse multipart form data
+	// 2. Validate file type and size
+	// 3. Upload to Azure Blob Storage via Dapr
+	// 4. Update research record with report URL
+	h.writeErrorResponse(w, http.StatusNotImplemented, "Report upload functionality not yet implemented")
+}
+
+// CreateResearchCategory handles POST /admin/api/v1/research/categories
+func (h *ResearchHandler) CreateResearchCategory(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	
+	// Extract user ID from header
+	userID := r.Header.Get("X-User-ID")
+	if userID == "" {
+		h.writeErrorResponse(w, http.StatusUnauthorized, "User ID is required")
+		return
+	}
+
+	// Add correlation context
+	correlationCtx := domain.FromContext(ctx)
+	correlationCtx.SetUserContext(userID, "research-admin-api-1.0.0")
+	ctx = correlationCtx.ToContext(ctx)
+
+	// Parse request body
+	var category ResearchCategory
+	if err := json.NewDecoder(r.Body).Decode(&category); err != nil {
+		h.writeErrorResponse(w, http.StatusBadRequest, "Invalid JSON payload")
+		return
+	}
+
+	// Create category through service
+	if err := h.service.CreateResearchCategory(ctx, &category, userID); err != nil {
+		h.handleError(w, r, err)
+		return
+	}
+
+	h.writeJSONResponse(w, http.StatusCreated, map[string]interface{}{
+		"category":       &category,
+		"correlation_id": correlationCtx.CorrelationID,
+	})
+}
+
+// UpdateResearchCategory handles PUT /admin/api/v1/research/categories/{id}
+func (h *ResearchHandler) UpdateResearchCategory(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	vars := mux.Vars(r)
+	categoryID := vars["id"]
+
+	if categoryID == "" {
+		h.writeErrorResponse(w, http.StatusBadRequest, "Category ID is required")
+		return
+	}
+
+	// Extract user ID from header
+	userID := r.Header.Get("X-User-ID")
+	if userID == "" {
+		h.writeErrorResponse(w, http.StatusUnauthorized, "User ID is required")
+		return
+	}
+
+	// Add correlation context
+	correlationCtx := domain.FromContext(ctx)
+	correlationCtx.SetUserContext(userID, "research-admin-api-1.0.0")
+	ctx = correlationCtx.ToContext(ctx)
+
+	// Parse request body
+	var category ResearchCategory
+	if err := json.NewDecoder(r.Body).Decode(&category); err != nil {
+		h.writeErrorResponse(w, http.StatusBadRequest, "Invalid JSON payload")
+		return
+	}
+
+	// Ensure the category ID matches the URL parameter
+	category.CategoryID = categoryID
+
+	// Update category through service
+	if err := h.service.UpdateResearchCategory(ctx, &category, userID); err != nil {
+		h.handleError(w, r, err)
+		return
+	}
+
+	h.writeJSONResponse(w, http.StatusOK, map[string]interface{}{
+		"category":       &category,
+		"correlation_id": correlationCtx.CorrelationID,
+	})
+}
+
+// DeleteResearchCategory handles DELETE /admin/api/v1/research/categories/{id}
+func (h *ResearchHandler) DeleteResearchCategory(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	vars := mux.Vars(r)
+	categoryID := vars["id"]
+
+	if categoryID == "" {
+		h.writeErrorResponse(w, http.StatusBadRequest, "Category ID is required")
+		return
+	}
+
+	// Extract user ID from header
+	userID := r.Header.Get("X-User-ID")
+	if userID == "" {
+		h.writeErrorResponse(w, http.StatusUnauthorized, "User ID is required")
+		return
+	}
+
+	// Add correlation context
+	correlationCtx := domain.FromContext(ctx)
+	correlationCtx.SetUserContext(userID, "research-admin-api-1.0.0")
+	ctx = correlationCtx.ToContext(ctx)
+
+	// Delete category through service
+	if err := h.service.DeleteResearchCategory(ctx, categoryID, userID); err != nil {
+		h.handleError(w, r, err)
+		return
+	}
+
+	h.writeJSONResponse(w, http.StatusNoContent, nil)
+}
+
+// SetFeaturedResearch handles POST /admin/api/v1/research/featured
+func (h *ResearchHandler) SetFeaturedResearch(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	
+	// Extract user ID from header
+	userID := r.Header.Get("X-User-ID")
+	if userID == "" {
+		h.writeErrorResponse(w, http.StatusUnauthorized, "User ID is required")
+		return
+	}
+
+	// Add correlation context
+	correlationCtx := domain.FromContext(ctx)
+	correlationCtx.SetUserContext(userID, "research-admin-api-1.0.0")
+	ctx = correlationCtx.ToContext(ctx)
+
+	// Parse request body to get research ID
+	var requestBody struct {
+		ResearchID string `json:"research_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&requestBody); err != nil {
+		h.writeErrorResponse(w, http.StatusBadRequest, "Invalid JSON payload")
+		return
+	}
+
+	if requestBody.ResearchID == "" {
+		h.writeErrorResponse(w, http.StatusBadRequest, "Research ID is required")
+		return
+	}
+
+	// Set featured research through service
+	if err := h.service.SetFeaturedResearch(ctx, requestBody.ResearchID, userID); err != nil {
+		h.handleError(w, r, err)
+		return
+	}
+
+	h.writeJSONResponse(w, http.StatusOK, map[string]interface{}{
+		"message":        "Featured research set successfully",
+		"research_id":    requestBody.ResearchID,
+		"correlation_id": correlationCtx.CorrelationID,
+	})
+}
+
+// RemoveFeaturedResearch handles DELETE /admin/api/v1/research/featured
+func (h *ResearchHandler) RemoveFeaturedResearch(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	
+	// Extract user ID from header
+	userID := r.Header.Get("X-User-ID")
+	if userID == "" {
+		h.writeErrorResponse(w, http.StatusUnauthorized, "User ID is required")
+		return
+	}
+
+	// Add correlation context
+	correlationCtx := domain.FromContext(ctx)
+	correlationCtx.SetUserContext(userID, "research-admin-api-1.0.0")
+	ctx = correlationCtx.ToContext(ctx)
+
+	// Remove featured research through service
+	if err := h.service.RemoveFeaturedResearch(ctx, userID); err != nil {
+		h.handleError(w, r, err)
+		return
+	}
+
+	h.writeJSONResponse(w, http.StatusOK, map[string]interface{}{
+		"message":        "Featured research removed successfully",
+		"correlation_id": correlationCtx.CorrelationID,
+	})
 }

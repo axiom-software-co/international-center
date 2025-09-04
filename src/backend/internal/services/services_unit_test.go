@@ -1148,3 +1148,500 @@ func TestServicesService_GetAdminFeaturedCategories(t *testing.T) {
 		})
 	}
 }
+
+// Admin CRUD Operations Tests
+
+func TestServicesService_AdminCreateService(t *testing.T) {
+	ctx, cancel := sharedtesting.CreateUnitTestContext()
+	defer cancel()
+
+	tests := []struct {
+		name      string
+		service   *Service
+		userID    string
+		setupFunc func(*MockServicesRepository)
+		wantErr   bool
+	}{
+		{
+			name: "successfully create new service",
+			service: &Service{
+				Title:            "New Healthcare Service",
+				Description:      "Description for new healthcare service with sufficient length to meet validation requirements",
+				Slug:             "new-healthcare-service",
+				CategoryID:       "550e8400-e29b-41d4-a716-446655440002",
+				DeliveryMode:     DeliveryModeOutpatient,
+				PublishingStatus: PublishingStatusDraft,
+			},
+			userID:    "admin-550e8400-e29b-41d4-a716-446655440003",
+			setupFunc: func(repo *MockServicesRepository) {},
+			wantErr:   false,
+		},
+		{
+			name: "return validation error for invalid service",
+			service: &Service{
+				Title: "", // Invalid: empty title
+			},
+			userID:    "admin-550e8400-e29b-41d4-a716-446655440003",
+			setupFunc: func(repo *MockServicesRepository) {},
+			wantErr:   true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repo := NewMockServicesRepository()
+			tt.setupFunc(repo)
+			service := NewServicesService(repo)
+
+			err := service.AdminCreateService(ctx, tt.service, tt.userID)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Len(t, repo.auditEvents, 1)
+				assert.Equal(t, domain.AuditEventInsert, repo.auditEvents[0].OperationType)
+			}
+		})
+	}
+}
+
+func TestServicesService_AdminUpdateService(t *testing.T) {
+	ctx, cancel := sharedtesting.CreateUnitTestContext()
+	defer cancel()
+
+	tests := []struct {
+		name      string
+		service   *Service
+		userID    string
+		setupFunc func(*MockServicesRepository)
+		wantErr   bool
+	}{
+		{
+			name: "successfully update existing service",
+			service: &Service{
+				ServiceID:        "550e8400-e29b-41d4-a716-446655440001",
+				Title:            "Updated Service Title",
+				Description:      "Updated description for service with sufficient length to meet validation requirements",
+				Slug:             "updated-service-title",
+				CategoryID:       "550e8400-e29b-41d4-a716-446655440002",
+				DeliveryMode:     DeliveryModeOutpatient,
+				PublishingStatus: PublishingStatusDraft,
+			},
+			userID: "admin-550e8400-e29b-41d4-a716-446655440003",
+			setupFunc: func(repo *MockServicesRepository) {
+				service := createTestService("admin-550e8400-e29b-41d4-a716-446655440003")
+				service.ServiceID = "550e8400-e29b-41d4-a716-446655440001"
+				repo.services["550e8400-e29b-41d4-a716-446655440001"] = service
+			},
+			wantErr: false,
+		},
+		{
+			name: "return not found error for non-existent service",
+			service: &Service{
+				ServiceID: "550e8400-e29b-41d4-a716-446655440999",
+			},
+			userID:    "admin-550e8400-e29b-41d4-a716-446655440003",
+			setupFunc: func(repo *MockServicesRepository) {},
+			wantErr:   true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repo := NewMockServicesRepository()
+			tt.setupFunc(repo)
+			service := NewServicesService(repo)
+
+			err := service.AdminUpdateService(ctx, tt.service, tt.userID)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Len(t, repo.auditEvents, 1)
+				assert.Equal(t, domain.AuditEventUpdate, repo.auditEvents[0].OperationType)
+			}
+		})
+	}
+}
+
+func TestServicesService_AdminDeleteService(t *testing.T) {
+	ctx, cancel := sharedtesting.CreateUnitTestContext()
+	defer cancel()
+
+	tests := []struct {
+		name      string
+		serviceID string
+		userID    string
+		setupFunc func(*MockServicesRepository)
+		wantErr   bool
+	}{
+		{
+			name:      "successfully delete existing service",
+			serviceID: "550e8400-e29b-41d4-a716-446655440001",
+			userID:    "admin-550e8400-e29b-41d4-a716-446655440003",
+			setupFunc: func(repo *MockServicesRepository) {
+				service := createTestService("admin-550e8400-e29b-41d4-a716-446655440003")
+				service.ServiceID = "550e8400-e29b-41d4-a716-446655440001"
+				repo.services["550e8400-e29b-41d4-a716-446655440001"] = service
+			},
+			wantErr: false,
+		},
+		{
+			name:      "return not found error for non-existent service",
+			serviceID: "550e8400-e29b-41d4-a716-446655440999",
+			userID:    "admin-550e8400-e29b-41d4-a716-446655440003",
+			setupFunc: func(repo *MockServicesRepository) {},
+			wantErr:   true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repo := NewMockServicesRepository()
+			tt.setupFunc(repo)
+			service := NewServicesService(repo)
+
+			err := service.AdminDeleteService(ctx, tt.serviceID, tt.userID)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Len(t, repo.auditEvents, 1)
+				assert.Equal(t, domain.AuditEventDelete, repo.auditEvents[0].OperationType)
+			}
+		})
+	}
+}
+
+func TestServicesService_AdminPublishService(t *testing.T) {
+	ctx, cancel := sharedtesting.CreateUnitTestContext()
+	defer cancel()
+
+	tests := []struct {
+		name      string
+		serviceID string
+		userID    string
+		setupFunc func(*MockServicesRepository)
+		wantErr   bool
+	}{
+		{
+			name:      "successfully publish draft service",
+			serviceID: "550e8400-e29b-41d4-a716-446655440001",
+			userID:    "admin-550e8400-e29b-41d4-a716-446655440003",
+			setupFunc: func(repo *MockServicesRepository) {
+				service := createTestService("admin-550e8400-e29b-41d4-a716-446655440003")
+				service.ServiceID = "550e8400-e29b-41d4-a716-446655440001"
+				service.PublishingStatus = PublishingStatusDraft
+				repo.services["550e8400-e29b-41d4-a716-446655440001"] = service
+			},
+			wantErr: false,
+		},
+		{
+			name:      "return validation error for service without required fields",
+			serviceID: "550e8400-e29b-41d4-a716-446655440001",
+			userID:    "admin-550e8400-e29b-41d4-a716-446655440003",
+			setupFunc: func(repo *MockServicesRepository) {
+				service := createTestService("admin-550e8400-e29b-41d4-a716-446655440003")
+				service.ServiceID = "550e8400-e29b-41d4-a716-446655440001"
+				service.Description = "" // Missing description for publication
+				service.PublishingStatus = PublishingStatusDraft
+				repo.services["550e8400-e29b-41d4-a716-446655440001"] = service
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repo := NewMockServicesRepository()
+			tt.setupFunc(repo)
+			service := NewServicesService(repo)
+
+			err := service.AdminPublishService(ctx, tt.serviceID, tt.userID)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Len(t, repo.auditEvents, 1)
+				assert.Equal(t, domain.AuditEventPublish, repo.auditEvents[0].OperationType)
+			}
+		})
+	}
+}
+
+func TestServicesService_AdminArchiveService(t *testing.T) {
+	ctx, cancel := sharedtesting.CreateUnitTestContext()
+	defer cancel()
+
+	tests := []struct {
+		name      string
+		serviceID string
+		userID    string
+		setupFunc func(*MockServicesRepository)
+		wantErr   bool
+	}{
+		{
+			name:      "successfully archive published service",
+			serviceID: "550e8400-e29b-41d4-a716-446655440001",
+			userID:    "admin-550e8400-e29b-41d4-a716-446655440003",
+			setupFunc: func(repo *MockServicesRepository) {
+				service := createTestService("admin-550e8400-e29b-41d4-a716-446655440003")
+				service.ServiceID = "550e8400-e29b-41d4-a716-446655440001"
+				service.PublishingStatus = PublishingStatusPublished
+				repo.services["550e8400-e29b-41d4-a716-446655440001"] = service
+			},
+			wantErr: false,
+		},
+		{
+			name:      "return not found error for non-existent service",
+			serviceID: "550e8400-e29b-41d4-a716-446655440999",
+			userID:    "admin-550e8400-e29b-41d4-a716-446655440003",
+			setupFunc: func(repo *MockServicesRepository) {},
+			wantErr:   true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repo := NewMockServicesRepository()
+			tt.setupFunc(repo)
+			service := NewServicesService(repo)
+
+			err := service.AdminArchiveService(ctx, tt.serviceID, tt.userID)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Len(t, repo.auditEvents, 1)
+				assert.Equal(t, domain.AuditEventArchive, repo.auditEvents[0].OperationType)
+			}
+		})
+	}
+}
+
+func TestServicesService_AdminCreateServiceCategory(t *testing.T) {
+	ctx, cancel := sharedtesting.CreateUnitTestContext()
+	defer cancel()
+
+	tests := []struct {
+		name      string
+		category  *ServiceCategory
+		userID    string
+		setupFunc func(*MockServicesRepository)
+		wantErr   bool
+	}{
+		{
+			name: "successfully create new service category",
+			category: &ServiceCategory{
+				Name: "New Healthcare Category",
+				Slug: "new-healthcare-category",
+			},
+			userID:    "admin-550e8400-e29b-41d4-a716-446655440003",
+			setupFunc: func(repo *MockServicesRepository) {},
+			wantErr:   false,
+		},
+		{
+			name: "return validation error for invalid category",
+			category: &ServiceCategory{
+				Name: "", // Invalid: empty name
+			},
+			userID:    "admin-550e8400-e29b-41d4-a716-446655440003",
+			setupFunc: func(repo *MockServicesRepository) {},
+			wantErr:   true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repo := NewMockServicesRepository()
+			tt.setupFunc(repo)
+			service := NewServicesService(repo)
+
+			err := service.AdminCreateServiceCategory(ctx, tt.category, tt.userID)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Len(t, repo.auditEvents, 1)
+				assert.Equal(t, domain.AuditEventInsert, repo.auditEvents[0].OperationType)
+			}
+		})
+	}
+}
+
+func TestServicesService_AdminUpdateServiceCategory(t *testing.T) {
+	ctx, cancel := sharedtesting.CreateUnitTestContext()
+	defer cancel()
+
+	tests := []struct {
+		name      string
+		category  *ServiceCategory
+		userID    string
+		setupFunc func(*MockServicesRepository)
+		wantErr   bool
+	}{
+		{
+			name: "successfully update existing service category",
+			category: &ServiceCategory{
+				CategoryID: "550e8400-e29b-41d4-a716-446655440002",
+				Name:       "Updated Category Name",
+				Slug:       "updated-category-name",
+			},
+			userID: "admin-550e8400-e29b-41d4-a716-446655440003",
+			setupFunc: func(repo *MockServicesRepository) {
+				category := createTestCategory("admin-550e8400-e29b-41d4-a716-446655440003")
+				category.CategoryID = "550e8400-e29b-41d4-a716-446655440002"
+				repo.categories["550e8400-e29b-41d4-a716-446655440002"] = category
+			},
+			wantErr: false,
+		},
+		{
+			name: "return not found error for non-existent category",
+			category: &ServiceCategory{
+				CategoryID: "550e8400-e29b-41d4-a716-446655440999",
+			},
+			userID:    "admin-550e8400-e29b-41d4-a716-446655440003",
+			setupFunc: func(repo *MockServicesRepository) {},
+			wantErr:   true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repo := NewMockServicesRepository()
+			tt.setupFunc(repo)
+			service := NewServicesService(repo)
+
+			err := service.AdminUpdateServiceCategory(ctx, tt.category, tt.userID)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Len(t, repo.auditEvents, 1)
+				assert.Equal(t, domain.AuditEventUpdate, repo.auditEvents[0].OperationType)
+			}
+		})
+	}
+}
+
+func TestServicesService_AdminDeleteServiceCategory(t *testing.T) {
+	ctx, cancel := sharedtesting.CreateUnitTestContext()
+	defer cancel()
+
+	tests := []struct {
+		name       string
+		categoryID string
+		userID     string
+		setupFunc  func(*MockServicesRepository)
+		wantErr    bool
+	}{
+		{
+			name:       "successfully delete existing service category",
+			categoryID: "550e8400-e29b-41d4-a716-446655440002",
+			userID:     "admin-550e8400-e29b-41d4-a716-446655440003",
+			setupFunc: func(repo *MockServicesRepository) {
+				category := createTestCategory("admin-550e8400-e29b-41d4-a716-446655440003")
+				category.CategoryID = "550e8400-e29b-41d4-a716-446655440002"
+				category.IsDefaultUnassigned = false
+				repo.categories["550e8400-e29b-41d4-a716-446655440002"] = category
+			},
+			wantErr: false,
+		},
+		{
+			name:       "return validation error for default unassigned category",
+			categoryID: "550e8400-e29b-41d4-a716-446655440002",
+			userID:     "admin-550e8400-e29b-41d4-a716-446655440003",
+			setupFunc: func(repo *MockServicesRepository) {
+				category := createTestCategory("admin-550e8400-e29b-41d4-a716-446655440003")
+				category.CategoryID = "550e8400-e29b-41d4-a716-446655440002"
+				category.IsDefaultUnassigned = true
+				repo.categories["550e8400-e29b-41d4-a716-446655440002"] = category
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repo := NewMockServicesRepository()
+			tt.setupFunc(repo)
+			service := NewServicesService(repo)
+
+			err := service.AdminDeleteServiceCategory(ctx, tt.categoryID, tt.userID)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Len(t, repo.auditEvents, 1)
+				assert.Equal(t, domain.AuditEventDelete, repo.auditEvents[0].OperationType)
+			}
+		})
+	}
+}
+
+func TestServicesService_AdminSetFeaturedCategories(t *testing.T) {
+	ctx, cancel := sharedtesting.CreateUnitTestContext()
+	defer cancel()
+
+	tests := []struct {
+		name        string
+		categoryIDs []string
+		userID      string
+		setupFunc   func(*MockServicesRepository)
+		wantErr     bool
+	}{
+		{
+			name:        "successfully set featured categories",
+			categoryIDs: []string{"550e8400-e29b-41d4-a716-446655440002", "550e8400-e29b-41d4-a716-446655440007"},
+			userID:      "admin-550e8400-e29b-41d4-a716-446655440003",
+			setupFunc: func(repo *MockServicesRepository) {
+				category1 := createTestCategory("admin-550e8400-e29b-41d4-a716-446655440003")
+				category1.CategoryID = "550e8400-e29b-41d4-a716-446655440002"
+				repo.categories["550e8400-e29b-41d4-a716-446655440002"] = category1
+
+				category2 := createTestCategory("admin-550e8400-e29b-41d4-a716-446655440003")
+				category2.CategoryID = "550e8400-e29b-41d4-a716-446655440007"
+				repo.categories["550e8400-e29b-41d4-a716-446655440007"] = category2
+			},
+			wantErr: false,
+		},
+		{
+			name:        "return validation error for deleted category",
+			categoryIDs: []string{"550e8400-e29b-41d4-a716-446655440002"},
+			userID:      "admin-550e8400-e29b-41d4-a716-446655440003",
+			setupFunc: func(repo *MockServicesRepository) {
+				category := createTestCategory("admin-550e8400-e29b-41d4-a716-446655440003")
+				category.CategoryID = "550e8400-e29b-41d4-a716-446655440002"
+				category.IsDeleted = true // Make category soft-deleted
+				repo.categories["550e8400-e29b-41d4-a716-446655440002"] = category
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repo := NewMockServicesRepository()
+			tt.setupFunc(repo)
+			service := NewServicesService(repo)
+
+			err := service.AdminSetFeaturedCategories(ctx, tt.categoryIDs, tt.userID)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				// Should have audit events for setting featured categories
+				assert.True(t, len(repo.auditEvents) >= 1)
+			}
+		})
+	}
+}
