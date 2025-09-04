@@ -35,7 +35,7 @@ export const localConfig = {
         retryAttempts: 2,
       },
       research: {
-        baseUrl: getBaseUrl('research-domain', 8083),
+        baseUrl: getPublicGatewayUrl(), // Route through Public Gateway for security and rate limiting
         timeout: 5000,
         retryAttempts: 2,
       },

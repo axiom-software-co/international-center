@@ -5,12 +5,26 @@
  * Format date for display in articles and news
  */
 export function formatArticleDate(dateString: string): string {
-  const date = new Date(dateString);
-  return date.toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  });
+  if (!dateString) return '';
+  
+  try {
+    const date = new Date(dateString);
+    
+    // Check for invalid date
+    if (isNaN(date.getTime())) {
+      console.warn('Invalid date string provided to formatArticleDate:', dateString);
+      return dateString;
+    }
+    
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
+  } catch (error) {
+    console.warn('Error formatting date:', dateString, error);
+    return dateString;
+  }
 }
 
 /**

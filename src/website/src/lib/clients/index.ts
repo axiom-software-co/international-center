@@ -58,12 +58,24 @@ export type {
 const eventsClientInstance = new EventsRestClient();
 export { eventsClientInstance as eventsClient };
 
+// Research domain (REST-enabled through Public Gateway)
+import { ResearchRestClient } from './research/ResearchRestClient';
+export { ResearchRestClient };
+export type {
+  ResearchArticle,
+  ResearchResponse,
+  ResearchArticleResponse,
+  GetResearchParams,
+  SearchResearchParams,
+} from './research/types';
+
+// Create research client instance
+const researchClientInstance = new ResearchRestClient();
+export { researchClientInstance as researchClient };
+
 // ====================================================================================
 // APIS ON HOLD - These will be migrated to REST architecture when development resumes
 // ====================================================================================
-
-// Research domain (ON HOLD - gRPC implementation preserved but unused)
-// export { researchGrpcClient as researchClient } from './grpc/clients';
 
 // Events domain (ON HOLD - gRPC implementation preserved but unused)  
 // export { eventsGrpcClient as eventsClient } from './grpc/clients';

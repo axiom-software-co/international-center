@@ -114,6 +114,37 @@ export function getEventSlugFromUrl(): string {
 }
 
 /**
+ * Extract research slug from research URLs
+ * Expected format: /community/research/research-slug
+ * Returns empty string if URL is just /community/research/ (no article)
+ */
+export function getResearchSlugFromUrl(): string {
+  if (typeof window === 'undefined') {
+    return '';
+  }
+  
+  const path = window.location.pathname;
+  
+  // Check if this is a research path
+  if (!path.startsWith('/community/research/')) {
+    return '';
+  }
+  
+  // Extract the part after /community/research/
+  const afterResearch = path.replace('/community/research/', '');
+  const slug = afterResearch.replace(/\/$/, ''); // Remove trailing slash
+  
+  // If it's empty or just contains slashes, return empty
+  if (!slug || slug.match(/^\/+$/)) {
+    return '';
+  }
+  
+  // Return the first segment after /community/research/
+  const segments = slug.split('/').filter(s => s.length > 0);
+  return segments[0] || '';
+}
+
+/**
  * Build a clean URL slug from a title
  */
 export function createSlugFromTitle(title: string): string {

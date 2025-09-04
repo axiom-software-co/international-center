@@ -155,28 +155,18 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed } from 'vue';
+import { useResearchArticle, useResearchArticles } from '../../composables/useResearch';
+import { getResearchSlugFromUrl } from '../../lib/utils/url';
+import { generateHeroImageUrl, calculateReadingTime, formatAuthorName } from '../../lib/utils/content';
+import { formatArticleDate } from '../../lib/utils/date';
 import ResearchBreadcrumb from './ResearchBreadcrumb.vue';
 import ResearchArticleContent from './ResearchArticleContent.vue';
 import ResearchArticleDetails from './ResearchArticleDetails.vue';
 import ContactCard from './ContactCard.vue';
 import UnifiedContentCTA from '../UnifiedContentCTA.vue';
 import ArticleCard from '../ArticleCard.vue';
-import { resolveAssetUrl } from '@/lib/utils/assets';
-
-interface ResearchArticle {
-  id: string;
-  title: string;
-  slug: string;
-  description: string;
-  content?: string;
-  excerpt?: string;
-  featured_image?: string;
-  published_at: string;
-  author?: string;
-  category?: string;
-  reading_time?: string;
-}
+import type { ResearchArticle } from '../../lib/clients';
 
 interface ResearchArticlePageData {
   id: string;
@@ -196,138 +186,54 @@ interface ResearchArticlePageData {
   category?: string;
 }
 
-// Reactive state
-const article = ref<ResearchArticle | null>(null);
-const relatedArticles = ref<ResearchArticle[]>([]);
-const isLoading = ref(false);
-const error = ref<string | null>(null);
-const relatedLoading = ref(false);
+// Use composables for data fetching
+const currentSlug = ref(getResearchSlugFromUrl());
+const { article, loading: articleLoading, error: articleError } = useResearchArticle(currentSlug);
+const { articles: relatedArticles, loading: relatedLoading, error: relatedError } = useResearchArticles({
+  category: computed(() => article.value?.category),
+  pageSize: 3,
+  enabled: computed(() => !!article.value?.category),
+  immediate: false
+});
 
-// Utility function to format dates
-const formatDate = (dateString: string): string => {
-  const date = new Date(dateString);
-  return date.toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  });
-};
+// Computed loading and error states
+const isLoading = computed(() => articleLoading.value);
+const error = computed(() => articleError.value);
+const relatedArticlesFiltered = computed(() => 
+  relatedArticles.value.filter(a => a.id !== article.value?.id)
+);
+
+// Use standardized utility functions for consistent formatting
 
 // Transform article data to match the expected structure
 const articleData = computed((): ResearchArticlePageData | null => {
   if (!article.value) return null;
   
+  // Use content if available, otherwise fall back to excerpt
+  const contentForDisplay = article.value.content || article.value.excerpt || '';
+  
   return {
     id: article.value.id,
     title: article.value.title,
     slug: article.value.slug,
-    description: article.value.description,
-    content: article.value.content || article.value.description || article.value.excerpt,
+    description: article.value.excerpt || article.value.meta_description || '',
+    content: contentForDisplay,
     heroImage: {
-      src: resolveAssetUrl(article.value.featured_image) || `https://placehold.co/1200x600/2563eb/ffffff/png?text=${encodeURIComponent(article.value.title)}`,
-      alt: `${article.value.title} - International Center Research`,
+      src: generateHeroImageUrl(article.value.featured_image, article.value.title, 'research'),
+      alt: `${article.value.title} - International Center Research`
     },
     articleDetails: {
-      publishedAt: formatDate(article.value.published_at),
-      author: article.value.author || 'International Center Research Team',
-      readTime: article.value.reading_time || '8 min read',
+      publishedAt: formatArticleDate(article.value.published_at || ''),
+      author: formatAuthorName(article.value.author, 'International Center Research Team'),
+      readTime: calculateReadingTime(contentForDisplay)
     },
-    category: article.value.category,
+    category: article.value.category
   };
 });
 
 // Dynamic title for related articles section
 const relatedArticlesTitle = computed(() => {
-  if (articleData.value?.category) {
-    return `More from ${articleData.value.category}`;
-  }
-  return 'More Research Articles';
-});
-
-// Get slug from current URL
-const getSlugFromUrl = (): string => {
-  if (typeof window === 'undefined') return '';
-  const pathParts = window.location.pathname.split('/');
-  return pathParts[pathParts.length - 1] || '';
-};
-
-// Client-side data loading following services pattern
-onMounted(async () => {
-  try {
-    isLoading.value = true;
-    error.value = null;
-
-    const slug = getSlugFromUrl();
-    if (!slug) {
-      throw new Error('Research article slug not found');
-    }
-
-    console.log(`🔍 [DynamicResearchArticlePage] Loading article: ${slug}`);
-
-    // Dynamic import for client-side code splitting
-    const { researchClient } = await import('../../lib/clients');
-    
-    const articleResult = await researchClient.getResearchArticleBySlug(slug);
-    
-    if (articleResult) {
-      article.value = articleResult;
-      console.log('✅ [DynamicResearchArticlePage] Article loaded:', articleResult);
-
-      // Fetch related articles from same category (excluding current article)
-      if (articleResult.category) {
-        try {
-          relatedLoading.value = true;
-          console.log(`🔍 [DynamicResearchArticlePage] Loading related articles for category: ${articleResult.category}`);
-          
-          // Get all articles and filter client-side for more reliable results  
-          const relatedResult = await researchClient.getResearchArticles({
-            pageSize: 50, // Get more articles to filter from
-            sortBy: 'date-desc'
-          });
-          
-          console.log(`🔍 [DynamicResearchArticlePage] Related articles API response:`, relatedResult);
-          
-          if (relatedResult.data) {
-            // Filter by category and exclude current article
-            const filteredRelated = relatedResult.data
-              .filter(relatedArticle => 
-                relatedArticle.id !== articleResult.id && 
-                relatedArticle.category === articleResult.category
-              )
-              .slice(0, 3);
-            
-            // If no articles in same category, show recent articles instead
-            if (filteredRelated.length === 0) {
-              const recentArticles = relatedResult.data
-                .filter(relatedArticle => relatedArticle.id !== articleResult.id)
-                .slice(0, 3);
-              relatedArticles.value = recentArticles;
-              console.log(`✅ [DynamicResearchArticlePage] No same-category articles, showing recent: ${recentArticles.length}`);
-            } else {
-              relatedArticles.value = filteredRelated;
-              console.log(`✅ [DynamicResearchArticlePage] Related articles loaded: ${filteredRelated.length}`, filteredRelated);
-            }
-          } else {
-            console.warn('⚠️ [DynamicResearchArticlePage] No data in related articles response');
-          }
-        } catch (relatedErr) {
-          console.warn('⚠️ [DynamicResearchArticlePage] Failed to load related articles:', relatedErr);
-          // Don't set error, just continue without related articles
-        } finally {
-          relatedLoading.value = false;
-        }
-      } else {
-        console.log('ℹ️ [DynamicResearchArticlePage] No category found for current article, skipping related articles');
-      }
-    } else {
-      throw new Error(`Research article not found: ${slug}`);
-    }
-  } catch (err: any) {
-    console.error('❌ [DynamicResearchArticlePage] Failed to load article:', err.message);
-    error.value = err.message || 'Failed to load research article data';
-  } finally {
-    isLoading.value = false;
-  }
+  return articleData.value?.category ? `More from ${articleData.value.category}` : 'More Research Articles';
 });
 </script>
 
