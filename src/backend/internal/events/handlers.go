@@ -597,3 +597,24 @@ func (h *EventsHandler) writeJSONResponse(w http.ResponseWriter, statusCode int,
 		json.NewEncoder(w).Encode(data)
 	}
 }
+
+// Health check endpoints
+
+// HealthCheck handles GET /health
+func (h *EventsHandler) HealthCheck(w http.ResponseWriter, r *http.Request) {
+	h.writeJSONResponse(w, http.StatusOK, map[string]interface{}{
+		"status":  "healthy",
+		"service": "events-api",
+		"version": "1.0.0",
+	})
+}
+
+// ReadinessCheck handles GET /health/ready
+func (h *EventsHandler) ReadinessCheck(w http.ResponseWriter, r *http.Request) {
+	// In production, this would check dependencies like database connectivity
+	h.writeJSONResponse(w, http.StatusOK, map[string]interface{}{
+		"status":  "ready",
+		"service": "events-api",
+		"version": "1.0.0",
+	})
+}
