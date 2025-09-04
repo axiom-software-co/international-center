@@ -12,8 +12,6 @@
 
 - IMPORTANT AXIOM RULE TO FOLLOW : only run integration tests when the entire development environment is up ( only the deployer implements integration tests ) 
 
-- IMPORTANT AXIOM RULE TO FOLLOW : environment variables are defined only in the env files ( networking configuration , including ports  , should not be hardcoded , it should always come from the environment ) ( we should not have fallback networking configuration in implementation nor integration tests ) 
-
 - note : stop using the term 'medical-grade' ( this is implicit and there is no need to mention it in the naming system )
 
 - note : we do not need cloudfalre CDN for now
@@ -148,6 +146,7 @@
 
 - golang
 - golang-migrate
+- slog
 
 - sql
 
