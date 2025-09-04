@@ -12,6 +12,7 @@ type InfrastructureFactory interface {
 	VaultFactory
 	ObservabilityFactory
 	ServiceFactory
+	WebsiteFactory
 }
 
 // InfrastructureFactoryConfig holds common configuration for all factory implementations

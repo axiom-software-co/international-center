@@ -3,17 +3,17 @@ package testing
 import (
 	"testing"
 
-	"github.com/axiom-software-co/international-center/src/deployer/shared/testing"
+	sharedtesting "github.com/axiom-software-co/international-center/src/deployer/shared/testing"
 	"github.com/stretchr/testify/suite"
 )
 
 type StagingValidationTestSuite struct {
 	suite.Suite
-	integrationSuite       *testing.IntegrationTestSuite
-	pulumiSuite           *testing.PulumiDeploymentTestSuite
-	migrationSuite        *testing.MigrationValidationTestSuite
-	infrastructureSuite   *testing.InfrastructureComponentTestSuite
-	observabilitySuite    *testing.ObservabilityValidationTestSuite
+	integrationSuite       *sharedtesting.IntegrationTestSuite
+	pulumiSuite           *sharedtesting.PulumiDeploymentTestSuite
+	migrationSuite        *sharedtesting.MigrationValidationTestSuite
+	infrastructureSuite   *sharedtesting.InfrastructureComponentTestSuite
+	observabilitySuite    *sharedtesting.ObservabilityValidationTestSuite
 }
 
 func TestStagingValidationSuite(t *testing.T) {
@@ -22,11 +22,11 @@ func TestStagingValidationSuite(t *testing.T) {
 
 func (suite *StagingValidationTestSuite) SetupSuite() {
 	// Initialize deployment-focused integration test suites for staging
-	suite.integrationSuite = testing.NewIntegrationTestSuite(suite.T())
-	suite.pulumiSuite = testing.NewPulumiDeploymentTestSuite(suite.T())
-	suite.migrationSuite = testing.NewMigrationValidationTestSuite(suite.T())
-	suite.infrastructureSuite = testing.NewInfrastructureComponentTestSuite(suite.T())
-	suite.observabilitySuite = testing.NewObservabilityValidationTestSuite(suite.T())
+	suite.integrationSuite = sharedtesting.NewIntegrationTestSuite(suite.T())
+	suite.pulumiSuite = sharedtesting.NewPulumiDeploymentTestSuite(suite.T())
+	suite.migrationSuite = sharedtesting.NewMigrationValidationTestSuite(suite.T())
+	suite.infrastructureSuite = sharedtesting.NewInfrastructureComponentTestSuite(suite.T())
+	suite.observabilitySuite = sharedtesting.NewObservabilityValidationTestSuite(suite.T())
 	
 	// Validate staging infrastructure is fully deployed and ready
 	suite.integrationSuite.InfrastructureHealthCheck(suite.T())

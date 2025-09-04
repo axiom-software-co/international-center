@@ -45,6 +45,11 @@ func (f *DevelopmentInfrastructureFactory) CreateServiceStack(ctx *pulumi.Contex
 	return NewServiceStack(ctx, config, nil, "development-network", environment, ".")
 }
 
+// Website Factory Implementation
+func (f *DevelopmentInfrastructureFactory) CreateWebsiteStack(ctx *pulumi.Context, config *config.Config, environment string) sharedinfra.WebsiteStack {
+	return NewWebsiteStack(ctx, config, environment)
+}
+
 // Verify that DevelopmentInfrastructureFactory implements the shared InfrastructureFactory interface
 var _ sharedinfra.InfrastructureFactory = (*DevelopmentInfrastructureFactory)(nil)
 var _ sharedinfra.DatabaseFactory = (*DevelopmentInfrastructureFactory)(nil)
@@ -53,3 +58,4 @@ var _ sharedinfra.DaprFactory = (*DevelopmentInfrastructureFactory)(nil)
 var _ sharedinfra.VaultFactory = (*DevelopmentInfrastructureFactory)(nil)
 var _ sharedinfra.ObservabilityFactory = (*DevelopmentInfrastructureFactory)(nil)
 var _ sharedinfra.ServiceFactory = (*DevelopmentInfrastructureFactory)(nil)
+var _ sharedinfra.WebsiteFactory = (*DevelopmentInfrastructureFactory)(nil)

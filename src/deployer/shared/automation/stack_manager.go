@@ -312,7 +312,7 @@ func (sm *StackManager) extractResourceInfo(summary auto.UpdateSummary) []Resour
 		for urn, change := range *summary.ResourceChanges {
 			resources = append(resources, ResourceInfo{
 				URN:    urn,
-				Status: string(change),
+				Status: fmt.Sprintf("%v", change),
 				Type:   sm.extractResourceType(urn),
 				Name:   sm.extractResourceName(urn),
 			})

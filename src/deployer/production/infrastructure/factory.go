@@ -50,6 +50,12 @@ func (f *ProductionInfrastructureFactory) CreateServiceStack(ctx *pulumi.Context
 	return nil
 }
 
+// Website Factory Implementation - Uses Cloudflare Pages with production CDN
+func (f *ProductionInfrastructureFactory) CreateWebsiteStack(ctx *pulumi.Context, config *config.Config, environment string) sharedinfra.WebsiteStack {
+	// TODO: Implement production website stack with proper Cloudflare Pages integration
+	return nil // Stack not yet implemented
+}
+
 // Verify that ProductionInfrastructureFactory implements the shared InfrastructureFactory interface
 var _ sharedinfra.InfrastructureFactory = (*ProductionInfrastructureFactory)(nil)
 var _ sharedinfra.DatabaseFactory = (*ProductionInfrastructureFactory)(nil)
@@ -58,3 +64,4 @@ var _ sharedinfra.DaprFactory = (*ProductionInfrastructureFactory)(nil)
 var _ sharedinfra.VaultFactory = (*ProductionInfrastructureFactory)(nil)
 var _ sharedinfra.ObservabilityFactory = (*ProductionInfrastructureFactory)(nil)
 var _ sharedinfra.ServiceFactory = (*ProductionInfrastructureFactory)(nil)
+var _ sharedinfra.WebsiteFactory = (*ProductionInfrastructureFactory)(nil)

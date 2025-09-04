@@ -6,13 +6,13 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"strings"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	
+	sharedtesting "github.com/axiom-software-co/international-center/src/deployer/shared/testing"
 )
 
 // TestDaprControlPlane validates the Dapr control plane is running and accessible
@@ -21,18 +21,18 @@ func TestDaprControlPlane(t *testing.T) {
 		t.Skip("Skipping integration tests in short mode")
 	}
 
-	ctx, cancel := CreateIntegrationTestContext()
+	ctx, cancel := sharedtesting.CreateIntegrationTestContext()
 	defer cancel()
 
 	// Test Dapr sidecar HTTP API is accessible
 	t.Run("Dapr_HTTP_API_Accessibility", func(t *testing.T) {
 		// Arrange
-		daprHTTPPort := GetRequiredEnvVar(t, "DAPR_HTTP_PORT")
-		serviceHost := GetRequiredEnvVar(t, "SERVICE_HOST")
+		daprHTTPPort := sharedtesting.GetRequiredEnvVar(t, "DAPR_HTTP_PORT")
+		serviceHost := sharedtesting.GetRequiredEnvVar(t, "SERVICE_HOST")
 		
 		// Act - Check Dapr metadata endpoint
 		daprURL := fmt.Sprintf("http://%s:%s/v1.0/metadata", serviceHost, daprHTTPPort)
-		resp, err := makeHTTPRequest(ctx, "GET", daprURL, nil)
+		resp, err := sharedtesting.MakeHTTPRequest(ctx, "GET", daprURL, nil)
 
 		// Assert - Dapr HTTP API should be accessible
 		require.NoError(t, err, "Dapr HTTP API should be accessible")
@@ -61,8 +61,8 @@ func TestDaprControlPlane(t *testing.T) {
 	// Test Dapr sidecar gRPC API is accessible
 	t.Run("Dapr_GRPC_API_Accessibility", func(t *testing.T) {
 		// Arrange
-		daprGRPCPort := GetRequiredEnvVar(t, "DAPR_GRPC_PORT")
-		serviceHost := GetRequiredEnvVar(t, "SERVICE_HOST")
+		daprGRPCPort := sharedtesting.GetRequiredEnvVar(t, "DAPR_GRPC_PORT")
+		serviceHost := sharedtesting.GetRequiredEnvVar(t, "SERVICE_HOST")
 		
 		// Act - Check if Dapr gRPC port is listening
 		address := fmt.Sprintf("%s:%s", serviceHost, daprGRPCPort)
@@ -80,12 +80,12 @@ func TestDaprControlPlane(t *testing.T) {
 	// Test Dapr placement service is running
 	t.Run("Dapr_Placement_Service", func(t *testing.T) {
 		// Arrange
-		placementPort := GetEnvVar("DAPR_PLACEMENT_PORT")
+		placementPort := sharedtesting.GetEnvVar("DAPR_PLACEMENT_PORT", "6050")
 		if placementPort == "" {
 			t.Skip("DAPR_PLACEMENT_PORT not configured, skipping placement service test")
 		}
 		
-		serviceHost := GetRequiredEnvVar(t, "SERVICE_HOST")
+		serviceHost := sharedtesting.GetRequiredEnvVar(t, "SERVICE_HOST")
 		
 		// Act - Check if Dapr placement port is listening
 		address := fmt.Sprintf("%s:%s", serviceHost, placementPort)
@@ -107,7 +107,7 @@ func TestDaprServiceRegistration(t *testing.T) {
 		t.Skip("Skipping integration tests in short mode")
 	}
 
-	ctx, cancel := CreateIntegrationTestContext()
+	ctx, cancel := sharedtesting.CreateIntegrationTestContext()
 	defer cancel()
 
 	// Test services are discoverable via Dapr service invocation
@@ -116,12 +116,12 @@ func TestDaprServiceRegistration(t *testing.T) {
 	for _, serviceName := range expectedServices {
 		t.Run(fmt.Sprintf("Service_%s_Registration", serviceName), func(t *testing.T) {
 			// Arrange
-			daprHTTPPort := GetRequiredEnvVar(t, "DAPR_HTTP_PORT")
-			serviceHost := GetRequiredEnvVar(t, "SERVICE_HOST")
+			daprHTTPPort := sharedtesting.GetRequiredEnvVar(t, "DAPR_HTTP_PORT")
+			serviceHost := sharedtesting.GetRequiredEnvVar(t, "SERVICE_HOST")
 
 			// Act - Try to invoke service health endpoint via Dapr
 			healthURL := fmt.Sprintf("http://%s:%s/v1.0/invoke/%s/method/health", serviceHost, daprHTTPPort, serviceName)
-			resp, err := makeHTTPRequest(ctx, "GET", healthURL, nil)
+			resp, err := sharedtesting.MakeHTTPRequest(ctx, "GET", healthURL, nil)
 
 			// Assert - Service should be discoverable and responsive via Dapr
 			require.NoError(t, err, "Service %s should be discoverable via Dapr", serviceName)
@@ -142,18 +142,18 @@ func TestDaprComponents(t *testing.T) {
 		t.Skip("Skipping integration tests in short mode")
 	}
 
-	ctx, cancel := CreateIntegrationTestContext()
+	ctx, cancel := sharedtesting.CreateIntegrationTestContext()
 	defer cancel()
 
 	// Get Dapr components configuration
 	t.Run("Dapr_Components_Configuration", func(t *testing.T) {
 		// Arrange
-		daprHTTPPort := GetRequiredEnvVar(t, "DAPR_HTTP_PORT")
-		serviceHost := GetRequiredEnvVar(t, "SERVICE_HOST")
+		daprHTTPPort := sharedtesting.GetRequiredEnvVar(t, "DAPR_HTTP_PORT")
+		serviceHost := sharedtesting.GetRequiredEnvVar(t, "SERVICE_HOST")
 		
 		// Act - Get Dapr metadata to check components
 		metadataURL := fmt.Sprintf("http://%s:%s/v1.0/metadata", serviceHost, daprHTTPPort)
-		resp, err := makeHTTPRequest(ctx, "GET", metadataURL, nil)
+		resp, err := sharedtesting.MakeHTTPRequest(ctx, "GET", metadataURL, nil)
 
 		// Assert - Should be able to get components metadata
 		require.NoError(t, err, "Should be able to get Dapr components metadata")
@@ -196,12 +196,12 @@ func TestDaprComponents(t *testing.T) {
 	// Test state store component
 	t.Run("State_Store_Component", func(t *testing.T) {
 		// Arrange
-		daprHTTPPort := GetRequiredEnvVar(t, "DAPR_HTTP_PORT")
-		serviceHost := GetRequiredEnvVar(t, "SERVICE_HOST")
+		daprHTTPPort := sharedtesting.GetRequiredEnvVar(t, "DAPR_HTTP_PORT")
+		serviceHost := sharedtesting.GetRequiredEnvVar(t, "SERVICE_HOST")
 		
 		// Act - Try to access state store via Dapr
 		stateURL := fmt.Sprintf("http://%s:%s/v1.0/state/statestore", serviceHost, daprHTTPPort)
-		resp, err := makeHTTPRequest(ctx, "GET", stateURL, nil)
+		resp, err := sharedtesting.MakeHTTPRequest(ctx, "GET", stateURL, nil)
 
 		// Assert - State store component should be accessible
 		// Note: This might return 404 if no state exists, which is fine - it means the component is working
@@ -215,13 +215,13 @@ func TestDaprComponents(t *testing.T) {
 	// Test pubsub component
 	t.Run("PubSub_Component", func(t *testing.T) {
 		// Arrange
-		daprHTTPPort := GetRequiredEnvVar(t, "DAPR_HTTP_PORT")
-		serviceHost := GetRequiredEnvVar(t, "SERVICE_HOST")
+		daprHTTPPort := sharedtesting.GetRequiredEnvVar(t, "DAPR_HTTP_PORT")
+		serviceHost := sharedtesting.GetRequiredEnvVar(t, "SERVICE_HOST")
 		
 		// Act - Try to publish a test message via Dapr pubsub
 		pubsubURL := fmt.Sprintf("http://%s:%s/v1.0/publish/pubsub/test-topic", serviceHost, daprHTTPPort)
-		testMessage := strings.NewReader(`{"test": "message", "timestamp": "` + time.Now().Format(time.RFC3339) + `"}`)
-		resp, err := makeHTTPRequest(ctx, "POST", pubsubURL, testMessage)
+		testMessage := []byte(`{"test": "message", "timestamp": "` + time.Now().Format(time.RFC3339) + `"}`)
+		resp, err := sharedtesting.MakeHTTPRequest(ctx, "POST", pubsubURL, testMessage)
 
 		// Assert - PubSub component should be accessible
 		require.NoError(t, err, "PubSub component should be accessible via Dapr")
@@ -236,13 +236,13 @@ func TestDaprComponents(t *testing.T) {
 	// Test bindings component (for Azurite blob storage)
 	t.Run("Bindings_Component", func(t *testing.T) {
 		// Arrange
-		daprHTTPPort := GetRequiredEnvVar(t, "DAPR_HTTP_PORT")
-		serviceHost := GetRequiredEnvVar(t, "SERVICE_HOST")
+		daprHTTPPort := sharedtesting.GetRequiredEnvVar(t, "DAPR_HTTP_PORT")
+		serviceHost := sharedtesting.GetRequiredEnvVar(t, "SERVICE_HOST")
 		
 		// Act - Try to access bindings component via Dapr
 		bindingURL := fmt.Sprintf("http://%s:%s/v1.0/bindings/blob-storage", serviceHost, daprHTTPPort)
-		testData := strings.NewReader(`{"operation": "list"}`)
-		resp, err := makeHTTPRequest(ctx, "POST", bindingURL, testData)
+		testData := []byte(`{"operation": "list"}`)
+		resp, err := sharedtesting.MakeHTTPRequest(ctx, "POST", bindingURL, testData)
 
 		// Assert - Bindings component should be accessible
 		require.NoError(t, err, "Bindings component should be accessible via Dapr")
@@ -262,18 +262,18 @@ func TestDaprSecrets(t *testing.T) {
 		t.Skip("Skipping integration tests in short mode")
 	}
 
-	ctx, cancel := CreateIntegrationTestContext()
+	ctx, cancel := sharedtesting.CreateIntegrationTestContext()
 	defer cancel()
 
 	// Test secrets store component
 	t.Run("Secrets_Store_Component", func(t *testing.T) {
 		// Arrange
-		daprHTTPPort := GetRequiredEnvVar(t, "DAPR_HTTP_PORT")
-		serviceHost := GetRequiredEnvVar(t, "SERVICE_HOST")
+		daprHTTPPort := sharedtesting.GetRequiredEnvVar(t, "DAPR_HTTP_PORT")
+		serviceHost := sharedtesting.GetRequiredEnvVar(t, "SERVICE_HOST")
 		
 		// Act - Try to access secrets store via Dapr
 		secretsURL := fmt.Sprintf("http://%s:%s/v1.0/secrets/secretstore/test-secret", serviceHost, daprHTTPPort)
-		resp, err := makeHTTPRequest(ctx, "GET", secretsURL, nil)
+		resp, err := sharedtesting.MakeHTTPRequest(ctx, "GET", secretsURL, nil)
 
 		// Assert - Secrets store component should be accessible
 		require.NoError(t, err, "Secrets store component should be accessible via Dapr")
@@ -293,14 +293,14 @@ func TestDaprMiddleware(t *testing.T) {
 		t.Skip("Skipping integration tests in short mode")
 	}
 
-	ctx, cancel := CreateIntegrationTestContext()
+	ctx, cancel := sharedtesting.CreateIntegrationTestContext()
 	defer cancel()
 
 	// Test CORS middleware
 	t.Run("CORS_Middleware", func(t *testing.T) {
 		// Arrange
-		daprHTTPPort := GetRequiredEnvVar(t, "DAPR_HTTP_PORT")
-		serviceHost := GetRequiredEnvVar(t, "SERVICE_HOST")
+		daprHTTPPort := sharedtesting.GetRequiredEnvVar(t, "DAPR_HTTP_PORT")
+		serviceHost := sharedtesting.GetRequiredEnvVar(t, "SERVICE_HOST")
 		
 		// Act - Make CORS preflight request via Dapr
 		daprURL := fmt.Sprintf("http://%s:%s/v1.0/invoke/public-gateway/method/api/v1/services", serviceHost, daprHTTPPort)
@@ -336,8 +336,8 @@ func TestDaprMiddleware(t *testing.T) {
 	// Test rate limiting middleware
 	t.Run("Rate_Limiting_Middleware", func(t *testing.T) {
 		// Arrange
-		daprHTTPPort := GetRequiredEnvVar(t, "DAPR_HTTP_PORT")
-		serviceHost := GetRequiredEnvVar(t, "SERVICE_HOST")
+		daprHTTPPort := sharedtesting.GetRequiredEnvVar(t, "DAPR_HTTP_PORT")
+		serviceHost := sharedtesting.GetRequiredEnvVar(t, "SERVICE_HOST")
 		
 		// Act - Make multiple requests to test rate limiting
 		daprURL := fmt.Sprintf("http://%s:%s/v1.0/invoke/public-gateway/method/health", serviceHost, daprHTTPPort)
@@ -346,7 +346,7 @@ func TestDaprMiddleware(t *testing.T) {
 		requestCount := 5 // Make multiple requests to potentially trigger rate limiting
 		
 		for i := 0; i < requestCount; i++ {
-			resp, err := makeHTTPRequest(ctx, "GET", daprURL, nil)
+			resp, err := sharedtesting.MakeHTTPRequest(ctx, "GET", daprURL, nil)
 			if err == nil {
 				if resp.StatusCode == http.StatusTooManyRequests {
 					rateLimitedCount++

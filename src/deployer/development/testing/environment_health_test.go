@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	
+	sharedtesting "github.com/axiom-software-co/international-center/src/deployer/shared/testing"
 )
 
 // TestObservabilityStack validates Grafana observability components
@@ -19,19 +20,20 @@ func TestObservabilityStack(t *testing.T) {
 		t.Skip("Skipping integration tests in short mode")
 	}
 
-	ctx, cancel := CreateIntegrationTestContext()
+	ctx, cancel := sharedtesting.CreateIntegrationTestContext()
 	defer cancel()
 
 	// Test Grafana dashboard accessibility
 	t.Run("Grafana_Accessibility", func(t *testing.T) {
-		grafanaURL := GetEnvVar("GRAFANA_URL")
+		grafanaURL := sharedtesting.GetEnvVar("GRAFANA_URL", "")
 		if grafanaURL == "" {
 			t.Skip("GRAFANA_URL not configured, skipping Grafana test")
 		}
 
 		// Act - Check Grafana health endpoint
 		healthURL := fmt.Sprintf("%s/api/health", grafanaURL)
-		resp := MakeHTTPRequest(t, "GET", healthURL)
+		resp, err := sharedtesting.MakeHTTPRequest(ctx, "GET", healthURL, nil)
+		require.NoError(t, err, "Failed to make HTTP request to Grafana")
 
 		defer resp.Body.Close()
 
@@ -39,7 +41,7 @@ func TestObservabilityStack(t *testing.T) {
 		assert.Equal(t, http.StatusOK, resp.StatusCode, "Grafana should be healthy when running")
 
 		var healthData map[string]interface{}
-		err := json.NewDecoder(resp.Body).Decode(&healthData)
+		err = json.NewDecoder(resp.Body).Decode(&healthData)
 		if err == nil {
 			assert.Equal(t, "ok", healthData["database"], "Grafana database should be healthy")
 			t.Logf("Grafana is running and healthy at %s", grafanaURL)
@@ -48,14 +50,14 @@ func TestObservabilityStack(t *testing.T) {
 
 	// Test Loki log aggregation service
 	t.Run("Loki_Accessibility", func(t *testing.T) {
-		lokiURL := GetEnvVar("LOKI_URL")
+		lokiURL := sharedtesting.GetEnvVar("LOKI_URL", "")
 		if lokiURL == "" {
 			t.Skip("LOKI_URL not configured, skipping Loki test")
 		}
 
 		// Act - Check Loki readiness endpoint
 		readyURL := fmt.Sprintf("%s/ready", lokiURL)
-		resp, err := makeHTTPRequest(ctx, "GET", readyURL, nil)
+		resp, err := sharedtesting.MakeHTTPRequest(ctx, "GET", readyURL, nil)
 		require.NoError(t, err, "Should be able to connect to Loki")
 
 		defer resp.Body.Close()
@@ -67,9 +69,9 @@ func TestObservabilityStack(t *testing.T) {
 
 	// Test Prometheus/Mimir metrics collection
 	t.Run("Metrics_Collection_Accessibility", func(t *testing.T) {
-		prometheusURL := GetEnvVar("PROMETHEUS_URL")
+		prometheusURL := sharedtesting.GetEnvVar("PROMETHEUS_URL", "")
 		if prometheusURL == "" {
-			prometheusURL = GetEnvVar("MIMIR_URL")
+			prometheusURL = sharedtesting.GetEnvVar("MIMIR_URL", "")
 		}
 		
 		if prometheusURL == "" {
@@ -78,7 +80,7 @@ func TestObservabilityStack(t *testing.T) {
 
 		// Act - Check metrics endpoint
 		metricsURL := fmt.Sprintf("%s/api/v1/query?query=up", prometheusURL)
-		resp, err := makeHTTPRequest(ctx, "GET", metricsURL, nil)
+		resp, err := sharedtesting.MakeHTTPRequest(ctx, "GET", metricsURL, nil)
 		require.NoError(t, err, "Should be able to connect to metrics service")
 
 		defer resp.Body.Close()
@@ -96,16 +98,16 @@ func TestStorageServices(t *testing.T) {
 		t.Skip("Skipping integration tests in short mode")
 	}
 
-	ctx, cancel := CreateIntegrationTestContext()
+	ctx, cancel := sharedtesting.CreateIntegrationTestContext()
 	defer cancel()
 
 	// Test Azurite blob storage emulator
 	t.Run("Azurite_Blob_Storage", func(t *testing.T) {
 		// Arrange
-		azuriteURL := GetRequiredEnvVar(t, "AZURITE_URL")
+		azuriteURL := sharedtesting.GetRequiredEnvVar(t, "AZURITE_URL")
 
 		// Act - Check Azurite service availability
-		resp, err := makeHTTPRequest(ctx, "HEAD", azuriteURL, nil)
+		resp, err := sharedtesting.MakeHTTPRequest(ctx, "HEAD", azuriteURL, nil)
 
 		// Assert - Azurite should be accessible
 		require.NoError(t, err, "Azurite blob storage emulator should be accessible")
@@ -118,11 +120,11 @@ func TestStorageServices(t *testing.T) {
 	// Test blob storage container operations
 	t.Run("Blob_Storage_Operations", func(t *testing.T) {
 		// Arrange  
-		azuriteURL := GetRequiredEnvVar(t, "AZURITE_URL")
+		azuriteURL := sharedtesting.GetRequiredEnvVar(t, "AZURITE_URL")
 		
 		// Act - Try to list containers (should work even if no containers exist)
 		containerListURL := fmt.Sprintf("%s?comp=list", azuriteURL)
-		resp, err := makeHTTPRequest(ctx, "GET", containerListURL, nil)
+		resp, err := sharedtesting.MakeHTTPRequest(ctx, "GET", containerListURL, nil)
 
 		// Assert - Container listing should work
 		require.NoError(t, err, "Should be able to query blob storage containers")
@@ -142,11 +144,14 @@ func TestSecurityServices(t *testing.T) {
 	// Test Vault secret management service
 	t.Run("Vault_Secret_Management", func(t *testing.T) {
 		// Arrange
-		vaultURL := GetRequiredEnvVar(t, "VAULT_URL")
+		vaultURL := sharedtesting.GetRequiredEnvVar(t, "VAULT_URL")
 
 		// Act - Check Vault health endpoint
 		healthURL := fmt.Sprintf("%s/v1/sys/health", vaultURL)
-		resp := MakeHTTPRequest(t, "GET", healthURL)
+		ctx, cancel := sharedtesting.CreateIntegrationTestContext()
+		defer cancel()
+		resp, err := sharedtesting.MakeHTTPRequest(ctx, "GET", healthURL, nil)
+		require.NoError(t, err, "Should be able to make HTTP request to Vault")
 
 		// Assert - Vault should be accessible and healthy
 		
@@ -170,7 +175,7 @@ func TestSecurityServices(t *testing.T) {
 		
 		// Parse health response for detailed information
 		var healthData map[string]interface{}
-		err := json.NewDecoder(resp.Body).Decode(&healthData)
+		err = json.NewDecoder(resp.Body).Decode(&healthData)
 		if err == nil {
 			if initialized, exists := healthData["initialized"]; exists {
 				t.Logf("Vault initialized: %v", initialized)
@@ -185,14 +190,17 @@ func TestSecurityServices(t *testing.T) {
 
 	// Test Authentik identity provider (if configured)
 	t.Run("Authentik_Identity_Provider", func(t *testing.T) {
-		authentikURL := GetEnvVar("AUTHENTIK_URL")
+		authentikURL := sharedtesting.GetEnvVar("AUTHENTIK_URL", "")
 		if authentikURL == "" {
 			t.Skip("AUTHENTIK_URL not configured, skipping Authentik test")
 		}
 
 		// Act - Check Authentik health/status endpoint
 		healthURL := fmt.Sprintf("%s/api/v3/admin/version/", authentikURL)
-		resp := MakeHTTPRequest(t, "GET", healthURL)
+		ctx, cancel := sharedtesting.CreateIntegrationTestContext()
+		defer cancel()
+		resp, err := sharedtesting.MakeHTTPRequest(ctx, "GET", healthURL, nil)
+		require.NoError(t, err, "Should be able to make HTTP request to Authentik")
 
 		// Assert - If Authentik is running, it should respond
 		assert.True(t, resp.StatusCode >= 200 && resp.StatusCode < 500,
@@ -207,17 +215,17 @@ func TestNetworkConnectivity(t *testing.T) {
 		t.Skip("Skipping integration tests in short mode")
 	}
 
-	ctx, cancel := CreateIntegrationTestContext()
+	ctx, cancel := sharedtesting.CreateIntegrationTestContext()
 	defer cancel()
 
 	// Test internal network connectivity between services
 	t.Run("Internal_Service_Connectivity", func(t *testing.T) {
 		// Define service endpoints to test connectivity
 		services := map[string]string{
-			"Content API":    GetRequiredEnvVar(t, "CONTENT_API_URL"),
-			"Services API":   GetRequiredEnvVar(t, "SERVICES_API_URL"), 
-			"Public Gateway": GetRequiredEnvVar(t, "PUBLIC_GATEWAY_URL"),
-			"Admin Gateway":  GetRequiredEnvVar(t, "ADMIN_GATEWAY_URL"),
+			"Content API":    sharedtesting.GetRequiredEnvVar(t, "CONTENT_API_URL"),
+			"Services API":   sharedtesting.GetRequiredEnvVar(t, "SERVICES_API_URL"), 
+			"Public Gateway": sharedtesting.GetRequiredEnvVar(t, "PUBLIC_GATEWAY_URL"),
+			"Admin Gateway":  sharedtesting.GetRequiredEnvVar(t, "ADMIN_GATEWAY_URL"),
 		}
 
 		// Test each service can reach the others
@@ -231,7 +239,7 @@ func TestNetworkConnectivity(t *testing.T) {
 					// Act - Test connectivity by checking if we can resolve and connect
 					targetHost := extractHostFromURL(targetURL)
 					if targetHost != "" {
-						conn, err := ConnectWithTimeout(ctx, "tcp", targetHost, 2*time.Second)
+						conn, err := sharedtesting.ConnectWithTimeout(ctx, "tcp", targetHost, 2*time.Second)
 						
 						// Assert - Services should be able to connect to each other
 						if err != nil {
@@ -249,8 +257,8 @@ func TestNetworkConnectivity(t *testing.T) {
 	// Test external connectivity (if required)
 	t.Run("External_Connectivity", func(t *testing.T) {
 		// Test connectivity to external test endpoints if configured
-		testEndpoint1 := GetEnvVar("NETWORK_TEST_ENDPOINT_1") 
-		testEndpoint2 := GetEnvVar("NETWORK_TEST_ENDPOINT_2")
+		testEndpoint1 := sharedtesting.GetEnvVar("NETWORK_TEST_ENDPOINT_1", "") 
+		testEndpoint2 := sharedtesting.GetEnvVar("NETWORK_TEST_ENDPOINT_2", "")
 
 		if testEndpoint1 == "" && testEndpoint2 == "" {
 			t.Skip("No external connectivity test endpoints configured")
@@ -267,7 +275,7 @@ func TestNetworkConnectivity(t *testing.T) {
 		for _, endpoint := range endpoints {
 			t.Run(fmt.Sprintf("Endpoint_%s", endpoint), func(t *testing.T) {
 				// Act - Test external connectivity
-				conn, err := ConnectWithTimeout(ctx, "tcp", endpoint, 3*time.Second)
+				conn, err := sharedtesting.ConnectWithTimeout(ctx, "tcp", endpoint, 3*time.Second)
 
 				if err != nil {
 					t.Logf("External connectivity to %s failed: %v", endpoint, err)
@@ -303,7 +311,7 @@ func TestEnvironmentConfiguration(t *testing.T) {
 		}
 
 		for _, envVar := range requiredDevVars {
-			value := GetEnvVar(envVar)
+			value := sharedtesting.GetEnvVar(envVar, "")
 			assert.NotEmpty(t, value, "Development environment variable %s should be set", envVar)
 			
 			// Validate URL format for URL variables
@@ -318,14 +326,14 @@ func TestEnvironmentConfiguration(t *testing.T) {
 	t.Run("Port_Configuration_Consistency", func(t *testing.T) {
 		// Verify no port conflicts in configuration
 		portVars := map[string]string{
-			"DATABASE_PORT":   GetEnvVar("DATABASE_PORT"),
-			"REDIS_PORT":      GetEnvVar("REDIS_PORT"), 
-			"VAULT_PORT":      GetEnvVar("VAULT_PORT"),
-			"AZURITE_PORT":    GetEnvVar("AZURITE_PORT"),
-			"GRAFANA_PORT":    GetEnvVar("GRAFANA_PORT"),
-			"LOKI_PORT":       GetEnvVar("LOKI_PORT"),
-			"DAPR_HTTP_PORT":  GetEnvVar("DAPR_HTTP_PORT"),
-			"DAPR_GRPC_PORT":  GetEnvVar("DAPR_GRPC_PORT"),
+			"DATABASE_PORT":   sharedtesting.GetEnvVar("DATABASE_PORT", "5432"),
+			"REDIS_PORT":      sharedtesting.GetEnvVar("REDIS_PORT", "6379"), 
+			"VAULT_PORT":      sharedtesting.GetEnvVar("VAULT_PORT", "8200"),
+			"AZURITE_PORT":    sharedtesting.GetEnvVar("AZURITE_PORT", "10000"),
+			"GRAFANA_PORT":    sharedtesting.GetEnvVar("GRAFANA_PORT", "3000"),
+			"LOKI_PORT":       sharedtesting.GetEnvVar("LOKI_PORT", "3100"),
+			"DAPR_HTTP_PORT":  sharedtesting.GetEnvVar("DAPR_HTTP_PORT", "3500"),
+			"DAPR_GRPC_PORT":  sharedtesting.GetEnvVar("DAPR_GRPC_PORT", "50001"),
 		}
 
 		usedPorts := make(map[string]string)

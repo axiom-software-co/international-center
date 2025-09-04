@@ -2595,3 +2595,175 @@ func TestEnvironmentIsolationContract(t *testing.T) {
 		integration.ProgramTest(t, options)
 	})
 }
+
+// TestWebsiteIntegrationContract validates website integration contracts
+func TestWebsiteIntegrationContract(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration tests in short mode")
+	}
+
+	// RED PHASE: Website component integration contract test
+	t.Run("website_component_integration_contract", func(t *testing.T) {
+		// Arrange
+		options := &integration.ProgramTestOptions{
+			Dir:   "../../development/program",
+			Quick: true,
+			SkipRefresh: true,
+			ExpectRefreshChanges: false,
+			Env: []string{
+				"PULUMI_CONFIG_PASSPHRASE=",
+			},
+			ExtraRuntimeValidation: func(t *testing.T, stack integration.RuntimeValidationStackInfo) {
+				// Contract validation: Website integrated with infrastructure
+				require.NotEmpty(t, stack.Outputs, "Stack should have outputs when website integration succeeds")
+				
+				// Component-first architecture validation: Website as infrastructure component
+				expectedComponents := []string{"database", "storage", "vault", "dapr", "website"}
+				for _, component := range expectedComponents {
+					componentOutput := stack.Outputs[fmt.Sprintf("%s_resource_id", component)]
+					assert.NotNil(t, componentOutput, "Component %s should be integrated with resource ID", component)
+				}
+				
+				// Website integration with gateway contract
+				websiteGatewayEndpoint := stack.Outputs["website_gateway_endpoint"]
+				gatewayWebsiteConfig := stack.Outputs["gateway_website_config"]
+				
+				assert.NotNil(t, websiteGatewayEndpoint, "Website should be configured with gateway endpoint")
+				assert.NotNil(t, gatewayWebsiteConfig, "Gateway should be configured to serve website")
+				
+				// Environment isolation validation for website
+				environmentOutput := stack.Outputs["environment"]
+				assert.Equal(t, "development", environmentOutput.(string), "Website should be integrated in development environment")
+			},
+		}
+
+		// Act & Assert - Run integration test (RED PHASE: This will fail)
+		integration.ProgramTest(t, options)
+	})
+
+	// RED PHASE: Website-to-infrastructure communication contract test
+	t.Run("website_infrastructure_communication_contract", func(t *testing.T) {
+		// Arrange
+		options := &integration.ProgramTestOptions{
+			Dir:   "../../development/program",
+			Quick: true,
+			ExtraRuntimeValidation: func(t *testing.T, stack integration.RuntimeValidationStackInfo) {
+				// Contract validation: Website communicates with infrastructure through gateway
+				
+				// Website-to-gateway communication contract
+				websiteApiBaseUrl := stack.Outputs["website_api_base_url"]
+				gatewayPublicEndpoint := stack.Outputs["gateway_public_endpoint"]
+				
+				assert.NotNil(t, websiteApiBaseUrl, "Website should have API base URL configured")
+				assert.NotNil(t, gatewayPublicEndpoint, "Gateway should provide public endpoint for website")
+				
+				// No hardcoded infrastructure endpoints contract
+				apiBaseUrl := websiteApiBaseUrl.(string)
+				assert.NotContains(t, apiBaseUrl, "localhost", "Website API base URL should not be hardcoded to localhost")
+				assert.NotContains(t, apiBaseUrl, "127.0.0.1", "Website API base URL should not be hardcoded to localhost")
+				assert.NotContains(t, apiBaseUrl, "5432", "Website should not have hardcoded database port")
+				assert.NotContains(t, apiBaseUrl, "6379", "Website should not have hardcoded Redis port")
+				
+				// Gateway CORS configuration for website
+				corsOrigins := stack.Outputs["gateway_cors_allowed_origins"]
+				assert.NotNil(t, corsOrigins, "Gateway should configure CORS allowed origins for website")
+			},
+		}
+
+		// Act & Assert - Run integration test (RED PHASE: This will fail)
+		integration.ProgramTest(t, options)
+	})
+}
+
+// TestWebsiteDeploymentIntegration validates website deployment integration
+func TestWebsiteDeploymentIntegration(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration tests in short mode")
+	}
+
+	// RED PHASE: Website deployment integration test
+	t.Run("website_deployment_integration", func(t *testing.T) {
+		// Arrange
+		options := &integration.ProgramTestOptions{
+			Dir:   "../../development/program",
+			Quick: true,
+			ExtraRuntimeValidation: func(t *testing.T, stack integration.RuntimeValidationStackInfo) {
+				// Contract validation: Website deployed successfully as part of infrastructure
+				
+				// Website deployment status contract
+				websiteDeploymentStatus := stack.Outputs["website_deployment_status"]
+				websiteURL := stack.Outputs["website_url"]
+				websiteBuildStatus := stack.Outputs["website_build_status"]
+				
+				assert.NotNil(t, websiteDeploymentStatus, "Website should have deployment status")
+				assert.NotNil(t, websiteURL, "Website should provide deployment URL")
+				assert.NotNil(t, websiteBuildStatus, "Website should have build status")
+				
+				// Environment-specific website configuration contract
+				websiteEnvironment := stack.Outputs["website_environment"]
+				websiteNodeEnv := stack.Outputs["website_node_env"]
+				
+				assert.Equal(t, "development", websiteEnvironment.(string), "Website should be deployed in development environment")
+				assert.Equal(t, "development", websiteNodeEnv.(string), "Website should be built for development environment")
+				
+				// Website build configuration contract
+				buildCommand := stack.Outputs["website_build_command"]
+				buildOutput := stack.Outputs["website_build_output"]
+				sourceDirectory := stack.Outputs["website_source_directory"]
+				
+				assert.Equal(t, "npm run build", buildCommand.(string), "Website should use standard npm build command")
+				assert.Equal(t, "dist", buildOutput.(string), "Website should output to dist directory")
+				assert.Equal(t, "website/", sourceDirectory.(string), "Website should source from website/ directory")
+			},
+		}
+
+		// Act & Assert - Run integration test (RED PHASE: This will fail)
+		integration.ProgramTest(t, options)
+	})
+}
+
+// TestWebsiteEnvironmentIsolation validates website environment isolation
+func TestWebsiteEnvironmentIsolation(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration tests in short mode")
+	}
+
+	// RED PHASE: Website environment isolation contract test
+	t.Run("website_environment_isolation_contract", func(t *testing.T) {
+		// Arrange
+		options := &integration.ProgramTestOptions{
+			Dir:   "../../development/program",
+			Quick: true,
+			ExtraRuntimeValidation: func(t *testing.T, stack integration.RuntimeValidationStackInfo) {
+				// Contract validation: Website follows environment isolation patterns
+				
+				// Website naming follows environment isolation
+				websiteName := stack.Outputs["website_name"]
+				websiteProjectName := stack.Outputs["website_project_name"]
+				
+				assert.Contains(t, websiteName.(string), "development", "Website name should include environment")
+				assert.Contains(t, websiteProjectName.(string), "development", "Website project name should include environment")
+				
+				// Website environment variables isolated per environment
+				websiteEnvVars := stack.Outputs["website_environment_variables"]
+				require.NotNil(t, websiteEnvVars, "Website should have environment variables configured")
+				
+				envVarsMap := websiteEnvVars.(map[string]interface{})
+				nodeEnv := envVarsMap["NODE_ENV"].(string)
+				assert.Equal(t, "development", nodeEnv, "Website NODE_ENV should match deployment environment")
+				
+				// Website API base URL follows environment isolation (no hardcoded production URLs)
+				apiBaseUrl := envVarsMap["API_BASE_URL"].(string)
+				assert.NotContains(t, apiBaseUrl, "production", "Development website should not use production API URLs")
+				assert.NotContains(t, apiBaseUrl, "www.internationalcenter.org", "Development website should not use production domain")
+				
+				// Website deployment configuration isolation
+				previewDeployments := stack.Outputs["website_preview_deployments"]
+				assert.True(t, previewDeployments.(bool), "Development environment should enable preview deployments")
+			},
+		}
+
+		// Act & Assert - Run integration test (RED PHASE: This will fail)
+		integration.ProgramTest(t, options)
+	})
+}

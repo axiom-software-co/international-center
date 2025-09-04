@@ -50,6 +50,12 @@ func (f *StagingInfrastructureFactory) CreateServiceStack(ctx *pulumi.Context, c
 	return nil // Stack not yet implemented
 }
 
+// Website Factory Implementation - Uses Cloudflare Pages
+func (f *StagingInfrastructureFactory) CreateWebsiteStack(ctx *pulumi.Context, config *config.Config, environment string) sharedinfra.WebsiteStack {
+	// TODO: Implement staging website stack with proper Cloudflare Pages integration
+	return nil // Stack not yet implemented
+}
+
 // Verify that StagingInfrastructureFactory implements the shared InfrastructureFactory interface
 var _ sharedinfra.InfrastructureFactory = (*StagingInfrastructureFactory)(nil)
 var _ sharedinfra.DatabaseFactory = (*StagingInfrastructureFactory)(nil)
@@ -58,3 +64,4 @@ var _ sharedinfra.DaprFactory = (*StagingInfrastructureFactory)(nil)
 var _ sharedinfra.VaultFactory = (*StagingInfrastructureFactory)(nil)
 var _ sharedinfra.ObservabilityFactory = (*StagingInfrastructureFactory)(nil)
 var _ sharedinfra.ServiceFactory = (*StagingInfrastructureFactory)(nil)
+var _ sharedinfra.WebsiteFactory = (*StagingInfrastructureFactory)(nil)

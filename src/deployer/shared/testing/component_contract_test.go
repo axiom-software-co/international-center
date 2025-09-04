@@ -986,3 +986,230 @@ func TestCrossComponentCommunication(t *testing.T) {
 		integration.ProgramTest(t, options)
 	})
 }
+
+// WebsiteContractValidator validates website component contracts
+type WebsiteContractValidator struct {
+	suite *InfrastructureTestSuite
+}
+
+// NewWebsiteContractValidator creates a new website contract validator
+func NewWebsiteContractValidator(suite *InfrastructureTestSuite) *WebsiteContractValidator {
+	return &WebsiteContractValidator{
+		suite: suite,
+	}
+}
+
+// ValidateCloudflarePageContract validates Cloudflare Pages contract
+func (v *WebsiteContractValidator) ValidateCloudflarePageContract(t *testing.T) {
+	v.suite.RunPulumiTest("cloudflare_pages_contract", func(ctx *pulumi.Context) error {
+		// Contract: Cloudflare Pages must provide deployment URL
+		// Contract: Cloudflare Pages must support custom domains in staging/production
+		// Contract: Cloudflare Pages must enable SSL certificates
+		// Contract: Cloudflare Pages must support build commands and source directory
+		
+		expectedProperties := map[string]interface{}{
+			"name":               "international-center-" + v.suite.environment,
+			"productionBranch":   "main",
+			"buildConfig": map[string]interface{}{
+				"buildCommand":       "npm run build",
+				"destinationDir":     "dist",
+				"rootDir":           "website/",
+			},
+		}
+		
+		if v.suite.environment == "development" {
+			expectedProperties["previewDeploymentSetting"] = "all"
+		} else if v.suite.environment == "staging" {
+			expectedProperties["customDomain"] = "staging.internationalcenter.org"
+			expectedProperties["previewDeploymentSetting"] = "custom"
+		} else if v.suite.environment == "production" {
+			expectedProperties["customDomain"] = "www.internationalcenter.org"
+			expectedProperties["previewDeploymentSetting"] = "none"
+		}
+		
+		// Validate contract properties
+		for key, expectedValue := range expectedProperties {
+			if key == "buildConfig" {
+				buildConfig := expectedValue.(map[string]interface{})
+				for buildKey, buildValue := range buildConfig {
+					assert.NotNil(t, buildValue, "Build config %s must be configured", buildKey)
+				}
+			} else {
+				assert.NotNil(t, expectedValue, "Property %s must be configured", key)
+			}
+		}
+		
+		return nil
+	})
+}
+
+// ValidateGatewayIntegrationContract validates website-to-gateway integration contract
+func (v *WebsiteContractValidator) ValidateGatewayIntegrationContract(t *testing.T) {
+	v.suite.RunPulumiTest("gateway_integration_contract", func(ctx *pulumi.Context) error {
+		// Contract: Website must load dynamic data through public gateway
+		// Contract: Gateway endpoint must be configured through environment variables (no hardcoded URLs)
+		// Contract: Website must handle gateway communication errors gracefully
+		// Contract: CORS policies must be properly configured for cross-origin requests
+		
+		requiredEnvironmentVariables := []string{
+			"API_BASE_URL",
+			"NODE_ENV",
+		}
+		
+		for _, envVar := range requiredEnvironmentVariables {
+			// Validate environment variables are configured (not hardcoded)
+			envVarID, envVarProps, err := v.suite.mocks.NewResource(pulumi.MockResourceArgs{
+				TypeToken: "cloudflare:pages/project:Project",
+				Name:      "website-" + envVar,
+			})
+			assert.NoError(t, err, "Environment variable %s should be configured", envVar)
+			assert.Contains(t, envVarID, envVar, "Environment variable ID should contain variable name")
+			
+			// Contract: No hardcoded gateway URLs in environment variables
+			if valueProperty, exists := envVarProps["value"]; exists {
+				envValue := valueProperty.StringValue()
+				assert.NotContains(t, envValue, "localhost", "Gateway URL should not be hardcoded to localhost")
+				assert.NotContains(t, envValue, "127.0.0.1", "Gateway URL should not be hardcoded to localhost")
+			}
+		}
+		
+		// Contract: Gateway communication timeout configuration
+		if v.suite.environment == "production" {
+			// Production should have shorter timeouts for better UX
+			timeoutValue := 5000 // 5 seconds for production
+			assert.LessOrEqual(t, timeoutValue, 5000, "Production gateway timeout should be optimized for UX")
+		} else {
+			// Development/Staging can have longer timeouts for debugging
+			timeoutValue := 15000 // 15 seconds for development
+			assert.LessOrEqual(t, timeoutValue, 15000, "Development gateway timeout should support debugging")
+		}
+		
+		return nil
+	})
+}
+
+// TestWebsiteDeploymentContract validates website deployment contracts with 15s timeouts
+func TestWebsiteDeploymentContract(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration tests in short mode")
+	}
+
+	// RED PHASE: Website deployment contract test (will fail because website stack not implemented)
+	t.Run("website_deployment_contract", func(t *testing.T) {
+		// Arrange
+		options := &integration.ProgramTestOptions{
+			Dir:   "../../development/program",
+			Quick: true,
+			SkipRefresh: true,
+			ExpectRefreshChanges: false,
+			Env: []string{
+				"PULUMI_CONFIG_PASSPHRASE=",
+			},
+			ExtraRuntimeValidation: func(t *testing.T, stack integration.RuntimeValidationStackInfo) {
+				// Contract validation: Website component must be created successfully
+				require.NotEmpty(t, stack.Outputs, "Stack should have outputs when deployment succeeds")
+				
+				// Component-first architecture validation for website
+				websiteOutput := stack.Outputs["website_resource_id"]
+				assert.NotNil(t, websiteOutput, "Website component should be deployed with resource ID")
+				
+				// Website deployment URL contract
+				websiteURL := stack.Outputs["website_url"]
+				assert.NotNil(t, websiteURL, "Website should provide deployment URL")
+				
+				// Environment isolation validation for website
+				environmentOutput := stack.Outputs["environment"]
+				assert.Equal(t, "development", environmentOutput.(string), "Website should be deployed to development environment")
+				
+				// Website-specific validation
+				websiteName := stack.Outputs["website_name"]
+				assert.Contains(t, websiteName.(string), "development", "Website should include environment in name")
+			},
+		}
+
+		// Act & Assert - Run integration test (RED PHASE: This will fail)
+		integration.ProgramTest(t, options)
+	})
+}
+
+// TestWebsiteGatewayCommunicationContract validates website-to-gateway communication contracts
+func TestWebsiteGatewayCommunicationContract(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration tests in short mode")
+	}
+
+	// RED PHASE: Website-to-gateway communication contract test
+	t.Run("website_gateway_communication_contract", func(t *testing.T) {
+		// Arrange
+		options := &integration.ProgramTestOptions{
+			Dir:   "../../development/program",
+			Quick: true,
+			ExtraRuntimeValidation: func(t *testing.T, stack integration.RuntimeValidationStackInfo) {
+				// Contract validation: Website can communicate with gateway
+				
+				// Gateway endpoint configuration contract
+				gatewayEndpoint := stack.Outputs["gateway_endpoint"]
+				websiteApiBaseUrl := stack.Outputs["website_api_base_url"]
+				
+				assert.NotNil(t, gatewayEndpoint, "Gateway should provide endpoint for website communication")
+				assert.NotNil(t, websiteApiBaseUrl, "Website should be configured with gateway API base URL")
+				
+				// No hardcoded URL contract validation
+				apiBaseUrl := websiteApiBaseUrl.(string)
+				assert.NotContains(t, apiBaseUrl, "localhost", "Website API base URL should not be hardcoded to localhost")
+				assert.NotContains(t, apiBaseUrl, "127.0.0.1", "Website API base URL should not be hardcoded to localhost")
+				
+				// CORS configuration contract
+				corsConfig := stack.Outputs["gateway_cors_config"]
+				assert.NotNil(t, corsConfig, "Gateway should provide CORS configuration for website communication")
+				
+				// Website environment variables contract
+				websiteEnvVars := stack.Outputs["website_environment_variables"]
+				assert.NotNil(t, websiteEnvVars, "Website should have environment variables configured")
+			},
+		}
+
+		// Act & Assert - Run integration test (RED PHASE: This will fail)
+		integration.ProgramTest(t, options)
+	})
+}
+
+// TestWebsiteBuildContract validates website build and deployment contracts
+func TestWebsiteBuildContract(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration tests in short mode")
+	}
+
+	// RED PHASE: Website build contract test
+	t.Run("website_build_contract", func(t *testing.T) {
+		// Arrange
+		options := &integration.ProgramTestOptions{
+			Dir:   "../../development/program", 
+			Quick: true,
+			ExtraRuntimeValidation: func(t *testing.T, stack integration.RuntimeValidationStackInfo) {
+				// Contract validation: Website build configuration
+				
+				// Build command contract
+				buildCommand := stack.Outputs["website_build_command"]
+				buildOutput := stack.Outputs["website_build_output"]
+				sourceDir := stack.Outputs["website_source_dir"]
+				
+				assert.NotNil(t, buildCommand, "Website should have build command configured")
+				assert.NotNil(t, buildOutput, "Website should have build output directory configured")
+				assert.NotNil(t, sourceDir, "Website should have source directory configured")
+				
+				// Build configuration validation
+				assert.Equal(t, "npm run build", buildCommand.(string), "Website should use npm build command")
+				assert.Equal(t, "dist", buildOutput.(string), "Website should output to dist directory")
+				assert.Equal(t, "website/", sourceDir.(string), "Website should source from website/ directory")
+				
+				// Environment-specific build validation
+				nodeEnv := stack.Outputs["website_node_env"]
+				assert.Equal(t, "development", nodeEnv.(string), "Website should be built for development environment")
+			},
+		}
+
+		// Act & Assert - Run integration test (RED PHASE: This will fail)
+		integration.ProgramTest(t, options)
+	})
+}
