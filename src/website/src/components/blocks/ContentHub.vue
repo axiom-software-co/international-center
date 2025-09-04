@@ -37,7 +37,7 @@
       <div
         v-for="index in 2"
         :key="index"
-        class="content-category bg-white dark:bg-gray-900 rounded border border-gray-200 dark:border-gray-700 p-4 lg:p-6"
+        class="content-category-skeleton bg-white dark:bg-gray-900 rounded border border-gray-200 dark:border-gray-700 p-4 lg:p-6"
       >
         <div class="mb-4 lg:mb-6">
           <div class="h-6 bg-gray-300 dark:bg-gray-600 rounded animate-pulse w-48"></div>
@@ -250,11 +250,17 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed } from 'vue';
 import UnifiedContentCTA from '../UnifiedContentCTA.vue';
 import PublicationsSection from '../PublicationsSection.vue';
 import ArticleCard from '../ArticleCard.vue';
 import { resolveAssetUrl } from '@/lib/utils/assets';
+import { formatArticleDate } from '@/lib/utils/date';
+
+// Import composables based on content type
+import { useNews, useFeaturedNews } from '@/lib/clients/composables/useNews';
+import { useResearchArticles, useFeaturedResearch } from '@/composables/useResearch';
+import { useEvents, useFeaturedEvents } from '@/composables/useEvents';
 
 interface ContentArticle {
   id: string | number;
@@ -336,11 +342,92 @@ const config = computed(() => {
   }
 });
 
-// Reactive state
-const articleCategories = ref<ContentCategory[]>([]);
-const featuredArticle = ref<ContentArticle | null>(null);
-const isLoading = ref(false);
-const error = ref<string | null>(null);
+// Initialize composables directly - no lazy computed evaluation
+const newsArticles = useNews();
+const newsFeatured = useFeaturedNews(1);
+const researchArticles = useResearchArticles();
+const researchFeatured = useFeaturedResearch(1);
+const eventsArticles = useEvents();
+const eventsFeatured = useFeaturedEvents(1);
+
+// Get appropriate composables based on content type
+const activeComposables = computed(() => {
+  if (config.value.type === 'news') {
+    return { articles: newsArticles, featured: newsFeatured };
+  } else if (config.value.type === 'research') {
+    return { articles: researchArticles, featured: researchFeatured };
+  } else {
+    return { articles: eventsArticles, featured: eventsFeatured };
+  }
+});
+
+// Computed loading and error states
+const isLoading = computed(() => {
+  const composables = activeComposables.value;
+  return composables ? 
+    (composables.articles.loading.value || composables.featured.loading.value) : 
+    false;
+});
+
+const error = computed(() => {
+  const composables = activeComposables.value;
+  return composables ? 
+    (composables.articles.error.value || composables.featured.error.value) : 
+    null;
+});
+
+// Get articles from appropriate composable
+const allArticles = computed(() => {
+  const composables = activeComposables.value;
+  if (!composables) return [];
+  
+  if (config.value.type === 'news') {
+    return composables.articles.articles.value || [];
+  } else if (config.value.type === 'research') {
+    return composables.articles.articles.value || [];
+  } else {
+    return composables.articles.events.value || [];
+  }
+});
+
+// Get featured article from appropriate composable
+const featuredArticle = computed(() => {
+  const composables = activeComposables.value;
+  if (!composables) return null;
+  
+  const featuredList = composables.featured.articles?.value || composables.featured.events?.value || [];
+  return featuredList.length > 0 ? featuredList[0] : null;
+});
+
+// Transform articles into category structure
+const articleCategories = computed((): ContentCategory[] => {
+  // Don't show categories when loading
+  if (isLoading.value) return [];
+  
+  const articles = allArticles.value;
+  if (!articles.length) return [];
+  
+  // Group articles by category
+  const categoriesMap = new Map<string, ContentArticle[]>();
+  
+  articles.forEach((article: any) => {
+    const categoryName = typeof article.category === 'object' 
+      ? article.category?.name 
+      : article.category || config.value.defaultCategory;
+    
+    if (!categoriesMap.has(categoryName)) {
+      categoriesMap.set(categoryName, []);
+    }
+    categoriesMap.get(categoryName)!.push(article);
+  });
+  
+  // Convert to ContentCategory format
+  return Array.from(categoriesMap.entries()).map(([title, articles]) => ({
+    title,
+    description: `${title} articles`,
+    articles
+  }));
+});
 
 // Computed properties for featured article
 const featuredTitle = computed(() => featuredArticle.value?.title || '');
@@ -355,79 +442,24 @@ const featuredCategory = computed(() => {
 const featuredAuthor = computed(() => featuredArticle.value?.author || config.value.defaultAuthor);
 const featuredDate = computed(() => {
   if (!featuredArticle.value) return '';
-  return formatDate(featuredArticle.value.published_at);
+  return formatArticleDate(featuredArticle.value.published_at || featuredArticle.value.event_date || '');
 });
 const featuredArticleHref = computed(() => `${config.value.basePath}/${featuredArticle.value?.slug || ''}`);
 
-const formatDate = (dateString: string): string => {
-  return new Date(dateString).toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  });
-};
-
-onMounted(async () => {
-  console.log(`🚀 [ContentHub] Component mounted`);
-  console.log(`🔍 [ContentHub] Props received:`, props);
-  console.log(`🔍 [ContentHub] Config:`, config.value);
-  
-  if (!props.contentType) {
-    console.error(`❌ [ContentHub] No contentType prop received!`);
-    error.value = 'Component configuration missing';
-    return;
-  }
-  
-  try {
-    isLoading.value = true;
-    error.value = null;
-
-    console.log(`🔄 [ContentHub] Starting data load for ${config.value.type}...`);
-
-    // Test basic API connectivity first
-    if (config.value.type === 'news') {
-      console.log('🔍 [ContentHub] Testing news API...');
-      const { newsClient } = await import('../../lib/clients');
-      console.log('📦 [ContentHub] News client imported');
-      
-      const pageData = await newsClient.loadNewsPageData();
-      console.log('📊 [ContentHub] News page data:', pageData);
-      
-      articleCategories.value = pageData.articleCategories || [];
-      featuredArticle.value = pageData.featuredArticle || null;
-    } else if (config.value.type === 'events') {
-      console.log('🔍 [ContentHub] Testing events API...');
-      const { eventsClient } = await import('../../lib/clients');
-      console.log('📦 [ContentHub] Events client imported');
-      
-      const pageData = await eventsClient.loadEventsPageData();
-      console.log('📊 [ContentHub] Events page data:', pageData);
-      
-      articleCategories.value = pageData.articleCategories || [];
-      featuredArticle.value = pageData.featuredArticle || null;
-    } else {
-      console.log('🔍 [ContentHub] Testing research API...');
-      const { researchClient } = await import('../../lib/clients');
-      console.log('📦 [ContentHub] Research client imported');
-      
-      const pageData = await researchClient.loadResearchPageData();
-      console.log('📊 [ContentHub] Research page data:', pageData);
-      
-      articleCategories.value = pageData.articleCategories || [];
-      featuredArticle.value = pageData.featuredArticle || null;
-    }
-
-    console.log(`✅ [ContentHub] Final - Categories: ${articleCategories.value.length}, Featured: ${featuredArticle.value?.title || 'None'}`);
-  } catch (err: any) {
-    console.error(`❌ [ContentHub] ERROR:`, err);
-    error.value = err.message || `Failed to load ${config.value.type} content`;
-    articleCategories.value = [];
-    featuredArticle.value = null;
-  } finally {
-    isLoading.value = false;
-    console.log(`🏁 [ContentHub] Done - isLoading: ${isLoading.value}`);
-  }
+// Expose computed properties for testing
+defineExpose({
+  config,
+  articleCategories,
+  featuredArticle,
+  featuredTitle,
+  featuredCategory,
+  featuredAuthor,
+  featuredDate,
+  featuredArticleHref,
+  isLoading,
+  error
 });
+
 </script>
 
 <style scoped>
