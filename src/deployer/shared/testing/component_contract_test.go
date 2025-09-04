@@ -6,7 +6,9 @@ import (
 
 	"github.com/pulumi/pulumi/sdk/v3/go/common/resource"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
+	"github.com/pulumi/pulumi/pkg/v3/testing/integration"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // DatabaseContractValidator validates database component contracts
@@ -811,4 +813,176 @@ func getResourceTypeShortName(resourceType string) string {
 	default:
 		return "resource"
 	}
+}
+
+// RED PHASE: Component-First Architecture Integration Tests using official Pulumi framework
+
+// TestDatabaseComponentIntegration validates database component integration contracts
+func TestDatabaseComponentIntegration(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration tests in short mode")
+	}
+
+	// RED PHASE: Database deployment integration contract test
+	t.Run("database_deployment_integration", func(t *testing.T) {
+		// Arrange
+		options := &integration.ProgramTestOptions{
+			Dir:   "../../development/program",
+			Quick: true,
+			ExtraRuntimeValidation: func(t *testing.T, stack integration.RuntimeValidationStackInfo) {
+				// Contract validation: Database component deployed successfully
+				databaseOutput := stack.Outputs["database_resource_id"]
+				require.NotNil(t, databaseOutput, "Database component should be deployed")
+				
+				// Component-first validation: Database should be isolated component
+				databaseName := stack.Outputs["database_name"]
+				require.Contains(t, databaseName.(string), "development", "Database should follow environment naming")
+				
+				// Connection contract validation
+				connectionString := stack.Outputs["database_connection_string"]
+				require.NotNil(t, connectionString, "Database should provide connection string")
+			},
+		}
+
+		// Act & Assert - Run integration test (RED PHASE: This will fail)
+		integration.ProgramTest(t, options)
+	})
+}
+
+// TestStorageComponentIntegration validates storage component integration contracts
+func TestStorageComponentIntegration(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration tests in short mode")
+	}
+
+	// RED PHASE: Storage deployment integration contract test
+	t.Run("storage_deployment_integration", func(t *testing.T) {
+		// Arrange
+		options := &integration.ProgramTestOptions{
+			Dir:   "../../development/program",
+			Quick: true,
+			ExtraRuntimeValidation: func(t *testing.T, stack integration.RuntimeValidationStackInfo) {
+				// Contract validation: Storage component deployed successfully
+				storageOutput := stack.Outputs["storage_resource_id"]
+				require.NotNil(t, storageOutput, "Storage component should be deployed")
+				
+				// Component-first validation: Storage should be isolated component
+				storageName := stack.Outputs["storage_name"]
+				require.Contains(t, storageName.(string), "development", "Storage should follow environment naming")
+				
+				// Blob service contract validation
+				blobEndpoint := stack.Outputs["storage_blob_endpoint"]
+				require.NotNil(t, blobEndpoint, "Storage should provide blob endpoint")
+			},
+		}
+
+		// Act & Assert - Run integration test (RED PHASE: This will fail)
+		integration.ProgramTest(t, options)
+	})
+}
+
+// TestVaultComponentIntegration validates vault component integration contracts
+func TestVaultComponentIntegration(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration tests in short mode")
+	}
+
+	// RED PHASE: Vault deployment integration contract test
+	t.Run("vault_deployment_integration", func(t *testing.T) {
+		// Arrange
+		options := &integration.ProgramTestOptions{
+			Dir:   "../../development/program",
+			Quick: true,
+			ExtraRuntimeValidation: func(t *testing.T, stack integration.RuntimeValidationStackInfo) {
+				// Contract validation: Vault component deployed successfully
+				vaultOutput := stack.Outputs["vault_resource_id"]
+				require.NotNil(t, vaultOutput, "Vault component should be deployed")
+				
+				// Component-first validation: Vault should be isolated component
+				vaultName := stack.Outputs["vault_name"]
+				require.Contains(t, vaultName.(string), "development", "Vault should follow environment naming")
+				
+				// Secret management contract validation
+				vaultEndpoint := stack.Outputs["vault_endpoint"]
+				require.NotNil(t, vaultEndpoint, "Vault should provide endpoint for secret access")
+			},
+		}
+
+		// Act & Assert - Run integration test (RED PHASE: This will fail)
+		integration.ProgramTest(t, options)
+	})
+}
+
+// TestDaprComponentIntegration validates Dapr component integration contracts
+func TestDaprComponentIntegration(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration tests in short mode")
+	}
+
+	// RED PHASE: Dapr service discovery integration contract test
+	t.Run("dapr_service_discovery_integration", func(t *testing.T) {
+		// Arrange
+		options := &integration.ProgramTestOptions{
+			Dir:   "../../development/program",
+			Quick: true,
+			ExtraRuntimeValidation: func(t *testing.T, stack integration.RuntimeValidationStackInfo) {
+				// Contract validation: Dapr components registered successfully
+				daprComponents := stack.Outputs["dapr_component_names"]
+				require.NotNil(t, daprComponents, "Dapr should register component names")
+				
+				// Service discovery contract validation
+				componentList := daprComponents.([]interface{})
+				assert.GreaterOrEqual(t, len(componentList), 3, "Dapr should register at least 3 components (database, storage, vault)")
+				
+				// Component communication contract validation
+				daprHTTPPort := stack.Outputs["dapr_http_port"]
+				daprGRPCPort := stack.Outputs["dapr_grpc_port"]
+				require.NotNil(t, daprHTTPPort, "Dapr should provide HTTP port for communication")
+				require.NotNil(t, daprGRPCPort, "Dapr should provide GRPC port for communication")
+			},
+		}
+
+		// Act & Assert - Run integration test (RED PHASE: This will fail)
+		integration.ProgramTest(t, options)
+	})
+}
+
+// TestCrossComponentCommunication validates cross-component communication contracts
+func TestCrossComponentCommunication(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration tests in short mode")
+	}
+
+	// RED PHASE: Cross-component communication contract test
+	t.Run("cross_component_communication_contract", func(t *testing.T) {
+		// Arrange
+		options := &integration.ProgramTestOptions{
+			Dir:   "../../development/program",
+			Quick: true,
+			ExtraRuntimeValidation: func(t *testing.T, stack integration.RuntimeValidationStackInfo) {
+				// Contract validation: Components can communicate through Dapr
+				
+				// Database-to-Dapr communication contract
+				databaseConnectionString := stack.Outputs["database_connection_string"]
+				daprStateStoreConfig := stack.Outputs["dapr_statestore_config"]
+				require.NotNil(t, databaseConnectionString, "Database should provide connection for Dapr state store")
+				require.NotNil(t, daprStateStoreConfig, "Dapr should configure database as state store")
+				
+				// Storage-to-Dapr communication contract
+				storageBlobEndpoint := stack.Outputs["storage_blob_endpoint"]
+				daprBindingConfig := stack.Outputs["dapr_blob_binding_config"]
+				require.NotNil(t, storageBlobEndpoint, "Storage should provide endpoint for Dapr bindings")
+				require.NotNil(t, daprBindingConfig, "Dapr should configure storage as binding")
+				
+				// Vault-to-Dapr communication contract
+				vaultEndpoint := stack.Outputs["vault_endpoint"]
+				daprSecretStoreConfig := stack.Outputs["dapr_secretstore_config"]
+				require.NotNil(t, vaultEndpoint, "Vault should provide endpoint for Dapr secret store")
+				require.NotNil(t, daprSecretStoreConfig, "Dapr should configure vault as secret store")
+			},
+		}
+
+		// Act & Assert - Run integration test (RED PHASE: This will fail)
+		integration.ProgramTest(t, options)
+	})
 }

@@ -15,7 +15,6 @@ import (
 )
 
 type DevelopmentDatabaseStack struct {
-	pulumi.ComponentResource
 	ctx           *pulumi.Context
 	config        *config.Config
 	configManager *sharedconfig.ConfigManager
@@ -63,14 +62,6 @@ func NewDatabaseStack(ctx *pulumi.Context, config *config.Config, networkName, e
 		errorHandler:  errorHandler,
 	}
 	
-	err = ctx.RegisterComponentResource("international-center:database:DevelopmentStack", 
-		fmt.Sprintf("%s-database-stack", environment), component)
-	if err != nil {
-		resourceErr := shared.NewResourceError("register_component", "database", environment, "DevelopmentStack", err)
-		errorHandler.HandleError(resourceErr)
-		return nil
-	}
-	
 	return component
 }
 
@@ -78,7 +69,7 @@ func (ds *DevelopmentDatabaseStack) Deploy(ctx context.Context) (shared.Database
 	// Create the deployment component
 	deployment := &DevelopmentDatabaseDeployment{}
 	err := ds.ctx.RegisterComponentResource("international-center:database:DevelopmentDeployment",
-		fmt.Sprintf("%s-database-deployment", ds.environment), deployment, pulumi.Parent(ds))
+		fmt.Sprintf("%s-database-deployment", ds.environment), deployment)
 	if err != nil {
 		return nil, fmt.Errorf("failed to register deployment component: %w", err)
 	}
@@ -127,16 +118,7 @@ func (ds *DevelopmentDatabaseStack) Deploy(ctx context.Context) (shared.Database
 	ds.DatabaseNetwork = deployment.NetworkID
 	ds.PostgreSQLContainer = deployment.PostgreSQLContainer.ID().ToStringOutput()
 
-	// Register stack component outputs
-	err = ds.ctx.RegisterResourceOutputs(ds, pulumi.Map{
-		"databaseEndpoint": ds.DatabaseEndpoint,
-		"connectionString": ds.ConnectionString,
-		"networkId":        ds.DatabaseNetwork,
-		"containerId":      ds.PostgreSQLContainer,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to register stack outputs: %w", err)
-	}
+	// Stack outputs are set in the struct fields and can be accessed directly
 
 	return deployment, nil
 }

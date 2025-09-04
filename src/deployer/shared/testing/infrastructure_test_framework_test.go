@@ -9,6 +9,7 @@ import (
 
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi/internals"
+	"github.com/pulumi/pulumi/pkg/v3/testing/integration"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	
@@ -2416,5 +2417,181 @@ func TestInfrastructureMocksSuccess(t *testing.T) {
 				assert.True(t, props["geoRedundantBackupEnabled"].BoolValue())
 			}
 		}
+	})
+}
+
+// RED PHASE: Pulumi Integration Testing Framework - Infrastructure Deployment Contract Tests
+// These tests validate actual infrastructure deployment using official Pulumi integration testing
+
+// TestInfrastructureDeploymentContract validates infrastructure deployment contracts
+func TestInfrastructureDeploymentContract(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration tests in short mode")
+	}
+
+	// RED PHASE: This will fail because we haven't implemented the deployment contract validation yet
+	t.Run("development_stack_deployment_contract", func(t *testing.T) {
+		// Arrange
+		// GREEN PHASE: Define integration test options for development stack
+		options := &integration.ProgramTestOptions{
+			Dir:                    "../../development/program",
+			Quick:                  true,
+			SkipRefresh:           true,
+			ExpectRefreshChanges: false,
+			Env: []string{
+				"PULUMI_CONFIG_PASSPHRASE=",
+			},
+			ExtraRuntimeValidation: func(t *testing.T, stack integration.RuntimeValidationStackInfo) {
+				// Contract validation: All components must be created successfully
+				require.NotEmpty(t, stack.Outputs, "Stack should have outputs when deployment succeeds")
+				
+				// Component-first architecture validation
+				expectedComponents := []string{"database", "storage", "vault", "dapr"}
+				for _, component := range expectedComponents {
+					componentOutput := stack.Outputs[fmt.Sprintf("%s_resource_id", component)]
+					assert.NotNil(t, componentOutput, "Component %s should be deployed with resource ID", component)
+				}
+
+				// Environment isolation validation
+				environmentOutput := stack.Outputs["environment"]
+				assert.Equal(t, "development", environmentOutput.(string), "Stack should be deployed to development environment")
+			},
+		}
+
+		// Act & Assert - Run integration test (RED PHASE: This will fail)
+		integration.ProgramTest(t, options)
+	})
+
+	// RED PHASE: Component communication contract test
+	t.Run("component_communication_contract", func(t *testing.T) {
+		// Arrange
+		options := &integration.ProgramTestOptions{
+			Dir:   "../../development/program", 
+			Quick: true,
+			ExtraRuntimeValidation: func(t *testing.T, stack integration.RuntimeValidationStackInfo) {
+				// Contract validation: Components can communicate with each other
+				
+				// Database to Vault communication contract
+				databaseOutput := stack.Outputs["database_connection_string"]
+				vaultOutput := stack.Outputs["vault_endpoint"]
+				
+				assert.NotNil(t, databaseOutput, "Database should provide connection information")
+				assert.NotNil(t, vaultOutput, "Vault should provide endpoint information")
+				
+				// Dapr service discovery contract
+				daprOutput := stack.Outputs["dapr_component_names"]
+				assert.NotNil(t, daprOutput, "Dapr should register component names for service discovery")
+			},
+		}
+
+		// Act & Assert - Run integration test (RED PHASE: This will fail)
+		integration.ProgramTest(t, options)
+	})
+}
+
+// TestConfigurationManagementContract validates environment configuration loading contracts
+func TestConfigurationManagementContract(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration tests in short mode")
+	}
+
+	// RED PHASE: Configuration loading contract test
+	t.Run("environment_configuration_contract", func(t *testing.T) {
+		// Arrange
+		options := &integration.ProgramTestOptions{
+			Dir:   "../../development/program",
+			Quick: true,
+			ExtraRuntimeValidation: func(t *testing.T, stack integration.RuntimeValidationStackInfo) {
+				// Contract validation: Configuration loaded from environment variables
+				
+				// Network configuration contract (no hardcoded ports)
+				databasePort := stack.Outputs["database_port"]
+				redisPort := stack.Outputs["redis_port"]
+				vaultPort := stack.Outputs["vault_port"]
+				
+				assert.NotNil(t, databasePort, "Database port should be loaded from environment configuration")
+				assert.NotNil(t, redisPort, "Redis port should be loaded from environment configuration") 
+				assert.NotNil(t, vaultPort, "Vault port should be loaded from environment configuration")
+				
+				// Ensure no hardcoded values
+				assert.NotEqual(t, "5432", databasePort.(string), "Database port should not be hardcoded")
+				assert.NotEqual(t, "6379", redisPort.(string), "Redis port should not be hardcoded")
+				assert.NotEqual(t, "8200", vaultPort.(string), "Vault port should not be hardcoded")
+			},
+		}
+
+		// Act & Assert - Run integration test (RED PHASE: This will fail)
+		integration.ProgramTest(t, options)
+	})
+}
+
+// TestResourceDependencyContract validates resource dependency contracts
+func TestResourceDependencyContract(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration tests in short mode")
+	}
+
+	// RED PHASE: Resource dependency validation contract test
+	t.Run("resource_dependency_contract", func(t *testing.T) {
+		// Arrange
+		options := &integration.ProgramTestOptions{
+			Dir:   "../../development/program",
+			Quick: true,
+			ExtraRuntimeValidation: func(t *testing.T, stack integration.RuntimeValidationStackInfo) {
+				// Contract validation: Resources deployed in correct dependency order
+				
+				// Database should be available before Dapr components
+				databaseState := stack.Outputs["database_ready"]
+				daprState := stack.Outputs["dapr_components_ready"]
+				
+				assert.True(t, databaseState.(bool), "Database should be ready before dependent components")
+				assert.True(t, daprState.(bool), "Dapr components should be ready after database")
+				
+				// Vault should be available before services requiring secrets
+				vaultState := stack.Outputs["vault_ready"]
+				servicesState := stack.Outputs["services_ready"]
+				
+				assert.True(t, vaultState.(bool), "Vault should be ready before services requiring secrets")
+				assert.True(t, servicesState.(bool), "Services should be ready after vault")
+			},
+		}
+
+		// Act & Assert - Run integration test (RED PHASE: This will fail)
+		integration.ProgramTest(t, options)
+	})
+}
+
+// TestEnvironmentIsolationContract validates environment isolation contracts
+func TestEnvironmentIsolationContract(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration tests in short mode")
+	}
+
+	// RED PHASE: Environment isolation contract test
+	t.Run("development_isolation_contract", func(t *testing.T) {
+		// Arrange
+		options := &integration.ProgramTestOptions{
+			Dir:   "../../development/program",
+			Quick: true,
+			ExtraRuntimeValidation: func(t *testing.T, stack integration.RuntimeValidationStackInfo) {
+				// Contract validation: Development environment isolation
+				
+				// All resources should include development environment prefix
+				databaseName := stack.Outputs["database_name"]
+				storageName := stack.Outputs["storage_name"]
+				vaultName := stack.Outputs["vault_name"]
+				
+				assert.Contains(t, databaseName.(string), "development", "Database should include development environment in name")
+				assert.Contains(t, storageName.(string), "development", "Storage should include development environment in name") 
+				assert.Contains(t, vaultName.(string), "development", "Vault should include development environment in name")
+				
+				// Security policies should be development-specific
+				securityPolicy := stack.Outputs["security_policy_level"]
+				assert.Equal(t, "development", securityPolicy.(string), "Security policy should be development-specific")
+			},
+		}
+
+		// Act & Assert - Run integration test (RED PHASE: This will fail)
+		integration.ProgramTest(t, options)
 	})
 }

@@ -15,7 +15,6 @@ import (
 )
 
 type StorageStack struct {
-	pulumi.ComponentResource
 	ctx           *pulumi.Context
 	config        *config.Config
 	configManager *sharedconfig.ConfigManager
@@ -81,13 +80,6 @@ func NewStorageStack(ctx *pulumi.Context, config *config.Config, networkName, en
 		environment:   environment,
 	}
 	
-	err = ctx.RegisterComponentResource("international-center:storage:DevelopmentStack", 
-		fmt.Sprintf("%s-storage-stack", environment), component)
-	if err != nil {
-		ctx.Log.Error(fmt.Sprintf("Failed to register StorageStack component: %v", err), nil)
-		return nil
-	}
-	
 	return component
 }
 
@@ -96,7 +88,7 @@ func (ss *StorageStack) Deploy(ctx context.Context) (sharedinfra.StorageDeployme
 	
 	// Register the deployment as a child ComponentResource
 	err := ss.ctx.RegisterComponentResource("international-center:storage:DevelopmentDeployment",
-		fmt.Sprintf("%s-storage-deployment", ss.environment), deployment, pulumi.Parent(ss))
+		fmt.Sprintf("%s-storage-deployment", ss.environment), deployment)
 	if err != nil {
 		return nil, fmt.Errorf("failed to register StorageDeployment component: %w", err)
 	}

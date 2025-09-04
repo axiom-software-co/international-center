@@ -17,7 +17,6 @@ import (
 )
 
 type VaultStack struct {
-	pulumi.ComponentResource
 	ctx           *pulumi.Context
 	config        *config.Config
 	configManager *sharedconfig.ConfigManager
@@ -83,12 +82,6 @@ func NewVaultStack(ctx *pulumi.Context, config *config.Config, networkName, envi
 		environment:   environment,
 	}
 	
-	err = ctx.RegisterComponentResource("international-center:vault:DevelopmentStack",
-		fmt.Sprintf("%s-vault-stack", environment), component)
-	if err != nil {
-		return nil
-	}
-	
 	return component
 }
 
@@ -97,7 +90,7 @@ func (vs *VaultStack) Deploy(ctx context.Context) (sharedinfra.VaultDeployment, 
 	
 	// Register the deployment as a child ComponentResource
 	err := vs.ctx.RegisterComponentResource("international-center:vault:DevelopmentDeployment",
-		fmt.Sprintf("%s-vault-deployment", vs.environment), deployment, pulumi.Parent(vs))
+		fmt.Sprintf("%s-vault-deployment", vs.environment), deployment)
 	if err != nil {
 		return nil, fmt.Errorf("failed to register VaultDeployment component: %w", err)
 	}
@@ -149,16 +142,7 @@ func (vs *VaultStack) Deploy(ctx context.Context) (sharedinfra.VaultDeployment, 
 	vs.VaultNetworkID = deployment.NetworkID
 	vs.VaultContainerID = deployment.VaultContainer.ID().ToStringOutput()
 
-	// Register stack component outputs
-	err = vs.ctx.RegisterResourceOutputs(vs, pulumi.Map{
-		"vaultEndpoint":   vs.VaultEndpoint,
-		"vaultToken":      vs.VaultToken,
-		"vaultNetworkId":  vs.VaultNetworkID,
-		"vaultContainerId": vs.VaultContainerID,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to register stack outputs: %w", err)
-	}
+	// Stack outputs are set in the struct fields and can be accessed directly
 
 	return deployment, nil
 }

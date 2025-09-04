@@ -12,7 +12,6 @@ import (
 )
 
 type DaprStack struct {
-	pulumi.ComponentResource
 	ctx           *pulumi.Context
 	config        *config.Config
 	configManager *sharedconfig.ConfigManager
@@ -82,12 +81,6 @@ func NewDaprStack(ctx *pulumi.Context, config *config.Config, networkName, envir
 		environment:   environment,
 	}
 	
-	err = ctx.RegisterComponentResource("international-center:dapr:DevelopmentStack",
-		fmt.Sprintf("%s-dapr-stack", environment), component)
-	if err != nil {
-		return nil
-	}
-	
 	return component
 }
 
@@ -96,7 +89,7 @@ func (ds *DaprStack) Deploy(ctx context.Context) (sharedinfra.DaprDeployment, er
 	
 	// Register the deployment as a child ComponentResource
 	err := ds.ctx.RegisterComponentResource("international-center:dapr:DevelopmentDeployment",
-		fmt.Sprintf("%s-dapr-deployment", ds.environment), deployment, pulumi.Parent(ds))
+		fmt.Sprintf("%s-dapr-deployment", ds.environment), deployment)
 	if err != nil {
 		return nil, fmt.Errorf("failed to register DaprDeployment component: %w", err)
 	}
@@ -178,17 +171,7 @@ func (ds *DaprStack) Deploy(ctx context.Context) (sharedinfra.DaprDeployment, er
 	ds.DaprNetworkID = deployment.NetworkID
 	ds.RedisEndpoint = deployment.RedisEndpoint
 
-	// Register stack component outputs
-	err = ds.ctx.RegisterResourceOutputs(ds, pulumi.Map{
-		"daprHTTPEndpoint":      ds.DaprHTTPEndpoint,
-		"daprGRPCEndpoint":      ds.DaprGRPCEndpoint,
-		"daprPlacementEndpoint": ds.DaprPlacementEndpoint,
-		"daprNetworkId":         ds.DaprNetworkID,
-		"redisEndpoint":         ds.RedisEndpoint,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to register stack outputs: %w", err)
-	}
+	// Stack outputs are set in the struct fields and can be accessed directly
 
 	return deployment, nil
 }
