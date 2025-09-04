@@ -9,7 +9,7 @@ CREATE TABLE services (
     title VARCHAR(255) NOT NULL,
     description TEXT NOT NULL,
     slug VARCHAR(255) UNIQUE NOT NULL,
-    content_url VARCHAR(500), -- URL to Azure Blob Storage content
+    content TEXT, -- Service detailed content stored in PostgreSQL
     category_id UUID NOT NULL REFERENCES service_categories(category_id),
     image_url VARCHAR(500),
     order_number INTEGER NOT NULL DEFAULT 0,
@@ -152,34 +152,28 @@ Audit data queries are optimized through Grafana Cloud Loki label indexing and L
 
 ## Content Storage Strategy
 
-### Rich Content Management
-Services rich content (detailed descriptions, articles) is stored in Azure Blob Storage via Dapr bindings for cloud-native portability.
+### Service Content Management
+Services detailed content is stored directly in PostgreSQL for full-text search capability and simplified content management.
 
 **Storage Pattern:**
-- **Database**: Stores `content_url` pointing to blob storage content
-- **Azure Blob Storage**: Stores HTML/Markdown files accessed via Dapr binding `blob-storage`
-- **Local Development**: Azurite emulator via Dapr binding `blob-storage-local`
+- **Database**: Stores service content in PostgreSQL TEXT fields
+- **Image Storage**: Service images stored in Azure Blob Storage via `image_url` references
+- **Local Development**: Azurite emulator for image storage only
 
-**URL Structure:**
-```
-blob-storage://{environment}/services/content/{service-id}/{content-hash}.html
-```
+**Content Benefits:**
+- Full-text search capability on service content
+- Simplified content management without external dependencies
+- Transactional consistency with service metadata
+- PostgreSQL performance optimization for content queries
 
-**Content Versioning:**
-- Content files use hash-based naming for immutability
-- URL changes trigger audit events via Dapr pub/sub to `services-content-events` topic
-- Previous content versions retained for audit compliance
-
-**Performance Benefits:**
-- Smaller database rows with PostgreSQL optimization
-- Dapr binding abstraction enables multi-cloud portability
-- Blob storage optimized for large content delivery
-- Cost-effective storage with Azure managed services
+**Image Management:**
+- Service images stored in Azure Blob Storage for optimal delivery
+- Image URLs reference blob storage paths
+- Image integrity maintained through URL validation
 
 **Compliance:**
-- Content URL changes audited in `services_audit` table
-- Content integrity verified via hash-based storage
-- Immutable content versions for regulatory requirements
+- Content changes audited directly in Grafana Cloud Loki
+- Complete content snapshots in audit events for regulatory requirements
 - Audit trail published to Grafana via Dapr telemetry middleware
 
 ## Database Functions and Triggers
@@ -226,10 +220,10 @@ $$ LANGUAGE plpgsql;
 2. **Default Status**: New services start with 'draft' status
 3. **Category Assignment**: All services start with the default unassigned category
 4. **Delivery Modes**: Services must specify delivery mode (mobile_service, outpatient_service, inpatient_service)
-5. **Content Storage**: Rich content stored in Azure Blob Storage, referenced via `long_description_url`
-6. **Content Versioning**: Content URLs use hash-based naming for immutable versions
-7. **Content Publishing**: Services can be published without rich content (URL can be NULL)
-8. **URL Validation**: All `content_url` values must be valid HTTPS URLs when not NULL
+5. **Content Storage**: Service content stored in PostgreSQL TEXT fields for full-text search capability
+6. **Content Immutability**: Published service content changes require audit approval for compliance
+7. **Content Publishing**: Services can be published without detailed content (content can be NULL)
+8. **URL Validation**: All `image_url` values must be valid HTTPS URLs when not NULL
 
 ### Audit Requirements
 1. **Compliance Enforcement**: All changes audited via direct publishing to Grafana Cloud Loki
@@ -246,7 +240,7 @@ $$ LANGUAGE plpgsql;
 2. **Unique Constraints**: Slugs must be unique across active (non-deleted) records
 3. **Order Numbers**: Used for consistent ordering within categories and featured positions
 4. **Foreign Key Integrity**: All category_id references must be valid and active
-5. **Content URL Integrity**: `content_url` must point to existing blob storage content when not NULL
-6. **Content Immutability**: Blob storage content files are never modified, only new versions created
-7. **URL Format Validation**: Content URLs must follow the standard pattern with service-id and content-hash
-8. **Content Lifecycle**: Orphaned content files cleaned up after audit retention period expires
+5. **Content Integrity**: Service content must be valid text format when not NULL
+6. **Content Immutability**: Published service content changes create audit events for compliance tracking
+7. **Image URL Validation**: Image URLs must point to existing blob storage content when not NULL
+8. **Content Lifecycle**: Service content lifecycle managed through publishing status and audit trails

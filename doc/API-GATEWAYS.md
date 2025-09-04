@@ -4,6 +4,7 @@
 ```yaml
 routeChecker:
   allowedRoutes:
+    # Services domain endpoints
     - "/api/v1/services"
     - "/api/v1/services/{id}"
     - "/api/v1/services/slug/{slug}"
@@ -11,10 +12,24 @@ routeChecker:
     - "/api/v1/services/categories"
     - "/api/v1/services/categories/{id}/services"
     - "/api/v1/services/search"
-    - "/api/v1/content"
-    - "/api/v1/content/{id}"
-    - "/api/v1/content/{id}/download"
-    - "/api/v1/content/{id}/preview"
+    # News domain endpoints
+    - "/api/v1/news"
+    - "/api/v1/news/{id}"
+    - "/api/v1/news/slug/{slug}"
+    - "/api/v1/news/featured"
+    - "/api/v1/news/categories"
+    - "/api/v1/news/categories/{id}/news"
+    - "/api/v1/news/search"
+    # Research domain endpoints
+    - "/api/v1/research"
+    - "/api/v1/research/{id}"
+    - "/api/v1/research/slug/{slug}"
+    - "/api/v1/research/featured"
+    - "/api/v1/research/categories"
+    - "/api/v1/research/categories/{id}/research"
+    - "/api/v1/research/search"
+    - "/api/v1/research/{id}/report"
+    # Health endpoints
     - "/health"
     - "/health/ready"
 ```
@@ -23,6 +38,7 @@ routeChecker:
 ```yaml
 routeChecker:
   allowedRoutes:
+    # Services domain admin endpoints
     - "/admin/api/v1/services"
     - "/admin/api/v1/services/{id}"
     - "/admin/api/v1/services/{id}/publish"
@@ -32,14 +48,28 @@ routeChecker:
     - "/admin/api/v1/services/categories/{id}"
     - "/admin/api/v1/services/categories/{id}/audit"
     - "/admin/api/v1/services/featured-categories"
-    - "/admin/api/v1/content"
-    - "/admin/api/v1/content/{id}"
-    - "/admin/api/v1/content/upload"
-    - "/admin/api/v1/content/{id}/reprocess"
-    - "/admin/api/v1/content/{id}/status"
-    - "/admin/api/v1/content/{id}/audit"
-    - "/admin/api/v1/content/processing-queue"
-    - "/admin/api/v1/content/analytics"
+    # News domain admin endpoints
+    - "/admin/api/v1/news"
+    - "/admin/api/v1/news/{id}"
+    - "/admin/api/v1/news/{id}/publish"
+    - "/admin/api/v1/news/{id}/archive"
+    - "/admin/api/v1/news/{id}/audit"
+    - "/admin/api/v1/news/categories"
+    - "/admin/api/v1/news/categories/{id}"
+    - "/admin/api/v1/news/categories/{id}/audit"
+    - "/admin/api/v1/news/featured"
+    # Research domain admin endpoints
+    - "/admin/api/v1/research"
+    - "/admin/api/v1/research/{id}"
+    - "/admin/api/v1/research/{id}/publish"
+    - "/admin/api/v1/research/{id}/archive"
+    - "/admin/api/v1/research/{id}/audit"
+    - "/admin/api/v1/research/{id}/report/upload"
+    - "/admin/api/v1/research/categories"
+    - "/admin/api/v1/research/categories/{id}"
+    - "/admin/api/v1/research/categories/{id}/audit"
+    - "/admin/api/v1/research/featured"
+    # Health endpoints
     - "/health"
     - "/health/ready"
 ```

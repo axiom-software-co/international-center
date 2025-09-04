@@ -10,18 +10,13 @@
 
 - IMPORTANT AXIOM RULE TO FOLLOW : consider stubs the worst anti-pattern ( we should use propper infrastructure and fix root issues as they arise ) ( we should not fall back to stubs in integration tests ) 
 
-- IMPORTANT AXIOM RULE TO FOLLOW : only run integration tests when the entire development environment is up
+- IMPORTANT AXIOM RULE TO FOLLOW : only run integration tests when the entire development environment is up ( only the deployer implements integration tests ) 
 
 - IMPORTANT AXIOM RULE TO FOLLOW : environment variables are defined only in the env files ( networking configuration , including ports  , should not be hardcoded , it should always come from the environment ) ( we should not have fallback networking configuration in implementation nor integration tests ) 
-
-
-- note : we will not work on the public and admin website frontend at the moment ( once we confirm our infrastructure and api gateways CICD is working , we will consider working on the website )
 
 - note : stop using the term 'medical-grade' ( this is implicit and there is no need to mention it in the naming system )
 
 - note : we do not need cloudfalre CDN for now
-
-- note : we will only work on the simple GET endpoints for now , while we validate our development environment and deployment
 
 
 [ important project related rules to follow ]
@@ -40,8 +35,7 @@
 - best practices in our stack
 - idiomatic go patterns
 
-- infrastructure as code pattern 
-- environment-driven infrastructure
+- infrastructure as code patterns ( stack per environment ( shared , dev , staging , prod ) ) ( component-first architecture ) ( no hard-coded secrets ) ( least privilage IAM ) ( consistent naming conversion ) ( pulumi testing framework for unit tests , property-based tests , integration tests )  ( Automation API for Programmatic Infrastructure Management for CICD workflows ) ( integration testing framework "github.com/pulumi/pulumi/pkg/v2/testing/integration" ) 
 
 - http server patterns 
 - handler , service , repository pattern, dapr-centric
@@ -248,7 +242,8 @@
 - do not create script files for projects ( this is an anti-pattern )
 - do not create simple ephimeral validation implementations in /temp/ directories to avoid disorder in source files
 - do not change the UI of our website unless explicitly asked to
-- do not stage and commit and push unless I explicitly ask you to
+
+- critical axiom rule : do not stage and commit and push unless I explicitly ask you to
 
 # Task Management Context Guidelines
 
@@ -258,7 +253,7 @@
 - task descriptions must include DEPENDENCIES ( what must complete first , integration points , so forth )
 - task descriptions must include CONTEXT ( gateway architecture , medical compliance , environment specifics , so forth )
 
-- critical : when a plan gets approved with the word 'approved' , add all the tasks to your tasks list . 
-- critical : in the event context compression happens in the middle of a task , your task list is your primary source of context between context compressions , so it needs to be well managed 
+- note : when a plan gets approved with the word 'approved' , add all the tasks to your tasks list . 
+- note : in the event context compression happens in the middle of a task , your task list is your primary source of context between context compressions , so it needs to be well managed 
 
 ( continue working ) ( get to work ) 
