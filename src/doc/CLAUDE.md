@@ -97,7 +97,7 @@
 
 - logging ( use structured logging , not concatenation ) ( each log should have key bits of information ( user ID , Correrlation ID , Request URL , APP Version , and so forth ) ( logs should be developer focused ) ( log levels : debug , information , waarning , error , critical ) ( not having 100% log delivery is okay )
 
-- audits ( for medical-grade compliance ) ( losing any data is unacceptable ) ( store in grafana cloud loki )
+- admin gateway audits ( for medical-grade compliance ) ( losing any data is unacceptable ) ( store in grafana cloud loki )
 
 ## security
 
@@ -252,7 +252,7 @@
 - task descriptions must include WHY ( business reason , compliance requirement , architectural decision , so forth )
 - task descriptions must include SCOPE ( which APIs , which components , which environments , so forth )
 - task descriptions must include DEPENDENCIES ( what must complete first , integration points , so forth )
-- task descriptions must include CONTEXT ( gateway architecture , medical compliance , environment specifics , so forth )
+- task descriptions must include CONTEXT ( gateway architecture , environment specifics , so forth )
 
 - note : when a plan gets approved with the word 'approved' , add all the tasks to your tasks list . 
 - note : in the event context compression happens in the middle of a task , your task list is your primary source of context between context compressions , so it needs to be well managed 
