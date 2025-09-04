@@ -221,23 +221,15 @@ func (ds *DevelopmentDatabaseStack) deployPostgreSQLContainer(deployment *Develo
 	var postgresPort int
 	var postgresDB, postgresUser, postgresPassword string
 	
-	if ds.configManager != nil {
-		dbConfig := ds.configManager.GetDatabaseConfig()
-		postgresPort = dbConfig.Port
-		postgresDB = dbConfig.Database
-		postgresUser = dbConfig.User
-		postgresPassword = dbConfig.Password
-	} else {
-		// Fallback to os.Getenv for backward compatibility
-		var err error
-		postgresPort, err = strconv.Atoi(os.Getenv("DATABASE_PORT"))
-		if err != nil {
-			return nil, fmt.Errorf("invalid DATABASE_PORT: %w", err)
-		}
-		postgresDB = os.Getenv("DATABASE_NAME")
-		postgresUser = os.Getenv("DATABASE_USER")  
-		postgresPassword = os.Getenv("DATABASE_PASSWORD")
+	if ds.configManager == nil {
+		return nil, fmt.Errorf("configManager is required for database deployment")
 	}
+	
+	dbConfig := ds.configManager.GetDatabaseConfig()
+	postgresPort = dbConfig.Port
+	postgresDB = dbConfig.Database
+	postgresUser = dbConfig.User
+	postgresPassword = dbConfig.Password
 	
 	if postgresDB == "" || postgresUser == "" || postgresPassword == "" {
 		return nil, fmt.Errorf("missing required database environment variables")
@@ -422,23 +414,15 @@ func (ds *DevelopmentDatabaseStack) deployPostgreSQLContainerWithParent(deployme
 	var postgresPort int
 	var postgresDB, postgresUser, postgresPassword string
 	
-	if ds.configManager != nil {
-		dbConfig := ds.configManager.GetDatabaseConfig()
-		postgresPort = dbConfig.Port
-		postgresDB = dbConfig.Database
-		postgresUser = dbConfig.User
-		postgresPassword = dbConfig.Password
-	} else {
-		// Fallback to os.Getenv for backward compatibility
-		var err error
-		postgresPort, err = strconv.Atoi(os.Getenv("DATABASE_PORT"))
-		if err != nil {
-			return nil, fmt.Errorf("invalid DATABASE_PORT: %w", err)
-		}
-		postgresDB = os.Getenv("DATABASE_NAME")
-		postgresUser = os.Getenv("DATABASE_USER")
-		postgresPassword = os.Getenv("DATABASE_PASSWORD")
+	if ds.configManager == nil {
+		return nil, fmt.Errorf("configManager is required for database deployment")
 	}
+	
+	dbConfig := ds.configManager.GetDatabaseConfig()
+	postgresPort = dbConfig.Port
+	postgresDB = dbConfig.Database
+	postgresUser = dbConfig.User
+	postgresPassword = dbConfig.Password
 	
 	if postgresDB == "" || postgresUser == "" || postgresPassword == "" {
 		return nil, fmt.Errorf("missing required database environment variables")
@@ -539,13 +523,12 @@ func (ds *DevelopmentDatabaseStack) deployPostgreSQLContainerWithParent(deployme
 func (ds *DevelopmentDatabaseStack) connectToDatabase(ctx context.Context) (*sql.DB, error) {
 	var databaseURL string
 	
-	if ds.configManager != nil {
-		dbConfig := ds.configManager.GetDatabaseConfig()
-		databaseURL = dbConfig.URL
-	} else {
-		// Fallback to os.Getenv for backward compatibility
-		databaseURL = os.Getenv("DATABASE_URL")
+	if ds.configManager == nil {
+		return nil, fmt.Errorf("configManager is required for database connection")
 	}
+	
+	dbConfig := ds.configManager.GetDatabaseConfig()
+	databaseURL = dbConfig.URL
 	
 	if databaseURL == "" {
 		return nil, fmt.Errorf("DATABASE_URL not configured")
@@ -579,13 +562,12 @@ func (ds *DevelopmentDatabaseStack) CreateSchemas(ctx context.Context, deploymen
 
 	var postgresUser string
 	
-	if ds.configManager != nil {
-		dbConfig := ds.configManager.GetDatabaseConfig()
-		postgresUser = dbConfig.User
-	} else {
-		// Fallback to os.Getenv for backward compatibility
-		postgresUser = os.Getenv("DATABASE_USER")
+	if ds.configManager == nil {
+		return fmt.Errorf("configManager is required for schema creation")
 	}
+	
+	dbConfig := ds.configManager.GetDatabaseConfig()
+	postgresUser = dbConfig.User
 	
 	if postgresUser == "" {
 		return fmt.Errorf("DATABASE_USER not configured")
@@ -889,13 +871,12 @@ func (ds *DevelopmentDatabaseStack) ValidateDeployment(ctx context.Context, depl
 func (ds *DevelopmentDatabaseStack) GetConnectionString() pulumi.StringOutput {
 	var databaseURL string
 	
-	if ds.configManager != nil {
-		dbConfig := ds.configManager.GetDatabaseConfig()
-		databaseURL = dbConfig.URL
-	} else {
-		// Fallback to os.Getenv for backward compatibility
-		databaseURL = os.Getenv("DATABASE_URL")
+	if ds.configManager == nil {
+		return pulumi.String("").ToStringOutput()
 	}
+	
+	dbConfig := ds.configManager.GetDatabaseConfig()
+	databaseURL = dbConfig.URL
 	
 	return pulumi.String(databaseURL).ToStringOutput()
 }
@@ -905,28 +886,15 @@ func (ds *DevelopmentDatabaseStack) GetConnectionInfo() (string, int, string, st
 	var postgresPort int
 	var postgresDB, postgresUser string
 	
-	if ds.configManager != nil {
-		dbConfig := ds.configManager.GetDatabaseConfig()
-		postgresHost = dbConfig.Host
-		postgresPort = dbConfig.Port
-		postgresDB = dbConfig.Database
-		postgresUser = dbConfig.User
-	} else {
-		// Fallback to os.Getenv for backward compatibility
-		postgresHost = os.Getenv("DATABASE_HOST")
-		if postgresHost == "" {
-			postgresHost = "localhost"
-		}
-		
-		var err error
-		postgresPort, err = strconv.Atoi(os.Getenv("DATABASE_PORT"))
-		if err != nil {
-			postgresPort = 5432
-		}
-		
-		postgresDB = os.Getenv("DATABASE_NAME")
-		postgresUser = os.Getenv("DATABASE_USER")
+	if ds.configManager == nil {
+		return "", 0, "", ""
 	}
+	
+	dbConfig := ds.configManager.GetDatabaseConfig()
+	postgresHost = dbConfig.Host
+	postgresPort = dbConfig.Port
+	postgresDB = dbConfig.Database
+	postgresUser = dbConfig.User
 	
 	return postgresHost, postgresPort, postgresDB, postgresUser
 }
@@ -943,54 +911,35 @@ func (ds *DevelopmentDatabaseStack) GetDatabaseEndpoint() pulumi.StringOutput {
 	var databaseHost string
 	var databasePort int
 	
-	if ds.configManager != nil {
-		dbConfig := ds.configManager.GetDatabaseConfig()
-		databaseHost = dbConfig.Host
-		databasePort = dbConfig.Port
-	} else {
-		// Fallback to os.Getenv for backward compatibility
-		databaseHost = os.Getenv("DATABASE_HOST")
-		if databaseHost == "" {
-			databaseHost = "localhost"
-		}
-		
-		portStr := os.Getenv("DATABASE_PORT")
-		if portStr == "" {
-			portStr = "5432"
-		}
-		var err error
-		databasePort, err = strconv.Atoi(portStr)
-		if err != nil {
-			databasePort = 5432
-		}
+	if ds.configManager == nil {
+		return pulumi.String("").ToStringOutput()
 	}
+	
+	dbConfig := ds.configManager.GetDatabaseConfig()
+	databaseHost = dbConfig.Host
+	databasePort = dbConfig.Port
 	
 	return pulumi.Sprintf("%s:%d", databaseHost, databasePort)
 }
 
 func (dd *DevelopmentDatabaseDeployment) GetConnectionString() pulumi.StringOutput {
 	// Note: DevelopmentDatabaseDeployment doesn't have direct access to configManager
-	// This method should ideally be refactored to receive the URL as a parameter
-	databaseURL := os.Getenv("DATABASE_URL")
-	return pulumi.String(databaseURL).ToStringOutput()
+	// This method returns the connection string that was computed by the stack
+	return dd.ConnectionString
 }
 
 func (dd *DevelopmentDatabaseDeployment) GetDatabaseEndpoint() pulumi.StringOutput {
 	// Note: DevelopmentDatabaseDeployment doesn't have direct access to configManager
-	// This method should ideally be refactored to receive the endpoint as a parameter
-	databaseHost := os.Getenv("DATABASE_HOST")
-	if databaseHost == "" {
-		databaseHost = "localhost"
-	}
-	databasePort := os.Getenv("DATABASE_PORT")
-	if databasePort == "" {
-		databasePort = "5432"
-	}
-	return pulumi.Sprintf("%s:%s", databaseHost, databasePort)
+	// This method returns the endpoint that was computed by the stack
+	return dd.PrimaryEndpoint
 }
 
 func (dd *DevelopmentDatabaseDeployment) GetPrimaryEndpoint() pulumi.StringOutput {
 	return dd.PrimaryEndpoint
+}
+
+func (dd *DevelopmentDatabaseDeployment) GetReplicationEndpoints() []pulumi.StringOutput {
+	return []pulumi.StringOutput{}
 }
 
 func (dd *DevelopmentDatabaseDeployment) GetReadReplicaEndpoints() []pulumi.StringOutput {
@@ -1003,23 +952,14 @@ func (dd *DevelopmentDatabaseDeployment) GetNetworkResources() shared.DatabaseNe
 	}
 }
 
-func (dd *DevelopmentDatabaseDeployment) GetBackupConfiguration() BackupConfig {
-	return BackupConfig{
+func (dd *DevelopmentDatabaseDeployment) GetBackupConfiguration() shared.BackupConfig {
+	return shared.BackupConfig{
 		Enabled:          false,
 		RetentionDays:    0,
 		BackupInterval:   "none",
 		StorageLocation:  "none",
 		EncryptionEnabled: false,
 	}
-}
-
-// BackupConfig represents backup configuration for database deployment
-type BackupConfig struct {
-	Enabled           bool
-	RetentionDays     int
-	BackupInterval    string
-	StorageLocation   string
-	EncryptionEnabled bool
 }
 
 // DevelopmentDatabaseNetworkResources implements DatabaseNetworkResources for development environment

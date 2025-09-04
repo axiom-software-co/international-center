@@ -18,6 +18,7 @@ type DatabaseDeployment interface {
 	GetPrimaryEndpoint() pulumi.StringOutput
 	GetReplicationEndpoints() []pulumi.StringOutput
 	GetNetworkResources() DatabaseNetworkResources
+	GetBackupConfiguration() BackupConfig
 }
 
 type DatabaseNetworkResources interface {
@@ -49,6 +50,15 @@ type DatabaseConfiguration struct {
 	GeoReplication    bool
 	HighAvailability  bool
 	ReadReplicas      []string
+}
+
+// BackupConfig represents backup configuration for database deployment
+type BackupConfig struct {
+	Enabled           bool
+	RetentionDays     int
+	BackupInterval    string
+	StorageLocation   string
+	EncryptionEnabled bool
 }
 
 func GetDatabaseConfiguration(environment string, config *config.Config) *DatabaseConfiguration {

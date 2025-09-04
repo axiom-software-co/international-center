@@ -3,17 +3,19 @@ package infrastructure
 import (
 	"context"
 	"fmt"
-	"path/filepath"
 
 	shared "github.com/axiom-software-co/international-center/src/deployer/shared/infrastructure"
 	"github.com/pulumi/pulumi-docker/sdk/v4/go/docker"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi/config"
+	sharedconfig "github.com/axiom-software-co/international-center/src/deployer/shared/config"
 )
 
 type IntegrationStack struct {
+	pulumi.ComponentResource
 	ctx         *pulumi.Context
 	config      *config.Config
+	configManager *sharedconfig.ConfigManager
 	environment string
 	projectRoot string
 	
@@ -24,9 +26,18 @@ type IntegrationStack struct {
 	storageStack   *StorageStack
 	vaultStack     *VaultStack
 	observabilityStack *ObservabilityStack
+	
+	// Outputs
+	MainNetworkID         pulumi.StringOutput `pulumi:"mainNetworkId"`
+	DatabaseEndpoint      pulumi.StringOutput `pulumi:"databaseEndpoint"`
+	VaultEndpoint         pulumi.StringOutput `pulumi:"vaultEndpoint"`
+	DaprHTTPEndpoint      pulumi.StringOutput `pulumi:"daprHTTPEndpoint"`
+	PublicGatewayEndpoint pulumi.StringOutput `pulumi:"publicGatewayEndpoint"`
+	AdminGatewayEndpoint  pulumi.StringOutput `pulumi:"adminGatewayEndpoint"`
 }
 
 type IntegratedDeployment struct {
+	pulumi.ComponentResource
 	// Infrastructure
 	DatabaseDeployment     shared.DatabaseDeployment
 	StorageDeployment      *StorageDeployment
@@ -44,15 +55,39 @@ type IntegratedDeployment struct {
 	
 	// Integration Test Dapr Sidecar
 	IntegrationTestSidecar *docker.Container
+	
+	// Outputs
+	MainNetworkID         pulumi.StringOutput `pulumi:"mainNetworkId"`
+	DatabaseEndpoint      pulumi.StringOutput `pulumi:"databaseEndpoint"`
+	VaultEndpoint         pulumi.StringOutput `pulumi:"vaultEndpoint"`
+	DaprHTTPEndpoint      pulumi.StringOutput `pulumi:"daprHTTPEndpoint"`
+	PublicGatewayEndpoint pulumi.StringOutput `pulumi:"publicGatewayEndpoint"`
+	AdminGatewayEndpoint  pulumi.StringOutput `pulumi:"adminGatewayEndpoint"`
 }
 
 func NewIntegrationStack(ctx *pulumi.Context, config *config.Config, environment, projectRoot string) *IntegrationStack {
-	return &IntegrationStack{
-		ctx:         ctx,
-		config:      config,
-		environment: environment,
-		projectRoot: projectRoot,
+	// Create ConfigManager for centralized configuration
+	configManager, err := sharedconfig.NewConfigManager(ctx)
+	if err != nil {
+		ctx.Log.Warn(fmt.Sprintf("Failed to create ConfigManager, using legacy configuration: %v", err), nil)
+		configManager = nil
 	}
+	
+	component := &IntegrationStack{
+		ctx:           ctx,
+		config:        config,
+		configManager: configManager,
+		environment:   environment,
+		projectRoot:   projectRoot,
+	}
+	
+	err = ctx.RegisterComponentResource("international-center:integration:DevelopmentStack",
+		fmt.Sprintf("%s-integration-stack", environment), component)
+	if err != nil {
+		return nil
+	}
+	
+	return component
 }
 
 func (is *IntegrationStack) Deploy(ctx context.Context) (*IntegratedDeployment, error) {
@@ -114,13 +149,10 @@ func (is *IntegrationStack) createMainNetwork() (*docker.Network, error) {
 	network, err := docker.NewNetwork(is.ctx, "main-network", &docker.NetworkArgs{
 		Name:   pulumi.Sprintf("%s-main-network", is.environment),
 		Driver: pulumi.String("bridge"),
-		Ipam: &docker.NetworkIpamArgs{
-			Driver: pulumi.String("default"),
-			Configs: docker.NetworkIpamConfigArray{
-				&docker.NetworkIpamConfigArgs{
-					Subnet:  pulumi.String("172.18.0.0/16"),
-					Gateway: pulumi.String("172.18.0.1"),
-				},
+		IpamConfigs: docker.NetworkIpamConfigArray{
+			&docker.NetworkIpamConfigArgs{
+				Subnet:  pulumi.String("172.18.0.0/16"),
+				Gateway: pulumi.String("172.18.0.1"),
 			},
 		},
 		Options: pulumi.StringMap{
@@ -149,7 +181,7 @@ func (is *IntegrationStack) createMainNetwork() (*docker.Network, error) {
 	return network, nil
 }
 
-func (is *IntegrationStack) deployDatabase(deployment *IntegratedDeployment) (*DatabaseDeployment, error) {
+func (is *IntegrationStack) deployDatabase(deployment *IntegratedDeployment) (shared.DatabaseDeployment, error) {
 	is.databaseStack = NewDatabaseStack(is.ctx, is.config, "dev-network", is.environment)
 	return is.databaseStack.Deploy(context.Background())
 }
@@ -221,11 +253,6 @@ func (is *IntegrationStack) deployIntegrationTestSidecar(deployment *IntegratedD
 			},
 		},
 		
-		DependsOn: pulumi.Array{
-			deployment.DaprDeployment.DaprPlacementContainer,
-			deployment.DaprDeployment.RedisContainer,
-		},
-		
 		Labels: docker.ContainerLabelArray{
 			&docker.ContainerLabelArgs{
 				Label: pulumi.String("environment"),
@@ -240,7 +267,10 @@ func (is *IntegrationStack) deployIntegrationTestSidecar(deployment *IntegratedD
 				Value: pulumi.String("pulumi"),
 			},
 		},
-	})
+	}, pulumi.DependsOn([]pulumi.Resource{
+		deployment.DaprDeployment.DaprPlacementContainer,
+		deployment.DaprDeployment.RedisContainer,
+	}))
 	if err != nil {
 		return nil, err
 	}

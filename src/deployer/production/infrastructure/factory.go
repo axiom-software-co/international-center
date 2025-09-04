@@ -1,0 +1,54 @@
+package infrastructure
+
+import (
+	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
+	"github.com/pulumi/pulumi/sdk/v3/go/pulumi/config"
+	sharedinfra "github.com/axiom-software-co/international-center/src/deployer/shared/infrastructure"
+)
+
+// ProductionInfrastructureFactory implements all factory interfaces for production environment
+// Uses Azure managed services with high availability, geo-replication, and enterprise features
+type ProductionInfrastructureFactory struct{}
+
+func NewProductionInfrastructureFactory() *ProductionInfrastructureFactory {
+	return &ProductionInfrastructureFactory{}
+}
+
+// Database Factory Implementation - Uses Azure Database for PostgreSQL with HA
+func (f *ProductionInfrastructureFactory) CreateDatabaseStack(ctx *pulumi.Context, config *config.Config, environment string) sharedinfra.DatabaseStack {
+	return NewAzurePostgreSQLHAStack(ctx, config, "production-vnet", environment)
+}
+
+// Storage Factory Implementation - Uses Azure Storage Account with geo-redundancy
+func (f *ProductionInfrastructureFactory) CreateStorageStack(ctx *pulumi.Context, config *config.Config, environment string) sharedinfra.StorageStack {
+	return NewAzureStorageGeoRedundantStack(ctx, config, "production-vnet", environment)
+}
+
+// Dapr Factory Implementation - Uses Azure Container Apps with Dapr and multi-region
+func (f *ProductionInfrastructureFactory) CreateDaprStack(ctx *pulumi.Context, config *config.Config, environment string) sharedinfra.DaprStack {
+	return NewAzureDaprHAStack(ctx, config, "production-vnet", environment)
+}
+
+// Vault Factory Implementation - Uses Azure Key Vault Premium with HSM
+func (f *ProductionInfrastructureFactory) CreateVaultStack(ctx *pulumi.Context, config *config.Config, environment string) sharedinfra.VaultStack {
+	return NewAzureKeyVaultPremiumStack(ctx, config, "production-vnet", environment)
+}
+
+// Observability Factory Implementation - Uses Azure Monitor with advanced analytics
+func (f *ProductionInfrastructureFactory) CreateObservabilityStack(ctx *pulumi.Context, config *config.Config, environment string) sharedinfra.ObservabilityStack {
+	return NewAzureObservabilityEnterpriseStack(ctx, config, "production-vnet", environment)
+}
+
+// Service Factory Implementation - Uses Azure Container Apps with auto-scaling
+func (f *ProductionInfrastructureFactory) CreateServiceStack(ctx *pulumi.Context, config *config.Config, environment string) sharedinfra.ServiceStack {
+	return NewAzureServiceHAStack(ctx, config, "production-vnet", environment)
+}
+
+// Verify that ProductionInfrastructureFactory implements the shared InfrastructureFactory interface
+var _ sharedinfra.InfrastructureFactory = (*ProductionInfrastructureFactory)(nil)
+var _ sharedinfra.DatabaseFactory = (*ProductionInfrastructureFactory)(nil)
+var _ sharedinfra.StorageFactory = (*ProductionInfrastructureFactory)(nil)
+var _ sharedinfra.DaprFactory = (*ProductionInfrastructureFactory)(nil)
+var _ sharedinfra.VaultFactory = (*ProductionInfrastructureFactory)(nil)
+var _ sharedinfra.ObservabilityFactory = (*ProductionInfrastructureFactory)(nil)
+var _ sharedinfra.ServiceFactory = (*ProductionInfrastructureFactory)(nil)

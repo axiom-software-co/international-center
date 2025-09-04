@@ -2,7 +2,7 @@
 
 - IMPORTANT AXIOM RULE TO FOLLOW : outside of unit tests , consider mocks and stubs the worst architectural anti pattern ( stop metioning the fact that you are using real implmentations , this is explicit in the implementation , keep the naming professional )
 
-- IMPORTANT AXIOM RULE TO FOLLOW : we cannot create new files outside of our current folders and files structure ( this is deliberate ) . you may alter implmentation details . 
+- IMPORTANT AXIOM RULE TO FOLLOW : we cannot create new files outside of our current folders and files structure ( this is deliberate ) . you may alter implmentation details . you may ask to delete/create files if you have a proper reason to do so 
 
 - IMPORTANT AXIOM RULE TO FOLLOW : do not edit any markdown files without permission . ensure you stop and ask for permission and provide your reasoning
 
@@ -128,6 +128,8 @@
 - trunk based development for version control
 
 # stack
+
+- note : azure container apps manages dapr ( we have to create it manually in development environment for a similar environment ) 
 
 ## public website
 

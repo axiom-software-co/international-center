@@ -11,56 +11,87 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	
+	sharedtesting "github.com/axiom-software-co/international-center/src/deployer/shared/testing"
 )
 
-// TestDatabaseConnectivity validates PostgreSQL database connectivity and basic operations
-func TestDatabaseConnectivity(t *testing.T) {
-	if testing.Short() {
-		t.Skip("Skipping integration tests in short mode")
-	}
-
-	ctx, cancel := CreateIntegrationTestContext()
-	defer cancel()
-
-	// Arrange
-	databaseURL := GetRequiredEnvVar(t, "DATABASE_URL")
-
-	// Act - Connect to database
+// TestDatabaseStackDeployment validates database stack deployment using interface patterns
+func TestDatabaseStackDeployment(t *testing.T) {
+	// Arrange - Setup test suite with development environment
+	suite := sharedtesting.NewInfrastructureTestSuite(t, "development")
+	suite.Setup()
+	defer suite.Teardown()
+	
+	// Require development environment is running
+	suite.RequireEnvironmentRunning()
+	
+	// Act - Get database stack through factory pattern
+	databaseStack := suite.GetDatabaseStack()
+	require.NotNil(t, databaseStack, "Database stack should be created through factory")
+	
+	// Get database configuration from ConfigManager
+	databaseConfig := suite.ConfigManager().GetDatabaseConfig()
+	require.NotNil(t, databaseConfig, "Database configuration should be available")
+	
+	// Assert - Test database connectivity using interface
+	databaseURL, exists := suite.ConfigManager().GetEnvironmentVariable("DATABASE_URL")
+	require.True(t, exists, "DATABASE_URL must be set when development environment is running")
+	
 	db, err := sql.Open("postgres", databaseURL)
 	require.NoError(t, err, "Should be able to open database connection")
 	defer db.Close()
-
-	// Assert - Database connection should work
-	err = db.PingContext(ctx)
+	
+	err = db.PingContext(suite.Context())
 	require.NoError(t, err, "Database should be accessible and responsive")
-
+	
 	// Test basic query execution
 	var result int
-	err = db.QueryRowContext(ctx, "SELECT 1").Scan(&result)
+	err = db.QueryRowContext(suite.Context(), "SELECT 1").Scan(&result)
 	require.NoError(t, err, "Should be able to execute basic queries")
 	assert.Equal(t, 1, result, "Query result should be correct")
 }
 
+// TestDatabaseStackConnectionInfo validates database stack connection information
+func TestDatabaseStackConnectionInfo(t *testing.T) {
+	// Arrange
+	suite := sharedtesting.NewInfrastructureTestSuite(t, "development")
+	suite.Setup()
+	defer suite.Teardown()
+	
+	suite.RequireEnvironmentRunning()
+	
+	// Act
+	databaseStack := suite.GetDatabaseStack()
+	host, port, dbName, user := databaseStack.GetConnectionInfo()
+	
+	// Assert
+	assert.NotEmpty(t, host, "Database host should be provided")
+	assert.Greater(t, port, 0, "Database port should be positive")
+	assert.NotEmpty(t, dbName, "Database name should be provided")
+	assert.NotEmpty(t, user, "Database user should be provided")
+}
+
 // TestDatabaseSchemaCompliance validates database schemas match the specification
 func TestDatabaseSchemaCompliance(t *testing.T) {
-	if testing.Short() {
-		t.Skip("Skipping integration tests in short mode")
-	}
-
-	ctx, cancel := CreateIntegrationTestContext()
-	defer cancel()
-
 	// Arrange
-	databaseURL := GetRequiredEnvVar(t, "DATABASE_URL")
+	suite := sharedtesting.NewInfrastructureTestSuite(t, "development")
+	suite.Setup()
+	defer suite.Teardown()
+	
+	suite.RequireEnvironmentRunning()
+	
+	// Get database connection using ConfigManager
+	databaseURL, exists := suite.ConfigManager().GetEnvironmentVariable("DATABASE_URL")
+	require.True(t, exists, "DATABASE_URL must be set when development environment is running")
+	
 	db, err := sql.Open("postgres", databaseURL)
-	require.NoError(t, err)
+	require.NoError(t, err, "Should be able to open database connection")
 	defer db.Close()
 
 	// Test Services domain schema compliance
 	t.Run("Services_Schema_Compliance", func(t *testing.T) {
 		// Verify services table exists with correct structure
 		t.Run("Services_Table_Structure", func(t *testing.T) {
-			tableExists := checkTableExists(t, ctx, db, "services")
+			tableExists := checkTableExists(t, suite.Context(), db, "services")
 			assert.True(t, tableExists, "Services table must exist")
 
 			if tableExists {
@@ -85,13 +116,13 @@ func TestDatabaseSchemaCompliance(t *testing.T) {
 					"deleted_by":       "character varying",
 				}
 
-				validateTableColumns(t, ctx, db, "services", expectedColumns)
+				validateTableColumns(t, suite.Context(), db, "services", expectedColumns)
 			}
 		})
 
 		// Verify service_categories table exists with correct structure
 		t.Run("ServiceCategories_Table_Structure", func(t *testing.T) {
-			tableExists := checkTableExists(t, ctx, db, "service_categories")
+			tableExists := checkTableExists(t, suite.Context(), db, "service_categories")
 			assert.True(t, tableExists, "Service categories table must exist")
 
 			if tableExists {
@@ -110,13 +141,13 @@ func TestDatabaseSchemaCompliance(t *testing.T) {
 					"deleted_by":              "character varying",
 				}
 
-				validateTableColumns(t, ctx, db, "service_categories", expectedColumns)
+				validateTableColumns(t, suite.Context(), db, "service_categories", expectedColumns)
 			}
 		})
 
 		// Verify featured_categories table exists with correct structure
 		t.Run("FeaturedCategories_Table_Structure", func(t *testing.T) {
-			tableExists := checkTableExists(t, ctx, db, "featured_categories")
+			tableExists := checkTableExists(t, suite.Context(), db, "featured_categories")
 			assert.True(t, tableExists, "Featured categories table must exist")
 
 			if tableExists {
@@ -130,7 +161,7 @@ func TestDatabaseSchemaCompliance(t *testing.T) {
 					"modified_by":          "character varying",
 				}
 
-				validateTableColumns(t, ctx, db, "featured_categories", expectedColumns)
+				validateTableColumns(t, suite.Context(), db, "featured_categories", expectedColumns)
 			}
 		})
 	})
@@ -139,7 +170,7 @@ func TestDatabaseSchemaCompliance(t *testing.T) {
 	t.Run("Content_Schema_Compliance", func(t *testing.T) {
 		// Verify content table exists with correct structure
 		t.Run("Content_Table_Structure", func(t *testing.T) {
-			tableExists := checkTableExists(t, ctx, db, "content")
+			tableExists := checkTableExists(t, suite.Context(), db, "content")
 			assert.True(t, tableExists, "Content table must exist")
 
 			if tableExists {
@@ -168,13 +199,13 @@ func TestDatabaseSchemaCompliance(t *testing.T) {
 					"deleted_by":            "character varying",
 				}
 
-				validateTableColumns(t, ctx, db, "content", expectedColumns)
+				validateTableColumns(t, suite.Context(), db, "content", expectedColumns)
 			}
 		})
 
 		// Verify content_access_log table exists with correct structure
 		t.Run("ContentAccessLog_Table_Structure", func(t *testing.T) {
-			tableExists := checkTableExists(t, ctx, db, "content_access_log")
+			tableExists := checkTableExists(t, suite.Context(), db, "content_access_log")
 			assert.True(t, tableExists, "Content access log table must exist")
 
 			if tableExists {
@@ -195,13 +226,13 @@ func TestDatabaseSchemaCompliance(t *testing.T) {
 					"storage_backend":  "character varying",
 				}
 
-				validateTableColumns(t, ctx, db, "content_access_log", expectedColumns)
+				validateTableColumns(t, suite.Context(), db, "content_access_log", expectedColumns)
 			}
 		})
 
 		// Verify content_virus_scan table exists with correct structure
 		t.Run("ContentVirusScan_Table_Structure", func(t *testing.T) {
-			tableExists := checkTableExists(t, ctx, db, "content_virus_scan")
+			tableExists := checkTableExists(t, suite.Context(), db, "content_virus_scan")
 			assert.True(t, tableExists, "Content virus scan table must exist")
 
 			if tableExists {
@@ -218,13 +249,13 @@ func TestDatabaseSchemaCompliance(t *testing.T) {
 					"correlation_id":   "uuid",
 				}
 
-				validateTableColumns(t, ctx, db, "content_virus_scan", expectedColumns)
+				validateTableColumns(t, suite.Context(), db, "content_virus_scan", expectedColumns)
 			}
 		})
 
 		// Verify content_storage_backend table exists with correct structure
 		t.Run("ContentStorageBackend_Table_Structure", func(t *testing.T) {
-			tableExists := checkTableExists(t, ctx, db, "content_storage_backend")
+			tableExists := checkTableExists(t, suite.Context(), db, "content_storage_backend")
 			assert.True(t, tableExists, "Content storage backend table must exist")
 
 			if tableExists {
@@ -245,7 +276,7 @@ func TestDatabaseSchemaCompliance(t *testing.T) {
 					"modified_by":               "character varying",
 				}
 
-				validateTableColumns(t, ctx, db, "content_storage_backend", expectedColumns)
+				validateTableColumns(t, suite.Context(), db, "content_storage_backend", expectedColumns)
 			}
 		})
 	})
@@ -253,17 +284,19 @@ func TestDatabaseSchemaCompliance(t *testing.T) {
 
 // TestDatabaseConstraints validates database constraints and business rules
 func TestDatabaseConstraints(t *testing.T) {
-	if testing.Short() {
-		t.Skip("Skipping integration tests in short mode")
-	}
-
-	ctx, cancel := CreateIntegrationTestContext()
-	defer cancel()
-
 	// Arrange
-	databaseURL := GetRequiredEnvVar(t, "DATABASE_URL")
+	suite := sharedtesting.NewInfrastructureTestSuite(t, "development")
+	suite.Setup()
+	defer suite.Teardown()
+	
+	suite.RequireEnvironmentRunning()
+
+	// Get database connection using ConfigManager
+	databaseURL, exists := suite.ConfigManager().GetEnvironmentVariable("DATABASE_URL")
+	require.True(t, exists, "DATABASE_URL must be set when development environment is running")
+	
 	db, err := sql.Open("postgres", databaseURL)
-	require.NoError(t, err)
+	require.NoError(t, err, "Should be able to open database connection")
 	defer db.Close()
 
 	// Test primary key constraints exist
@@ -272,11 +305,11 @@ func TestDatabaseConstraints(t *testing.T) {
 		
 		for _, tableName := range tables {
 			t.Run(fmt.Sprintf("%s_primary_key", tableName), func(t *testing.T) {
-				if !checkTableExists(t, ctx, db, tableName) {
+				if !checkTableExists(t, suite.Context(), db, tableName) {
 					t.Skipf("Table %s does not exist", tableName)
 				}
 
-				hasPrimaryKey := checkPrimaryKeyExists(t, ctx, db, tableName)
+				hasPrimaryKey := checkPrimaryKeyExists(t, suite.Context(), db, tableName)
 				assert.True(t, hasPrimaryKey, "Table %s must have a primary key constraint", tableName)
 			})
 		}
@@ -293,12 +326,12 @@ func TestDatabaseConstraints(t *testing.T) {
 
 		for tableName, columns := range foreignKeys {
 			t.Run(fmt.Sprintf("%s_foreign_keys", tableName), func(t *testing.T) {
-				if !checkTableExists(t, ctx, db, tableName) {
+				if !checkTableExists(t, suite.Context(), db, tableName) {
 					t.Skipf("Table %s does not exist", tableName)
 				}
 
 				for _, column := range columns {
-					hasForeignKey := checkForeignKeyExists(t, ctx, db, tableName, column)
+					hasForeignKey := checkForeignKeyExists(t, suite.Context(), db, tableName, column)
 					assert.True(t, hasForeignKey, "Table %s column %s must have foreign key constraint", tableName, column)
 				}
 			})
@@ -316,12 +349,12 @@ func TestDatabaseConstraints(t *testing.T) {
 
 		for tableName, columns := range uniqueConstraints {
 			t.Run(fmt.Sprintf("%s_unique_constraints", tableName), func(t *testing.T) {
-				if !checkTableExists(t, ctx, db, tableName) {
+				if !checkTableExists(t, suite.Context(), db, tableName) {
 					t.Skipf("Table %s does not exist", tableName)
 				}
 
 				for _, column := range columns {
-					hasUniqueConstraint := checkUniqueConstraintExists(t, ctx, db, tableName, column)
+					hasUniqueConstraint := checkUniqueConstraintExists(t, suite.Context(), db, tableName, column)
 					assert.True(t, hasUniqueConstraint, "Table %s column %s must have unique constraint", tableName, column)
 				}
 			})

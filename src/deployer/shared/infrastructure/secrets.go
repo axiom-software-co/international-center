@@ -70,18 +70,18 @@ type SecretConfiguration struct {
 
 // SecretsManager manages secrets across different providers and environments
 type SecretsManager struct {
-	config   *config.DeploymentConfig
-	ctx      *pulumi.Context
-	provider SecretProvider
+	configManager *config.ConfigManager
+	ctx           *pulumi.Context
+	provider      SecretProvider
 }
 
 // NewSecretsManager creates a new secrets manager
-func NewSecretsManager(ctx *pulumi.Context, cfg *config.DeploymentConfig) *SecretsManager {
+func NewSecretsManager(ctx *pulumi.Context, configManager *config.ConfigManager) *SecretsManager {
 	sm := &SecretsManager{
-		config:   cfg,
-		ctx:      ctx,
+		configManager: configManager,
+		ctx:           ctx,
 	}
-	sm.provider = sm.determineSecretProvider(cfg)
+	sm.provider = sm.determineSecretProvider(configManager)
 	
 	return sm
 }
@@ -655,18 +655,13 @@ func (sm *SecretsManager) createKubernetesSecret(secretName string, secretData m
 
 // Helper methods
 
-func (sm *SecretsManager) determineSecretProvider(cfg *config.DeploymentConfig) SecretProvider {
-	if cfg.Environment.IsDevelopment() {
-		return SecretProviderLocal
+func (sm *SecretsManager) determineSecretProvider(configManager *config.ConfigManager) SecretProvider {
+	if configManager.GetEnvironment().IsDevelopment() {
+		return SecretProviderVault // Use Vault even in development
 	}
 	
-	// TODO: Fix when Vault field is added to DeploymentConfig
-	// if cfg.Vault.Enabled {
-	//     return SecretProviderVault
-	// }
-	
-	// Default to Azure Key Vault for staging/production
-	return SecretProviderAzureKV
+	// Use Vault for all environments through ConfigManager
+	return SecretProviderVault
 }
 
 // GetSecretReference returns a reference to a secret for environment variables

@@ -13,16 +13,26 @@ import (
 	"github.com/pulumi/pulumi-docker/sdk/v4/go/docker"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi/config"
+	sharedconfig "github.com/axiom-software-co/international-center/src/deployer/shared/config"
 )
 
 type ObservabilityStack struct {
-	ctx         *pulumi.Context
-	config      *config.Config
-	networkName string
-	environment string
+	pulumi.ComponentResource
+	ctx           *pulumi.Context
+	config        *config.Config
+	configManager *sharedconfig.ConfigManager
+	networkName   string
+	environment   string
+	
+	// Outputs
+	GrafanaEndpoint    pulumi.StringOutput `pulumi:"grafanaEndpoint"`
+	LokiEndpoint       pulumi.StringOutput `pulumi:"lokiEndpoint"`
+	PrometheusEndpoint pulumi.StringOutput `pulumi:"prometheusEndpoint"`
+	ObservabilityNetworkID pulumi.StringOutput `pulumi:"observabilityNetworkId"`
 }
 
 type ObservabilityDeployment struct {
+	pulumi.ComponentResource
 	GrafanaContainer       *docker.Container
 	LokiContainer          *docker.Container
 	PrometheusContainer    *docker.Container
@@ -33,15 +43,37 @@ type ObservabilityDeployment struct {
 	LokiConfigVolume       *docker.Volume
 	PrometheusDataVolume   *docker.Volume
 	PrometheusConfigVolume *docker.Volume
+	
+	// Outputs
+	GrafanaEndpoint    pulumi.StringOutput `pulumi:"grafanaEndpoint"`
+	LokiEndpoint       pulumi.StringOutput `pulumi:"lokiEndpoint"`
+	PrometheusEndpoint pulumi.StringOutput `pulumi:"prometheusEndpoint"`
+	NetworkID          pulumi.StringOutput `pulumi:"networkId"`
 }
 
 func NewObservabilityStack(ctx *pulumi.Context, config *config.Config, networkName, environment string) *ObservabilityStack {
-	return &ObservabilityStack{
-		ctx:         ctx,
-		config:      config,
-		networkName: networkName,
-		environment: environment,
+	// Create ConfigManager for centralized configuration
+	configManager, err := sharedconfig.NewConfigManager(ctx)
+	if err != nil {
+		ctx.Log.Warn(fmt.Sprintf("Failed to create ConfigManager, using legacy configuration: %v", err), nil)
+		configManager = nil
 	}
+	
+	component := &ObservabilityStack{
+		ctx:           ctx,
+		config:        config,
+		configManager: configManager,
+		networkName:   networkName,
+		environment:   environment,
+	}
+	
+	err = ctx.RegisterComponentResource("international-center:observability:DevelopmentStack",
+		fmt.Sprintf("%s-observability-stack", environment), component)
+	if err != nil {
+		return nil
+	}
+	
+	return component
 }
 
 func (os *ObservabilityStack) Deploy(ctx context.Context) (*ObservabilityDeployment, error) {

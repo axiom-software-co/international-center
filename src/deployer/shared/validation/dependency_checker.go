@@ -13,6 +13,7 @@ type DependencyChecker struct {
 	environment string
 	components  []Component
 	dependencies map[string][]string
+	healthEndpoints map[string]string
 }
 
 type Component struct {
@@ -113,11 +114,12 @@ const (
 	DependencyStatusUnknown   DependencyStatus = "unknown"
 )
 
-func NewDependencyChecker(environment string) *DependencyChecker {
+func NewDependencyChecker(environment string, healthEndpoints map[string]string) *DependencyChecker {
 	checker := &DependencyChecker{
-		environment:  environment,
-		components:   []Component{},
-		dependencies: make(map[string][]string),
+		environment:     environment,
+		components:      []Component{},
+		dependencies:    make(map[string][]string),
+		healthEndpoints: healthEndpoints,
 	}
 
 	checker.initializeComponents()
@@ -231,84 +233,84 @@ func (dc *DependencyChecker) initializeDevelopmentComponents() {
 			Name:           "postgresql",
 			Type:           ComponentDatabase,
 			Required:       true,
-			HealthEndpoint: getRequiredEnv("POSTGRESQL_HEALTH_ENDPOINT"),
+			HealthEndpoint: dc.getHealthEndpoint("postgresql"),
 			Dependencies:   []string{},
 		},
 		{
 			Name:           "redis",
 			Type:           ComponentMessaging,
 			Required:       true,
-			HealthEndpoint: getRequiredEnv("REDIS_HEALTH_ENDPOINT"),
+			HealthEndpoint: dc.getHealthEndpoint("redis"),
 			Dependencies:   []string{},
 		},
 		{
 			Name:           "vault",
 			Type:           ComponentInfrastructure,
 			Required:       true,
-			HealthEndpoint: getRequiredEnv("VAULT_HEALTH_ENDPOINT"),
+			HealthEndpoint: dc.getHealthEndpoint("vault"),
 			Dependencies:   []string{},
 		},
 		{
 			Name:           "azurite",
 			Type:           ComponentStorage,
 			Required:       true,
-			HealthEndpoint: getRequiredEnv("AZURITE_HEALTH_ENDPOINT"),
+			HealthEndpoint: dc.getHealthEndpoint("azurite"),
 			Dependencies:   []string{},
 		},
 		{
 			Name:           "grafana",
 			Type:           ComponentObservability,
 			Required:       false,
-			HealthEndpoint: getOptionalEnv("GRAFANA_HEALTH_ENDPOINT"),
+			HealthEndpoint: dc.getHealthEndpoint("grafana"),
 			Dependencies:   []string{},
 		},
 		{
 			Name:           "loki",
 			Type:           ComponentObservability,
 			Required:       false,
-			HealthEndpoint: getOptionalEnv("LOKI_HEALTH_ENDPOINT"),
+			HealthEndpoint: dc.getHealthEndpoint("loki"),
 			Dependencies:   []string{},
 		},
 		{
 			Name:           "dapr",
 			Type:           ComponentService,
 			Required:       true,
-			HealthEndpoint: getRequiredEnv("DAPR_HEALTH_ENDPOINT"),
+			HealthEndpoint: dc.getHealthEndpoint("dapr"),
 			Dependencies:   []string{"redis"},
 		},
 		{
 			Name:           "identity-api",
 			Type:           ComponentApplication,
 			Required:       true,
-			HealthEndpoint: getRequiredEnv("IDENTITY_API_HEALTH_ENDPOINT"),
+			HealthEndpoint: dc.getHealthEndpoint("identity-api"),
 			Dependencies:   []string{"postgresql", "vault", "dapr"},
 		},
 		{
 			Name:           "content-api",
 			Type:           ComponentApplication,
 			Required:       true,
-			HealthEndpoint: getRequiredEnv("CONTENT_API_HEALTH_ENDPOINT"),
+			HealthEndpoint: dc.getHealthEndpoint("content-api"),
 			Dependencies:   []string{"postgresql", "azurite", "vault", "dapr"},
 		},
 		{
 			Name:           "services-api",
 			Type:           ComponentApplication,
 			Required:       true,
-			HealthEndpoint: getRequiredEnv("SERVICES_API_HEALTH_ENDPOINT"),
+			HealthEndpoint: dc.getHealthEndpoint("services-api"),
 			Dependencies:   []string{"postgresql", "vault", "dapr", "content-api"},
 		},
 		{
 			Name:           "public-gateway",
 			Type:           ComponentApplication,
 			Required:       true,
-			HealthEndpoint: getRequiredEnv("PUBLIC_GATEWAY_HEALTH_ENDPOINT"),
+			HealthEndpoint: dc.getHealthEndpoint("public-gateway"),
 			Dependencies:   []string{"dapr", "content-api", "services-api"},
 		},
 		{
 			Name:           "admin-gateway",
 			Type:           ComponentApplication,
 			Required:       true,
-			HealthEndpoint: getRequiredEnv("ADMIN_GATEWAY_HEALTH_ENDPOINT"),
+			HealthEndpoint: dc.getHealthEndpoint("admin-gateway"),
 			Dependencies:   []string{"dapr", "identity-api", "content-api", "services-api"},
 		},
 	}
@@ -567,14 +569,9 @@ func (dc *DependencyChecker) generateRecommendedActions(result *DependencyCheckR
 	return actions
 }
 
-func getRequiredEnv(key string) string {
-	value := os.Getenv(key)
-	if value == "" {
-		log.Fatalf("Required environment variable %s is not set", key)
+func (dc *DependencyChecker) getHealthEndpoint(componentName string) string {
+	if dc.healthEndpoints == nil {
+		return ""
 	}
-	return value
-}
-
-func getOptionalEnv(key string) string {
-	return os.Getenv(key)
+	return dc.healthEndpoints[componentName]
 }

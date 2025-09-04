@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 	"strconv"
 	"time"
 
@@ -16,19 +17,32 @@ import (
 )
 
 type VaultStack struct {
+	pulumi.ComponentResource
 	ctx           *pulumi.Context
 	config        *config.Config
 	configManager *sharedconfig.ConfigManager
 	networkName   string
 	environment   string
+	
+	// Outputs
+	VaultEndpoint   pulumi.StringOutput `pulumi:"vaultEndpoint"`
+	VaultToken      pulumi.StringOutput `pulumi:"vaultToken"`
+	VaultNetworkID  pulumi.StringOutput `pulumi:"vaultNetworkId"`
+	VaultContainerID pulumi.StringOutput `pulumi:"vaultContainerId"`
 }
 
 type VaultDeployment struct {
+	pulumi.ComponentResource
 	VaultContainer     *docker.Container
 	VaultNetwork       *docker.Network
 	VaultDataVolume    *docker.Volume
 	VaultConfigVolume  *docker.Volume
 	VaultPoliciesVolume *docker.Volume
+	
+	// Outputs
+	VaultEndpoint   pulumi.StringOutput `pulumi:"vaultEndpoint"`
+	VaultToken      pulumi.StringOutput `pulumi:"vaultToken"`
+	NetworkID       pulumi.StringOutput `pulumi:"networkId"`
 }
 
 func NewVaultStack(ctx *pulumi.Context, config *config.Config, networkName, environment string) *VaultStack {
@@ -39,19 +53,32 @@ func NewVaultStack(ctx *pulumi.Context, config *config.Config, networkName, envi
 		configManager = nil
 	}
 	
-	return &VaultStack{
+	component := &VaultStack{
 		ctx:           ctx,
 		config:        config,
 		configManager: configManager,
 		networkName:   networkName,
 		environment:   environment,
 	}
+	
+	err = ctx.RegisterComponentResource("international-center:vault:DevelopmentStack",
+		fmt.Sprintf("%s-vault-stack", environment), component)
+	if err != nil {
+		return nil
+	}
+	
+	return component
 }
 
 func (vs *VaultStack) Deploy(ctx context.Context) (*VaultDeployment, error) {
 	deployment := &VaultDeployment{}
-
-	var err error
+	
+	// Register the deployment as a child ComponentResource
+	err := vs.ctx.RegisterComponentResource("international-center:vault:DevelopmentDeployment",
+		fmt.Sprintf("%s-vault-deployment", vs.environment), deployment, pulumi.Parent(vs))
+	if err != nil {
+		return nil, fmt.Errorf("failed to register VaultDeployment component: %w", err)
+	}
 
 	deployment.VaultNetwork, err = vs.createVaultNetwork()
 	if err != nil {
@@ -76,6 +103,39 @@ func (vs *VaultStack) Deploy(ctx context.Context) (*VaultDeployment, error) {
 	deployment.VaultContainer, err = vs.deployVaultContainer(deployment)
 	if err != nil {
 		return nil, fmt.Errorf("failed to deploy Vault container: %w", err)
+	}
+
+	// Set deployment outputs
+	vaultURL, vaultToken, _ := vs.GetVaultConnectionInfo()
+	deployment.VaultEndpoint = pulumi.String(vaultURL).ToStringOutput()
+	deployment.VaultToken = pulumi.String(vaultToken).ToStringOutput()
+	deployment.NetworkID = deployment.VaultNetwork.ID().ToStringOutput()
+
+	// Register deployment component outputs
+	err = vs.ctx.RegisterResourceOutputs(deployment, pulumi.Map{
+		"vaultEndpoint": deployment.VaultEndpoint,
+		"vaultToken":    deployment.VaultToken,
+		"networkId":     deployment.NetworkID,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to register deployment outputs: %w", err)
+	}
+
+	// Set stack outputs
+	vs.VaultEndpoint = deployment.VaultEndpoint
+	vs.VaultToken = deployment.VaultToken
+	vs.VaultNetworkID = deployment.NetworkID
+	vs.VaultContainerID = deployment.VaultContainer.ID().ToStringOutput()
+
+	// Register stack component outputs
+	err = vs.ctx.RegisterResourceOutputs(vs, pulumi.Map{
+		"vaultEndpoint":   vs.VaultEndpoint,
+		"vaultToken":      vs.VaultToken,
+		"vaultNetworkId":  vs.VaultNetworkID,
+		"vaultContainerId": vs.VaultContainerID,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to register stack outputs: %w", err)
 	}
 
 	return deployment, nil
@@ -309,79 +369,46 @@ func (vs *VaultStack) InitializeSecrets(ctx context.Context, deployment *VaultDe
 	
 	var databaseSecrets, redisSecrets, storageSecrets, applicationSecrets map[string]interface{}
 	
-	if vs.configManager != nil {
-		// Use ConfigManager for centralized configuration
-		dbConfig := vs.configManager.GetDatabaseConfig()
-		redisConfig := vs.configManager.GetRedisConfig()
-		storageConfig := vs.configManager.GetStorageConfig()
-		
-		// Database secrets
-		databaseSecrets = map[string]interface{}{
-			"host":              dbConfig.ContainerHost,
-			"port":              strconv.Itoa(dbConfig.Port),
-			"database":          dbConfig.Database,
-			"username":          dbConfig.User,
-			"password":          dbConfig.Password,
-			"connection_string": dbConfig.ContainerURL,
-		}
+	if vs.configManager == nil {
+		return fmt.Errorf("configManager is required for vault secret initialization")
+	}
+	
+	// Use ConfigManager for centralized configuration
+	dbConfig := vs.configManager.GetDatabaseConfig()
+	redisConfig := vs.configManager.GetRedisConfig()
+	storageConfig := vs.configManager.GetStorageConfig()
+	
+	// Database secrets
+	databaseSecrets = map[string]interface{}{
+		"host":              dbConfig.ContainerHost,
+		"port":              strconv.Itoa(dbConfig.Port),
+		"database":          dbConfig.Database,
+		"username":          dbConfig.User,
+		"password":          dbConfig.Password,
+		"connection_string": dbConfig.ContainerURL,
+	}
 
-		// Redis secrets
-		redisSecrets = map[string]interface{}{
-			"host":     redisConfig.ContainerHost,
-			"port":     strconv.Itoa(redisConfig.Port),
-			"password": redisConfig.Password,
-			"addr":     redisConfig.ContainerAddr,
-		}
+	// Redis secrets
+	redisSecrets = map[string]interface{}{
+		"host":     redisConfig.ContainerHost,
+		"port":     strconv.Itoa(redisConfig.Port),
+		"password": redisConfig.Password,
+		"addr":     redisConfig.ContainerAddr,
+	}
 
-		// Storage secrets
-		storageSecrets = map[string]interface{}{
-			"account_name":      "devstoreaccount1",
-			"account_key":       "Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==",
-			"blob_endpoint":     storageConfig.BlobEndpoint,
-			"connection_string": storageConfig.ConnectionString,
-		}
-		
-		// Application secrets (cors_origins would need to be added to ConfigManager if needed)
-		applicationSecrets = map[string]interface{}{
-			"jwt_secret":     "dev-jwt-secret-key",
-			"encryption_key": "dev-encryption-key",
-			"cors_origins":   "", // TODO: Add to ConfigManager if needed
-		}
-	} else {
-		// Fallback to os.Getenv for backward compatibility
-		// Database secrets
-		databaseSecrets = map[string]interface{}{
-			"host":              os.Getenv("POSTGRES_CONTAINER_HOST"),
-			"port":              os.Getenv("DATABASE_PORT"),
-			"database":          os.Getenv("DATABASE_NAME"),
-			"username":          os.Getenv("DATABASE_USER"),
-			"password":          os.Getenv("DATABASE_PASSWORD"),
-			"connection_string": os.Getenv("DATABASE_CONTAINER_URL"),
-		}
-
-		// Redis secrets
-		redisSecrets = map[string]interface{}{
-			"host":     os.Getenv("REDIS_CONTAINER_HOST"),
-			"port":     os.Getenv("REDIS_PORT"),
-			"password": os.Getenv("REDIS_PASSWORD"),
-			"addr":     os.Getenv("REDIS_CONTAINER_ADDR"),
-		}
-
-		// Storage secrets
-		azuritePort := os.Getenv("AZURITE_PORT")
-		storageSecrets = map[string]interface{}{
-			"account_name": "devstoreaccount1",
-			"account_key":  "Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==",
-			"blob_endpoint": fmt.Sprintf("http://%s:%s/devstoreaccount1", os.Getenv("AZURITE_CONTAINER_HOST"), azuritePort),
-			"connection_string": fmt.Sprintf("DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://%s:%s/devstoreaccount1;", os.Getenv("AZURITE_CONTAINER_HOST"), azuritePort),
-		}
-
-		// Application secrets
-		applicationSecrets = map[string]interface{}{
-			"jwt_secret":     "dev-jwt-secret-key",
-			"encryption_key": "dev-encryption-key",
-			"cors_origins":   os.Getenv("PUBLIC_ALLOWED_ORIGINS"),
-		}
+	// Storage secrets
+	storageSecrets = map[string]interface{}{
+		"account_name":      "devstoreaccount1",
+		"account_key":       "Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==",
+		"blob_endpoint":     storageConfig.BlobEndpoint,
+		"connection_string": storageConfig.ConnectionString,
+	}
+	
+	// Application secrets
+	applicationSecrets = map[string]interface{}{
+		"jwt_secret":     "dev-jwt-secret-key",
+		"encryption_key": "dev-encryption-key",
+		"cors_origins":   "", // TODO: Add to ConfigManager if needed
 	}
 
 	secretPaths := []struct {

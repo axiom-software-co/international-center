@@ -15,7 +15,6 @@ type ConfigManager struct {
 	environment Environment
 	envConfig   *EnvironmentConfig
 	pulumiConfig *PulumiConfig
-	deploymentConfig *DeploymentConfig
 	
 	// Cached configuration values to avoid repeated environment variable access
 	databaseConfig *RuntimeDatabaseConfig
@@ -92,17 +91,10 @@ func NewConfigManager(ctx *pulumi.Context) (*ConfigManager, error) {
 	// Create Pulumi configuration wrapper
 	pulumiConfig := NewPulumiConfig(ctx, env)
 	
-	// Create deployment configuration
-	deploymentConfig, err := NewDeploymentConfig(ctx, env)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create deployment config: %w", err)
-	}
-	
 	manager := &ConfigManager{
-		environment:      env,
-		envConfig:        envConfig,
-		pulumiConfig:     pulumiConfig,
-		deploymentConfig: deploymentConfig,
+		environment:  env,
+		envConfig:    envConfig,
+		pulumiConfig: pulumiConfig,
 	}
 	
 	// Initialize runtime configurations
@@ -323,10 +315,6 @@ func (cm *ConfigManager) GetPulumiConfig() *PulumiConfig {
 	return cm.pulumiConfig
 }
 
-// GetDeploymentConfig returns the deployment configuration
-func (cm *ConfigManager) GetDeploymentConfig() *DeploymentConfig {
-	return cm.deploymentConfig
-}
 
 // GetDatabaseConfig returns the runtime database configuration
 func (cm *ConfigManager) GetDatabaseConfig() *RuntimeDatabaseConfig {
@@ -440,4 +428,70 @@ func (cm *ConfigManager) IsStaging() bool {
 // IsProduction returns true if the environment is production
 func (cm *ConfigManager) IsProduction() bool {
 	return cm.environment.IsProduction()
+}
+
+// NewConfigManagerFromEnv creates a ConfigManager from environment variables (for testing)
+func NewConfigManagerFromEnv() (*ConfigManager, error) {
+	// Detect environment from environment variables
+	environment, err := DetectEnvironment()
+	if err != nil {
+		return nil, fmt.Errorf("failed to detect environment: %w", err)
+	}
+	
+	// Load environment file first
+	if err := loadEnvironmentFile(); err != nil {
+		// Log warning but continue
+		fmt.Printf("Warning: Failed to load environment file: %v\n", err)
+	}
+	
+	// Get environment configuration
+	envConfig, err := GetEnvironmentConfig(environment)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get environment configuration: %w", err)
+	}
+	
+	// Create ConfigManager with runtime configurations only
+	cm := &ConfigManager{
+		environment: environment,
+		envConfig:   envConfig,
+	}
+	
+	// Load runtime configurations
+	databaseConfig, err := cm.loadDatabaseConfig()
+	if err != nil {
+		return nil, fmt.Errorf("failed to load database configuration: %w", err)
+	}
+	cm.databaseConfig = databaseConfig
+	
+	redisConfig, err := cm.loadRedisConfig()
+	if err != nil {
+		return nil, fmt.Errorf("failed to load Redis configuration: %w", err)
+	}
+	cm.redisConfig = redisConfig
+	
+	storageConfig, err := cm.loadStorageConfig()
+	if err != nil {
+		return nil, fmt.Errorf("failed to load storage configuration: %w", err)
+	}
+	cm.storageConfig = storageConfig
+	
+	vaultConfig, err := cm.loadVaultConfig()
+	if err != nil {
+		return nil, fmt.Errorf("failed to load Vault configuration: %w", err)
+	}
+	cm.vaultConfig = vaultConfig
+	
+	daprConfig, err := cm.loadDaprConfig()
+	if err != nil {
+		return nil, fmt.Errorf("failed to load Dapr configuration: %w", err)
+	}
+	cm.daprConfig = daprConfig
+	
+	return cm, nil
+}
+
+// GetEnvironmentVariable returns an environment variable value and whether it exists
+func (cm *ConfigManager) GetEnvironmentVariable(key string) (string, bool) {
+	value := os.Getenv(key)
+	return value, value != ""
 }

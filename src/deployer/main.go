@@ -23,7 +23,7 @@ func main() {
 		}
 		
 		// Get environment and network name from config manager
-		environment := configManager.GetEnvironment().String()
+		environment := string(configManager.GetEnvironment())
 		networkName := configManager.GetNetworkName()
 
 		// Deploy Database Stack (PostgreSQL)

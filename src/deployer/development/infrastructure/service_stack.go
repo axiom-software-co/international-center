@@ -10,19 +10,30 @@ import (
 	"github.com/pulumi/pulumi-docker/sdk/v4/go/docker"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi/config"
+	sharedconfig "github.com/axiom-software-co/international-center/src/deployer/shared/config"
 )
 
 type ServiceStack struct {
+	pulumi.ComponentResource
 	ctx             *pulumi.Context
 	config          *config.Config
+	configManager   *sharedconfig.ConfigManager
 	containerRuntime *infrastructure.ContainerRuntime
 	daprDeployment  *DaprDeployment
 	networkName     string
 	environment     string
 	projectRoot     string
+	
+	// Outputs
+	ContentAPIEndpoint     pulumi.StringOutput `pulumi:"contentAPIEndpoint"`
+	ServicesAPIEndpoint    pulumi.StringOutput `pulumi:"servicesAPIEndpoint"`
+	PublicGatewayEndpoint  pulumi.StringOutput `pulumi:"publicGatewayEndpoint"`
+	AdminGatewayEndpoint   pulumi.StringOutput `pulumi:"adminGatewayEndpoint"`
+	ServiceNetworkID       pulumi.StringOutput `pulumi:"serviceNetworkId"`
 }
 
 type ServiceDeployment struct {
+	pulumi.ComponentResource
 	// Container Images
 	ContentAPIImage     *docker.Image
 	ServicesAPIImage    *docker.Image
@@ -43,20 +54,43 @@ type ServiceDeployment struct {
 	ServicesAPIDaprSidecar  *docker.Container
 	PublicGatewayDaprSidecar *docker.Container
 	AdminGatewayDaprSidecar *docker.Container
+	
+	// Outputs
+	ContentAPIEndpoint     pulumi.StringOutput `pulumi:"contentAPIEndpoint"`
+	ServicesAPIEndpoint    pulumi.StringOutput `pulumi:"servicesAPIEndpoint"`
+	PublicGatewayEndpoint  pulumi.StringOutput `pulumi:"publicGatewayEndpoint"`
+	AdminGatewayEndpoint   pulumi.StringOutput `pulumi:"adminGatewayEndpoint"`
+	NetworkID              pulumi.StringOutput `pulumi:"networkId"`
 }
 
 func NewServiceStack(ctx *pulumi.Context, config *config.Config, daprDeployment *DaprDeployment, networkName, environment, projectRoot string) *ServiceStack {
+	// Create ConfigManager for centralized configuration
+	configManager, err := sharedconfig.NewConfigManager(ctx)
+	if err != nil {
+		ctx.Log.Warn(fmt.Sprintf("Failed to create ConfigManager, using legacy configuration: %v", err), nil)
+		configManager = nil
+	}
+	
 	containerRuntime := infrastructure.NewContainerRuntime(ctx, "podman", "localhost", 5000)
 	
-	return &ServiceStack{
+	component := &ServiceStack{
 		ctx:              ctx,
 		config:           config,
+		configManager:    configManager,
 		containerRuntime: containerRuntime,
 		daprDeployment:   daprDeployment,
 		networkName:      networkName,
 		environment:      environment,
 		projectRoot:      projectRoot,
 	}
+	
+	err = ctx.RegisterComponentResource("international-center:service:DevelopmentStack",
+		fmt.Sprintf("%s-service-stack", environment), component)
+	if err != nil {
+		return nil
+	}
+	
+	return component
 }
 
 func (ss *ServiceStack) Deploy(ctx context.Context) (*ServiceDeployment, error) {
@@ -140,13 +174,10 @@ func (ss *ServiceStack) createServiceNetwork() (*docker.Network, error) {
 	network, err := docker.NewNetwork(ss.ctx, "service-network", &docker.NetworkArgs{
 		Name:   pulumi.Sprintf("%s-service-network", ss.environment),
 		Driver: pulumi.String("bridge"),
-		Ipam: &docker.NetworkIpamArgs{
-			Driver: pulumi.String("default"),
-			Configs: docker.NetworkIpamConfigArray{
-				&docker.NetworkIpamConfigArgs{
-					Subnet:  pulumi.String("172.20.0.0/16"),
-					Gateway: pulumi.String("172.20.0.1"),
-				},
+		IpamConfigs: docker.NetworkIpamConfigArray{
+			&docker.NetworkIpamConfigArgs{
+				Subnet:  pulumi.String("172.20.0.0/16"),
+				Gateway: pulumi.String("172.20.0.1"),
 			},
 		},
 		Options: pulumi.StringMap{
@@ -280,11 +311,6 @@ func (ss *ServiceStack) deployDaprSidecar(appID string, daprHTTPPort, daprGRPCPo
 			},
 		},
 		
-		DependsOn: pulumi.Array{
-			ss.daprDeployment.DaprPlacementContainer,
-			ss.daprDeployment.RedisContainer,
-		},
-		
 		Labels: docker.ContainerLabelArray{
 			&docker.ContainerLabelArgs{
 				Label: pulumi.String("environment"),
@@ -303,7 +329,10 @@ func (ss *ServiceStack) deployDaprSidecar(appID string, daprHTTPPort, daprGRPCPo
 				Value: pulumi.String("pulumi"),
 			},
 		},
-	})
+	}, pulumi.DependsOn([]pulumi.Resource{
+		ss.daprDeployment.DaprPlacementContainer,
+		ss.daprDeployment.RedisContainer,
+	}))
 	if err != nil {
 		return nil, err
 	}
@@ -329,7 +358,7 @@ func (ss *ServiceStack) deployContentAPIContainer(deployment *ServiceDeployment)
 		Ports: []infrastructure.ContainerPort{
 			{Internal: 8080, External: 8080, Protocol: "tcp"},
 		},
-		Networks: []string{deployment.ServiceNetwork.Name.ToStringOutput().AsStringOutput().ToStringOutput().ApplyT(func(name interface{}) string { return name.(string) }).(string)},
+		Networks: []string{fmt.Sprintf("%s-service-network", ss.environment)},
 		RestartPolicy: "unless-stopped",
 		HealthCheck: infrastructure.ContainerHealthCheck{
 			Test:     []string{"CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1"},
@@ -368,7 +397,7 @@ func (ss *ServiceStack) deployServicesAPIContainer(deployment *ServiceDeployment
 		Ports: []infrastructure.ContainerPort{
 			{Internal: 8081, External: 8081, Protocol: "tcp"},
 		},
-		Networks: []string{deployment.ServiceNetwork.Name.ToStringOutput().AsStringOutput().ToStringOutput().ApplyT(func(name interface{}) string { return name.(string) }).(string)},
+		Networks: []string{fmt.Sprintf("%s-service-network", ss.environment)},
 		RestartPolicy: "unless-stopped",
 		HealthCheck: infrastructure.ContainerHealthCheck{
 			Test:     []string{"CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8081/health || exit 1"},
@@ -407,7 +436,7 @@ func (ss *ServiceStack) deployPublicGatewayContainer(deployment *ServiceDeployme
 		Ports: []infrastructure.ContainerPort{
 			{Internal: 8082, External: 8082, Protocol: "tcp"},
 		},
-		Networks: []string{deployment.ServiceNetwork.Name.ToStringOutput().AsStringOutput().ToStringOutput().ApplyT(func(name interface{}) string { return name.(string) }).(string)},
+		Networks: []string{fmt.Sprintf("%s-service-network", ss.environment)},
 		RestartPolicy: "unless-stopped",
 		HealthCheck: infrastructure.ContainerHealthCheck{
 			Test:     []string{"CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8082/health || exit 1"},
@@ -447,7 +476,7 @@ func (ss *ServiceStack) deployAdminGatewayContainer(deployment *ServiceDeploymen
 		Ports: []infrastructure.ContainerPort{
 			{Internal: 8083, External: 8083, Protocol: "tcp"},
 		},
-		Networks: []string{deployment.ServiceNetwork.Name.ToStringOutput().AsStringOutput().ToStringOutput().ApplyT(func(name interface{}) string { return name.(string) }).(string)},
+		Networks: []string{fmt.Sprintf("%s-service-network", ss.environment)},
 		RestartPolicy: "unless-stopped",
 		HealthCheck: infrastructure.ContainerHealthCheck{
 			Test:     []string{"CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8083/health || exit 1"},

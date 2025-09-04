@@ -55,15 +55,15 @@ type VolumeConfiguration struct {
 
 // VolumeManager manages volume operations across environments
 type VolumeManager struct {
-	config *config.DeploymentConfig
-	ctx    *pulumi.Context
+	configManager *config.ConfigManager
+	ctx           *pulumi.Context
 }
 
 // NewVolumeManager creates a new volume manager
-func NewVolumeManager(ctx *pulumi.Context, cfg *config.DeploymentConfig) *VolumeManager {
+func NewVolumeManager(ctx *pulumi.Context, configManager *config.ConfigManager) *VolumeManager {
 	return &VolumeManager{
-		config: cfg,
-		ctx:    ctx,
+		configManager: configManager,
+		ctx:           ctx,
 	}
 }
 
@@ -431,9 +431,8 @@ func (vm *VolumeManager) getVolumePath(serviceName, volumeName string) string {
 	}
 	
 	// For Azure Files, return the share name
-	// TODO: Fix when ResourcePrefix field is added to DeploymentConfig
-	// return fmt.Sprintf("%s-%s-%s", vm.config.ResourcePrefix, serviceName, volumeName)
-	return fmt.Sprintf("ic-%s-%s", serviceName, volumeName) // Temporary hardcoded prefix
+	resourcePrefix := vm.configManager.GetResourcePrefix()
+	return fmt.Sprintf("%s-%s-%s", resourcePrefix, serviceName, volumeName)
 }
 
 func (vm *VolumeManager) getVolumeOptions(serviceName string) map[string]string {
@@ -489,10 +488,8 @@ func (vm *VolumeManager) createLocalVolume(volumeName string, volumeMount Volume
 
 func (vm *VolumeManager) createAzureFilesVolume(volumeName string, volumeMount VolumeMount) (pulumi.Resource, error) {
 	// Create Azure File Share for persistent storage
-	// TODO: Fix when Storage and ResourceGroupName fields are added to DeploymentConfig
-	// fileShare, err := storage.NewFileShare(vm.ctx, volumeName, &storage.FileShareArgs{
-	//     ShareName:          pulumi.String(volumeMount.Source),
-	//     AccountName:        pulumi.String(vm.config.Storage.AccountName),
+	// Note: Azure Files integration would require Azure provider setup
+	// Currently using local volumes through ConfigManager
 	//     ResourceGroupName:  pulumi.String(vm.config.ResourceGroupName),
 	//     ShareQuota:         pulumi.Int(vm.getShareQuota(volumeName)),
 	//     AccessTier:         pulumi.StringPtr("Hot"),

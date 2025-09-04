@@ -7,16 +7,27 @@ import (
 	"github.com/pulumi/pulumi-docker/sdk/v4/go/docker"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi/config"
+	sharedconfig "github.com/axiom-software-co/international-center/src/deployer/shared/config"
 )
 
 type DaprStack struct {
+	pulumi.ComponentResource
 	ctx           *pulumi.Context
 	config        *config.Config
+	configManager *sharedconfig.ConfigManager
 	networkName   string
 	environment   string
+	
+	// Outputs
+	DaprHTTPEndpoint      pulumi.StringOutput `pulumi:"daprHTTPEndpoint"`
+	DaprGRPCEndpoint      pulumi.StringOutput `pulumi:"daprGRPCEndpoint"`
+	DaprPlacementEndpoint pulumi.StringOutput `pulumi:"daprPlacementEndpoint"`
+	DaprNetworkID         pulumi.StringOutput `pulumi:"daprNetworkId"`
+	RedisEndpoint         pulumi.StringOutput `pulumi:"redisEndpoint"`
 }
 
 type DaprDeployment struct {
+	pulumi.ComponentResource
 	RedisContainer      *docker.Container
 	DaprPlacementContainer *docker.Container
 	DaprSentryContainer   *docker.Container
@@ -24,21 +35,49 @@ type DaprDeployment struct {
 	RedisNetwork        *docker.Network
 	DaprComponentsVolume *docker.Volume
 	RedisDataVolume     *docker.Volume
+	
+	// Outputs
+	DaprHTTPEndpoint      pulumi.StringOutput `pulumi:"daprHTTPEndpoint"`
+	DaprGRPCEndpoint      pulumi.StringOutput `pulumi:"daprGRPCEndpoint"`
+	DaprPlacementEndpoint pulumi.StringOutput `pulumi:"daprPlacementEndpoint"`
+	NetworkID             pulumi.StringOutput `pulumi:"networkId"`
+	RedisEndpoint         pulumi.StringOutput `pulumi:"redisEndpoint"`
 }
 
 func NewDaprStack(ctx *pulumi.Context, config *config.Config, networkName, environment string) *DaprStack {
-	return &DaprStack{
-		ctx:         ctx,
-		config:      config,
-		networkName: networkName,
-		environment: environment,
+	// Create ConfigManager for centralized configuration
+	configManager, err := sharedconfig.NewConfigManager(ctx)
+	if err != nil {
+		ctx.Log.Warn(fmt.Sprintf("Failed to create ConfigManager, using legacy configuration: %v", err), nil)
+		configManager = nil
 	}
+	
+	component := &DaprStack{
+		ctx:           ctx,
+		config:        config,
+		configManager: configManager,
+		networkName:   networkName,
+		environment:   environment,
+	}
+	
+	err = ctx.RegisterComponentResource("international-center:dapr:DevelopmentStack",
+		fmt.Sprintf("%s-dapr-stack", environment), component)
+	if err != nil {
+		return nil
+	}
+	
+	return component
 }
 
 func (ds *DaprStack) Deploy(ctx context.Context) (*DaprDeployment, error) {
 	deployment := &DaprDeployment{}
-
-	var err error
+	
+	// Register the deployment as a child ComponentResource
+	err := ds.ctx.RegisterComponentResource("international-center:dapr:DevelopmentDeployment",
+		fmt.Sprintf("%s-dapr-deployment", ds.environment), deployment, pulumi.Parent(ds))
+	if err != nil {
+		return nil, fmt.Errorf("failed to register DaprDeployment component: %w", err)
+	}
 
 	deployment.RedisNetwork, err = ds.createRedisNetwork()
 	if err != nil {
@@ -73,6 +112,58 @@ func (ds *DaprStack) Deploy(ctx context.Context) (*DaprDeployment, error) {
 	deployment.DaprOperatorContainer, err = ds.deployDaprOperatorContainer(deployment)
 	if err != nil {
 		return nil, fmt.Errorf("failed to deploy Dapr operator container: %w", err)
+	}
+
+	// Set deployment outputs
+	var daprConfig *sharedconfig.RuntimeDaprConfig
+	if ds.configManager != nil {
+		daprConfig = ds.configManager.GetDaprConfig()
+	} else {
+		daprConfig = &sharedconfig.RuntimeDaprConfig{
+			HTTPEndpoint:      "localhost:3500",
+			GRPCEndpoint:      "localhost:50001", 
+			PlacementEndpoint: "localhost:50005",
+		}
+	}
+	
+	deployment.DaprHTTPEndpoint = pulumi.String(daprConfig.HTTPEndpoint).ToStringOutput()
+	deployment.DaprGRPCEndpoint = pulumi.String(daprConfig.GRPCEndpoint).ToStringOutput()
+	deployment.DaprPlacementEndpoint = pulumi.String(daprConfig.PlacementEndpoint).ToStringOutput()
+	deployment.NetworkID = deployment.RedisNetwork.ID().ToStringOutput()
+	deployment.RedisEndpoint = deployment.RedisContainer.Ports.Index(pulumi.Int(0)).External().ToStringOutput().
+		ApplyT(func(port string) string {
+			return fmt.Sprintf("localhost:%s", port)
+		}).(pulumi.StringOutput)
+
+	// Register deployment component outputs
+	err = ds.ctx.RegisterResourceOutputs(deployment, pulumi.Map{
+		"daprHTTPEndpoint":      deployment.DaprHTTPEndpoint,
+		"daprGRPCEndpoint":      deployment.DaprGRPCEndpoint,
+		"daprPlacementEndpoint": deployment.DaprPlacementEndpoint,
+		"networkId":             deployment.NetworkID,
+		"redisEndpoint":         deployment.RedisEndpoint,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to register deployment outputs: %w", err)
+	}
+
+	// Set stack outputs
+	ds.DaprHTTPEndpoint = deployment.DaprHTTPEndpoint
+	ds.DaprGRPCEndpoint = deployment.DaprGRPCEndpoint
+	ds.DaprPlacementEndpoint = deployment.DaprPlacementEndpoint
+	ds.DaprNetworkID = deployment.NetworkID
+	ds.RedisEndpoint = deployment.RedisEndpoint
+
+	// Register stack component outputs
+	err = ds.ctx.RegisterResourceOutputs(ds, pulumi.Map{
+		"daprHTTPEndpoint":      ds.DaprHTTPEndpoint,
+		"daprGRPCEndpoint":      ds.DaprGRPCEndpoint,
+		"daprPlacementEndpoint": ds.DaprPlacementEndpoint,
+		"daprNetworkId":         ds.DaprNetworkID,
+		"redisEndpoint":         ds.RedisEndpoint,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to register stack outputs: %w", err)
 	}
 
 	return deployment, nil
