@@ -32,15 +32,21 @@ export type {
 } from './rest';
 
 // News domain (REST-enabled through Public Gateway)
-export { newsClient } from './rest';
+import { NewsRestClient } from './news/NewsRestClient';
+export { NewsRestClient };
 export type {
   NewsArticle,
   NewsCategory,
   NewsResponse,
   NewsArticleResponse,
+  NewsCategoriesResponse,
   GetNewsParams,
   SearchNewsParams,
-} from './rest';
+} from './news/types';
+
+// Create news client instance
+const newsClientInstance = new NewsRestClient();
+export { newsClientInstance as newsClient };
 
 // Events domain (REST-enabled through Public Gateway)
 import { EventsRestClient } from './events/EventsRestClient';
