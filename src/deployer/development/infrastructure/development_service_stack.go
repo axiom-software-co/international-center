@@ -3,6 +3,7 @@ package infrastructure
 import (
 	"context"
 	"fmt"
+	"os"
 	"path/filepath"
 	"time"
 
@@ -80,15 +81,36 @@ func (sd *ServiceDeployment) GetServiceEndpoint(serviceName string) pulumi.Strin
 }
 
 func (sd *ServiceDeployment) GetServiceHealthEndpoint(serviceName string) string {
+	serviceHost := os.Getenv("SERVICE_HOST")
+	if serviceHost == "" {
+		serviceHost = "localhost"
+	}
+	
 	switch serviceName {
 	case "content-api":
-		return "http://localhost:8080/health"
+		contentPort := os.Getenv("CONTENT_API_PORT")
+		if contentPort == "" {
+			contentPort = "8080"
+		}
+		return fmt.Sprintf("http://%s:%s/health", serviceHost, contentPort)
 	case "services-api":
-		return "http://localhost:8081/health"
+		servicesPort := os.Getenv("SERVICES_API_PORT")
+		if servicesPort == "" {
+			servicesPort = "8081"
+		}
+		return fmt.Sprintf("http://%s:%s/health", serviceHost, servicesPort)
 	case "public-gateway":
-		return "http://localhost:8082/health"
+		publicPort := os.Getenv("PUBLIC_GATEWAY_PORT")
+		if publicPort == "" {
+			publicPort = "8082"
+		}
+		return fmt.Sprintf("http://%s:%s/health", serviceHost, publicPort)
 	case "admin-gateway":
-		return "http://localhost:8083/health"
+		adminPort := os.Getenv("ADMIN_GATEWAY_PORT")
+		if adminPort == "" {
+			adminPort = "8083"
+		}
+		return fmt.Sprintf("http://%s:%s/health", serviceHost, adminPort)
 	default:
 		return ""
 	}

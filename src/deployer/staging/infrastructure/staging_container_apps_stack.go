@@ -1,11 +1,10 @@
 package infrastructure
 
 import (
-	"context"
 	"fmt"
 
-	"github.com/pulumi/pulumi-azure-native-sdk/app"
-	"github.com/pulumi/pulumi-azure-native-sdk/resources"
+	"github.com/pulumi/pulumi-azure-native-sdk/app/v2"
+	"github.com/pulumi/pulumi-azure-native-sdk/resources/v2"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 )
 

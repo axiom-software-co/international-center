@@ -21,6 +21,7 @@ type DevelopmentDatabaseStack struct {
 	configManager *sharedconfig.ConfigManager
 	networkName   string
 	environment   string
+	errorHandler  *shared.ErrorHandler
 	
 	// Outputs
 	DatabaseEndpoint    pulumi.StringOutput `pulumi:"databaseEndpoint"`
@@ -43,11 +44,14 @@ type DevelopmentDatabaseDeployment struct {
 }
 
 func NewDatabaseStack(ctx *pulumi.Context, config *config.Config, networkName, environment string) shared.DatabaseStack {
+	errorHandler := shared.NewErrorHandler(ctx, environment, "database")
+	
 	// Create ConfigManager for centralized configuration
 	configManager, err := sharedconfig.NewConfigManager(ctx)
 	if err != nil {
-		ctx.Log.Warn(fmt.Sprintf("Failed to create ConfigManager, using legacy configuration: %v", err), nil)
-		configManager = nil
+		configErr := shared.NewConfigurationError("create_config_manager", "database", environment, "ConfigManager", err)
+		errorHandler.HandleError(configErr)
+		configManager = nil // Fallback to legacy configuration
 	}
 	
 	component := &DevelopmentDatabaseStack{
@@ -56,11 +60,14 @@ func NewDatabaseStack(ctx *pulumi.Context, config *config.Config, networkName, e
 		configManager: configManager,
 		networkName:   networkName,
 		environment:   environment,
+		errorHandler:  errorHandler,
 	}
 	
 	err = ctx.RegisterComponentResource("international-center:database:DevelopmentStack", 
 		fmt.Sprintf("%s-database-stack", environment), component)
 	if err != nil {
+		resourceErr := shared.NewResourceError("register_component", "database", environment, "DevelopmentStack", err)
+		errorHandler.HandleError(resourceErr)
 		return nil
 	}
 	
@@ -157,7 +164,7 @@ func (ds *DevelopmentDatabaseStack) createDatabaseNetwork() (*docker.Network, er
 		},
 	})
 	if err != nil {
-		return nil, err
+		return nil, shared.NewNetworkError("create_database_network", "database", ds.environment, "database-network", err)
 	}
 
 	return network, nil
@@ -183,7 +190,7 @@ func (ds *DevelopmentDatabaseStack) createPostgreSQLDataVolume() (*docker.Volume
 		},
 	})
 	if err != nil {
-		return nil, err
+		return nil, shared.NewResourceError("create_postgresql_data_volume", "database", ds.environment, "postgresql-data", err)
 	}
 
 	return volume, nil
@@ -209,7 +216,7 @@ func (ds *DevelopmentDatabaseStack) createPostgreSQLInitVolume() (*docker.Volume
 		},
 	})
 	if err != nil {
-		return nil, err
+		return nil, shared.NewResourceError("create_postgresql_init_volume", "database", ds.environment, "postgresql-init", err)
 	}
 
 	return volume, nil

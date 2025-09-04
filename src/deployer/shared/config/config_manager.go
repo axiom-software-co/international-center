@@ -22,6 +22,7 @@ type ConfigManager struct {
 	storageConfig  *RuntimeStorageConfig
 	vaultConfig    *RuntimeVaultConfig
 	daprConfig     *RuntimeDaprConfig
+	serviceConfig  *RuntimeServiceConfig
 }
 
 // RuntimeDatabaseConfig holds runtime database configuration values
@@ -67,6 +68,15 @@ type RuntimeDaprConfig struct {
 	GRPCEndpoint      string
 	PlacementEndpoint string
 	ComponentsPath    string
+}
+
+// RuntimeServiceConfig holds runtime service configuration values
+type RuntimeServiceConfig struct {
+	Host             string
+	ContentAPIURL    string
+	ServicesAPIURL   string
+	PublicGatewayURL string
+	AdminGatewayURL  string
 }
 
 // NewConfigManager creates a new centralized configuration manager
@@ -183,6 +193,11 @@ func (cm *ConfigManager) initializeRuntimeConfigs() error {
 		return fmt.Errorf("failed to load Dapr config: %w", err)
 	}
 	
+	// Initialize service configuration
+	if cm.serviceConfig, err = cm.loadServiceConfig(); err != nil {
+		return fmt.Errorf("failed to load service config: %w", err)
+	}
+	
 	return nil
 }
 
@@ -290,6 +305,19 @@ func (cm *ConfigManager) loadDaprConfig() (*RuntimeDaprConfig, error) {
 	return config, nil
 }
 
+// loadServiceConfig loads service configuration from environment variables
+func (cm *ConfigManager) loadServiceConfig() (*RuntimeServiceConfig, error) {
+	config := &RuntimeServiceConfig{
+		Host:             cm.getEnvWithDefault("SERVICE_HOST", "localhost"),
+		ContentAPIURL:    cm.getEnvWithDefault("CONTENT_API_URL", "http://localhost:8080"),
+		ServicesAPIURL:   cm.getEnvWithDefault("SERVICES_API_URL", "http://localhost:8081"),
+		PublicGatewayURL: cm.getEnvWithDefault("PUBLIC_GATEWAY_URL", "http://localhost:8082"),
+		AdminGatewayURL:  cm.getEnvWithDefault("ADMIN_GATEWAY_URL", "http://localhost:8083"),
+	}
+	
+	return config, nil
+}
+
 // getEnvWithDefault gets an environment variable with a default value
 func (cm *ConfigManager) getEnvWithDefault(key, defaultValue string) string {
 	if value := os.Getenv(key); value != "" {
@@ -339,6 +367,11 @@ func (cm *ConfigManager) GetVaultConfig() *RuntimeVaultConfig {
 // GetDaprConfig returns the runtime Dapr configuration
 func (cm *ConfigManager) GetDaprConfig() *RuntimeDaprConfig {
 	return cm.daprConfig
+}
+
+// GetServiceConfig returns the runtime service configuration
+func (cm *ConfigManager) GetServiceConfig() *RuntimeServiceConfig {
+	return cm.serviceConfig
 }
 
 // Validation methods
@@ -486,6 +519,12 @@ func NewConfigManagerFromEnv() (*ConfigManager, error) {
 		return nil, fmt.Errorf("failed to load Dapr configuration: %w", err)
 	}
 	cm.daprConfig = daprConfig
+	
+	serviceConfig, err := cm.loadServiceConfig()
+	if err != nil {
+		return nil, fmt.Errorf("failed to load service configuration: %w", err)
+	}
+	cm.serviceConfig = serviceConfig
 	
 	return cm, nil
 }

@@ -1,11 +1,10 @@
 package infrastructure
 
 import (
-	"context"
 	"fmt"
 
-	"github.com/pulumi/pulumi-azure-native-sdk/resources"
-	"github.com/pulumi/pulumi-azure-native-sdk/storage"
+	"github.com/pulumi/pulumi-azure-native-sdk/resources/v2"
+	"github.com/pulumi/pulumi-azure-native-sdk/storage/v2"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 )
 
@@ -54,15 +53,13 @@ func (stack *AzureStorageStack) createStorageAccount(ctx *pulumi.Context) error 
 		Sku: &storage.SkuArgs{
 			Name: pulumi.String("Standard_LRS"), // Locally redundant for staging
 		},
-		AccessTier:                   pulumi.String("Hot"),
+		AccessTier:                   storage.AccessTierHot,
 		AllowBlobPublicAccess:        pulumi.Bool(false), // Security best practice
 		AllowSharedKeyAccess:         pulumi.Bool(true),  // Required for some integrations
 		MinimumTlsVersion:           pulumi.String("TLS1_2"),
-		SupportsHttpsTrafficOnly:    pulumi.Bool(true),
-		AllowCrossTenantReplication: pulumi.Bool(false),
 		NetworkRuleSet: &storage.NetworkRuleSetArgs{
-			DefaultAction: pulumi.String("Allow"), // More permissive for staging
-			Bypass:        pulumi.String("AzureServices"),
+			DefaultAction: storage.DefaultActionAllow, // More permissive for staging
+			Bypass:        pulumi.String(string(storage.BypassAzureServices)),
 		},
 		Tags: pulumi.StringMap{
 			"environment": pulumi.String("staging"),
@@ -94,7 +91,7 @@ func (stack *AzureStorageStack) createBlobContainer(ctx *pulumi.Context, contain
 		ResourceGroupName:  stack.resourceGroup.Name,
 		AccountName:        stack.storageAccount.Name,
 		ContainerName:      pulumi.String(containerName),
-		PublicAccess:       pulumi.String("None"), // Private containers
+		PublicAccess:       storage.PublicAccessNone, // Private containers
 		Metadata: pulumi.StringMap{
 			"environment": pulumi.String("staging"),
 			"project":     pulumi.String("international-center"),
@@ -145,7 +142,7 @@ func (stack *AzureStorageStack) createQueue(ctx *pulumi.Context, queueName strin
 }
 
 func (stack *AzureStorageStack) retrieveAccessKeys(ctx *pulumi.Context) error {
-	stack.accessKeys = storage.ListStorageAccountKeysOutput(ctx, &storage.ListStorageAccountKeysOutputArgs{
+	stack.accessKeys = storage.ListStorageAccountKeysOutput(ctx, storage.ListStorageAccountKeysOutputArgs{
 		ResourceGroupName: stack.resourceGroup.Name,
 		AccountName:       stack.storageAccount.Name,
 	})

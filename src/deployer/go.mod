@@ -6,13 +6,13 @@ require (
 	github.com/go-redis/redis/v8 v8.11.5
 	github.com/golang-migrate/migrate/v4 v4.19.0
 	github.com/lib/pq v1.10.9
-	github.com/pulumi/pulumi-azure-native-sdk/app v1.104.0
-	github.com/pulumi/pulumi-azure-native-sdk/dbforpostgresql v1.104.0
-	github.com/pulumi/pulumi-azure-native-sdk/keyvault v1.104.0
-	github.com/pulumi/pulumi-azure-native-sdk/network v1.104.0
-	github.com/pulumi/pulumi-azure-native-sdk/resources v1.104.0
-	github.com/pulumi/pulumi-azure-native-sdk/security v1.104.0
-	github.com/pulumi/pulumi-azure-native-sdk/storage v1.104.0
+	github.com/pulumi/pulumi-azure-native-sdk/app/v2 v2.90.0
+	github.com/pulumi/pulumi-azure-native-sdk/dbforpostgresql/v2 v2.90.0
+	github.com/pulumi/pulumi-azure-native-sdk/keyvault/v2 v2.90.0
+	github.com/pulumi/pulumi-azure-native-sdk/network/v2 v2.90.0
+	github.com/pulumi/pulumi-azure-native-sdk/resources/v2 v2.90.0
+	github.com/pulumi/pulumi-azure-native-sdk/security/v2 v2.90.0
+	github.com/pulumi/pulumi-azure-native-sdk/storage/v2 v2.90.0
 	github.com/pulumi/pulumi-docker/sdk/v4 v4.8.2
 	github.com/pulumi/pulumi/sdk/v3 v3.192.0
 	github.com/stretchr/testify v1.11.1
@@ -79,7 +79,7 @@ require (
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/pulumi/appdash v0.0.0-20231130102222-75f619a67231 // indirect
 	github.com/pulumi/esc v0.17.0 // indirect
-	github.com/pulumi/pulumi-azure-native-sdk v1.104.0 // indirect
+	github.com/pulumi/pulumi-azure-native-sdk/v2 v2.90.0 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/rogpeppe/go-internal v1.14.1 // indirect
 	github.com/sabhiram/go-gitignore v0.0.0-20210923224102-525f6e181f06 // indirect

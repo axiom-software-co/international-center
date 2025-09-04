@@ -25,9 +25,8 @@ func main() {
 			return fmt.Errorf("configuration validation failed: %w", err)
 		}
 		
-		// Get environment and network name from config manager
+		// Get environment from config manager
 		environment := string(configManager.GetEnvironment())
-		networkName := configManager.GetNetworkName()
 		pulumiConfig := configManager.GetPulumiConfig().GetUnderlyingConfig()
 
 		// Select infrastructure factory based on environment
@@ -106,12 +105,13 @@ func main() {
 		ctx.Export("DAPR_GRPC_ENDPOINT", pulumi.String(daprEndpoints["grpc"]))
 		ctx.Export("DAPR_PLACEMENT_ENDPOINT", pulumi.String(daprEndpoints["placement"]))
 
-		// Service endpoints (these would be set by the service deployment)
-		ctx.Export("SERVICE_HOST", pulumi.String("localhost"))
-		ctx.Export("CONTENT_API_URL", pulumi.String("http://localhost:8081"))
-		ctx.Export("SERVICES_API_URL", pulumi.String("http://localhost:8082"))
-		ctx.Export("PUBLIC_GATEWAY_URL", pulumi.String("http://localhost:8080"))
-		ctx.Export("ADMIN_GATEWAY_URL", pulumi.String("http://localhost:8090"))
+		// Service endpoints from configuration manager
+		serviceConfig := configManager.GetServiceConfig()
+		ctx.Export("SERVICE_HOST", pulumi.String(serviceConfig.Host))
+		ctx.Export("CONTENT_API_URL", pulumi.String(configManager.GetPulumiConfig().GetString("content_api_url")))
+		ctx.Export("SERVICES_API_URL", pulumi.String(configManager.GetPulumiConfig().GetString("services_api_url")))
+		ctx.Export("PUBLIC_GATEWAY_URL", pulumi.String(configManager.GetPulumiConfig().GetString("public_gateway_url")))
+		ctx.Export("ADMIN_GATEWAY_URL", pulumi.String(configManager.GetPulumiConfig().GetString("admin_gateway_url")))
 
 		// Generate Dapr components after all infrastructure is deployed
 		err = daprStack.GenerateDaprComponents(context.Background(), daprDeployment)

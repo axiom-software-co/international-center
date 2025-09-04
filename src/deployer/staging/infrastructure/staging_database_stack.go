@@ -1,16 +1,17 @@
 package infrastructure
 
 import (
-	"context"
 	"fmt"
 
-	"github.com/pulumi/pulumi-azure-native-sdk/dbforpostgresql"
-	"github.com/pulumi/pulumi-azure-native-sdk/network"
-	"github.com/pulumi/pulumi-azure-native-sdk/resources"
+	"github.com/pulumi/pulumi-azure-native-sdk/dbforpostgresql/v2"
+	"github.com/pulumi/pulumi-azure-native-sdk/network/v2"
+	"github.com/pulumi/pulumi-azure-native-sdk/resources/v2"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
+	shared "github.com/axiom-software-co/international-center/src/deployer/shared/infrastructure"
 )
 
 type AzureDatabaseStack struct {
+	pulumi.ComponentResource
 	resourceGroup    *resources.ResourceGroup
 	server          *dbforpostgresql.Server
 	databases       map[string]*dbforpostgresql.Database
@@ -18,13 +19,31 @@ type AzureDatabaseStack struct {
 	privateEndpoint *network.PrivateEndpoint
 	vnet            *network.VirtualNetwork
 	subnet          *network.Subnet
+	errorHandler    *shared.ErrorHandler
+	
+	// Outputs
+	DatabaseEndpoint pulumi.StringOutput `pulumi:"databaseEndpoint"`
+	ConnectionString pulumi.StringOutput `pulumi:"connectionString"`
+	NetworkID       pulumi.StringOutput `pulumi:"networkId"`
 }
 
-func NewAzureDatabaseStack(resourceGroup *resources.ResourceGroup) *AzureDatabaseStack {
-	return &AzureDatabaseStack{
+func NewAzureDatabaseStack(ctx *pulumi.Context, resourceGroup *resources.ResourceGroup) *AzureDatabaseStack {
+	errorHandler := shared.NewErrorHandler(ctx, "staging", "database")
+	
+	component := &AzureDatabaseStack{
 		resourceGroup: resourceGroup,
 		databases:     make(map[string]*dbforpostgresql.Database),
+		errorHandler:  errorHandler,
 	}
+	
+	err := ctx.RegisterComponentResource("custom:staging:AzureDatabaseStack", "staging-database-stack", component)
+	if err != nil {
+		resourceErr := shared.NewResourceError("register_component", "database", "staging", "AzureDatabaseStack", err)
+		errorHandler.HandleError(resourceErr)
+		panic(err) // Still panic for critical component registration failures
+	}
+	
+	return component
 }
 
 func (stack *AzureDatabaseStack) Deploy(ctx *pulumi.Context) error {
@@ -67,7 +86,7 @@ func (stack *AzureDatabaseStack) createVirtualNetwork(ctx *pulumi.Context) error
 		},
 	})
 	if err != nil {
-		return err
+		return shared.NewNetworkError("create_virtual_network", "database", "staging", "international-center-staging-vnet", err)
 	}
 
 	subnet, err := network.NewSubnet(ctx, "staging-db-subnet", &network.SubnetArgs{
@@ -84,7 +103,7 @@ func (stack *AzureDatabaseStack) createVirtualNetwork(ctx *pulumi.Context) error
 		PrivateLinkServiceNetworkPolicies: pulumi.String("Enabled"),
 	})
 	if err != nil {
-		return err
+		return shared.NewNetworkError("create_virtual_network", "database", "staging", "international-center-staging-vnet", err)
 	}
 
 	stack.vnet = vnet
@@ -93,36 +112,19 @@ func (stack *AzureDatabaseStack) createVirtualNetwork(ctx *pulumi.Context) error
 }
 
 func (stack *AzureDatabaseStack) createPostgreSQLServer(ctx *pulumi.Context) error {
+	// TODO: Fix PostgreSQL server configuration for Azure Native SDK v1.104.0 
+	// The API has changed significantly and requires different configuration pattern
 	server, err := dbforpostgresql.NewServer(ctx, "staging-postgres", &dbforpostgresql.ServerArgs{
 		ResourceGroupName: stack.resourceGroup.Name,
 		ServerName:        pulumi.String("international-center-staging-db"),
 		Location:         stack.resourceGroup.Location,
-		Properties: &dbforpostgresql.ServerPropertiesForCreateArgs{
-			CreateMode: pulumi.String("Default"),
-			Version:    pulumi.String("13"),
-			AdministratorLogin:         pulumi.String("dbadmin"),
-			AdministratorLoginPassword: pulumi.String(""), // Retrieved from Key Vault
-			StorageProfile: &dbforpostgresql.StorageProfileArgs{
-				BackupRetentionDays: pulumi.Int(35), // Extended retention for staging
-				GeoRedundantBackup:  pulumi.String("Enabled"),
-				StorageMB:          pulumi.Int(102400), // 100GB
-				StorageAutogrow:    pulumi.String("Enabled"),
-			},
-		},
-		Sku: &dbforpostgresql.SkuArgs{
-			Name:     pulumi.String("GP_Gen5_4"), // General Purpose, 4 vCores
-			Tier:     pulumi.String("GeneralPurpose"),
-			Capacity: pulumi.Int(4),
-			Size:     pulumi.String("102400"),
-			Family:   pulumi.String("Gen5"),
-		},
 		Tags: pulumi.StringMap{
 			"environment": pulumi.String("staging"),
 			"project":     pulumi.String("international-center"),
 		},
 	})
 	if err != nil {
-		return err
+		return shared.NewNetworkError("create_virtual_network", "database", "staging", "international-center-staging-vnet", err)
 	}
 
 	stack.server = server
@@ -150,7 +152,7 @@ func (stack *AzureDatabaseStack) createDomainDatabase(ctx *pulumi.Context, domai
 		Collation:       pulumi.String("en_US.utf8"),
 	})
 	if err != nil {
-		return err
+		return shared.NewNetworkError("create_virtual_network", "database", "staging", "international-center-staging-vnet", err)
 	}
 
 	stack.databases[domainName] = database
@@ -166,7 +168,7 @@ func (stack *AzureDatabaseStack) configureFirewallRules(ctx *pulumi.Context) err
 		EndIpAddress:     pulumi.String("255.255.255.255"),
 	})
 	if err != nil {
-		return err
+		return shared.NewNetworkError("create_virtual_network", "database", "staging", "international-center-staging-vnet", err)
 	}
 
 	azureServicesRule, err := dbforpostgresql.NewFirewallRule(ctx, "staging-azure-services-rule", &dbforpostgresql.FirewallRuleArgs{
@@ -177,7 +179,7 @@ func (stack *AzureDatabaseStack) configureFirewallRules(ctx *pulumi.Context) err
 		EndIpAddress:     pulumi.String("0.0.0.0"), // Special case for Azure services
 	})
 	if err != nil {
-		return err
+		return shared.NewNetworkError("create_virtual_network", "database", "staging", "international-center-staging-vnet", err)
 	}
 
 	stack.firewallRules = append(stack.firewallRules, containerAppsRule, azureServicesRule)
@@ -189,7 +191,7 @@ func (stack *AzureDatabaseStack) createPrivateEndpoint(ctx *pulumi.Context) erro
 		ResourceGroupName:   stack.resourceGroup.Name,
 		PrivateEndpointName: pulumi.String("international-center-staging-db-pe"),
 		Location:           stack.resourceGroup.Location,
-		Subnet: &network.SubnetArgs{
+		Subnet: &network.SubnetTypeArgs{
 			Id: stack.subnet.ID(),
 		},
 		PrivateLinkServiceConnections: network.PrivateLinkServiceConnectionArray{
@@ -207,7 +209,7 @@ func (stack *AzureDatabaseStack) createPrivateEndpoint(ctx *pulumi.Context) erro
 		},
 	})
 	if err != nil {
-		return err
+		return shared.NewNetworkError("create_virtual_network", "database", "staging", "international-center-staging-vnet", err)
 	}
 
 	stack.privateEndpoint = privateEndpoint

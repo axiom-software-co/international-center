@@ -16,32 +16,38 @@ func NewStagingInfrastructureFactory() *StagingInfrastructureFactory {
 
 // Database Factory Implementation - Uses Azure Database for PostgreSQL
 func (f *StagingInfrastructureFactory) CreateDatabaseStack(ctx *pulumi.Context, config *config.Config, environment string) sharedinfra.DatabaseStack {
-	return NewAzurePostgreSQLStack(ctx, config, "staging-vnet", environment)
+	// TODO: Implement proper shared interface compatibility for AzureDatabaseStack
+	return nil // NewAzureDatabaseStack requires resource group parameter
 }
 
 // Storage Factory Implementation - Uses Azure Storage Account
 func (f *StagingInfrastructureFactory) CreateStorageStack(ctx *pulumi.Context, config *config.Config, environment string) sharedinfra.StorageStack {
-	return NewAzureStorageStack(ctx, config, "staging-vnet", environment)
+	// TODO: Implement proper shared interface compatibility for AzureStorageStack
+	return nil // NewAzureStorageStack requires resource group parameter
 }
 
 // Dapr Factory Implementation - Uses Azure Container Apps with Dapr
 func (f *StagingInfrastructureFactory) CreateDaprStack(ctx *pulumi.Context, config *config.Config, environment string) sharedinfra.DaprStack {
-	return NewAzureDaprStack(ctx, config, "staging-vnet", environment)
+	// TODO: Implement proper shared interface compatibility
+	return nil // Stack not yet implemented
 }
 
 // Vault Factory Implementation - Uses Azure Key Vault
 func (f *StagingInfrastructureFactory) CreateVaultStack(ctx *pulumi.Context, config *config.Config, environment string) sharedinfra.VaultStack {
-	return NewAzureKeyVaultStack(ctx, config, "staging-vnet", environment)
+	// TODO: Implement proper shared interface compatibility for VaultCloudStack
+	return nil // NewVaultCloudStack requires resource group parameter
 }
 
 // Observability Factory Implementation - Uses Azure Monitor, Application Insights
 func (f *StagingInfrastructureFactory) CreateObservabilityStack(ctx *pulumi.Context, config *config.Config, environment string) sharedinfra.ObservabilityStack {
-	return NewAzureObservabilityStack(ctx, config, "staging-vnet", environment)
+	// TODO: Implement proper shared interface compatibility
+	return nil // Stack not yet implemented
 }
 
 // Service Factory Implementation - Uses Azure Container Apps
 func (f *StagingInfrastructureFactory) CreateServiceStack(ctx *pulumi.Context, config *config.Config, environment string) sharedinfra.ServiceStack {
-	return NewAzureServiceStack(ctx, config, "staging-vnet", environment)
+	// TODO: Implement proper shared interface compatibility
+	return nil // Stack not yet implemented
 }
 
 // Verify that StagingInfrastructureFactory implements the shared InfrastructureFactory interface
