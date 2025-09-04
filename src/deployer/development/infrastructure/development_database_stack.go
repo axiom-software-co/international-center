@@ -30,7 +30,6 @@ type DevelopmentDatabaseStack struct {
 }
 
 type DevelopmentDatabaseDeployment struct {
-	pulumi.ComponentResource
 	PostgreSQLContainer *docker.Container
 	DatabaseNetwork     *docker.Network
 	PostgreSQLDataVolume *docker.Volume
@@ -66,51 +65,37 @@ func NewDatabaseStack(ctx *pulumi.Context, config *config.Config, networkName, e
 }
 
 func (ds *DevelopmentDatabaseStack) Deploy(ctx context.Context) (shared.DatabaseDeployment, error) {
-	// Create the deployment component
+	// Create the deployment  
 	deployment := &DevelopmentDatabaseDeployment{}
-	err := ds.ctx.RegisterComponentResource("international-center:database:DevelopmentDeployment",
-		fmt.Sprintf("%s-database-deployment", ds.environment), deployment)
-	if err != nil {
-		return nil, fmt.Errorf("failed to register deployment component: %w", err)
-	}
+	var err error
 
-	// Create database network with deployment as parent
-	deployment.DatabaseNetwork, err = ds.createDatabaseNetworkWithParent(deployment)
+	// Create database network
+	deployment.DatabaseNetwork, err = ds.createDatabaseNetwork()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create database network: %w", err)
 	}
 
-	// Create PostgreSQL volumes with deployment as parent
-	deployment.PostgreSQLDataVolume, err = ds.createPostgreSQLDataVolumeWithParent(deployment)
+	// Create PostgreSQL volumes
+	deployment.PostgreSQLDataVolume, err = ds.createPostgreSQLDataVolume()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create PostgreSQL data volume: %w", err)
 	}
 
-	deployment.PostgreSQLInitVolume, err = ds.createPostgreSQLInitVolumeWithParent(deployment)
+	deployment.PostgreSQLInitVolume, err = ds.createPostgreSQLInitVolume()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create PostgreSQL init volume: %w", err)
 	}
 
-	// Create PostgreSQL container with deployment as parent
-	deployment.PostgreSQLContainer, err = ds.deployPostgreSQLContainerWithParent(deployment)
+	// Create PostgreSQL container
+	deployment.PostgreSQLContainer, err = ds.deployPostgreSQLContainer(deployment)
 	if err != nil {
 		return nil, fmt.Errorf("failed to deploy PostgreSQL container: %w", err)
 	}
 
-	// Register deployment outputs
+	// Set deployment outputs
 	deployment.PrimaryEndpoint = ds.GetDatabaseEndpoint()
 	deployment.ConnectionString = ds.GetConnectionString()
 	deployment.NetworkID = deployment.DatabaseNetwork.ID().ToStringOutput()
-
-	// Register deployment component outputs
-	err = ds.ctx.RegisterResourceOutputs(deployment, pulumi.Map{
-		"primaryEndpoint":  deployment.PrimaryEndpoint,
-		"connectionString": deployment.ConnectionString,
-		"networkId":        deployment.NetworkID,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to register deployment outputs: %w", err)
-	}
 
 	// Register stack outputs
 	ds.DatabaseEndpoint = deployment.PrimaryEndpoint
@@ -499,7 +484,7 @@ func (ds *DevelopmentDatabaseStack) deployPostgreSQLContainerWithParent(deployme
 		},
 		
 		ShmSize: pulumi.Int(256 * 1024 * 1024),
-	}, pulumi.Parent(deployment), pulumi.DependsOn([]pulumi.Resource{deployment.DatabaseNetwork, deployment.PostgreSQLDataVolume, deployment.PostgreSQLInitVolume}))
+	}, pulumi.DependsOn([]pulumi.Resource{deployment.DatabaseNetwork, deployment.PostgreSQLDataVolume, deployment.PostgreSQLInitVolume}))
 	if err != nil {
 		return nil, err
 	}

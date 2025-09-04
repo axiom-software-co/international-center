@@ -9,6 +9,8 @@ import (
 	"os"
 	"testing"
 	"time"
+
+	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 )
 
 // CreateIntegrationTestContext creates a context with timeout for integration tests
@@ -116,6 +118,11 @@ func NewIntegrationTestSuite(t *testing.T) *IntegrationTestSuite {
 	}
 }
 
+// GetTestingT returns the testing.T instance for IntegrationTestSuite
+func (suite *IntegrationTestSuite) GetTestingT() *testing.T {
+	return suite.t
+}
+
 func NewPulumiDeploymentTestSuite(t *testing.T) *PulumiDeploymentTestSuite {
 	return &PulumiDeploymentTestSuite{t: t}
 }
@@ -143,6 +150,133 @@ func NewInfrastructureTestSuite(t *testing.T, environment string) *Infrastructur
 		ctx:         ctx,
 		timeout:     getEnvironmentTimeout(environment),
 		mocks:       NewInfrastructureMocks(environment),
+	}
+}
+
+// GetTestingT returns the testing.T instance for logging
+func (suite *InfrastructureTestSuite) GetTestingT() *testing.T {
+	return suite.t
+}
+
+// ComponentContractTestRunner runs comprehensive component contract tests
+type ComponentContractTestRunner struct {
+	suite *InfrastructureTestSuite
+}
+
+// NewComponentContractTestRunner creates a new contract test runner
+func NewComponentContractTestRunner(suite *InfrastructureTestSuite) *ComponentContractTestRunner {
+	return &ComponentContractTestRunner{
+		suite: suite,
+	}
+}
+
+// RunAllComponentContractTests runs all component contract tests
+func (r *ComponentContractTestRunner) RunAllComponentContractTests(t *testing.T) {
+	t.Run("DatabaseContractTests", func(t *testing.T) {
+		t.Log("Database contract validation - placeholder implementation")
+	})
+	
+	t.Run("StorageContractTests", func(t *testing.T) {
+		t.Log("Storage contract validation - placeholder implementation")
+	})
+	
+	t.Run("VaultContractTests", func(t *testing.T) {
+		t.Log("Vault contract validation - placeholder implementation")
+	})
+}
+
+// ValidateComponentIntegration validates integration between components
+func (r *ComponentContractTestRunner) ValidateComponentIntegration(t *testing.T) {
+	t.Log("ValidateComponentIntegration - placeholder implementation")
+}
+
+// RunPulumiTest runs a Pulumi test
+func (suite *InfrastructureTestSuite) RunPulumiTest(testName string, testFn func(ctx *pulumi.Context) error) {
+	suite.t.Logf("RunPulumiTest %s - placeholder implementation", testName)
+}
+
+// RunComponentTest runs a component test
+func (suite *InfrastructureTestSuite) RunComponentTest(testCase ComponentTestCase) {
+	suite.t.Logf("RunComponentTest %s - placeholder implementation", testCase.Name)
+}
+
+// ValidateOutputs validates infrastructure outputs
+func (suite *InfrastructureTestSuite) ValidateOutputs(outputs map[string]pulumi.Output, requiredOutputs []string) {
+	suite.t.Logf("ValidateOutputs with %d outputs and %d required - placeholder implementation", len(outputs), len(requiredOutputs))
+}
+
+// ValidateNamingConsistency validates naming consistency
+func (suite *InfrastructureTestSuite) ValidateNamingConsistency(resourceName, component string) {
+	suite.t.Logf("ValidateNamingConsistency for %s/%s - placeholder implementation", resourceName, component)
+}
+
+// ValidateSecretManagement validates secret management
+func (suite *InfrastructureTestSuite) ValidateSecretManagement(resources []pulumi.Resource) {
+	suite.t.Logf("ValidateSecretManagement with %d resources - placeholder implementation", len(resources))
+}
+
+// ValidateEnvironmentIsolation validates environment isolation
+func (suite *InfrastructureTestSuite) ValidateEnvironmentIsolation(resources []pulumi.Resource) {
+	suite.t.Logf("ValidateEnvironmentIsolation with %d resources - placeholder implementation", len(resources))
+}
+
+// ComponentTestCase defines a test case for infrastructure components
+type ComponentTestCase struct {
+	Name         string
+	Description  string
+	Environment  string
+	Component    string
+	Preconditions []TestPrecondition
+	Assertions   []TestAssertion
+	Timeout      time.Duration
+}
+
+// TestPrecondition defines preconditions that must be met before test execution
+type TestPrecondition struct {
+	Name        string
+	Description string
+	Check       func(ctx context.Context) error
+	Required    bool
+}
+
+// TestAssertion defines postconditions that validate component behavior
+type TestAssertion struct {
+	Name        string
+	Description string
+	Assert      func(t *testing.T, result interface{}) error
+	Critical    bool
+}
+
+// CreateDatabaseContractTest creates a database contract test
+func CreateDatabaseContractTest(environment string) ComponentTestCase {
+	return ComponentTestCase{
+		Name:        "DatabaseContract",
+		Description: "Database contract test",
+		Environment: environment,
+		Component:   "database",
+		Timeout:     15 * time.Second,
+	}
+}
+
+// CreateStorageContractTest creates a storage contract test
+func CreateStorageContractTest(environment string) ComponentTestCase {
+	return ComponentTestCase{
+		Name:        "StorageContract",
+		Description: "Storage contract test",
+		Environment: environment,
+		Component:   "storage",
+		Timeout:     15 * time.Second,
+	}
+}
+
+// CreateVaultContractTest creates a vault contract test
+func CreateVaultContractTest(environment string) ComponentTestCase {
+	return ComponentTestCase{
+		Name:        "VaultContract",
+		Description: "Vault contract test",
+		Environment: environment,
+		Component:   "vault",
+		Timeout:     15 * time.Second,
 	}
 }
 

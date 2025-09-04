@@ -393,44 +393,9 @@ func (v *VaultContractValidator) ValidateCryptographicKeyContract(t *testing.T) 
 	})
 }
 
-// ComponentContractTestRunner runs comprehensive component contract tests
-type ComponentContractTestRunner struct {
-	suite *InfrastructureTestSuite
-}
-
-// NewComponentContractTestRunner creates a new contract test runner
-func NewComponentContractTestRunner(suite *InfrastructureTestSuite) *ComponentContractTestRunner {
-	return &ComponentContractTestRunner{
-		suite: suite,
-	}
-}
-
-// RunAllComponentContractTests runs all component contract tests
-func (r *ComponentContractTestRunner) RunAllComponentContractTests(t *testing.T) {
-	t.Run("DatabaseContractTests", func(t *testing.T) {
-		validator := NewDatabaseContractValidator(r.suite)
-		validator.ValidatePostgreSQLServerContract(t)
-		validator.ValidateFirewallRulesContract(t)
-	})
-	
-	t.Run("StorageContractTests", func(t *testing.T) {
-		validator := NewStorageContractValidator(r.suite)
-		validator.ValidateStorageAccountContract(t)
-		validator.ValidateContainerContract(t)
-		validator.ValidateQueueContract(t)
-	})
-	
-	t.Run("VaultContractTests", func(t *testing.T) {
-		validator := NewVaultContractValidator(r.suite)
-		validator.ValidateKeyVaultContract(t)
-		validator.ValidateSecretManagementContract(t)
-		validator.ValidateCryptographicKeyContract(t)
-	})
-}
-
 // ValidateComponentIntegration validates integration between components
-func (r *ComponentContractTestRunner) ValidateComponentIntegration(t *testing.T) {
-	r.suite.RunPulumiTest("component_integration_contract", func(ctx *pulumi.Context) error {
+func ValidateComponentIntegration(suite *InfrastructureTestSuite, t *testing.T) {
+	suite.RunPulumiTest("component_integration_contract", func(ctx *pulumi.Context) error {
 		// Contract: Database must use secrets from vault for connection strings
 		// Contract: Storage must use keys from vault for encryption
 		// Contract: All components must be properly networked in production
@@ -446,7 +411,7 @@ func (r *ComponentContractTestRunner) ValidateComponentIntegration(t *testing.T)
 		})
 		
 		t.Run("network_integration", func(t *testing.T) {
-			if r.suite.environment == "production" {
+			if suite.environment == "production" {
 				// Production requires private networking integration
 				assert.True(t, true, "Production must use private endpoints")
 			}

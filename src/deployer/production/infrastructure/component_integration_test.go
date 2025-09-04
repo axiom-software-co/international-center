@@ -54,7 +54,7 @@ func TestProductionEnvironmentContractCompliance(t *testing.T) {
 			}
 			
 			for contract, expectedValue := range productionContracts {
-				suite.t.Logf("Validating production contract: %s = %v", contract, expectedValue)
+				suite.GetTestingT().Logf("Validating production contract: %s = %v", contract, expectedValue)
 				// Contract validation would happen here in real implementation
 			}
 		})
@@ -72,7 +72,7 @@ func TestProductionEnvironmentContractCompliance(t *testing.T) {
 			}
 			
 			for contract, expectedValue := range performanceContracts {
-				suite.t.Logf("Validating performance contract: %s = %v", contract, expectedValue)
+				suite.GetTestingT().Logf("Validating performance contract: %s = %v", contract, expectedValue)
 				// Performance contract validation would happen here
 			}
 		})
@@ -82,7 +82,7 @@ func TestProductionEnvironmentContractCompliance(t *testing.T) {
 			// Contract: Production must have automated failover
 			// Contract: Production must have health monitoring
 			
-			suite.t.Log("Validating production reliability contracts")
+			suite.GetTestingT().Log("Validating production reliability contracts")
 			// Reliability validation would happen here
 		})
 	})
@@ -109,7 +109,7 @@ func TestProductionSecurityContractCompliance(t *testing.T) {
 		}
 		
 		for contract, expectedValue := range securityContracts {
-			suite.t.Logf("Validating enhanced security contract: %s = %v", contract, expectedValue)
+			suite.GetTestingT().Logf("Validating enhanced security contract: %s = %v", contract, expectedValue)
 			// Enhanced security contract validation would happen here
 		}
 	})
@@ -131,7 +131,7 @@ func TestProductionSecurityContractCompliance(t *testing.T) {
 		}
 		
 		for _, contract := range complianceContracts {
-			suite.t.Logf("Validating compliance contract: %s", contract)
+			suite.GetTestingT().Logf("Validating compliance contract: %s", contract)
 			// Compliance contract validation would happen here
 		}
 	})
@@ -152,7 +152,7 @@ func TestProductionSecurityContractCompliance(t *testing.T) {
 		}
 		
 		for contract, expectedValue := range accessContracts {
-			suite.t.Logf("Validating access control contract: %s = %v", contract, expectedValue)
+			suite.GetTestingT().Logf("Validating access control contract: %s = %v", contract, expectedValue)
 			// Access control contract validation would happen here
 		}
 	})
@@ -179,7 +179,7 @@ func TestProductionMonitoringAndObservabilityContracts(t *testing.T) {
 		}
 		
 		for contract, expectedValue := range monitoringContracts {
-			suite.t.Logf("Validating monitoring contract: %s = %v", contract, expectedValue)
+			suite.GetTestingT().Logf("Validating monitoring contract: %s = %v", contract, expectedValue)
 			// Monitoring contract validation would happen here
 		}
 	})
@@ -201,7 +201,7 @@ func TestProductionMonitoringAndObservabilityContracts(t *testing.T) {
 		}
 		
 		for _, alert := range criticalAlerts {
-			suite.t.Logf("Validating critical alert contract: %s", alert)
+			suite.GetTestingT().Logf("Validating critical alert contract: %s", alert)
 			// Alert configuration validation would happen here
 		}
 	})
@@ -223,7 +223,7 @@ func TestProductionMonitoringAndObservabilityContracts(t *testing.T) {
 		}
 		
 		for _, contract := range observabilityContracts {
-			suite.t.Logf("Validating observability contract: %s", contract)
+			suite.GetTestingT().Logf("Validating observability contract: %s", contract)
 			// Observability contract validation would happen here
 		}
 	})
@@ -250,7 +250,7 @@ func TestProductionDisasterRecoveryContracts(t *testing.T) {
 		}
 		
 		for contract, expectedValue := range drContracts {
-			suite.t.Logf("Validating disaster recovery contract: %s = %v", contract, expectedValue)
+			suite.GetTestingT().Logf("Validating disaster recovery contract: %s = %v", contract, expectedValue)
 			// DR contract validation would happen here
 		}
 	})
@@ -260,7 +260,7 @@ func TestProductionDisasterRecoveryContracts(t *testing.T) {
 		// Contract: Production must have communication plans
 		// Contract: Production must have escalation procedures
 		
-		suite.t.Log("Validating business continuity contracts")
+		suite.GetTestingT().Log("Validating business continuity contracts")
 		// Business continuity validation would happen here
 	})
 }
