@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"testing"
@@ -16,6 +17,13 @@ import (
 	"github.com/pulumi/pulumi/sdk/v3/go/auto/optup"
 	"github.com/stretchr/testify/require"
 	_ "github.com/lib/pq"
+)
+
+// Test timeout constants
+const (
+	integrationTestTimeout = 15 * time.Second
+	unitTestTimeout       = 5 * time.Second
+	endToEndTestTimeout   = 30 * time.Second
 )
 
 // IntegrationTestSuite provides deployer infrastructure integration test setup
@@ -912,5 +920,46 @@ func ValidateTestEnvironment(t *testing.T, suite *IntegrationTestSuite) {
 	suite.CleanupRedisTestData(t, []string{testKey})
 	
 	t.Logf("✅ Test environment validation completed for: %s", suite.Environment.Environment)
+}
+
+// GetRequiredEnvVar gets a required environment variable and fails the test if not present
+func GetRequiredEnvVar(t *testing.T, key string) string {
+	value := os.Getenv(key)
+	require.NotEmpty(t, value, "Required environment variable %s must be set for integration tests", key)
+	return value
+}
+
+// GetEnvVar gets an environment variable with optional default value
+func GetEnvVar(key string, defaultValue string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
+	}
+	return defaultValue
+}
+
+// MakeHTTPRequest creates and executes an HTTP request with timeout
+func MakeHTTPRequest(t *testing.T, method, url string) *http.Response {
+	ctx, cancel := context.WithTimeout(context.Background(), integrationTestTimeout)
+	defer cancel()
+	
+	req, err := http.NewRequestWithContext(ctx, method, url, nil)
+	require.NoError(t, err, "Failed to create HTTP request")
+	
+	client := &http.Client{
+		Timeout: integrationTestTimeout,
+	}
+	
+	resp, err := client.Do(req)
+	require.NoError(t, err, "Failed to execute HTTP request")
+	
+	return resp
+}
+
+// ConnectWithTimeout attempts to establish a network connection with timeout
+func ConnectWithTimeout(ctx context.Context, network, address string, timeout time.Duration) (net.Conn, error) {
+	dialer := &net.Dialer{
+		Timeout: timeout,
+	}
+	return dialer.DialContext(ctx, network, address)
 }
 

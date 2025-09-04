@@ -3,6 +3,7 @@ package content
 import (
 	"encoding/json"
 	"net/http"
+	"time"
 
 	"github.com/axiom-software-co/international-center/src/backend/internal/shared/domain"
 	"github.com/gorilla/mux"
@@ -230,8 +231,9 @@ func (h *ContentHandler) writeJSONResponse(w http.ResponseWriter, statusCode int
 // HealthCheck provides a health check endpoint
 func (h *ContentHandler) HealthCheck(w http.ResponseWriter, r *http.Request) {
 	h.writeJSONResponse(w, http.StatusOK, map[string]interface{}{
-		"status":  "ok",
-		"service": "content-api",
+		"status":    "ok",
+		"service":   "content-api",
+		"timestamp": time.Now().UTC().Format(time.RFC3339),
 	})
 }
 

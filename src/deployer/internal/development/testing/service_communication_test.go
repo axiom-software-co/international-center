@@ -1,16 +1,14 @@
 package testing
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	
 )
 
 // TestServiceToServiceCommunication validates Dapr service invocation between APIs
@@ -19,14 +17,14 @@ func TestServiceToServiceCommunication(t *testing.T) {
 		t.Skip("Skipping integration tests in short mode")
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), integrationTestTimeout)
+	ctx, cancel := CreateIntegrationTestContext()
 	defer cancel()
 
 	// This test validates that the content API can call the services API via Dapr service invocation
 	t.Run("ContentAPI_to_ServicesAPI_Communication", func(t *testing.T) {
 		// Arrange
-		contentAPIURL := getRequiredEnvVar(t, "CONTENT_API_URL")
-		servicesAPIURL := getRequiredEnvVar(t, "SERVICES_API_URL")
+		contentAPIURL := GetRequiredEnvVar(t, "CONTENT_API_URL")
+		servicesAPIURL := GetRequiredEnvVar(t, "SERVICES_API_URL")
 
 		// Act - Make request to content API that should invoke services API
 		endpointURL := fmt.Sprintf("%s/api/v1/content/services-integration", contentAPIURL)
@@ -53,8 +51,8 @@ func TestServiceToServiceCommunication(t *testing.T) {
 	// This test validates that the services API can call the content API via Dapr service invocation
 	t.Run("ServicesAPI_to_ContentAPI_Communication", func(t *testing.T) {
 		// Arrange
-		servicesAPIURL := getRequiredEnvVar(t, "SERVICES_API_URL")
-		contentAPIURL := getRequiredEnvVar(t, "CONTENT_API_URL")
+		servicesAPIURL := GetRequiredEnvVar(t, "SERVICES_API_URL")
+		contentAPIURL := GetRequiredEnvVar(t, "CONTENT_API_URL")
 
 		// Act - Make request to services API that should invoke content API
 		endpointURL := fmt.Sprintf("%s/api/v1/services/content-integration", servicesAPIURL)
@@ -85,13 +83,13 @@ func TestGatewayToAPIProxying(t *testing.T) {
 		t.Skip("Skipping integration tests in short mode")
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), integrationTestTimeout)
+	ctx, cancel := CreateIntegrationTestContext()
 	defer cancel()
 
 	// Test public gateway proxying to content and services APIs
 	t.Run("PublicGateway_Proxying", func(t *testing.T) {
 		// Arrange
-		publicGatewayURL := getRequiredEnvVar(t, "PUBLIC_GATEWAY_URL")
+		publicGatewayURL := GetRequiredEnvVar(t, "PUBLIC_GATEWAY_URL")
 
 		// Test proxying to services API
 		t.Run("Proxy_to_ServicesAPI", func(t *testing.T) {
@@ -125,7 +123,7 @@ func TestGatewayToAPIProxying(t *testing.T) {
 	// Test admin gateway proxying to backend APIs
 	t.Run("AdminGateway_Proxying", func(t *testing.T) {
 		// Arrange
-		adminGatewayURL := getRequiredEnvVar(t, "ADMIN_GATEWAY_URL")
+		adminGatewayURL := GetRequiredEnvVar(t, "ADMIN_GATEWAY_URL")
 
 		// Test proxying to services API with admin prefix
 		t.Run("Proxy_to_AdminServicesAPI", func(t *testing.T) {
@@ -163,14 +161,14 @@ func TestDaprServiceInvocation(t *testing.T) {
 		t.Skip("Skipping integration tests in short mode")
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), integrationTestTimeout)
+	ctx, cancel := CreateIntegrationTestContext()
 	defer cancel()
 
 	// Test direct Dapr service invocation to content API
 	t.Run("Direct_ContentAPI_Invocation", func(t *testing.T) {
 		// Arrange
-		daprHTTPPort := getRequiredEnvVar(t, "DAPR_HTTP_PORT")
-		serviceHost := getRequiredEnvVar(t, "SERVICE_HOST")
+		daprHTTPPort := GetRequiredEnvVar(t, "DAPR_HTTP_PORT")
+		serviceHost := GetRequiredEnvVar(t, "SERVICE_HOST")
 		
 		// Act - Invoke content API directly via Dapr
 		daprURL := fmt.Sprintf("http://%s:%s/v1.0/invoke/content-api/method/api/v1/content", serviceHost, daprHTTPPort)
@@ -187,8 +185,8 @@ func TestDaprServiceInvocation(t *testing.T) {
 	// Test direct Dapr service invocation to services API
 	t.Run("Direct_ServicesAPI_Invocation", func(t *testing.T) {
 		// Arrange
-		daprHTTPPort := getRequiredEnvVar(t, "DAPR_HTTP_PORT")
-		serviceHost := getRequiredEnvVar(t, "SERVICE_HOST")
+		daprHTTPPort := GetRequiredEnvVar(t, "DAPR_HTTP_PORT")
+		serviceHost := GetRequiredEnvVar(t, "SERVICE_HOST")
 		
 		// Act - Invoke services API directly via Dapr
 		daprURL := fmt.Sprintf("http://%s:%s/v1.0/invoke/services-api/method/api/v1/services", serviceHost, daprHTTPPort)
@@ -209,15 +207,15 @@ func TestHealthEndpoints(t *testing.T) {
 		t.Skip("Skipping integration tests in short mode")
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), integrationTestTimeout)
+	ctx, cancel := CreateIntegrationTestContext()
 	defer cancel()
 
 	// Test health endpoints for all services
 	services := map[string]string{
-		"Content API":      getRequiredEnvVar(t, "CONTENT_API_URL"),
-		"Services API":     getRequiredEnvVar(t, "SERVICES_API_URL"),
-		"Public Gateway":   getRequiredEnvVar(t, "PUBLIC_GATEWAY_URL"),
-		"Admin Gateway":    getRequiredEnvVar(t, "ADMIN_GATEWAY_URL"),
+		"Content API":      GetRequiredEnvVar(t, "CONTENT_API_URL"),
+		"Services API":     GetRequiredEnvVar(t, "SERVICES_API_URL"),
+		"Public Gateway":   GetRequiredEnvVar(t, "PUBLIC_GATEWAY_URL"),
+		"Admin Gateway":    GetRequiredEnvVar(t, "ADMIN_GATEWAY_URL"),
 	}
 
 	for serviceName, serviceURL := range services {
@@ -241,26 +239,3 @@ func TestHealthEndpoints(t *testing.T) {
 	}
 }
 
-// makeHTTPRequest creates HTTP request with proper timeout and context
-func makeHTTPRequest(ctx context.Context, method, url string, body io.Reader) (*http.Response, error) {
-	req, err := http.NewRequestWithContext(ctx, method, url, body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
-	}
-
-	// Add required headers for API requests
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Accept", "application/json")
-	req.Header.Set("User-Agent", "development-integration-tests/1.0")
-
-	client := &http.Client{
-		Timeout: 10 * time.Second,
-	}
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("HTTP request failed: %w", err)
-	}
-
-	return resp, nil
-}

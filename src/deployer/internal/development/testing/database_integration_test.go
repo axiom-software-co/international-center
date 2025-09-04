@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"strings"
 	"testing"
-	"time"
 
 	_ "github.com/lib/pq" // PostgreSQL driver
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	
 )
 
 // TestDatabaseConnectivity validates PostgreSQL database connectivity and basic operations
@@ -19,11 +19,11 @@ func TestDatabaseConnectivity(t *testing.T) {
 		t.Skip("Skipping integration tests in short mode")
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), integrationTestTimeout)
+	ctx, cancel := CreateIntegrationTestContext()
 	defer cancel()
 
 	// Arrange
-	databaseURL := getRequiredEnvVar(t, "DATABASE_URL")
+	databaseURL := GetRequiredEnvVar(t, "DATABASE_URL")
 
 	// Act - Connect to database
 	db, err := sql.Open("postgres", databaseURL)
@@ -47,11 +47,11 @@ func TestDatabaseSchemaCompliance(t *testing.T) {
 		t.Skip("Skipping integration tests in short mode")
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), integrationTestTimeout)
+	ctx, cancel := CreateIntegrationTestContext()
 	defer cancel()
 
 	// Arrange
-	databaseURL := getRequiredEnvVar(t, "DATABASE_URL")
+	databaseURL := GetRequiredEnvVar(t, "DATABASE_URL")
 	db, err := sql.Open("postgres", databaseURL)
 	require.NoError(t, err)
 	defer db.Close()
@@ -257,11 +257,11 @@ func TestDatabaseConstraints(t *testing.T) {
 		t.Skip("Skipping integration tests in short mode")
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), integrationTestTimeout)
+	ctx, cancel := CreateIntegrationTestContext()
 	defer cancel()
 
 	// Arrange
-	databaseURL := getRequiredEnvVar(t, "DATABASE_URL")
+	databaseURL := GetRequiredEnvVar(t, "DATABASE_URL")
 	db, err := sql.Open("postgres", databaseURL)
 	require.NoError(t, err)
 	defer db.Close()
@@ -368,9 +368,11 @@ func validateTableColumns(t *testing.T, ctx context.Context, db *sql.DB, tableNa
 		actualType, exists := actualColumns[expectedColumn]
 		assert.True(t, exists, "Table %s should have column %s", tableName, expectedColumn)
 		if exists {
-			// Handle type variations (e.g., varchar vs character varying)
-			assert.True(t, 
-				strings.Contains(actualType, expectedType) || strings.Contains(expectedType, actualType),
+			// Handle type variations (e.g., varchar vs character varying, text[] vs ARRAY)
+			typeMatches := strings.Contains(actualType, expectedType) || 
+						  strings.Contains(expectedType, actualType) ||
+						  (expectedType == "text[]" && actualType == "ARRAY")
+			assert.True(t, typeMatches,
 				"Table %s column %s should have type %s, but has type %s", 
 				tableName, expectedColumn, expectedType, actualType)
 		}

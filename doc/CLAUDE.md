@@ -2,13 +2,11 @@
 
 - IMPORTANT AXIOM RULE TO FOLLOW : outside of unit tests , consider mocks and stubs the worst architectural anti pattern ( stop metioning the fact that you are using real implmentations , this is explicit in the implementation , keep the naming professional )
 
-- IMPORTANT AXIOM RULE TO FOLLOW : when you read a compact conversation summary , the first thing you should do is read all the markdown files in the project to get context .
-
 - IMPORTANT AXIOM RULE TO FOLLOW : we cannot create new files outside of our current folders and files structure ( this is deliberate ) . you may alter implmentation details . 
 
 - IMPORTANT AXIOM RULE TO FOLLOW : do not edit any markdown files without permission . ensure you stop and ask for permission and provide your reasoning
 
-- IMPORTANT AXIOM RULE TO FOLLOW : Our database schemas should exactly match that in our [name]-SCHEMA.md markdown files
+- IMPORTANT AXIOM RULE TO FOLLOW : Our database schemas should exactly match that in our [name]-TABLE.md markdown files
 
 - IMPORTANT AXIOM RULE TO FOLLOW : consider stubs the worst anti-pattern ( we should use propper infrastructure and fix root issues as they arise ) ( we should not fall back to stubs in integration tests ) 
 
@@ -113,6 +111,7 @@
 ## testing
 
 - arrange , act , assert
+- testing should be results reprodusable ( temporary fixes need to followed up with reprodusable implmentation )
 - contract-first testing ( testing interfaces/contracts rather than implementation details ) ( focused on preconditions/dependencies and postconditions/state-change )
 - properly-based testing
 

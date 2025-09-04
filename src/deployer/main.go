@@ -1,15 +1,55 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"fmt"
+	"os"
+	"strings"
 
 	"github.com/axiom-software-co/international-center/src/deployer/internal/development/infrastructure"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi/config"
 )
 
+// loadDevelopmentEnv loads environment variables from .env.development file
+func loadDevelopmentEnv() error {
+	file, err := os.Open(".env.development")
+	if err != nil {
+		return nil // File doesn't exist, continue without loading
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		
+		parts := strings.SplitN(line, "=", 2)
+		if len(parts) != 2 {
+			continue
+		}
+		
+		key := strings.TrimSpace(parts[0])
+		value := strings.TrimSpace(parts[1])
+		
+		// Only set if not already set (environment variables take precedence)
+		if os.Getenv(key) == "" {
+			os.Setenv(key, value)
+		}
+	}
+	
+	return scanner.Err()
+}
+
 func main() {
+	// Load development environment variables
+	if err := loadDevelopmentEnv(); err != nil {
+		fmt.Printf("Warning: Failed to load development environment: %v\n", err)
+	}
+	
 	pulumi.Run(func(ctx *pulumi.Context) error {
 		config := config.New(ctx, "")
 		environment := "development"

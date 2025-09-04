@@ -18,12 +18,8 @@ CREATE TABLE service_categories (
     -- Soft delete fields  
     is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
     deleted_on TIMESTAMPTZ,
-    deleted_by VARCHAR(255),
-    
-    CONSTRAINT only_one_default_unassigned CHECK (
-        NOT is_default_unassigned OR 
-        (SELECT COUNT(*) FROM service_categories WHERE is_default_unassigned = TRUE AND is_deleted = FALSE) <= 1
-    )
+    deleted_by VARCHAR(255)
+    -- Note: single default_unassigned constraint enforced by application logic
 );
 
 -- Create services table
@@ -63,14 +59,8 @@ CREATE TABLE featured_categories (
     modified_on TIMESTAMPTZ,
     modified_by VARCHAR(255),
     
-    UNIQUE(feature_position),
-    CONSTRAINT no_default_unassigned_featured CHECK (
-        NOT EXISTS (
-            SELECT 1 FROM service_categories sc 
-            WHERE sc.category_id = featured_categories.category_id 
-            AND sc.is_default_unassigned = TRUE
-        )
-    )
+    UNIQUE(feature_position)
+    -- Note: no_default_unassigned_featured constraint enforced by application logic
 );
 
 -- Performance Indexes

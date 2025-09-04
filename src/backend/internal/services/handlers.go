@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/axiom-software-co/international-center/src/backend/internal/shared/domain"
 	"github.com/gorilla/mux"
@@ -439,8 +440,9 @@ func (h *ServicesHandler) writeJSONResponse(w http.ResponseWriter, statusCode in
 // HealthCheck provides a health check endpoint
 func (h *ServicesHandler) HealthCheck(w http.ResponseWriter, r *http.Request) {
 	h.writeJSONResponse(w, http.StatusOK, map[string]interface{}{
-		"status":  "ok",
-		"service": "services-api",
+		"status":    "ok",
+		"service":   "services-api",
+		"timestamp": time.Now().UTC().Format(time.RFC3339),
 	})
 }
 
