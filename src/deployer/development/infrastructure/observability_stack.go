@@ -14,6 +14,7 @@ import (
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi/config"
 	sharedconfig "github.com/axiom-software-co/international-center/src/deployer/shared/config"
+	sharedinfra "github.com/axiom-software-co/international-center/src/deployer/shared/infrastructure"
 )
 
 type ObservabilityStack struct {
@@ -51,6 +52,29 @@ type ObservabilityDeployment struct {
 	NetworkID          pulumi.StringOutput `pulumi:"networkId"`
 }
 
+// Implement the shared ObservabilityDeployment interface
+func (od *ObservabilityDeployment) GetMetricsEndpoint() pulumi.StringOutput {
+	return od.PrometheusEndpoint
+}
+
+func (od *ObservabilityDeployment) GetLogsEndpoint() pulumi.StringOutput {
+	return od.LokiEndpoint
+}
+
+func (od *ObservabilityDeployment) GetTracingEndpoint() pulumi.StringOutput {
+	// In development, we don't have separate tracing, return empty
+	return pulumi.String("").ToStringOutput()
+}
+
+func (od *ObservabilityDeployment) GetDashboardEndpoint() pulumi.StringOutput {
+	return od.GrafanaEndpoint
+}
+
+func (od *ObservabilityDeployment) GetAlertManagerEndpoint() pulumi.StringOutput {
+	// In development, we don't have separate alertmanager, return Grafana endpoint
+	return od.GrafanaEndpoint
+}
+
 func NewObservabilityStack(ctx *pulumi.Context, config *config.Config, networkName, environment string) *ObservabilityStack {
 	// Create ConfigManager for centralized configuration
 	configManager, err := sharedconfig.NewConfigManager(ctx)
@@ -76,7 +100,7 @@ func NewObservabilityStack(ctx *pulumi.Context, config *config.Config, networkNa
 	return component
 }
 
-func (os *ObservabilityStack) Deploy(ctx context.Context) (*ObservabilityDeployment, error) {
+func (os *ObservabilityStack) Deploy(ctx context.Context) (sharedinfra.ObservabilityDeployment, error) {
 	deployment := &ObservabilityDeployment{}
 
 	var err error
@@ -616,7 +640,7 @@ func (os *ObservabilityStack) deployGrafanaContainer(deployment *ObservabilityDe
 	return container, nil
 }
 
-func (os *ObservabilityStack) ConfigureDataSources(ctx context.Context, deployment *ObservabilityDeployment) error {
+func (os *ObservabilityStack) ConfigureDataSources(ctx context.Context, deployment sharedinfra.ObservabilityDeployment) error {
 	lokiPort, err := strconv.Atoi(oslib.Getenv("LOKI_PORT"))
 	if err != nil {
 		return fmt.Errorf("invalid LOKI_PORT: %w", err)
@@ -652,16 +676,22 @@ func (os *ObservabilityStack) ConfigureDataSources(ctx context.Context, deployme
 	return nil
 }
 
-func (os *ObservabilityStack) ValidateDeployment(ctx context.Context, deployment *ObservabilityDeployment) error {
-	if deployment.GrafanaContainer == nil {
+func (os *ObservabilityStack) ValidateDeployment(ctx context.Context, deployment sharedinfra.ObservabilityDeployment) error {
+	// Cast to concrete type to access implementation details
+	concreteDeployment, ok := deployment.(*ObservabilityDeployment)
+	if !ok {
+		return fmt.Errorf("deployment is not a valid ObservabilityDeployment implementation")
+	}
+
+	if concreteDeployment.GrafanaContainer == nil {
 		return fmt.Errorf("Grafana container is not deployed")
 	}
 
-	if deployment.LokiContainer == nil {
+	if concreteDeployment.LokiContainer == nil {
 		return fmt.Errorf("Loki container is not deployed")
 	}
 
-	if deployment.PrometheusContainer == nil {
+	if concreteDeployment.PrometheusContainer == nil {
 		return fmt.Errorf("Prometheus container is not deployed")
 	}
 
@@ -687,6 +717,20 @@ func (os *ObservabilityStack) GetObservabilityEndpoints() map[string]string {
 		"loki":       fmt.Sprintf("http://localhost:%d", lokiPort),
 		"prometheus": fmt.Sprintf("http://localhost:%d", prometheusPort),
 	}
+}
+
+func (os *ObservabilityStack) ConfigureAlerts(ctx context.Context) error {
+	// For development environment, we don't configure complex alerts
+	// This method is required by the shared interface but can be no-op in dev
+	os.ctx.Log.Info("ConfigureAlerts: Skipping alert configuration for development environment", nil)
+	return nil
+}
+
+func (os *ObservabilityStack) CreateDashboards(ctx context.Context) error {
+	// For development environment, we use default dashboards
+	// This method provides basic dashboard setup
+	os.ctx.Log.Info("CreateDashboards: Using default dashboards for development environment", nil)
+	return nil
 }
 
 func (os *ObservabilityStack) GetGrafanaCredentials() (string, string) {

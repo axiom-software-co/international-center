@@ -4,8 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"os"
-	"strconv"
 	"time"
 
 	_ "github.com/lib/pq"

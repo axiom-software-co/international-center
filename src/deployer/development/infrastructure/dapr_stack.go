@@ -8,6 +8,7 @@ import (
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi/config"
 	sharedconfig "github.com/axiom-software-co/international-center/src/deployer/shared/config"
+	sharedinfra "github.com/axiom-software-co/international-center/src/deployer/shared/infrastructure"
 )
 
 type DaprStack struct {
@@ -44,6 +45,27 @@ type DaprDeployment struct {
 	RedisEndpoint         pulumi.StringOutput `pulumi:"redisEndpoint"`
 }
 
+// Implement the shared DaprDeployment interface
+func (dd *DaprDeployment) GetSidecarEndpoint() pulumi.StringOutput {
+	return dd.DaprHTTPEndpoint
+}
+
+func (dd *DaprDeployment) GetPlacementEndpoint() pulumi.StringOutput {
+	return dd.DaprPlacementEndpoint
+}
+
+func (dd *DaprDeployment) GetStateStoreEndpoint() pulumi.StringOutput {
+	return dd.RedisEndpoint
+}
+
+func (dd *DaprDeployment) GetPubSubEndpoint() pulumi.StringOutput {
+	return dd.RedisEndpoint
+}
+
+func (dd *DaprDeployment) GetConfigurationEndpoint() pulumi.StringOutput {
+	return dd.RedisEndpoint
+}
+
 func NewDaprStack(ctx *pulumi.Context, config *config.Config, networkName, environment string) *DaprStack {
 	// Create ConfigManager for centralized configuration
 	configManager, err := sharedconfig.NewConfigManager(ctx)
@@ -69,7 +91,7 @@ func NewDaprStack(ctx *pulumi.Context, config *config.Config, networkName, envir
 	return component
 }
 
-func (ds *DaprStack) Deploy(ctx context.Context) (*DaprDeployment, error) {
+func (ds *DaprStack) Deploy(ctx context.Context) (sharedinfra.DaprDeployment, error) {
 	deployment := &DaprDeployment{}
 	
 	// Register the deployment as a child ComponentResource
@@ -130,10 +152,12 @@ func (ds *DaprStack) Deploy(ctx context.Context) (*DaprDeployment, error) {
 	deployment.DaprGRPCEndpoint = pulumi.String(daprConfig.GRPCEndpoint).ToStringOutput()
 	deployment.DaprPlacementEndpoint = pulumi.String(daprConfig.PlacementEndpoint).ToStringOutput()
 	deployment.NetworkID = deployment.RedisNetwork.ID().ToStringOutput()
-	deployment.RedisEndpoint = deployment.RedisContainer.Ports.Index(pulumi.Int(0)).External().ToStringOutput().
-		ApplyT(func(port string) string {
-			return fmt.Sprintf("localhost:%s", port)
-		}).(pulumi.StringOutput)
+	deployment.RedisEndpoint = deployment.RedisContainer.Ports.Index(pulumi.Int(0)).External().ApplyT(func(port *int) string {
+		if port != nil {
+			return fmt.Sprintf("localhost:%d", *port)
+		}
+		return "localhost:6379"
+	}).(pulumi.StringOutput)
 
 	// Register deployment component outputs
 	err = ds.ctx.RegisterResourceOutputs(deployment, pulumi.Map{
@@ -547,27 +571,33 @@ func (ds *DaprStack) deployDaprOperatorContainer(deployment *DaprDeployment) (*d
 	return container, nil
 }
 
-func (ds *DaprStack) ValidateDeployment(ctx context.Context, deployment *DaprDeployment) error {
-	if deployment.RedisContainer == nil {
+func (ds *DaprStack) ValidateDeployment(ctx context.Context, deployment sharedinfra.DaprDeployment) error {
+	// Cast to concrete type to access implementation details
+	concreteDeployment, ok := deployment.(*DaprDeployment)
+	if !ok {
+		return fmt.Errorf("deployment is not a valid DaprDeployment implementation")
+	}
+
+	if concreteDeployment.RedisContainer == nil {
 		return fmt.Errorf("Redis container is not deployed")
 	}
 
-	if deployment.DaprPlacementContainer == nil {
+	if concreteDeployment.DaprPlacementContainer == nil {
 		return fmt.Errorf("Dapr placement container is not deployed")
 	}
 
-	if deployment.DaprSentryContainer == nil {
+	if concreteDeployment.DaprSentryContainer == nil {
 		return fmt.Errorf("Dapr sentry container is not deployed")
 	}
 
-	if deployment.DaprOperatorContainer == nil {
+	if concreteDeployment.DaprOperatorContainer == nil {
 		return fmt.Errorf("Dapr operator container is not deployed")
 	}
 
 	return nil
 }
 
-func (ds *DaprStack) GenerateDaprComponents(ctx context.Context, deployment *DaprDeployment) error {
+func (ds *DaprStack) GenerateDaprComponents(ctx context.Context, deployment sharedinfra.DaprDeployment) error {
 	redisPort := ds.config.RequireInt("redis_port")
 	redisPassword := ds.config.Get("redis_password")
 	

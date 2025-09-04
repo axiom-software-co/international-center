@@ -4,8 +4,11 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/axiom-software-co/international-center/src/deployer/development/infrastructure"
+	devinfra "github.com/axiom-software-co/international-center/src/deployer/development/infrastructure"
+	prodinfra "github.com/axiom-software-co/international-center/src/deployer/production/infrastructure"
+	staginginfra "github.com/axiom-software-co/international-center/src/deployer/staging/infrastructure"
 	"github.com/axiom-software-co/international-center/src/deployer/shared/config"
+	sharedinfra "github.com/axiom-software-co/international-center/src/deployer/shared/infrastructure"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 )
 
@@ -25,37 +28,51 @@ func main() {
 		// Get environment and network name from config manager
 		environment := string(configManager.GetEnvironment())
 		networkName := configManager.GetNetworkName()
+		pulumiConfig := configManager.GetPulumiConfig().GetUnderlyingConfig()
 
-		// Deploy Database Stack (PostgreSQL)
-		databaseStack := infrastructure.NewDatabaseStack(ctx, configManager.GetPulumiConfig().GetUnderlyingConfig(), networkName, environment)
+		// Select infrastructure factory based on environment
+		var factory sharedinfra.InfrastructureFactory
+		switch configManager.GetEnvironment() {
+		case config.EnvironmentDevelopment:
+			factory = devinfra.NewDevelopmentInfrastructureFactory()
+		case config.EnvironmentStaging:
+			factory = staginginfra.NewStagingInfrastructureFactory()
+		case config.EnvironmentProduction:
+			factory = prodinfra.NewProductionInfrastructureFactory()
+		default:
+			return fmt.Errorf("unsupported environment: %s", environment)
+		}
+
+		// Deploy Database Stack using factory
+		databaseStack := factory.CreateDatabaseStack(ctx, pulumiConfig, environment)
 		databaseDeployment, err := databaseStack.Deploy(context.Background())
 		if err != nil {
 			return fmt.Errorf("failed to deploy database stack: %w", err)
 		}
 
-		// Deploy Dapr Stack (Redis + Dapr control plane)
-		daprStack := infrastructure.NewDaprStack(ctx, configManager.GetPulumiConfig().GetUnderlyingConfig(), networkName, environment)
+		// Deploy Dapr Stack using factory
+		daprStack := factory.CreateDaprStack(ctx, pulumiConfig, environment)
 		daprDeployment, err := daprStack.Deploy(context.Background())
 		if err != nil {
 			return fmt.Errorf("failed to deploy Dapr stack: %w", err)
 		}
 
-		// Deploy Storage Stack (Azurite)
-		storageStack := infrastructure.NewStorageStack(ctx, configManager.GetPulumiConfig().GetUnderlyingConfig(), networkName, environment)
+		// Deploy Storage Stack using factory
+		storageStack := factory.CreateStorageStack(ctx, pulumiConfig, environment)
 		storageDeployment, err := storageStack.Deploy(context.Background())
 		if err != nil {
 			return fmt.Errorf("failed to deploy storage stack: %w", err)
 		}
 
-		// Deploy Vault Stack (HashiCorp Vault)
-		vaultStack := infrastructure.NewVaultStack(ctx, configManager.GetPulumiConfig().GetUnderlyingConfig(), networkName, environment)
+		// Deploy Vault Stack using factory
+		vaultStack := factory.CreateVaultStack(ctx, pulumiConfig, environment)
 		vaultDeployment, err := vaultStack.Deploy(context.Background())
 		if err != nil {
 			return fmt.Errorf("failed to deploy Vault stack: %w", err)
 		}
 
-		// Deploy Observability Stack (Grafana + Loki + Prometheus)
-		observabilityStack := infrastructure.NewObservabilityStack(ctx, configManager.GetPulumiConfig().GetUnderlyingConfig(), networkName, environment)
+		// Deploy Observability Stack using factory
+		observabilityStack := factory.CreateObservabilityStack(ctx, pulumiConfig, environment)
 		observabilityDeployment, err := observabilityStack.Deploy(context.Background())
 		if err != nil {
 			return fmt.Errorf("failed to deploy observability stack: %w", err)

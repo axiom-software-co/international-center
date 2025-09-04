@@ -90,14 +90,14 @@ func (vm *VolumeManager) CreateVolumeConfigurations() (map[string]*VolumeConfigu
 	configurations["loki"] = vm.createLokiVolumes()
 	
 	// Application service volumes
-	applications := map[string]config.ApplicationConfig{
-		"content-api":    vm.config.Applications.ContentAPI,
-		"services-api":   vm.config.Applications.ServicesAPI,
-		"public-gateway": vm.config.Applications.PublicGateway,
-		"admin-gateway":  vm.config.Applications.AdminGateway,
+	applications := []string{
+		"content-api",
+		"services-api",
+		"public-gateway",
+		"admin-gateway",
 	}
-	for appName, appConfig := range applications {
-		configurations[appName] = vm.createApplicationVolumes(appName, appConfig)
+	for _, appName := range applications {
+		configurations[appName] = vm.createApplicationVolumes(appName)
 	}
 	
 	return configurations, nil
@@ -203,7 +203,7 @@ func (vm *VolumeManager) createAzuriteVolumes() *VolumeConfiguration {
 	volumes := make(map[string]VolumeMount)
 	
 	// Only for development environment - staging/production use real Azure Storage
-	if vm.config.Environment.IsDevelopment() {
+	if vm.configManager.IsDevelopment() {
 		volumes["data"] = VolumeMount{
 			Name:       "azurite-data",
 			Source:     vm.getVolumePath("azurite", "data"),
@@ -340,7 +340,7 @@ func (vm *VolumeManager) createLokiVolumes() *VolumeConfiguration {
 	}
 }
 
-func (vm *VolumeManager) createApplicationVolumes(serviceName string, appConfig config.ApplicationConfig) *VolumeConfiguration {
+func (vm *VolumeManager) createApplicationVolumes(serviceName string) *VolumeConfiguration {
 	volumes := make(map[string]VolumeMount)
 	secretMounts := make(map[string]VolumeMount)
 	configMounts := make(map[string]VolumeMount)
@@ -413,7 +413,7 @@ func (vm *VolumeManager) createApplicationVolumes(serviceName string, appConfig 
 // Helper methods for volume configuration
 
 func (vm *VolumeManager) getVolumeType(serviceName string) VolumeType {
-	if vm.config.Environment.IsDevelopment() {
+	if vm.configManager.IsDevelopment() {
 		return VolumeTypeLocal
 	}
 	
@@ -426,7 +426,7 @@ func (vm *VolumeManager) getVolumeType(serviceName string) VolumeType {
 }
 
 func (vm *VolumeManager) getVolumePath(serviceName, volumeName string) string {
-	if vm.config.Environment.IsDevelopment() {
+	if vm.configManager.IsDevelopment() {
 		return filepath.Join("/opt/data", serviceName, volumeName)
 	}
 	
@@ -438,7 +438,7 @@ func (vm *VolumeManager) getVolumePath(serviceName, volumeName string) string {
 func (vm *VolumeManager) getVolumeOptions(serviceName string) map[string]string {
 	options := make(map[string]string)
 	
-	if vm.config.Environment.IsDevelopment() {
+	if vm.configManager.IsDevelopment() {
 		// Local volume options
 		options["bind-propagation"] = "rprivate"
 		options["consistency"] = "cached"

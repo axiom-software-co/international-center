@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"os"
 	"strconv"
 	"time"
 
@@ -12,6 +11,7 @@ import (
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi/config"
 	sharedconfig "github.com/axiom-software-co/international-center/src/deployer/shared/config"
+	sharedinfra "github.com/axiom-software-co/international-center/src/deployer/shared/infrastructure"
 )
 
 type StorageStack struct {
@@ -43,6 +43,28 @@ type StorageDeployment struct {
 	ConnectionString  pulumi.StringOutput `pulumi:"connectionString"`
 }
 
+// Implement the shared StorageDeployment interface
+func (sd *StorageDeployment) GetPrimaryStorageEndpoint() pulumi.StringOutput {
+	return sd.BlobEndpoint
+}
+
+func (sd *StorageDeployment) GetBackupStorageEndpoint() pulumi.StringOutput {
+	// In development, we don't have backup storage, return the primary endpoint
+	return sd.BlobEndpoint
+}
+
+func (sd *StorageDeployment) GetConnectionString() pulumi.StringOutput {
+	return sd.ConnectionString
+}
+
+func (sd *StorageDeployment) GetContainerEndpoint(name string) string {
+	return "http://localhost:10000/devstoreaccount1/" + name
+}
+
+func (sd *StorageDeployment) GetQueueEndpoint(name string) string {
+	return "http://localhost:10001/devstoreaccount1/" + name
+}
+
 func NewStorageStack(ctx *pulumi.Context, config *config.Config, networkName, environment string) *StorageStack {
 	// Create ConfigManager for centralized configuration
 	configManager, err := sharedconfig.NewConfigManager(ctx)
@@ -69,7 +91,7 @@ func NewStorageStack(ctx *pulumi.Context, config *config.Config, networkName, en
 	return component
 }
 
-func (ss *StorageStack) Deploy(ctx context.Context) (*StorageDeployment, error) {
+func (ss *StorageStack) Deploy(ctx context.Context) (sharedinfra.StorageDeployment, error) {
 	deployment := &StorageDeployment{}
 	
 	// Register the deployment as a child ComponentResource
@@ -100,30 +122,49 @@ func (ss *StorageStack) Deploy(ctx context.Context) (*StorageDeployment, error) 
 	}
 	
 	// Set outputs
-	deployment.BlobEndpoint = deployment.AzuriteContainer.Ports.Index(pulumi.Int(0)).External().ToStringOutput().
-		ApplyT(func(port string) string {
-			return fmt.Sprintf("http://localhost:%s/devstoreaccount1", port)
-		}).(pulumi.StringOutput)
+	deployment.BlobEndpoint = deployment.AzuriteContainer.Ports.Index(pulumi.Int(0)).External().ApplyT(func(port *int) string {
+		if port != nil {
+			return fmt.Sprintf("http://localhost:%d/devstoreaccount1", *port)
+		}
+		return "http://localhost:10000/devstoreaccount1"
+	}).(pulumi.StringOutput)
 		
-	deployment.QueueEndpoint = deployment.AzuriteContainer.Ports.Index(pulumi.Int(1)).External().ToStringOutput().
-		ApplyT(func(port string) string {
-			return fmt.Sprintf("http://localhost:%s/devstoreaccount1", port)
-		}).(pulumi.StringOutput)
+	deployment.QueueEndpoint = deployment.AzuriteContainer.Ports.Index(pulumi.Int(1)).External().ApplyT(func(port *int) string {
+		if port != nil {
+			return fmt.Sprintf("http://localhost:%d/devstoreaccount1", *port)
+		}
+		return "http://localhost:10001/devstoreaccount1"
+	}).(pulumi.StringOutput)
 		
-	deployment.TableEndpoint = deployment.AzuriteContainer.Ports.Index(pulumi.Int(2)).External().ToStringOutput().
-		ApplyT(func(port string) string {
-			return fmt.Sprintf("http://localhost:%s/devstoreaccount1", port)
-		}).(pulumi.StringOutput)
+	deployment.TableEndpoint = deployment.AzuriteContainer.Ports.Index(pulumi.Int(2)).External().ApplyT(func(port *int) string {
+		if port != nil {
+			return fmt.Sprintf("http://localhost:%d/devstoreaccount1", *port)
+		}
+		return "http://localhost:10002/devstoreaccount1"
+	}).(pulumi.StringOutput)
 		
 	deployment.ConnectionString = pulumi.All(
 		deployment.AzuriteContainer.Ports.Index(pulumi.Int(0)).External(),
 		deployment.AzuriteContainer.Ports.Index(pulumi.Int(1)).External(),
 		deployment.AzuriteContainer.Ports.Index(pulumi.Int(2)).External(),
 	).ApplyT(func(args []interface{}) string {
-		blobPort := args[0].(float64)
-		queuePort := args[1].(float64)
-		tablePort := args[2].(float64)
-		return fmt.Sprintf("DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://localhost:%.0f/devstoreaccount1;QueueEndpoint=http://localhost:%.0f/devstoreaccount1;TableEndpoint=http://localhost:%.0f/devstoreaccount1;",
+		var blobPort, queuePort, tablePort int
+		if args[0] != nil && args[0].(*int) != nil {
+			blobPort = *args[0].(*int)
+		} else {
+			blobPort = 10000
+		}
+		if args[1] != nil && args[1].(*int) != nil {
+			queuePort = *args[1].(*int)
+		} else {
+			queuePort = 10001
+		}
+		if args[2] != nil && args[2].(*int) != nil {
+			tablePort = *args[2].(*int)
+		} else {
+			tablePort = 10002
+		}
+		return fmt.Sprintf("DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://localhost:%d/devstoreaccount1;QueueEndpoint=http://localhost:%d/devstoreaccount1;TableEndpoint=http://localhost:%d/devstoreaccount1;",
 			blobPort, queuePort, tablePort)
 	}).(pulumi.StringOutput)
 
@@ -333,7 +374,7 @@ func (ss *StorageStack) deployAzuriteContainer(deployment *StorageDeployment) (*
 	return container, nil
 }
 
-func (ss *StorageStack) CreateStorageContainers(ctx context.Context, deployment *StorageDeployment) error {
+func (ss *StorageStack) CreateStorageContainers(ctx context.Context, deployment sharedinfra.StorageDeployment) error {
 	var azuriteHost string
 	var azuritePort int
 	
@@ -395,8 +436,13 @@ func (ss *StorageStack) createBlobContainer(ctx context.Context, endpoint, conta
 	return nil
 }
 
-func (ss *StorageStack) ValidateDeployment(ctx context.Context, deployment *StorageDeployment) error {
-	if deployment.AzuriteContainer == nil {
+func (ss *StorageStack) ValidateDeployment(ctx context.Context, deployment sharedinfra.StorageDeployment) error {
+	// Cast to concrete type to access implementation details
+	concreteDeployment, ok := deployment.(*StorageDeployment)
+	if !ok {
+		return fmt.Errorf("deployment is not a valid StorageDeployment implementation")
+	}
+	if concreteDeployment.AzuriteContainer == nil {
 		return fmt.Errorf("Azurite container is not deployed")
 	}
 
@@ -456,7 +502,7 @@ func (ss *StorageStack) GetBlobStorageEndpoint() string {
 	return fmt.Sprintf("http://%s:%d/devstoreaccount1", azuriteHost, azuritePort)
 }
 
-func (ss *StorageStack) GetDaprBindingConfiguration() map[string]interface{} {
+func (ss *StorageStack) GetDaprBindingConfiguration(serviceName string) map[string]interface{} {
 	connectionInfo := ss.GetStorageConnectionInfo()
 	
 	return map[string]interface{}{

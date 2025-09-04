@@ -40,7 +40,9 @@ func (f *DevelopmentInfrastructureFactory) CreateObservabilityStack(ctx *pulumi.
 
 // Service Factory Implementation
 func (f *DevelopmentInfrastructureFactory) CreateServiceStack(ctx *pulumi.Context, config *config.Config, environment string) sharedinfra.ServiceStack {
-	return NewServiceStack(ctx, config, "development-network", environment)
+	// For development factory, we create a service stack without external dependencies
+	// The service stack will handle its own dapr dependency internally
+	return NewServiceStack(ctx, config, nil, "development-network", environment, ".")
 }
 
 // Verify that DevelopmentInfrastructureFactory implements the shared InfrastructureFactory interface

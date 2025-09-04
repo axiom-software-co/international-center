@@ -124,17 +124,19 @@ func (is *IntegrationStack) Deploy(ctx context.Context) (*IntegratedDeployment, 
 	
 	// 3. Deploy Dapr control plane
 	is.daprStack = NewDaprStack(is.ctx, is.config, "dev-network", is.environment)
-	deployment.DaprDeployment, err = is.daprStack.Deploy(ctx)
+	daprDeployment, err := is.daprStack.Deploy(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to deploy Dapr stack: %w", err)
 	}
+	deployment.DaprDeployment = daprDeployment.(*DaprDeployment)
 	
 	// 4. Deploy containerized services with Dapr sidecars
 	is.serviceStack = NewServiceStack(is.ctx, is.config, deployment.DaprDeployment, "dev-network", is.environment, is.projectRoot)
-	deployment.ServiceDeployment, err = is.serviceStack.Deploy(ctx)
+	serviceDeployment, err := is.serviceStack.Deploy(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to deploy service stack: %w", err)
 	}
+	deployment.ServiceDeployment = serviceDeployment.(*ServiceDeployment)
 	
 	// 5. Deploy integration test Dapr sidecar
 	deployment.IntegrationTestSidecar, err = is.deployIntegrationTestSidecar(deployment)
@@ -188,17 +190,29 @@ func (is *IntegrationStack) deployDatabase(deployment *IntegratedDeployment) (sh
 
 func (is *IntegrationStack) deployStorage(deployment *IntegratedDeployment) (*StorageDeployment, error) {
 	is.storageStack = NewStorageStack(is.ctx, is.config, "dev-network", is.environment)
-	return is.storageStack.Deploy(context.Background())
+	storageDeployment, err := is.storageStack.Deploy(context.Background())
+	if err != nil {
+		return nil, err
+	}
+	return storageDeployment.(*StorageDeployment), nil
 }
 
 func (is *IntegrationStack) deployVault(deployment *IntegratedDeployment) (*VaultDeployment, error) {
 	is.vaultStack = NewVaultStack(is.ctx, is.config, "dev-network", is.environment)
-	return is.vaultStack.Deploy(context.Background())
+	vaultDeployment, err := is.vaultStack.Deploy(context.Background())
+	if err != nil {
+		return nil, err
+	}
+	return vaultDeployment.(*VaultDeployment), nil
 }
 
 func (is *IntegrationStack) deployObservability(deployment *IntegratedDeployment) (*ObservabilityDeployment, error) {
 	is.observabilityStack = NewObservabilityStack(is.ctx, is.config, "dev-network", is.environment)
-	return is.observabilityStack.Deploy(context.Background())
+	observabilityDeployment, err := is.observabilityStack.Deploy(context.Background())
+	if err != nil {
+		return nil, err
+	}
+	return observabilityDeployment.(*ObservabilityDeployment), nil
 }
 
 func (is *IntegrationStack) deployIntegrationTestSidecar(deployment *IntegratedDeployment) (*docker.Container, error) {

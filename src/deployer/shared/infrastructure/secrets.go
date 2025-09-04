@@ -100,14 +100,14 @@ func (sm *SecretsManager) CreateSecretConfigurations() (map[string]*SecretConfig
 	configurations["azurite"] = sm.createAzuriteSecrets()
 	
 	// Application secrets
-	applications := map[string]config.ApplicationConfig{
-		"content-api":    sm.config.Applications.ContentAPI,
-		"services-api":   sm.config.Applications.ServicesAPI,
-		"public-gateway": sm.config.Applications.PublicGateway,
-		"admin-gateway":  sm.config.Applications.AdminGateway,
+	applications := []string{
+		"content-api",
+		"services-api", 
+		"public-gateway",
+		"admin-gateway",
 	}
-	for appName, appConfig := range applications {
-		configurations[appName] = sm.createApplicationSecrets(appName, appConfig)
+	for _, appName := range applications {
+		configurations[appName] = sm.createApplicationSecrets(appName)
 	}
 	
 	// System secrets
@@ -148,13 +148,13 @@ func (sm *SecretsManager) createPostgreSQLSecrets() *SecretConfiguration {
 		Tags: map[string]string{
 			"service":     "postgresql",
 			"type":        "password",
-			"environment": string(sm.config.Environment),
+			"environment": string(sm.configManager.GetEnvironment()),
 		},
 		RotationPolicy: &SecretRotationPolicy{
 			Enabled:       true,
 			RotationDays:  90,
 			RetainOldDays: 7,
-			AutoRotate:    !sm.config.Environment.IsProduction(),
+			AutoRotate:    !sm.configManager.IsProduction(),
 			NotifyDays:    14,
 		},
 	}
@@ -168,7 +168,7 @@ func (sm *SecretsManager) createPostgreSQLSecrets() *SecretConfiguration {
 		Tags: map[string]string{
 			"service":     "postgresql",
 			"type":        "replication",
-			"environment": string(sm.config.Environment),
+			"environment": string(sm.configManager.GetEnvironment()),
 		},
 		RotationPolicy: &SecretRotationPolicy{
 			Enabled:       true,
@@ -188,7 +188,7 @@ func (sm *SecretsManager) createPostgreSQLSecrets() *SecretConfiguration {
 		Tags: map[string]string{
 			"service":     "postgresql",
 			"type":        "tls",
-			"environment": string(sm.config.Environment),
+			"environment": string(sm.configManager.GetEnvironment()),
 		},
 		RotationPolicy: &SecretRotationPolicy{
 			Enabled:       true,
@@ -229,13 +229,13 @@ func (sm *SecretsManager) createRedisSecrets() *SecretConfiguration {
 		Tags: map[string]string{
 			"service":     "redis",
 			"type":        "password",
-			"environment": string(sm.config.Environment),
+			"environment": string(sm.configManager.GetEnvironment()),
 		},
 		RotationPolicy: &SecretRotationPolicy{
 			Enabled:       true,
 			RotationDays:  60,
 			RetainOldDays: 7,
-			AutoRotate:    !sm.config.Environment.IsProduction(),
+			AutoRotate:    !sm.configManager.IsProduction(),
 			NotifyDays:    14,
 		},
 	}
@@ -249,7 +249,7 @@ func (sm *SecretsManager) createRedisSecrets() *SecretConfiguration {
 		Tags: map[string]string{
 			"service":     "redis",
 			"type":        "tls",
-			"environment": string(sm.config.Environment),
+			"environment": string(sm.configManager.GetEnvironment()),
 		},
 		RotationPolicy: &SecretRotationPolicy{
 			Enabled:       true,
@@ -278,7 +278,7 @@ func (sm *SecretsManager) createVaultSecrets() *SecretConfiguration {
 	envSecrets := make(map[string]string)
 	
 	// Vault root token (only for initialization)
-	if sm.config.Environment.IsDevelopment() {
+	if sm.configManager.IsDevelopment() {
 		secrets["root-token"] = SecretMetadata{
 			Name:        "vault-root-token",
 			Description: "Vault root token (development only)",
@@ -308,7 +308,7 @@ func (sm *SecretsManager) createVaultSecrets() *SecretConfiguration {
 				"service":     "vault",
 				"type":        "unseal-key",
 				"key-number":  fmt.Sprintf("%d", i),
-				"environment": string(sm.config.Environment),
+				"environment": string(sm.configManager.GetEnvironment()),
 			},
 			RotationPolicy: &SecretRotationPolicy{
 				Enabled:    false,
@@ -326,7 +326,7 @@ func (sm *SecretsManager) createVaultSecrets() *SecretConfiguration {
 		Tags: map[string]string{
 			"service":     "vault",
 			"type":        "tls",
-			"environment": string(sm.config.Environment),
+			"environment": string(sm.configManager.GetEnvironment()),
 		},
 		RotationPolicy: &SecretRotationPolicy{
 			Enabled:       true,
@@ -362,13 +362,13 @@ func (sm *SecretsManager) createGrafanaSecrets() *SecretConfiguration {
 		Tags: map[string]string{
 			"service":     "grafana",
 			"type":        "password",
-			"environment": string(sm.config.Environment),
+			"environment": string(sm.configManager.GetEnvironment()),
 		},
 		RotationPolicy: &SecretRotationPolicy{
 			Enabled:       true,
 			RotationDays:  90,
 			RetainOldDays: 7,
-			AutoRotate:    !sm.config.Environment.IsProduction(),
+			AutoRotate:    !sm.configManager.IsProduction(),
 			NotifyDays:    14,
 		},
 	}
@@ -382,7 +382,7 @@ func (sm *SecretsManager) createGrafanaSecrets() *SecretConfiguration {
 		Tags: map[string]string{
 			"service":     "grafana",
 			"type":        "encryption-key",
-			"environment": string(sm.config.Environment),
+			"environment": string(sm.configManager.GetEnvironment()),
 		},
 		RotationPolicy: &SecretRotationPolicy{
 			Enabled:       true,
@@ -402,7 +402,7 @@ func (sm *SecretsManager) createGrafanaSecrets() *SecretConfiguration {
 		Tags: map[string]string{
 			"service":     "grafana",
 			"type":        "database-password",
-			"environment": string(sm.config.Environment),
+			"environment": string(sm.configManager.GetEnvironment()),
 		},
 		RotationPolicy: &SecretRotationPolicy{
 			Enabled:       true,
@@ -432,7 +432,7 @@ func (sm *SecretsManager) createAzuriteSecrets() *SecretConfiguration {
 	envSecrets := make(map[string]string)
 	
 	// Only for development - staging/production use real Azure Storage with managed identity
-	if sm.config.Environment.IsDevelopment() {
+	if sm.configManager.IsDevelopment() {
 		secrets["account-key"] = SecretMetadata{
 			Name:        "azurite-account-key",
 			Description: "Azurite storage account key",
@@ -459,7 +459,7 @@ func (sm *SecretsManager) createAzuriteSecrets() *SecretConfiguration {
 	}
 }
 
-func (sm *SecretsManager) createApplicationSecrets(serviceName string, appConfig config.ApplicationConfig) *SecretConfiguration {
+func (sm *SecretsManager) createApplicationSecrets(serviceName string) *SecretConfiguration {
 	secrets := make(map[string]SecretMetadata)
 	secretMounts := make(map[string]string)
 	envSecrets := make(map[string]string)
@@ -473,7 +473,7 @@ func (sm *SecretsManager) createApplicationSecrets(serviceName string, appConfig
 		Tags: map[string]string{
 			"service":     serviceName,
 			"type":        "jwt-key",
-			"environment": string(sm.config.Environment),
+			"environment": string(sm.configManager.GetEnvironment()),
 		},
 		RotationPolicy: &SecretRotationPolicy{
 			Enabled:       true,
@@ -493,7 +493,7 @@ func (sm *SecretsManager) createApplicationSecrets(serviceName string, appConfig
 		Tags: map[string]string{
 			"service":     serviceName,
 			"type":        "external-api-key",
-			"environment": string(sm.config.Environment),
+			"environment": string(sm.configManager.GetEnvironment()),
 		},
 		RotationPolicy: &SecretRotationPolicy{
 			Enabled:       true,
@@ -544,7 +544,7 @@ func (sm *SecretsManager) createSystemSecrets() *SecretConfiguration {
 		Tags: map[string]string{
 			"service":     "dapr",
 			"type":        "api-token",
-			"environment": string(sm.config.Environment),
+			"environment": string(sm.configManager.GetEnvironment()),
 		},
 		RotationPolicy: &SecretRotationPolicy{
 			Enabled:       true,
@@ -564,7 +564,7 @@ func (sm *SecretsManager) createSystemSecrets() *SecretConfiguration {
 		Tags: map[string]string{
 			"service":     "registry",
 			"type":        "credentials",
-			"environment": string(sm.config.Environment),
+			"environment": string(sm.configManager.GetEnvironment()),
 		},
 		RotationPolicy: &SecretRotationPolicy{
 			Enabled:       true,
@@ -584,7 +584,7 @@ func (sm *SecretsManager) createSystemSecrets() *SecretConfiguration {
 		Tags: map[string]string{
 			"service":     "backup",
 			"type":        "encryption-key",
-			"environment": string(sm.config.Environment),
+			"environment": string(sm.configManager.GetEnvironment()),
 		},
 		RotationPolicy: &SecretRotationPolicy{
 			Enabled:       true,

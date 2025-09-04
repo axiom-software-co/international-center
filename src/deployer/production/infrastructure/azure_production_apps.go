@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/pulumi/pulumi-azure-native/sdk/v2/go/azurenative/app"
-	"github.com/pulumi/pulumi-azure-native/sdk/v2/go/azurenative/network"
-	"github.com/pulumi/pulumi-azure-native/sdk/v2/go/azurenative/resources"
-	"github.com/pulumi/pulumi-azure-native/sdk/v2/go/azurenative/security"
+	"github.com/pulumi/pulumi-azure-native-sdk/app"
+	"github.com/pulumi/pulumi-azure-native-sdk/network"
+	"github.com/pulumi/pulumi-azure-native-sdk/resources"
+	"github.com/pulumi/pulumi-azure-native-sdk/security"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 )
 

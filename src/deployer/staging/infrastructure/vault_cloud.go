@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/pulumi/pulumi-azure-native/sdk/v2/go/azurenative/keyvault"
-	"github.com/pulumi/pulumi-azure-native/sdk/v2/go/azurenative/resources"
+	"github.com/pulumi/pulumi-azure-native-sdk/keyvault"
+	"github.com/pulumi/pulumi-azure-native-sdk/resources"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 )
 

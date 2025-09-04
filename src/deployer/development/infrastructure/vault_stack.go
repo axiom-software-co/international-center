@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"os"
 	"strconv"
 	"time"
 
@@ -14,6 +13,7 @@ import (
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi/config"
 	sharedconfig "github.com/axiom-software-co/international-center/src/deployer/shared/config"
+	sharedinfra "github.com/axiom-software-co/international-center/src/deployer/shared/infrastructure"
 )
 
 type VaultStack struct {
@@ -45,6 +45,28 @@ type VaultDeployment struct {
 	NetworkID       pulumi.StringOutput `pulumi:"networkId"`
 }
 
+// Implement the shared VaultDeployment interface
+func (vd *VaultDeployment) GetVaultEndpoint() pulumi.StringOutput {
+	return vd.VaultEndpoint
+}
+
+func (vd *VaultDeployment) GetUIEndpoint() pulumi.StringOutput {
+	return vd.VaultEndpoint
+}
+
+func (vd *VaultDeployment) GetRootToken() pulumi.StringOutput {
+	return vd.VaultToken
+}
+
+func (vd *VaultDeployment) GetUnsealKeys() []pulumi.StringOutput {
+	// In development mode, Vault runs in dev mode with no unseal keys
+	return []pulumi.StringOutput{}
+}
+
+func (vd *VaultDeployment) GetServiceAccount() string {
+	return "development-vault"
+}
+
 func NewVaultStack(ctx *pulumi.Context, config *config.Config, networkName, environment string) *VaultStack {
 	// Create ConfigManager for centralized configuration
 	configManager, err := sharedconfig.NewConfigManager(ctx)
@@ -70,7 +92,7 @@ func NewVaultStack(ctx *pulumi.Context, config *config.Config, networkName, envi
 	return component
 }
 
-func (vs *VaultStack) Deploy(ctx context.Context) (*VaultDeployment, error) {
+func (vs *VaultStack) Deploy(ctx context.Context) (sharedinfra.VaultDeployment, error) {
 	deployment := &VaultDeployment{}
 	
 	// Register the deployment as a child ComponentResource
@@ -364,7 +386,12 @@ func (vs *VaultStack) deployVaultContainer(deployment *VaultDeployment) (*docker
 	return container, nil
 }
 
-func (vs *VaultStack) InitializeSecrets(ctx context.Context, deployment *VaultDeployment) error {
+func (vs *VaultStack) InitializeSecrets(ctx context.Context, deployment sharedinfra.VaultDeployment) error {
+	// Cast to concrete type to access implementation details
+	_, ok := deployment.(*VaultDeployment)
+	if !ok {
+		return fmt.Errorf("deployment is not a valid VaultDeployment implementation")
+	}
 	vaultURL, vaultToken, _ := vs.GetVaultConnectionInfo()
 	
 	var databaseSecrets, redisSecrets, storageSecrets, applicationSecrets map[string]interface{}
@@ -461,7 +488,7 @@ func (vs *VaultStack) storeSecret(ctx context.Context, vaultURL, vaultToken, pat
 	return nil
 }
 
-func (vs *VaultStack) CreatePolicies(ctx context.Context, deployment *VaultDeployment) error {
+func (vs *VaultStack) CreatePolicies(ctx context.Context, deployment sharedinfra.VaultDeployment) error {
 	vaultURL, vaultToken, _ := vs.GetVaultConnectionInfo()
 
 	policies := []struct {
@@ -566,15 +593,21 @@ func (vs *VaultStack) createPolicy(ctx context.Context, vaultURL, vaultToken, po
 	return nil
 }
 
-func (vs *VaultStack) ValidateDeployment(ctx context.Context, deployment *VaultDeployment) error {
-	if deployment.VaultContainer == nil {
+func (vs *VaultStack) ValidateDeployment(ctx context.Context, deployment sharedinfra.VaultDeployment) error {
+	// Cast to concrete type to access implementation details
+	concreteDeployment, ok := deployment.(*VaultDeployment)
+	if !ok {
+		return fmt.Errorf("deployment is not a valid VaultDeployment implementation")
+	}
+
+	if concreteDeployment.VaultContainer == nil {
 		return fmt.Errorf("Vault container is not deployed")
 	}
 
 	return nil
 }
 
-func (vs *VaultStack) GetVaultConnectionInfo() (string, string, string) {
+func (vs *VaultStack) GetVaultConnectionInfo() (string, string, error) {
 	vaultHost := "localhost"
 	vaultPort := vs.config.RequireInt("vault_port")
 	vaultToken := vs.config.Get("vault_dev_root_token")
@@ -583,7 +616,7 @@ func (vs *VaultStack) GetVaultConnectionInfo() (string, string, string) {
 	}
 
 	vaultURL := fmt.Sprintf("http://%s:%d", vaultHost, vaultPort)
-	return vaultURL, vaultToken, vaultHost
+	return vaultURL, vaultToken, nil
 }
 
 func (vs *VaultStack) GetDaprSecretStoreConfiguration() map[string]interface{} {

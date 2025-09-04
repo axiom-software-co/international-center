@@ -96,47 +96,6 @@ type DaprServiceConfig struct {
 	MTLSEnabled bool
 }
 
-type DaprConfiguration struct {
-	Version     string
-	Placement   DaprPlacementConfig
-	Components  []DaprComponentConfig
-	Tracing     DaprTracingConfig
-	Metrics     DaprMetricsConfig
-	Security    DaprSecurityConfig
-}
-
-type DaprPlacementConfig struct {
-	Host string
-	Port int
-}
-
-type DaprComponentConfig struct {
-	Name    string
-	Type    string
-	Version string
-	Scopes  []string
-	Spec    map[string]interface{}
-}
-
-type DaprTracingConfig struct {
-	SamplingRate float64
-	Endpoint     string
-	Protocol     string
-}
-
-type DaprMetricsConfig struct {
-	Enabled    bool
-	Port       int
-	Path       string
-	Namespace  string
-}
-
-type DaprSecurityConfig struct {
-	MTLSEnabled           bool
-	TokenValidation       bool
-	TrustDomain          string
-	AccessControlPolicies []string
-}
 
 type ScalingMetric struct {
 	Type       string // "cpu", "memory", "http", "custom"
@@ -459,46 +418,3 @@ func getDefaultServices() []ServiceConfig {
 	return getDevelopmentServices()
 }
 
-func GetDaprConfiguration(environment string) DaprConfiguration {
-	base := DaprConfiguration{
-		Version: "1.12.0",
-		Placement: DaprPlacementConfig{
-			Host: "dapr-placement",
-			Port: 50005,
-		},
-		Tracing: DaprTracingConfig{
-			SamplingRate: 0.1,
-			Protocol:     "grpc",
-		},
-		Metrics: DaprMetricsConfig{
-			Enabled:   true,
-			Port:      9090,
-			Path:      "/metrics",
-			Namespace: "international-center",
-		},
-	}
-
-	switch environment {
-	case "development":
-		base.Security = DaprSecurityConfig{
-			MTLSEnabled:     false,
-			TokenValidation: false,
-		}
-	case "staging":
-		base.Security = DaprSecurityConfig{
-			MTLSEnabled:     true,
-			TokenValidation: true,
-			TrustDomain:    "staging.international-center.com",
-		}
-		base.Tracing.SamplingRate = 0.5
-	case "production":
-		base.Security = DaprSecurityConfig{
-			MTLSEnabled:     true,
-			TokenValidation: true,
-			TrustDomain:    "international-center.com",
-		}
-		base.Tracing.SamplingRate = 0.1 // Lower sampling in production
-	}
-
-	return base
-}

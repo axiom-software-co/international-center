@@ -6,11 +6,11 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/axiom-software-co/international-center/src/deployer/shared/infrastructure"
 	"github.com/pulumi/pulumi-docker/sdk/v4/go/docker"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi/config"
 	sharedconfig "github.com/axiom-software-co/international-center/src/deployer/shared/config"
+	sharedinfra "github.com/axiom-software-co/international-center/src/deployer/shared/infrastructure"
 )
 
 type ServiceStack struct {
@@ -18,7 +18,7 @@ type ServiceStack struct {
 	ctx             *pulumi.Context
 	config          *config.Config
 	configManager   *sharedconfig.ConfigManager
-	containerRuntime *infrastructure.ContainerRuntime
+	containerRuntime *sharedinfra.ContainerRuntime
 	daprDeployment  *DaprDeployment
 	networkName     string
 	environment     string
@@ -63,6 +63,67 @@ type ServiceDeployment struct {
 	NetworkID              pulumi.StringOutput `pulumi:"networkId"`
 }
 
+// Implement the shared ServiceDeployment interface
+func (sd *ServiceDeployment) GetServiceEndpoint(serviceName string) pulumi.StringOutput {
+	switch serviceName {
+	case "content-api":
+		return sd.ContentAPIEndpoint
+	case "services-api":
+		return sd.ServicesAPIEndpoint
+	case "public-gateway":
+		return sd.PublicGatewayEndpoint
+	case "admin-gateway":
+		return sd.AdminGatewayEndpoint
+	default:
+		return pulumi.String("").ToStringOutput()
+	}
+}
+
+func (sd *ServiceDeployment) GetServiceHealthEndpoint(serviceName string) string {
+	switch serviceName {
+	case "content-api":
+		return "http://localhost:8080/health"
+	case "services-api":
+		return "http://localhost:8081/health"
+	case "public-gateway":
+		return "http://localhost:8082/health"
+	case "admin-gateway":
+		return "http://localhost:8083/health"
+	default:
+		return ""
+	}
+}
+
+func (sd *ServiceDeployment) GetServiceMetrics() sharedinfra.ServiceMetrics {
+	return sharedinfra.ServiceMetrics{
+		Availability:        0.99,
+		ResponseTime:        100.0,
+		ThroughputRPS:       100,
+		ErrorRate:           0.01,
+		ResourceUtilization: map[string]float64{"cpu": 0.5, "memory": 0.6},
+	}
+}
+
+func (sd *ServiceDeployment) GetScalingConfiguration() sharedinfra.ScalingConfiguration {
+	return sharedinfra.ScalingConfiguration{
+		Strategy:     "reactive",
+		MinInstances: 1,
+		MaxInstances: 3,
+		Metrics:      []sharedinfra.ScalingMetric{{Type: "cpu", Threshold: 80, Window: "2m"}},
+		Cooldown:     300,
+	}
+}
+
+func (sd *ServiceDeployment) GetNetworkConfiguration() sharedinfra.ServiceNetworkConfiguration {
+	return sharedinfra.ServiceNetworkConfiguration{
+		Type:           "bridge",
+		ExternalAccess: true,
+		InternalDNS:    true,
+		LoadBalancer:   sharedinfra.ServiceLoadBalancerConfig{Enabled: false},
+		ServiceMesh:    sharedinfra.ServiceMeshConfig{Enabled: true, Provider: "dapr"},
+	}
+}
+
 func NewServiceStack(ctx *pulumi.Context, config *config.Config, daprDeployment *DaprDeployment, networkName, environment, projectRoot string) *ServiceStack {
 	// Create ConfigManager for centralized configuration
 	configManager, err := sharedconfig.NewConfigManager(ctx)
@@ -71,7 +132,7 @@ func NewServiceStack(ctx *pulumi.Context, config *config.Config, daprDeployment 
 		configManager = nil
 	}
 	
-	containerRuntime := infrastructure.NewContainerRuntime(ctx, "podman", "localhost", 5000)
+	containerRuntime := sharedinfra.NewContainerRuntime(ctx, "podman", "localhost", 5000)
 	
 	component := &ServiceStack{
 		ctx:              ctx,
@@ -93,7 +154,7 @@ func NewServiceStack(ctx *pulumi.Context, config *config.Config, daprDeployment 
 	return component
 }
 
-func (ss *ServiceStack) Deploy(ctx context.Context) (*ServiceDeployment, error) {
+func (ss *ServiceStack) Deploy(ctx context.Context) (sharedinfra.ServiceDeployment, error) {
 	deployment := &ServiceDeployment{}
 	
 	var err error
@@ -341,7 +402,7 @@ func (ss *ServiceStack) deployDaprSidecar(appID string, daprHTTPPort, daprGRPCPo
 }
 
 func (ss *ServiceStack) deployContentAPIContainer(deployment *ServiceDeployment) (*docker.Container, error) {
-	return ss.deployServiceContainer(infrastructure.ContainerConfig{
+	return ss.deployServiceContainer(sharedinfra.ContainerConfig{
 		Name:  fmt.Sprintf("%s-content-api", ss.environment),
 		Image: "content-api",
 		Tag:   "latest",
@@ -355,12 +416,12 @@ func (ss *ServiceStack) deployContentAPIContainer(deployment *ServiceDeployment)
 			"DAPR_HTTP_PORT":     pulumi.String("3501"),
 			"DAPR_GRPC_PORT":     pulumi.String("50002"),
 		},
-		Ports: []infrastructure.ContainerPort{
+		Ports: []sharedinfra.ContainerPort{
 			{Internal: 8080, External: 8080, Protocol: "tcp"},
 		},
 		Networks: []string{fmt.Sprintf("%s-service-network", ss.environment)},
 		RestartPolicy: "unless-stopped",
-		HealthCheck: infrastructure.ContainerHealthCheck{
+		HealthCheck: sharedinfra.ContainerHealthCheck{
 			Test:     []string{"CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1"},
 			Interval: 30 * time.Second,
 			Timeout:  10 * time.Second,
@@ -380,7 +441,7 @@ func (ss *ServiceStack) deployContentAPIContainer(deployment *ServiceDeployment)
 }
 
 func (ss *ServiceStack) deployServicesAPIContainer(deployment *ServiceDeployment) (*docker.Container, error) {
-	return ss.deployServiceContainer(infrastructure.ContainerConfig{
+	return ss.deployServiceContainer(sharedinfra.ContainerConfig{
 		Name:  fmt.Sprintf("%s-services-api", ss.environment),
 		Image: "services-api",
 		Tag:   "latest",
@@ -394,12 +455,12 @@ func (ss *ServiceStack) deployServicesAPIContainer(deployment *ServiceDeployment
 			"DAPR_HTTP_PORT":     pulumi.String("3502"),
 			"DAPR_GRPC_PORT":     pulumi.String("50003"),
 		},
-		Ports: []infrastructure.ContainerPort{
+		Ports: []sharedinfra.ContainerPort{
 			{Internal: 8081, External: 8081, Protocol: "tcp"},
 		},
 		Networks: []string{fmt.Sprintf("%s-service-network", ss.environment)},
 		RestartPolicy: "unless-stopped",
-		HealthCheck: infrastructure.ContainerHealthCheck{
+		HealthCheck: sharedinfra.ContainerHealthCheck{
 			Test:     []string{"CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8081/health || exit 1"},
 			Interval: 30 * time.Second,
 			Timeout:  10 * time.Second,
@@ -419,7 +480,7 @@ func (ss *ServiceStack) deployServicesAPIContainer(deployment *ServiceDeployment
 }
 
 func (ss *ServiceStack) deployPublicGatewayContainer(deployment *ServiceDeployment) (*docker.Container, error) {
-	return ss.deployServiceContainer(infrastructure.ContainerConfig{
+	return ss.deployServiceContainer(sharedinfra.ContainerConfig{
 		Name:  fmt.Sprintf("%s-public-gateway", ss.environment),
 		Image: "public-gateway",
 		Tag:   "latest",
@@ -433,12 +494,12 @@ func (ss *ServiceStack) deployPublicGatewayContainer(deployment *ServiceDeployme
 			"CONTENT_API_URL":         pulumi.String("http://localhost:3501"),
 			"SERVICES_API_URL":        pulumi.String("http://localhost:3502"),
 		},
-		Ports: []infrastructure.ContainerPort{
+		Ports: []sharedinfra.ContainerPort{
 			{Internal: 8082, External: 8082, Protocol: "tcp"},
 		},
 		Networks: []string{fmt.Sprintf("%s-service-network", ss.environment)},
 		RestartPolicy: "unless-stopped",
-		HealthCheck: infrastructure.ContainerHealthCheck{
+		HealthCheck: sharedinfra.ContainerHealthCheck{
 			Test:     []string{"CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8082/health || exit 1"},
 			Interval: 30 * time.Second,
 			Timeout:  10 * time.Second,
@@ -459,7 +520,7 @@ func (ss *ServiceStack) deployPublicGatewayContainer(deployment *ServiceDeployme
 }
 
 func (ss *ServiceStack) deployAdminGatewayContainer(deployment *ServiceDeployment) (*docker.Container, error) {
-	return ss.deployServiceContainer(infrastructure.ContainerConfig{
+	return ss.deployServiceContainer(sharedinfra.ContainerConfig{
 		Name:  fmt.Sprintf("%s-admin-gateway", ss.environment),
 		Image: "admin-gateway",
 		Tag:   "latest",
@@ -473,12 +534,12 @@ func (ss *ServiceStack) deployAdminGatewayContainer(deployment *ServiceDeploymen
 			"CONTENT_API_URL":         pulumi.String("http://localhost:3501"),
 			"SERVICES_API_URL":        pulumi.String("http://localhost:3502"),
 		},
-		Ports: []infrastructure.ContainerPort{
+		Ports: []sharedinfra.ContainerPort{
 			{Internal: 8083, External: 8083, Protocol: "tcp"},
 		},
 		Networks: []string{fmt.Sprintf("%s-service-network", ss.environment)},
 		RestartPolicy: "unless-stopped",
-		HealthCheck: infrastructure.ContainerHealthCheck{
+		HealthCheck: sharedinfra.ContainerHealthCheck{
 			Test:     []string{"CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8083/health || exit 1"},
 			Interval: 30 * time.Second,
 			Timeout:  10 * time.Second,
@@ -498,7 +559,7 @@ func (ss *ServiceStack) deployAdminGatewayContainer(deployment *ServiceDeploymen
 	})
 }
 
-func (ss *ServiceStack) deployServiceContainer(config infrastructure.ContainerConfig) (*docker.Container, error) {
+func (ss *ServiceStack) deployServiceContainer(config sharedinfra.ContainerConfig) (*docker.Container, error) {
 	return ss.containerRuntime.CreateContainer(config)
 }
 
@@ -527,38 +588,57 @@ func (ss *ServiceStack) getDatabaseURL() string {
 	return fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=disable", user, password, host, port, dbname)
 }
 
-func (ss *ServiceStack) ValidateDeployment(ctx context.Context, deployment *ServiceDeployment) error {
-	if deployment.ContentAPIContainer == nil {
+func (ss *ServiceStack) ValidateDeployment(ctx context.Context, deployment sharedinfra.ServiceDeployment) error {
+	// Cast to concrete type to access implementation details
+	concreteDeployment, ok := deployment.(*ServiceDeployment)
+	if !ok {
+		return fmt.Errorf("deployment is not a valid ServiceDeployment implementation")
+	}
+	
+	if concreteDeployment.ContentAPIContainer == nil {
 		return fmt.Errorf("content-api container is not deployed")
 	}
 	
-	if deployment.ServicesAPIContainer == nil {
+	if concreteDeployment.ServicesAPIContainer == nil {
 		return fmt.Errorf("services-api container is not deployed")
 	}
 	
-	if deployment.PublicGatewayContainer == nil {
+	if concreteDeployment.PublicGatewayContainer == nil {
 		return fmt.Errorf("public-gateway container is not deployed")
 	}
 	
-	if deployment.AdminGatewayContainer == nil {
+	if concreteDeployment.AdminGatewayContainer == nil {
 		return fmt.Errorf("admin-gateway container is not deployed")
 	}
 	
-	if deployment.ContentAPIDaprSidecar == nil {
+	if concreteDeployment.ContentAPIDaprSidecar == nil {
 		return fmt.Errorf("content-api Dapr sidecar is not deployed")
 	}
 	
-	if deployment.ServicesAPIDaprSidecar == nil {
+	if concreteDeployment.ServicesAPIDaprSidecar == nil {
 		return fmt.Errorf("services-api Dapr sidecar is not deployed")
 	}
 	
-	if deployment.PublicGatewayDaprSidecar == nil {
+	if concreteDeployment.PublicGatewayDaprSidecar == nil {
 		return fmt.Errorf("public-gateway Dapr sidecar is not deployed")
 	}
 	
-	if deployment.AdminGatewayDaprSidecar == nil {
+	if concreteDeployment.AdminGatewayDaprSidecar == nil {
 		return fmt.Errorf("admin-gateway Dapr sidecar is not deployed")
 	}
 	
 	return nil
+}
+
+func (ss *ServiceStack) GetServiceEndpoints() map[string]string {
+	return map[string]string{
+		"content-api":     "http://localhost:8080",
+		"services-api":    "http://localhost:8081",
+		"public-gateway":  "http://localhost:8082",
+		"admin-gateway":   "http://localhost:8083",
+	}
+}
+
+func (ss *ServiceStack) GetDaprConfiguration() sharedinfra.DaprConfiguration {
+	return *sharedinfra.GetDaprConfiguration("development", ss.config)
 }
