@@ -147,7 +147,7 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue';
-import { useEvent, useEvents } from '../../composables/useEvents';
+import { useEvent, useEvents } from '@/composables/';
 import { getEventSlugFromUrl } from '../../lib/utils/url';
 import { generateEventImageUrl } from '../../lib/utils/content';
 import EventBreadcrumb from './EventBreadcrumb.vue';

@@ -257,10 +257,15 @@ import ArticleCard from '../ArticleCard.vue';
 import { resolveAssetUrl } from '@/lib/utils/assets';
 import { formatArticleDate } from '@/lib/utils/date';
 
-// Import composables based on content type
-import { useNews, useFeaturedNews } from '@/lib/clients/composables/useNews';
-import { useResearchArticles, useFeaturedResearch } from '@/composables/useResearch';
-import { useEvents, useFeaturedEvents } from '@/composables/useEvents';
+// Import composables from centralized API
+import { 
+  useNews, 
+  useFeaturedNews,
+  useResearchArticles, 
+  useFeaturedResearch,
+  useEvents, 
+  useFeaturedEvents 
+} from '@/composables/';
 
 interface ContentArticle {
   id: string | number;

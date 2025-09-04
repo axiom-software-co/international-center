@@ -33,9 +33,14 @@ vi.mock('../ArticleCard.vue', () => ({
 }));
 
 // Import mocked composables
-import { useNews, useFeaturedNews } from '@/lib/clients/composables/useNews';
-import { useResearchArticles, useFeaturedResearch } from '@/composables/useResearch';
-import { useEvents, useFeaturedEvents } from '@/composables/useEvents';
+import { 
+  useNews, 
+  useFeaturedNews,
+  useResearchArticles, 
+  useFeaturedResearch,
+  useEvents, 
+  useFeaturedEvents 
+} from '@/composables/';
 
 describe('ContentHub', () => {
   // Get mocked functions

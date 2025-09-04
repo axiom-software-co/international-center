@@ -166,7 +166,7 @@ import { resolveAssetUrl } from '@/lib/utils/assets';
 import { formatArticleDate, getDisplayDate } from '@/lib/utils/date';
 import { getNewsSlugFromUrl } from '@/lib/utils/url';
 import { calculateReadingTime, generateHeroImageUrl, generateImageAlt, formatAuthorName } from '@/lib/utils/content';
-import { useNewsArticle, useFeaturedNews } from '@/lib/clients/composables/useNews';
+import { useNewsArticle, useFeaturedNews } from '@/composables/';
 import type { NewsArticle } from '@/lib/clients/news/types';
 
 interface NewsArticlePageData {

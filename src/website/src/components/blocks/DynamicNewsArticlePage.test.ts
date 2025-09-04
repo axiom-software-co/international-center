@@ -3,10 +3,10 @@ import { mount } from '@vue/test-utils';
 import { ref, nextTick } from 'vue';
 import DynamicNewsArticlePage from './DynamicNewsArticlePage.vue';
 import type { NewsArticle } from '@/lib/clients/news/types';
-import * as newsComposables from '@/lib/clients/composables/useNews';
+import * as newsComposables from '@/composables/';
 
 // Mock composables
-vi.mock('@/lib/clients/composables/useNews', () => ({
+vi.mock('@/composables/', () => ({
   useNewsArticle: vi.fn(),
   useFeaturedNews: vi.fn()
 }));

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/axiom-software-co/international-center/src/backend/internal/shared/domain"
 	"github.com/gorilla/mux"
@@ -429,4 +430,27 @@ func (h *DonationsHandler) writeJSONResponse(w http.ResponseWriter, statusCode i
 	if data != nil {
 		json.NewEncoder(w).Encode(data)
 	}
+}
+
+// HealthCheck provides a health check endpoint
+func (h *DonationsHandler) HealthCheck(w http.ResponseWriter, r *http.Request) {
+	h.writeJSONResponse(w, http.StatusOK, map[string]interface{}{
+		"status":    "ok",
+		"service":   "donations-api",
+		"timestamp": time.Now().UTC().Format(time.RFC3339),
+	})
+}
+
+// ReadinessCheck provides a readiness check endpoint
+func (h *DonationsHandler) ReadinessCheck(w http.ResponseWriter, r *http.Request) {
+	// In a real implementation, this would check:
+	// - Dapr connectivity
+	// - State store accessibility
+	// - Blob storage connectivity
+	// For now, just return OK
+	
+	h.writeJSONResponse(w, http.StatusOK, map[string]interface{}{
+		"status":  "ready",
+		"service": "donations-api",
+	})
 }

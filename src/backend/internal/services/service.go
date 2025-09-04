@@ -821,7 +821,7 @@ func (s *ServicesService) AdminCreateServiceCategory(ctx context.Context, catego
 	}
 
 	// Publish audit event
-	return s.repository.PublishAuditEvent(ctx, domain.EntityTypeCategory, category.CategoryID, domain.AuditEventInsert, userID, nil, category)
+	return s.repository.PublishAuditEvent(ctx, domain.EntityTypeServiceCategory, category.CategoryID, domain.AuditEventInsert, userID, nil, category)
 }
 
 // AdminUpdateServiceCategory updates an existing service category (admin only)
@@ -848,7 +848,7 @@ func (s *ServicesService) AdminUpdateServiceCategory(ctx context.Context, catego
 	}
 
 	// Publish audit event
-	return s.repository.PublishAuditEvent(ctx, domain.EntityTypeCategory, category.CategoryID, domain.AuditEventUpdate, userID, existing, category)
+	return s.repository.PublishAuditEvent(ctx, domain.EntityTypeServiceCategory, category.CategoryID, domain.AuditEventUpdate, userID, existing, category)
 }
 
 // AdminDeleteServiceCategory soft deletes a service category (admin only)
@@ -879,7 +879,7 @@ func (s *ServicesService) AdminDeleteServiceCategory(ctx context.Context, catego
 	}
 
 	// Publish audit event
-	return s.repository.PublishAuditEvent(ctx, domain.EntityTypeCategory, categoryID, domain.AuditEventDelete, userID, existing, nil)
+	return s.repository.PublishAuditEvent(ctx, domain.EntityTypeServiceCategory, categoryID, domain.AuditEventDelete, userID, existing, nil)
 }
 
 // AdminSetFeaturedCategories sets the featured categories list (admin only)

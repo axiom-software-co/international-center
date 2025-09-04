@@ -156,7 +156,7 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue';
-import { useResearchArticle, useResearchArticles } from '../../composables/useResearch';
+import { useResearchArticle, useResearchArticles } from '@/composables/';
 import { getResearchSlugFromUrl } from '../../lib/utils/url';
 import { generateHeroImageUrl, calculateReadingTime, formatAuthorName } from '../../lib/utils/content';
 import { formatArticleDate } from '../../lib/utils/date';

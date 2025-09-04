@@ -338,7 +338,7 @@ func (m *MockServicesRepository) GetServiceAudit(ctx context.Context, serviceID 
 		return nil, err
 	}
 	// Return mock audit events for this service
-	var events []*ServiceAuditEvent
+	events := []*ServiceAuditEvent{}
 	for _, auditEvent := range m.auditEvents {
 		if auditEvent.EntityID == serviceID && auditEvent.EntityType == domain.EntityTypeService {
 			events = append(events, &ServiceAuditEvent{
@@ -367,7 +367,7 @@ func (m *MockServicesRepository) GetServiceCategoryAudit(ctx context.Context, ca
 	// Return mock audit events for this category
 	var events []*ServiceAuditEvent
 	for _, auditEvent := range m.auditEvents {
-		if auditEvent.EntityID == categoryID && auditEvent.EntityType == domain.EntityTypeCategory {
+		if auditEvent.EntityID == categoryID && auditEvent.EntityType == domain.EntityTypeServiceCategory {
 			events = append(events, &ServiceAuditEvent{
 				AuditID:       fmt.Sprintf("audit-%s-%d", categoryID, len(events)+1),
 				EntityType:    string(auditEvent.EntityType),
@@ -1014,7 +1014,7 @@ func TestServicesService_GetServiceCategoryAudit(t *testing.T) {
 				// Add audit events
 				repo.auditEvents = []MockAuditEvent{
 					{
-						EntityType:    domain.EntityTypeCategory,
+						EntityType:    domain.EntityTypeServiceCategory,
 						EntityID:      "category-1",
 						OperationType: domain.AuditEventInsert,
 						UserID:        "creator-1",
