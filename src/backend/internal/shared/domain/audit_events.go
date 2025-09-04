@@ -41,6 +41,7 @@ const (
 	EntityTypeBusiness EntityType = "business"
 	EntityTypeDonations EntityType = "donations"
 	EntityTypeMedia EntityType = "media"
+	EntityTypeVolunteerApplication EntityType = "volunteer_application"
 )
 
 // AuditEvent represents a complete audit event for compliance
@@ -156,7 +157,7 @@ func (a *AuditEvent) Validate() error {
 // IsValidEntityType checks if the entity type is valid
 func IsValidEntityType(entityType EntityType) bool {
 	switch entityType {
-	case EntityTypeService, EntityTypeServiceCategory, EntityTypeCategory, EntityTypeFeatured, EntityTypeContent, EntityTypeUser, EntityTypeMigration, EntityTypeNews, EntityTypeNewsCategory, EntityTypeFeaturedNews, EntityTypeResearch, EntityTypeResearchCategory, EntityTypeFeaturedResearch, EntityTypeEvent, EntityTypeEventCategory, EntityTypeFeaturedEvent, EntityTypeBusiness, EntityTypeDonations, EntityTypeMedia:
+	case EntityTypeService, EntityTypeServiceCategory, EntityTypeCategory, EntityTypeFeatured, EntityTypeContent, EntityTypeUser, EntityTypeMigration, EntityTypeNews, EntityTypeNewsCategory, EntityTypeFeaturedNews, EntityTypeResearch, EntityTypeResearchCategory, EntityTypeFeaturedResearch, EntityTypeEvent, EntityTypeEventCategory, EntityTypeFeaturedEvent, EntityTypeBusiness, EntityTypeDonations, EntityTypeMedia, EntityTypeVolunteerApplication:
 		return true
 	default:
 		return false
