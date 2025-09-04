@@ -105,14 +105,24 @@ func (suite *StagingValidationTestSuite) TestStagingSecurityValidation() {
 	t := suite.T()
 
 	t.Run("HTTPSEnforcement", func(t *testing.T) {
-		// Validate HTTPS enforcement in staging
+		// Validate HTTPS enforcement using Cloudflare domain validation
 		if suite.integrationSuite.Environment.APIEndpoint != "" {
 			suite.Require().Contains(suite.integrationSuite.Environment.APIEndpoint, "https://", 
 				"Staging API should enforce HTTPS")
+			
+			// Extract domain from API endpoint for Cloudflare validation
+			if suite.integrationSuite.Environment.APIEndpoint == "https://api.axiomcloud.dev" {
+				sharedtesting.ValidateHTTPSEnforcement(t, "api.axiomcloud.dev")
+			}
 		}
 		if suite.integrationSuite.Environment.AdminEndpoint != "" {
 			suite.Require().Contains(suite.integrationSuite.Environment.AdminEndpoint, "https://", 
 				"Staging Admin should enforce HTTPS")
+				
+			// Extract domain from Admin endpoint for Cloudflare validation
+			if suite.integrationSuite.Environment.AdminEndpoint == "https://admin.axiomcloud.dev" {
+				sharedtesting.ValidateHTTPSEnforcement(t, "admin.axiomcloud.dev")
+			}
 		}
 	})
 

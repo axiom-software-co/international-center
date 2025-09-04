@@ -496,6 +496,16 @@ func (d *DaprMockProvider) generateFileProperties(args pulumi.MockResourceArgs) 
 	return props
 }
 
+// Cleanup cleans up mock resources and providers
+func (m *InfrastructureMocks) Cleanup() {
+	// Clean up all providers
+	if m.providers != nil {
+		for providerName := range m.providers {
+			delete(m.providers, providerName)
+		}
+	}
+}
+
 // Utility function to generate unique resource suffixes
 func generateResourceSuffix() string {
 	return fmt.Sprintf("%d", time.Now().Unix()%10000)
