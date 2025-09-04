@@ -26,6 +26,9 @@ export type { RestClientConfig, RestResponse, PaginatedRestResponse } from './Ba
 // Services domain (REST-enabled)
 export { ServicesRestClient } from './ServicesRestClient';
 
+// News domain (REST-enabled)
+export { NewsRestClient } from './NewsRestClient';
+
 // Re-export services types
 export type {
   Service,
@@ -37,5 +40,16 @@ export type {
   LegacyServicesResponse,
 } from '../services/types';
 
-// Create singleton instance
+// Re-export news types
+export type {
+  NewsArticle,
+  NewsCategory,
+  NewsResponse,
+  NewsArticleResponse,
+  GetNewsParams,
+  SearchNewsParams,
+} from '../news/types';
+
+// Create singleton instances
 export const servicesClient = new ServicesRestClient();
+export const newsClient = new NewsRestClient();

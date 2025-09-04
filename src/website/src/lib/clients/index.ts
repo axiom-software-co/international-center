@@ -31,12 +31,20 @@ export type {
   ServiceCategory,
 } from './rest';
 
+// News domain (REST-enabled through Public Gateway)
+export { newsClient } from './rest';
+export type {
+  NewsArticle,
+  NewsCategory,
+  NewsResponse,
+  NewsArticleResponse,
+  GetNewsParams,
+  SearchNewsParams,
+} from './rest';
+
 // ====================================================================================
 // APIS ON HOLD - These will be migrated to REST architecture when development resumes
 // ====================================================================================
-
-// News domain (ON HOLD - gRPC implementation preserved but unused)
-// export { newsClient } from './news/NewsGrpcAdapter';
 
 // Research domain (ON HOLD - gRPC implementation preserved but unused)
 // export { researchGrpcClient as researchClient } from './grpc/clients';

@@ -30,7 +30,7 @@ export const localConfig = {
         retryAttempts: 2,
       },
       news: {
-        baseUrl: getBaseUrl('news-domain', 8082),
+        baseUrl: getPublicGatewayUrl(), // Route through Public Gateway for security and rate limiting
         timeout: 5000,
         retryAttempts: 2,
       },

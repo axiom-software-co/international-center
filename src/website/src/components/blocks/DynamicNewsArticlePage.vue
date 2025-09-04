@@ -155,7 +155,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { computed } from 'vue';
 import NewsBreadcrumb from './NewsBreadcrumb.vue';
 import NewsArticleContent from './NewsArticleContent.vue';
 import NewsArticleDetails from './NewsArticleDetails.vue';
@@ -163,20 +163,11 @@ import ContactCard from './ContactCard.vue';
 import UnifiedContentCTA from '../UnifiedContentCTA.vue';
 import ArticleCard from '../ArticleCard.vue';
 import { resolveAssetUrl } from '@/lib/utils/assets';
-
-interface NewsArticle {
-  id: string;
-  title: string;
-  slug: string;
-  description: string;
-  content?: string;
-  excerpt?: string;
-  featured_image?: string;
-  published_at: string;
-  author?: string;
-  category?: string;
-  reading_time?: string;
-}
+import { formatArticleDate, getDisplayDate } from '@/lib/utils/date';
+import { getNewsSlugFromUrl } from '@/lib/utils/url';
+import { calculateReadingTime, generateHeroImageUrl, generateImageAlt, formatAuthorName } from '@/lib/utils/content';
+import { useNewsArticle, useFeaturedNews } from '@/lib/clients/composables/useNews';
+import type { NewsArticle } from '@/lib/clients/news/types';
 
 interface NewsArticlePageData {
   id: string;
@@ -196,141 +187,46 @@ interface NewsArticlePageData {
   category?: string;
 }
 
-// Reactive state
-const article = ref<NewsArticle | null>(null);
-const relatedArticles = ref<NewsArticle[]>([]);
-const relatedArticlesType = ref<'category' | 'recent'>('category');
-const isLoading = ref(false);
-const error = ref<string | null>(null);
-const relatedLoading = ref(false);
-
-// Utility function to format dates
-const formatDate = (dateString: string): string => {
-  const date = new Date(dateString);
-  return date.toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  });
-};
+// Use composables for data fetching
+const slug = computed(() => getNewsSlugFromUrl());
+const { article, loading: isLoading, error } = useNewsArticle(slug);
+const { articles: relatedArticles, loading: relatedLoading } = useFeaturedNews(3);
 
 // Transform article data to match the expected structure
 const articleData = computed((): NewsArticlePageData | null => {
   if (!article.value) return null;
   
+  const displayDate = getDisplayDate(article.value.published_at, article.value.created_on);
+  const content = article.value.content || article.value.summary;
+  const resolvedImageUrl = resolveAssetUrl(article.value.image_url);
+  
   return {
-    id: article.value.id,
+    id: article.value.news_id,
     title: article.value.title,
     slug: article.value.slug,
-    description: article.value.description,
-    content: article.value.content || article.value.description || article.value.excerpt,
+    description: article.value.summary,
+    content,
     heroImage: {
-      src: resolveAssetUrl(article.value.featured_image) || `https://placehold.co/1200x600/2563eb/ffffff/png?text=${encodeURIComponent(article.value.title)}`,
-      alt: `${article.value.title} - International Center News`,
+      src: generateHeroImageUrl(resolvedImageUrl, article.value.title, 'news'),
+      alt: generateImageAlt(article.value.title, 'news'),
     },
     articleDetails: {
-      publishedAt: formatDate(article.value.published_at),
-      author: article.value.author || 'International Center Team',
-      readTime: article.value.reading_time || '5 min read',
+      publishedAt: formatArticleDate(displayDate),
+      author: formatAuthorName(article.value.author_name),
+      readTime: calculateReadingTime(content),
     },
-    category: article.value.category,
+    category: article.value.category_id,
   };
 });
 
 // Dynamic title for related articles section
 const relatedArticlesTitle = computed(() => {
-  if (relatedArticlesType.value === 'category' && articleData.value?.category) {
-    return `More from ${articleData.value.category}`;
-  }
+  const count = relatedArticles.value?.length || 0;
+  
+  if (count === 0) return 'More News Articles';
+  if (count === 1) return 'Related Article';
+  
   return 'More News Articles';
-});
-
-// Get slug from current URL
-const getSlugFromUrl = (): string => {
-  if (typeof window === 'undefined') return '';
-  const pathParts = window.location.pathname.split('/');
-  return pathParts[pathParts.length - 1] || '';
-};
-
-// Client-side data loading following services pattern
-onMounted(async () => {
-  try {
-    isLoading.value = true;
-    error.value = null;
-
-    const slug = getSlugFromUrl();
-    if (!slug) {
-      throw new Error('News article slug not found');
-    }
-
-    console.log(`🔍 [DynamicNewsArticlePage] Loading article: ${slug}`);
-
-    // Dynamic import for client-side code splitting
-    const { newsClient } = await import('../../lib/clients');
-    
-    const articleResult = await newsClient.getNewsArticleBySlug(slug);
-    
-    if (articleResult) {
-      article.value = articleResult;
-      console.log('✅ [DynamicNewsArticlePage] Article loaded:', articleResult);
-
-      // Fetch related articles from same category (excluding current article)
-      if (articleResult.category) {
-        try {
-          relatedLoading.value = true;
-          console.log(`🔍 [DynamicNewsArticlePage] Loading related articles for category: ${articleResult.category}`);
-          
-          // Get all articles and filter client-side for more reliable results  
-          const relatedResult = await newsClient.getNewsArticles({
-            pageSize: 50, // Get more articles to filter from
-            sortBy: 'date-desc'
-          });
-          
-          console.log(`🔍 [DynamicNewsArticlePage] Related articles API response:`, relatedResult);
-          
-          if (relatedResult.data) {
-            // Filter by category and exclude current article
-            const filteredRelated = relatedResult.data
-              .filter(relatedArticle => 
-                relatedArticle.id !== articleResult.id && 
-                relatedArticle.category === articleResult.category
-              )
-              .slice(0, 3);
-            
-            // If no articles in same category, show recent articles instead
-            if (filteredRelated.length === 0) {
-              const recentArticles = relatedResult.data
-                .filter(relatedArticle => relatedArticle.id !== articleResult.id)
-                .slice(0, 3);
-              relatedArticles.value = recentArticles;
-              relatedArticlesType.value = 'recent';
-              console.log(`✅ [DynamicNewsArticlePage] No same-category articles, showing recent: ${recentArticles.length}`);
-            } else {
-              relatedArticles.value = filteredRelated;
-              relatedArticlesType.value = 'category';
-              console.log(`✅ [DynamicNewsArticlePage] Related articles loaded: ${filteredRelated.length}`, filteredRelated);
-            }
-          } else {
-            console.warn('⚠️ [DynamicNewsArticlePage] No data in related articles response');
-          }
-        } catch (relatedErr) {
-          console.warn('⚠️ [DynamicNewsArticlePage] Failed to load related articles:', relatedErr);
-          // Don't set error, just continue without related articles
-        } finally {
-          relatedLoading.value = false;
-        }
-      } else {
-        console.log('ℹ️ [DynamicNewsArticlePage] No category found for current article, skipping related articles');
-      }
-    } else {
-      throw new Error(`News article not found: ${slug}`);
-    }
-  } catch (err: any) {
-    console.error('❌ [DynamicNewsArticlePage] Failed to load article:', err.message);
-    error.value = err.message || 'Failed to load article data';
-  } finally {
-    isLoading.value = false;
-  }
 });
 </script>
 
