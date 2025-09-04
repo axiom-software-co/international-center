@@ -477,11 +477,23 @@ func (d *DaprMockProvider) generateContainerProperties(args pulumi.MockResourceA
 }
 
 func (d *DaprMockProvider) generateFileProperties(args pulumi.MockResourceArgs) resource.PropertyMap {
-	return resource.PropertyMap{
+	props := resource.PropertyMap{
 		"filename": resource.NewStringProperty(args.Name),
-		"content":  resource.NewStringProperty("# Dapr component configuration\napiVersion: dapr.io/v1alpha1\nkind: Component"),
 		"filePermissions": resource.NewStringProperty("0644"),
 	}
+	
+	// Use provided content if available, otherwise use default
+	if args.Inputs != nil {
+		if content, exists := args.Inputs["content"]; exists {
+			props["content"] = content
+		} else {
+			props["content"] = resource.NewStringProperty("# Dapr component configuration\napiVersion: dapr.io/v1alpha1\nkind: Component")
+		}
+	} else {
+		props["content"] = resource.NewStringProperty("# Dapr component configuration\napiVersion: dapr.io/v1alpha1\nkind: Component")
+	}
+	
+	return props
 }
 
 // Utility function to generate unique resource suffixes
