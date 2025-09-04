@@ -1,9 +1,9 @@
-// Research Composables - Vue 3 Composition API composables for research data
-// Provides clean interface for Vue components to interact with research domain
+// Research Composables - Database Schema Compliant
+// Updated to work with TABLES-RESEARCH.md aligned types
 
 import { ref, computed, onMounted, watch, type Ref } from 'vue';
 import { researchClient } from '../lib/clients';
-import type { ResearchArticle, GetResearchParams } from '../lib/clients/research/types';
+import type { ResearchArticle, GetResearchParams, FeaturedResearch } from '../lib/clients/research/types';
 
 export interface UseResearchArticlesResult {
   articles: Ref<ResearchArticle[]>;
@@ -39,18 +39,17 @@ export function useResearchArticles(options: UseResearchArticlesOptions = {}): U
       loading.value = true;
       error.value = null;
 
-      // Backend returns: { data: [...], pagination: {...}, success: boolean }
+      // Backend returns: { data: [...], pagination: {...}, success: boolean, message?, errors? }
       const response = await researchClient.getResearchArticles(params);
 
-      if (response.data) {
+      if (response.success && response.data) {
         articles.value = response.data;
-        total.value = response.pagination?.total || response.data.length;
-        // Calculate pagination from response
-        page.value = response.pagination?.page || params.page || 1;
-        pageSize.value = response.pagination?.pageSize || params.pageSize || 10;
-        totalPages.value = response.pagination?.totalPages || Math.ceil(total.value / pageSize.value);
+        total.value = response.pagination.total;
+        page.value = response.pagination.page;
+        pageSize.value = response.pagination.pageSize;
+        totalPages.value = response.pagination.totalPages;
       } else {
-        throw new Error('Failed to fetch research articles');
+        throw new Error(response.message || 'Failed to fetch research articles');
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch research articles';
@@ -108,13 +107,13 @@ export function useResearchArticle(slug: Ref<string | null> | string | null): Us
       loading.value = true;
       error.value = null;
 
-      // Backend returns: { data: {...}, success: boolean }
+      // Backend returns: { data: {...}, success: boolean, message?, errors? }
       const response = await researchClient.getResearchArticleBySlug(slugRef.value);
       
-      if (response.data) {
+      if (response.success && response.data) {
         article.value = response.data;
       } else {
-        throw new Error('Failed to fetch research article');
+        throw new Error(response.message || 'Failed to fetch research article');
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch research article';
@@ -138,54 +137,73 @@ export function useResearchArticle(slug: Ref<string | null> | string | null): Us
 }
 
 export interface UseFeaturedResearchResult {
-  articles: Ref<ResearchArticle[]>;
+  featuredResearch: Ref<FeaturedResearch | null>;
+  article: Ref<ResearchArticle | null>;
   loading: Ref<boolean>;
   error: Ref<string | null>;
   refetch: () => Promise<void>;
 }
 
-export function useFeaturedResearch(limit?: Ref<number> | number): UseFeaturedResearchResult {
-  const limitRef = typeof limit === 'number' ? ref(limit) : limit;
-  
-  const articles = ref<ResearchArticle[]>([]);
+export function useFeaturedResearch(): UseFeaturedResearchResult {
+  const featuredResearch = ref<FeaturedResearch | null>(null);
+  const article = ref<ResearchArticle | null>(null);
   const loading = ref(true);
   const error = ref<string | null>(null);
 
-  const fetchFeaturedArticles = async () => {
+  const fetchFeaturedResearch = async () => {
     try {
       loading.value = true;
       error.value = null;
 
-      // Backend returns: { data: [...], pagination: {...}, success: boolean }
-      const response = await researchClient.getFeaturedResearch(limitRef?.value);
+      // Backend returns: { data: {...}, success: boolean, message?, errors? }
+      const response = await researchClient.getFeaturedResearch();
       
-      if (response.data) {
-        articles.value = response.data;
+      if (response.success && response.data) {
+        featuredResearch.value = response.data;
+        // Optionally fetch the full research article details if needed
+        if (response.data.research_id) {
+          const articleResponse = await researchClient.getResearchArticleById(response.data.research_id);
+          if (articleResponse.success && articleResponse.data) {
+            article.value = articleResponse.data;
+          }
+        }
       } else {
-        throw new Error('Failed to fetch featured research articles');
+        // No featured research is not an error, just no data
+        featuredResearch.value = null;
+        article.value = null;
       }
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch featured research articles';
+      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch featured research';
       error.value = errorMessage;
-      console.error('Error fetching featured research articles:', err);
-      articles.value = [];
+      console.error('Error fetching featured research:', err);
+      featuredResearch.value = null;
+      article.value = null;
     } finally {
       loading.value = false;
     }
   };
 
-  // Watch for limit changes
-  if (limitRef) {
-    watch(limitRef, fetchFeaturedArticles, { immediate: true });
-  } else {
-    onMounted(fetchFeaturedArticles);
-  }
+  onMounted(fetchFeaturedResearch);
 
+  return {
+    featuredResearch,
+    article,
+    loading,
+    error,
+    refetch: fetchFeaturedResearch,
+  };
+}
+
+// Legacy compatibility function
+export function useFeaturedResearchArticles(): { articles: Ref<ResearchArticle[]>; loading: Ref<boolean>; error: Ref<string | null>; refetch: () => Promise<void> } {
+  const { article, loading, error, refetch } = useFeaturedResearch();
+  const articles = computed(() => article.value ? [article.value] : []);
+  
   return {
     articles,
     loading,
     error,
-    refetch: fetchFeaturedArticles,
+    refetch,
   };
 }
 
@@ -221,23 +239,27 @@ export function useSearchResearch(): UseSearchResearchResult {
       loading.value = true;
       error.value = null;
 
-      // Backend returns: { data: [...], pagination: {...}, success: boolean }
+      // Backend returns: { data: [...], pagination: {...}, success: boolean, message?, errors? }
       const response = await researchClient.searchResearch({
         q: query,
         page: options.page || 1,
         pageSize: options.pageSize || 10,
-        category: options.category,
+        category_id: options.category_id,
+        research_type: options.research_type,
+        publishing_status: options.publishing_status,
+        publication_date_from: options.publication_date_from,
+        publication_date_to: options.publication_date_to,
         ...options,
       });
 
-      if (response.data) {
+      if (response.success && response.data) {
         results.value = response.data;
-        total.value = response.pagination?.total || response.data.length;
-        page.value = response.pagination?.page || options.page || 1;
-        pageSize.value = response.pagination?.pageSize || options.pageSize || 10;
-        totalPages.value = response.pagination?.totalPages || Math.ceil(total.value / pageSize.value);
+        total.value = response.pagination.total;
+        page.value = response.pagination.page;
+        pageSize.value = response.pagination.pageSize;
+        totalPages.value = response.pagination.totalPages;
       } else {
-        throw new Error('Failed to search research articles');
+        throw new Error(response.message || 'Failed to search research articles');
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to search research articles';

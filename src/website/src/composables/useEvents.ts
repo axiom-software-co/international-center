@@ -1,9 +1,9 @@
-// Events Composables - Vue 3 Composition API composables for events data
-// Provides clean interface for Vue components to interact with events domain
+// Events Composables - Database Schema Compliant
+// Updated to work with TABLES-EVENTS.md aligned types
 
 import { ref, computed, onMounted, watch, type Ref } from 'vue';
 import { eventsClient } from '../lib/clients';
-import type { Event, GetEventsParams } from '../lib/clients';
+import type { Event, GetEventsParams, FeaturedEvent } from '../lib/clients';
 
 export interface UseEventsResult {
   events: Ref<Event[]>;
@@ -39,18 +39,17 @@ export function useEvents(options: UseEventsOptions = {}): UseEventsResult {
       loading.value = true;
       error.value = null;
 
-      // Backend returns: { events: [...], count: number, correlation_id: string }
+      // Backend returns: { data: [...], pagination: {...}, success: boolean, message?, errors? }
       const response = await eventsClient.getEvents(params);
 
-      if (response.events) {
-        events.value = response.events;
-        total.value = response.count || response.events.length;
-        // Calculate pagination from current params since backend doesn't return pagination info
-        page.value = params.page || 1;
-        pageSize.value = params.pageSize || 10;
-        totalPages.value = Math.ceil(total.value / pageSize.value);
+      if (response.success && response.data) {
+        events.value = response.data;
+        total.value = response.pagination.total;
+        page.value = response.pagination.page;
+        pageSize.value = response.pagination.pageSize;
+        totalPages.value = response.pagination.totalPages;
       } else {
-        throw new Error('Failed to fetch events');
+        throw new Error(response.message || 'Failed to fetch events');
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch events';
@@ -108,13 +107,13 @@ export function useEvent(slug: Ref<string | null> | string | null): UseEventResu
       loading.value = true;
       error.value = null;
 
-      // Backend returns: { event: {...}, correlation_id: string }
+      // Backend returns: { data: {...}, success: boolean, message?, errors? }
       const response = await eventsClient.getEventBySlug(slugRef.value);
       
-      if (response.event) {
-        event.value = response.event;
+      if (response.success && response.data) {
+        event.value = response.data;
       } else {
-        throw new Error('Failed to fetch event');
+        throw new Error(response.message || 'Failed to fetch event');
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch event';
@@ -137,55 +136,74 @@ export function useEvent(slug: Ref<string | null> | string | null): UseEventResu
   };
 }
 
-export interface UseFeaturedEventsResult {
-  events: Ref<Event[]>;
+export interface UseFeaturedEventResult {
+  featuredEvent: Ref<FeaturedEvent | null>;
+  event: Ref<Event | null>;
   loading: Ref<boolean>;
   error: Ref<string | null>;
   refetch: () => Promise<void>;
 }
 
-export function useFeaturedEvents(limit?: Ref<number> | number): UseFeaturedEventsResult {
-  const limitRef = typeof limit === 'number' ? ref(limit) : limit;
-  
-  const events = ref<Event[]>([]);
+export function useFeaturedEvent(): UseFeaturedEventResult {
+  const featuredEvent = ref<FeaturedEvent | null>(null);
+  const event = ref<Event | null>(null);
   const loading = ref(true);
   const error = ref<string | null>(null);
 
-  const fetchFeaturedEvents = async () => {
+  const fetchFeaturedEvent = async () => {
     try {
       loading.value = true;
       error.value = null;
 
-      // Backend returns: { events: [...], count: number, correlation_id: string }
-      const response = await eventsClient.getFeaturedEvents(limitRef?.value);
+      // Backend returns: { data: {...}, success: boolean, message?, errors? }
+      const response = await eventsClient.getFeaturedEvents();
       
-      if (response.events) {
-        events.value = response.events;
+      if (response.success && response.data) {
+        featuredEvent.value = response.data;
+        // Optionally fetch the full event details if needed
+        if (response.data.event_id) {
+          const eventResponse = await eventsClient.getEventById(response.data.event_id);
+          if (eventResponse.success && eventResponse.data) {
+            event.value = eventResponse.data;
+          }
+        }
       } else {
-        throw new Error('Failed to fetch featured events');
+        // No featured event is not an error, just no data
+        featuredEvent.value = null;
+        event.value = null;
       }
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch featured events';
+      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch featured event';
       error.value = errorMessage;
-      console.error('Error fetching featured events:', err);
-      events.value = [];
+      console.error('Error fetching featured event:', err);
+      featuredEvent.value = null;
+      event.value = null;
     } finally {
       loading.value = false;
     }
   };
 
-  // Watch for limit changes
-  if (limitRef) {
-    watch(limitRef, fetchFeaturedEvents, { immediate: true });
-  } else {
-    onMounted(fetchFeaturedEvents);
-  }
+  onMounted(fetchFeaturedEvent);
 
+  return {
+    featuredEvent,
+    event,
+    loading,
+    error,
+    refetch: fetchFeaturedEvent,
+  };
+}
+
+// Legacy compatibility function
+export function useFeaturedEvents(): { events: Ref<Event[]>; loading: Ref<boolean>; error: Ref<string | null>; refetch: () => Promise<void> } {
+  const { event, loading, error, refetch } = useFeaturedEvent();
+  const events = computed(() => event.value ? [event.value] : []);
+  
   return {
     events,
     loading,
     error,
-    refetch: fetchFeaturedEvents,
+    refetch,
   };
 }
 
@@ -221,23 +239,27 @@ export function useSearchEvents(): UseSearchEventsResult {
       loading.value = true;
       error.value = null;
 
-      // Backend returns: { events: [...], count: number, correlation_id: string }
+      // Backend returns: { data: [...], pagination: {...}, success: boolean, message?, errors? }
       const response = await eventsClient.searchEvents({
         q: query,
         page: options.page || 1,
         pageSize: options.pageSize || 10,
-        category: options.category,
+        category_id: options.category_id,
+        event_type: options.event_type,
+        publishing_status: options.publishing_status,
+        event_date_from: options.event_date_from,
+        event_date_to: options.event_date_to,
         ...options,
       });
 
-      if (response.events) {
-        results.value = response.events;
-        total.value = response.count || response.events.length;
-        page.value = options.page || 1;
-        pageSize.value = options.pageSize || 10;
-        totalPages.value = Math.ceil(total.value / pageSize.value);
+      if (response.success && response.data) {
+        results.value = response.data;
+        total.value = response.pagination.total;
+        page.value = response.pagination.page;
+        pageSize.value = response.pagination.pageSize;
+        totalPages.value = response.pagination.totalPages;
       } else {
-        throw new Error('Failed to search events');
+        throw new Error(response.message || 'Failed to search events');
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to search events';
