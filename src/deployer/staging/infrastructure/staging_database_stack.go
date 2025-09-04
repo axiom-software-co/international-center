@@ -3,9 +3,9 @@ package infrastructure
 import (
 	"fmt"
 
-	"github.com/pulumi/pulumi-azure-native-sdk/dbforpostgresql/v2"
-	"github.com/pulumi/pulumi-azure-native-sdk/network/v2"
-	"github.com/pulumi/pulumi-azure-native-sdk/resources/v2"
+	"github.com/pulumi/pulumi-azure-native-sdk/dbforpostgresql/v3"
+	"github.com/pulumi/pulumi-azure-native-sdk/network/v3"
+	"github.com/pulumi/pulumi-azure-native-sdk/resources/v3"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	shared "github.com/axiom-software-co/international-center/src/deployer/shared/infrastructure"
 )

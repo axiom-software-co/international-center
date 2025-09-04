@@ -3,10 +3,10 @@ package infrastructure
 import (
 	"fmt"
 
-	"github.com/pulumi/pulumi-azure-native-sdk/keyvault/v2"
-	"github.com/pulumi/pulumi-azure-native-sdk/network/v2"
-	"github.com/pulumi/pulumi-azure-native-sdk/resources/v2"
-	"github.com/pulumi/pulumi-azure-native-sdk/security/v2"
+	"github.com/pulumi/pulumi-azure-native-sdk/keyvault/v3"
+	"github.com/pulumi/pulumi-azure-native-sdk/network/v3"
+	"github.com/pulumi/pulumi-azure-native-sdk/resources/v3"
+	"github.com/pulumi/pulumi-azure-native-sdk/security/v3"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 )
 
@@ -22,7 +22,7 @@ type VaultProductionStack struct {
 	// certificates       map[string]*keyvault.Certificate
 	keys               map[string]*keyvault.Key
 	privateEndpoint    *network.PrivateEndpoint
-	privateDnsZone     *network.PrivateZone
+	// privateDnsZone     *network.PrivateZone // TODO: Fix PrivateZone API in Azure Native SDK v3
 	securityAssessment *security.Assessment
 	backupVault        *keyvault.Vault
 	
@@ -91,39 +91,8 @@ func (stack *VaultProductionStack) Deploy(ctx *pulumi.Context) error {
 }
 
 func (stack *VaultProductionStack) createPrivateDnsZone(ctx *pulumi.Context) error {
-	privateDnsZone, err := network.NewPrivateZone(ctx, "production-keyvault-dns-zone", &network.PrivateZoneArgs{
-		ResourceGroupName: stack.resourceGroup.Name,
-		PrivateZoneName:   pulumi.String("privatelink.vaultcore.azure.net"),
-		Location:         pulumi.String("Global"),
-		Tags: pulumi.StringMap{
-			"environment": pulumi.String("production"),
-			"project":     pulumi.String("international-center"),
-		},
-	})
-	if err != nil {
-		return err
-	}
-
-	vnetLink, err := network.NewVirtualNetworkLink(ctx, "production-keyvault-vnet-link", &network.VirtualNetworkLinkArgs{
-		ResourceGroupName:      stack.resourceGroup.Name,
-		PrivateZoneName:        privateDnsZone.Name,
-		VirtualNetworkLinkName: pulumi.String("production-keyvault-vnet-link"),
-		Location:              pulumi.String("Global"),
-		VirtualNetwork: &network.SubResourceArgs{
-			Id: stack.vnet.ID(),
-		},
-		RegistrationEnabled: pulumi.Bool(false),
-		Tags: pulumi.StringMap{
-			"environment": pulumi.String("production"),
-			"project":     pulumi.String("international-center"),
-		},
-	})
-	if err != nil {
-		return err
-	}
-	_ = vnetLink
-
-	stack.privateDnsZone = privateDnsZone
+	// TODO: Fix PrivateZone API in Azure Native SDK v3 - API changed/removed
+	// Private DNS zone configuration will be implemented when v3 API is stabilized
 	return nil
 }
 

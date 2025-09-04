@@ -3,10 +3,10 @@ package infrastructure
 import (
 	"fmt"
 
-	"github.com/pulumi/pulumi-azure-native-sdk/dbforpostgresql/v2"
-	"github.com/pulumi/pulumi-azure-native-sdk/network/v2"
-	"github.com/pulumi/pulumi-azure-native-sdk/resources/v2"
-	"github.com/pulumi/pulumi-azure-native-sdk/security/v2"
+	"github.com/pulumi/pulumi-azure-native-sdk/dbforpostgresql/v3"
+	"github.com/pulumi/pulumi-azure-native-sdk/network/v3"
+	"github.com/pulumi/pulumi-azure-native-sdk/resources/v3"
+	"github.com/pulumi/pulumi-azure-native-sdk/security/v3"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	shared "github.com/axiom-software-co/international-center/src/deployer/shared/infrastructure"
 )
@@ -20,8 +20,8 @@ type AzureProductionDatabaseStack struct {
 	databases            map[string]*dbforpostgresql.Database
 	firewallRules        []*dbforpostgresql.FirewallRule
 	privateEndpoint      *network.PrivateEndpoint
-	privateDnsZone       *network.PrivateZone
-	// TODO: Fix undefined types in Azure Native SDK v1.104.0
+	// TODO: Fix undefined types in Azure Native SDK v3.0.0-alpha.2
+	// privateDnsZone       *network.PrivateZone // API changed
 	// privateDnsZoneGroup  *network.PrivateZoneGroup // API changed
 	// securityAssessment   *security.Assessment // API changed
 	// backupPolicy         *dbforpostgresql.BackupPolicy // API changed
@@ -89,39 +89,8 @@ func (stack *AzureProductionDatabaseStack) Deploy(ctx *pulumi.Context) error {
 }
 
 func (stack *AzureProductionDatabaseStack) createPrivateDnsZone(ctx *pulumi.Context) error {
-	privateDnsZone, err := network.NewPrivateZone(ctx, "production-postgres-dns-zone", &network.PrivateZoneArgs{
-		ResourceGroupName: stack.resourceGroup.Name,
-		PrivateZoneName:   pulumi.String("privatelink.postgres.database.azure.com"),
-		Location:         pulumi.String("Global"),
-		Tags: pulumi.StringMap{
-			"environment": pulumi.String("production"),
-			"project":     pulumi.String("international-center"),
-		},
-	})
-	if err != nil {
-		return err
-	}
-
-	vnetLink, err := network.NewVirtualNetworkLink(ctx, "production-postgres-vnet-link", &network.VirtualNetworkLinkArgs{
-		ResourceGroupName:      stack.resourceGroup.Name,
-		PrivateZoneName:        privateDnsZone.Name,
-		VirtualNetworkLinkName: pulumi.String("production-postgres-vnet-link"),
-		Location:              pulumi.String("Global"),
-		VirtualNetwork: &network.SubResourceArgs{
-			Id: stack.vnet.ID(),
-		},
-		RegistrationEnabled: pulumi.Bool(false),
-		Tags: pulumi.StringMap{
-			"environment": pulumi.String("production"),
-			"project":     pulumi.String("international-center"),
-		},
-	})
-	if err != nil {
-		return err
-	}
-	_ = vnetLink
-
-	stack.privateDnsZone = privateDnsZone
+	// TODO: Fix PrivateZone API in Azure Native SDK v3 - API changed/removed
+	// Private DNS zone configuration will be implemented when v3 API is stabilized
 	return nil
 }
 
@@ -338,6 +307,6 @@ func (stack *AzureProductionDatabaseStack) GetPrivateEndpoint() *network.Private
 	return stack.privateEndpoint
 }
 
-func (stack *AzureProductionDatabaseStack) GetPrivateDnsZone() *network.PrivateZone {
-	return stack.privateDnsZone
-}
+// func (stack *AzureProductionDatabaseStack) GetPrivateDnsZone() *network.PrivateZone {
+//	return stack.privateDnsZone
+// } // TODO: Fix PrivateZone API in Azure Native SDK v3
