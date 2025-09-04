@@ -43,6 +43,7 @@ routeChecker:
     - "/api/v1/inquiries/media"
     - "/api/v1/inquiries/business"
     - "/api/v1/inquiries/donations"
+    - "/api/v1/inquiries/volunteers"
     # Health endpoints
     - "/health"
     - "/health/ready"
@@ -105,6 +106,9 @@ routeChecker:
     - "/admin/api/v1/inquiries/donations"
     - "/admin/api/v1/inquiries/donations/{id}"
     - "/admin/api/v1/inquiries/donations/{id}/audit"
+    - "/admin/api/v1/inquiries/volunteers"
+    - "/admin/api/v1/inquiries/volunteers/{id}"
+    - "/admin/api/v1/inquiries/volunteers/{id}/audit"
     # Health endpoints
     - "/health"
     - "/health/ready"
