@@ -115,25 +115,15 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed } from 'vue';
+import { useService, useServiceCategories } from '../../composables/useServices';
+import { getServiceSlugFromUrl } from '../../lib/utils/url';
+import { parseServiceDeliveryModes, generateHeroImageUrl, generateImageAlt } from '../../lib/utils/content';
 import ServiceBreadcrumb from './ServiceBreadcrumb.vue';
 import ServiceContent from './ServiceContent.vue';
 import ServiceTreatmentDetails from './ServiceTreatmentDetails.vue';
 import ServiceContact from './ServiceContact.vue';
-
-interface Service {
-  id: string;
-  title: string;
-  slug: string;
-  description: string;
-  detailed_description?: string;
-  technologies?: string[];
-  features?: string[];
-  delivery_modes?: string[];
-  image?: string;
-  status: string;
-  category_id?: number;
-}
+import type { Service, ServiceCategory } from '../../lib/clients';
 
 interface ServicePageData {
   id: string;
@@ -156,125 +146,42 @@ interface ServicePageData {
   isComingSoon: boolean;
 }
 
-// Reactive state
-const service = ref<Service | null>(null);
-const isLoading = ref(false);
-const error = ref<string | null>(null);
-const categories = ref<{ id: number; name: string }[]>([]);
+// Use composables for data fetching
+const currentSlug = ref(getServiceSlugFromUrl());
+const { service, loading: serviceLoading, error: serviceError } = useService(currentSlug);
+const { categories, loading: categoriesLoading, error: categoriesError } = useServiceCategories();
+
+// Computed loading and error states
+const isLoading = computed(() => serviceLoading.value || categoriesLoading.value);
+const error = computed(() => serviceError.value || categoriesError.value);
 
 // Transform service data to match the expected structure
 const serviceData = computed((): ServicePageData | null => {
   if (!service.value) return null;
   
   // Find category name from category_id
-  const categoryName = categories.value.find(cat => cat.id === service.value?.category_id)?.name;
+  const categoryName = categories.value.find((cat: ServiceCategory) => cat.category_id === service.value?.category_id)?.name;
   
   return {
-    id: service.value.id,
+    id: service.value.service_id,
     title: service.value.title,
     slug: service.value.slug,
     description: service.value.description,
-    detailed_description: service.value.detailed_description,
-    technologies: service.value.technologies,
-    features: service.value.features,
+    detailed_description: service.value.content,
+    technologies: [],
+    features: [],
     heroImage: {
-      src: service.value.image || `https://placehold.co/1200x600/2563eb/ffffff/png?text=${encodeURIComponent(service.value.title)}`,
-      alt: `${service.value.title} service at International Center`,
+      src: generateHeroImageUrl(service.value.image_url, service.value.title, 'service'),
+      alt: generateImageAlt(service.value.title, 'service'),
     },
     treatmentDetails: {
       duration: '45-90 minutes',
       recovery: 'Minimal to no downtime',
     },
-    deliveryModes: parseDeliveryModes(service.value.slug),
+    deliveryModes: parseServiceDeliveryModes(service.value.slug),
     category: categoryName,
     isComingSoon: false,
   };
-});
-
-// Parse delivery modes based on service type (from original logic)
-const parseDeliveryModes = (slug: string): string[] => {
-  const modes: string[] = [];
-
-  // Mobile services (can be performed at patient location)
-  if (
-    [
-      'prp-therapy',
-      'exosome-therapy',
-      'peptide-therapy',
-      'iv-therapy',
-      'wellness',
-      'immunizations',
-      'telehealth',
-      'annual-wellness',
-      'chronic-care',
-      'physical-exams',
-      'immune-support',
-    ].includes(slug)
-  ) {
-    modes.push('mobile');
-  }
-
-  // Outpatient services (most services are outpatient except complex procedures)
-  if (!['stem-cell'].includes(slug)) {
-    modes.push('outpatient');
-  }
-
-  // Inpatient services (requiring facility stay or complex procedures)
-  if (['stem-cell', 'diagnostics', 'longevity'].includes(slug)) {
-    modes.push('inpatient');
-  }
-
-  return modes.length > 0 ? modes : ['outpatient'];
-};
-
-// Get slug from current URL
-const getSlugFromUrl = (): string => {
-  if (typeof window === 'undefined') return '';
-  const pathParts = window.location.pathname.split('/');
-  return pathParts[pathParts.length - 1] || '';
-};
-
-// Client-side data loading following home page pattern
-onMounted(async () => {
-  try {
-    isLoading.value = true;
-    error.value = null;
-
-    const slug = getSlugFromUrl();
-    if (!slug) {
-      throw new Error('Service slug not found');
-    }
-
-    console.log(`🔍 [DynamicServicePage] Loading service: ${slug}`);
-
-    // Dynamic import for client-side code splitting (like RecentContentCycler)
-    const { servicesClient } = await import('../../lib/clients');
-    
-    // Fetch both service data and categories in parallel from REST API
-    const [serviceResponse, categoriesResponse] = await Promise.all([
-      servicesClient.getServiceBySlug(slug),
-      servicesClient.getServiceCategories()
-    ]);
-    
-    // Handle REST API response format
-    if (!serviceResponse.success) {
-      throw new Error(serviceResponse.message || `Service not found: ${slug}`);
-    }
-    
-    if (!categoriesResponse.success) {
-      throw new Error(categoriesResponse.message || 'Failed to load categories');
-    }
-    
-    service.value = serviceResponse.data;
-    categories.value = categoriesResponse.data;
-    console.log('✅ [DynamicServicePage] Service loaded:', serviceResponse.data);
-    console.log('✅ [DynamicServicePage] Categories loaded:', categoriesResponse.data);
-  } catch (err: any) {
-    console.error('❌ [DynamicServicePage] Failed to load service:', err.message);
-    error.value = err.message || 'Failed to load service data';
-  } finally {
-    isLoading.value = false;
-  }
 });
 </script>
 

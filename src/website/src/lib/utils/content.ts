@@ -207,3 +207,47 @@ export function shouldFeatureContent(content: {
   
   return false;
 }
+
+/**
+ * Parse delivery modes based on service type
+ * Determines which delivery modes (mobile, outpatient, inpatient) are available for a service
+ * @param slug - The service slug to analyze
+ * @returns Array of delivery mode strings
+ */
+export function parseServiceDeliveryModes(slug: string): string[] {
+  const modes: string[] = [];
+
+  // Mobile services (can be performed at patient location)
+  const mobileServices = [
+    'prp-therapy',
+    'exosome-therapy', 
+    'peptide-therapy',
+    'iv-therapy',
+    'wellness',
+    'immunizations',
+    'telehealth',
+    'annual-wellness',
+    'chronic-care',
+    'physical-exams',
+    'immune-support'
+  ];
+
+  if (mobileServices.includes(slug)) {
+    modes.push('mobile');
+  }
+
+  // Outpatient services (most services are outpatient except complex procedures)
+  const inpatientOnlyServices = ['stem-cell'];
+  if (!inpatientOnlyServices.includes(slug)) {
+    modes.push('outpatient');
+  }
+
+  // Inpatient services (requiring facility stay or complex procedures)
+  const inpatientServices = ['stem-cell', 'diagnostics', 'longevity'];
+  if (inpatientServices.includes(slug)) {
+    modes.push('inpatient');
+  }
+
+  // Default to outpatient if no modes determined
+  return modes.length > 0 ? modes : ['outpatient'];
+}
