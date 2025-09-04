@@ -11,7 +11,6 @@ require (
 	github.com/agext/levenshtein v1.2.3 // indirect
 	github.com/apparentlymart/go-textseg/v15 v15.0.0 // indirect
 	github.com/atotto/clipboard v0.1.4 // indirect
-	github.com/axiom-software-co/international-center/src/deployer/internal/development/infrastructure v0.0.0-00010101000000-000000000000 // indirect
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
 	github.com/blang/semver v3.5.1+incompatible // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
@@ -64,6 +63,7 @@ require (
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/pulumi/appdash v0.0.0-20231130102222-75f619a67231 // indirect
 	github.com/pulumi/esc v0.17.0 // indirect
+	github.com/pulumi/pulumi-azure-native/sdk v1.93.0 // indirect
 	github.com/pulumi/pulumi-docker/sdk/v4 v4.8.2 // indirect
 	github.com/pulumi/pulumi/sdk/v3 v3.192.0 // indirect
 	github.com/rivo/uniseg v0.4.4 // indirect
@@ -99,5 +99,3 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	lukechampine.com/frand v1.4.2 // indirect
 )
-
-replace github.com/axiom-software-co/international-center/src/deployer/internal/development/infrastructure => ./internal/development/infrastructure

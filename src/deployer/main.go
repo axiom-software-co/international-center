@@ -1,90 +1,61 @@
 package main
 
 import (
-	"bufio"
 	"context"
 	"fmt"
-	"os"
-	"strings"
 
-	"github.com/axiom-software-co/international-center/src/deployer/internal/development/infrastructure"
+	"github.com/axiom-software-co/international-center/src/deployer/development/infrastructure"
+	"github.com/axiom-software-co/international-center/src/deployer/shared/config"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
-	"github.com/pulumi/pulumi/sdk/v3/go/pulumi/config"
 )
 
-// loadDevelopmentEnv loads environment variables from .env.development file
-func loadDevelopmentEnv() error {
-	file, err := os.Open(".env.development")
-	if err != nil {
-		return nil // File doesn't exist, continue without loading
-	}
-	defer file.Close()
-
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue
-		}
-		
-		parts := strings.SplitN(line, "=", 2)
-		if len(parts) != 2 {
-			continue
-		}
-		
-		key := strings.TrimSpace(parts[0])
-		value := strings.TrimSpace(parts[1])
-		
-		// Only set if not already set (environment variables take precedence)
-		if os.Getenv(key) == "" {
-			os.Setenv(key, value)
-		}
-	}
-	
-	return scanner.Err()
-}
-
 func main() {
-	// Load development environment variables
-	if err := loadDevelopmentEnv(); err != nil {
-		fmt.Printf("Warning: Failed to load development environment: %v\n", err)
-	}
-	
 	pulumi.Run(func(ctx *pulumi.Context) error {
-		config := config.New(ctx, "")
-		environment := "development"
-		networkName := fmt.Sprintf("%s-network", environment)
+		// Initialize centralized configuration manager
+		configManager, err := config.NewConfigManager(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to initialize configuration manager: %w", err)
+		}
+		
+		// Validate configuration
+		if err := configManager.ValidateConfiguration(); err != nil {
+			return fmt.Errorf("configuration validation failed: %w", err)
+		}
+		
+		// Get environment and network name from config manager
+		environment := configManager.GetEnvironment().String()
+		networkName := configManager.GetNetworkName()
 
 		// Deploy Database Stack (PostgreSQL)
-		databaseStack := infrastructure.NewDatabaseStack(ctx, config, networkName, environment)
+		databaseStack := infrastructure.NewDatabaseStack(ctx, configManager.GetPulumiConfig().GetUnderlyingConfig(), networkName, environment)
 		databaseDeployment, err := databaseStack.Deploy(context.Background())
 		if err != nil {
 			return fmt.Errorf("failed to deploy database stack: %w", err)
 		}
 
 		// Deploy Dapr Stack (Redis + Dapr control plane)
-		daprStack := infrastructure.NewDaprStack(ctx, config, networkName, environment)
+		daprStack := infrastructure.NewDaprStack(ctx, configManager.GetPulumiConfig().GetUnderlyingConfig(), networkName, environment)
 		daprDeployment, err := daprStack.Deploy(context.Background())
 		if err != nil {
 			return fmt.Errorf("failed to deploy Dapr stack: %w", err)
 		}
 
 		// Deploy Storage Stack (Azurite)
-		storageStack := infrastructure.NewStorageStack(ctx, config, networkName, environment)
+		storageStack := infrastructure.NewStorageStack(ctx, configManager.GetPulumiConfig().GetUnderlyingConfig(), networkName, environment)
 		storageDeployment, err := storageStack.Deploy(context.Background())
 		if err != nil {
 			return fmt.Errorf("failed to deploy storage stack: %w", err)
 		}
 
 		// Deploy Vault Stack (HashiCorp Vault)
-		vaultStack := infrastructure.NewVaultStack(ctx, config, networkName, environment)
+		vaultStack := infrastructure.NewVaultStack(ctx, configManager.GetPulumiConfig().GetUnderlyingConfig(), networkName, environment)
 		vaultDeployment, err := vaultStack.Deploy(context.Background())
 		if err != nil {
 			return fmt.Errorf("failed to deploy Vault stack: %w", err)
 		}
 
 		// Deploy Observability Stack (Grafana + Loki + Prometheus)
-		observabilityStack := infrastructure.NewObservabilityStack(ctx, config, networkName, environment)
+		observabilityStack := infrastructure.NewObservabilityStack(ctx, configManager.GetPulumiConfig().GetUnderlyingConfig(), networkName, environment)
 		observabilityDeployment, err := observabilityStack.Deploy(context.Background())
 		if err != nil {
 			return fmt.Errorf("failed to deploy observability stack: %w", err)
@@ -93,7 +64,7 @@ func main() {
 		// Export environment variables for integration tests
 		dbHost, dbPort, dbName, dbUser := databaseStack.GetConnectionInfo()
 		ctx.Export("DATABASE_URL", pulumi.Sprintf("postgresql://%s:%s@%s:%d/%s?sslmode=disable",
-			dbUser, config.Require("postgres_password"), dbHost, dbPort, dbName))
+			dbUser, configManager.GetPulumiConfig().GetRequiredString("postgres_password"), dbHost, dbPort, dbName))
 
 		redisHost, redisPort, redisPassword := daprStack.GetRedisConnectionInfo()
 		ctx.Export("REDIS_URL", pulumi.Sprintf("redis://%s:%d", redisHost, redisPort))
