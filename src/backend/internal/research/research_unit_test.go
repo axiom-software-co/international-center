@@ -105,6 +105,31 @@ func (m *MockResearchRepository) SearchResearch(ctx context.Context, query strin
 	return researchList, nil
 }
 
+func (m *MockResearchRepository) GetResearchByPublishingStatus(ctx context.Context, status PublishingStatus, limit, offset int) ([]*Research, error) {
+	if err, exists := m.failures["GetResearchByPublishingStatus"]; exists {
+		return nil, err
+	}
+	
+	researchList := make([]*Research, 0)
+	count := 0
+	for _, research := range m.research {
+		if research.PublishingStatus == status && !research.IsDeleted {
+			// Apply offset
+			if count < offset {
+				count++
+				continue
+			}
+			// Apply limit
+			if len(researchList) >= limit {
+				break
+			}
+			researchList = append(researchList, research)
+		}
+		count++
+	}
+	return researchList, nil
+}
+
 func (m *MockResearchRepository) SaveResearch(ctx context.Context, research *Research) error {
 	if err, exists := m.failures["SaveResearch"]; exists {
 		return err
@@ -149,6 +174,51 @@ func (m *MockResearchRepository) GetResearchCategory(ctx context.Context, catego
 		return category, nil
 	}
 	return nil, domain.NewNotFoundError("research_category", categoryID)
+}
+
+func (m *MockResearchRepository) GetResearchCategoryBySlug(ctx context.Context, slug string) (*ResearchCategory, error) {
+	if err, exists := m.failures["GetResearchCategoryBySlug"]; exists {
+		return nil, err
+	}
+	for _, category := range m.categories {
+		if category.Slug == slug && !category.IsDeleted {
+			return category, nil
+		}
+	}
+	return nil, domain.NewNotFoundError("research_category", slug)
+}
+
+func (m *MockResearchRepository) SaveResearchCategory(ctx context.Context, category *ResearchCategory) error {
+	if err, exists := m.failures["SaveResearchCategory"]; exists {
+		return err
+	}
+	m.categories[category.CategoryID] = category
+	return nil
+}
+
+func (m *MockResearchRepository) GetDefaultUnassignedCategory(ctx context.Context) (*ResearchCategory, error) {
+	if err, exists := m.failures["GetDefaultUnassignedCategory"]; exists {
+		return nil, err
+	}
+	for _, category := range m.categories {
+		if category.IsDefaultUnassigned && !category.IsDeleted {
+			return category, nil
+		}
+	}
+	return nil, domain.NewNotFoundError("default_unassigned_category", "")
+}
+
+func (m *MockResearchRepository) DeleteResearchCategory(ctx context.Context, categoryID string) error {
+	if err, exists := m.failures["DeleteResearchCategory"]; exists {
+		return err
+	}
+	if category, exists := m.categories[categoryID]; exists {
+		category.IsDeleted = true
+		now := time.Now()
+		category.DeletedOn = &now
+		return nil
+	}
+	return domain.NewNotFoundError("research_category", categoryID)
 }
 
 func (m *MockResearchRepository) GetResearchByCategory(ctx context.Context, categoryID string, limit, offset int) ([]*Research, error) {
