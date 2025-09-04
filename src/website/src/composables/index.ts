@@ -70,3 +70,36 @@ export type {
   UseSearchNewsResult,
   UseNewsCategoriesResult,
 } from './useNews';
+
+// Business Inquiry domain composables
+export {
+  useBusinessInquiry,
+  useBusinessInquirySubmission,
+} from '../lib/clients/composables/useBusinessInquiry';
+
+export type {
+  UseBusinessInquiryResult,
+  UseBusinessInquirySubmissionResult,
+} from '../lib/clients/composables/useBusinessInquiry';
+
+// Donations Inquiry domain composables
+export {
+  useDonationsInquiry,
+  useDonationsInquirySubmission,
+} from '../lib/clients/composables/useDonationsInquiry';
+
+export type {
+  UseDonationsInquiryResult,
+  UseDonationsInquirySubmissionResult,
+} from '../lib/clients/composables/useDonationsInquiry';
+
+// Media Inquiry domain composables
+export {
+  useMediaInquiry,
+  useMediaInquirySubmission,
+} from '../lib/clients/composables/useMediaInquiry';
+
+export type {
+  UseMediaInquiryResult,
+  UseMediaInquirySubmissionResult,
+} from '../lib/clients/composables/useMediaInquiry';

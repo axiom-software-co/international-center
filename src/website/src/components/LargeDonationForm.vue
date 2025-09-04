@@ -210,7 +210,8 @@
 
 <script setup lang="ts">
 import { ref, reactive } from 'vue';
-import { contactsClient } from '../lib/clients';
+import { useDonationsInquirySubmission } from '@/composables/';
+import type { DonationsInquirySubmission } from '../lib/clients/inquiries/types';
 
 // Form data
 const form = reactive({
@@ -242,6 +243,9 @@ const errors = reactive({
   amount: null as string | null,
   message: null as string | null,
 });
+
+// Initialize donations inquiry composable
+const donationsInquiry = useDonationsInquirySubmission();
 
 // Submission state
 const isSubmitting = ref(false);
@@ -371,25 +375,29 @@ const handleSubmit = async (event: Event) => {
 
   isSubmitting.value = true;
   submitStatus.value = 'idle';
+  
+  // Reset donations inquiry state
+  donationsInquiry.reset();
 
   try {
-    const consultationData = {
-      type: 'large-donation-consultation',
-      firstName: form.firstName.trim(),
-      lastName: form.lastName.trim(),
+    // Prepare data for Donations Inquiry API submission
+    const submissionData: DonationsInquirySubmission = {
+      donor_first_name: form.firstName.trim(),
+      donor_last_name: form.lastName.trim(),
       email: form.email.trim(),
-      phone: form.phone.trim(),
-      interest: form.interest,
-      estimatedAmount: form.amount,
-      message: form.message.trim() || null,
-      submittedAt: new Date().toISOString(),
+      phone: form.phone.trim() || undefined,
+      interest_area: form.interest,
+      estimated_amount: form.amount,
+      message: form.message.trim() || undefined,
     };
 
-    const response = await contactsClient.submitContact(consultationData as any);
+    // Submit using donations inquiry composable
+    await donationsInquiry.submitInquiry(submissionData);
     
-    if (response.success) {
+    if (donationsInquiry.isSuccess.value) {
       submitStatus.value = 'success';
-      submitMessage.value = 'Thank you for your interest! Our team will contact you within 2 business days to discuss your donation and partnership opportunities.';
+      const referenceMsg = donationsInquiry.response.value?.inquiry_id ? ` Your reference ID is: ${donationsInquiry.response.value.inquiry_id}` : '';
+      submitMessage.value = `Thank you for your interest! Our team will contact you within 2 business days to discuss your donation and partnership opportunities.${referenceMsg}`;
       
       // Reset form
       Object.keys(form).forEach(key => {
@@ -405,10 +413,10 @@ const handleSubmit = async (event: Event) => {
       });
     } else {
       submitStatus.value = 'error';
-      submitMessage.value = response.message || 'Failed to submit consultation request. Please try again.';
+      submitMessage.value = donationsInquiry.error.value || 'Failed to submit donation consultation request. Please try again.';
     }
   } catch (error) {
-    console.error('Large donation consultation submission error:', error);
+    console.error('Donations inquiry submission error:', error);
     submitStatus.value = 'error';
     submitMessage.value = 'Network error occurred. Please try again later.';
   } finally {

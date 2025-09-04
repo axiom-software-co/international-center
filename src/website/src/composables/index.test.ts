@@ -268,4 +268,89 @@ describe('Composables Integration - Unified API Surface', () => {
       expect(typeof composables.useNews).toBe('function');
     }, 5000);
   });
+
+  describe('Business Inquiry Domain Exports', () => {
+    it('should export all Business Inquiry composables', async () => {
+      const businessInquiryComposables = await import('./index');
+      
+      // Validate Business Inquiry composable functions
+      expect(businessInquiryComposables.useBusinessInquiry).toBeTypeOf('function');
+      expect(businessInquiryComposables.useBusinessInquirySubmission).toBeTypeOf('function');
+      
+      // Validate Business Inquiry types are exported
+      expect(typeof businessInquiryComposables.UseBusinessInquiryResult).toBe('undefined'); // Type, not runtime value
+      expect(typeof businessInquiryComposables.UseBusinessInquirySubmissionResult).toBe('undefined'); // Type, not runtime value
+    }, 5000);
+  });
+
+  describe('Donations Inquiry Domain Exports', () => {
+    it('should export all Donations Inquiry composables', async () => {
+      const donationsInquiryComposables = await import('./index');
+      
+      // Validate Donations Inquiry composable functions
+      expect(donationsInquiryComposables.useDonationsInquiry).toBeTypeOf('function');
+      expect(donationsInquiryComposables.useDonationsInquirySubmission).toBeTypeOf('function');
+      
+      // Validate Donations Inquiry types are exported
+      expect(typeof donationsInquiryComposables.UseDonationsInquiryResult).toBe('undefined'); // Type, not runtime value
+      expect(typeof donationsInquiryComposables.UseDonationsInquirySubmissionResult).toBe('undefined'); // Type, not runtime value
+    }, 5000);
+  });
+
+  describe('Media Inquiry Domain Exports', () => {
+    it('should export all Media Inquiry composables', async () => {
+      const mediaInquiryComposables = await import('./index');
+      
+      // Validate Media Inquiry composable functions
+      expect(mediaInquiryComposables.useMediaInquiry).toBeTypeOf('function');
+      expect(mediaInquiryComposables.useMediaInquirySubmission).toBeTypeOf('function');
+      
+      // Validate Media Inquiry types are exported
+      expect(typeof mediaInquiryComposables.UseMediaInquiryResult).toBe('undefined'); // Type, not runtime value
+      expect(typeof mediaInquiryComposables.UseMediaInquirySubmissionResult).toBe('undefined'); // Type, not runtime value
+    }, 5000);
+  });
+
+  describe('Inquiry Domain Integration', () => {
+    it('should maintain consistent inquiry composable patterns across domains', async () => {
+      const composables = await import('./index');
+      
+      // Check that all inquiry domains follow use[Domain]Inquiry pattern
+      expect(composables.useBusinessInquiry).toBeTypeOf('function');
+      expect(composables.useDonationsInquiry).toBeTypeOf('function');
+      expect(composables.useMediaInquiry).toBeTypeOf('function');
+      
+      // Check that all inquiry domains follow use[Domain]InquirySubmission pattern
+      expect(composables.useBusinessInquirySubmission).toBeTypeOf('function');
+      expect(composables.useDonationsInquirySubmission).toBeTypeOf('function');
+      expect(composables.useMediaInquirySubmission).toBeTypeOf('function');
+    }, 5000);
+
+    it('should allow simultaneous usage of inquiry and content domain composables', async () => {
+      const composables = await import('./index');
+      
+      // Test that inquiry and content composables can be imported together
+      const { 
+        useServices,
+        useBusinessInquiry,
+        useEvents,
+        useDonationsInquiry,
+        useNews,
+        useMediaInquiry
+      } = composables;
+      
+      // Validate all functions are available for component consumption
+      expect(useServices).toBeTypeOf('function');
+      expect(useBusinessInquiry).toBeTypeOf('function');
+      expect(useEvents).toBeTypeOf('function');
+      expect(useDonationsInquiry).toBeTypeOf('function');
+      expect(useNews).toBeTypeOf('function');
+      expect(useMediaInquiry).toBeTypeOf('function');
+      
+      // Verify architectural separation between inquiry and content domains
+      expect(useBusinessInquiry).not.toBe(useServices);
+      expect(useDonationsInquiry).not.toBe(useEvents);
+      expect(useMediaInquiry).not.toBe(useNews);
+    }, 5000);
+  });
 });

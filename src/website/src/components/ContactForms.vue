@@ -514,7 +514,14 @@ import SelectValue from '@/components/vue-ui/SelectValue.vue';
 import DatePicker from '@/components/vue-ui/DatePicker.vue';
 import Label from '@/components/vue-ui/Label.vue';
 import { cn } from '@/lib/utils';
-import { contactsClient, type ContactSubmission } from '../lib/clients';
+import { 
+  useBusinessInquirySubmission, 
+  useMediaInquirySubmission 
+} from '@/composables/';
+import type { 
+  BusinessInquirySubmission, 
+  MediaInquirySubmission 
+} from '../lib/clients/inquiries/types';
 
 interface ContactFormsProps {
   className?: string;
@@ -524,41 +531,9 @@ const props = withDefaults(defineProps<ContactFormsProps>(), {
   className: '',
 });
 
-// Vue reactive state for contact submission
-const submitting = ref(false);
-const error = ref<string | null>(null);
-const success = ref(false);
-
-// Contact submission function
-const submitContact = async (contactData: ContactSubmission) => {
-  submitting.value = true;
-  error.value = null;
-  success.value = false;
-
-  try {
-    const response = await contactsClient.submitContact(contactData);
-    if (response.success) {
-      success.value = true;
-      return response;
-    } else {
-      error.value = response.message || 'Failed to submit contact form';
-      return response;
-    }
-  } catch (err) {
-    error.value = 'Network error occurred. Please try again.';
-    console.error('Contact submission error:', err);
-    return { success: false, message: error.value };
-  } finally {
-    submitting.value = false;
-  }
-};
-
-// Reset function
-const reset = () => {
-  submitting.value = false;
-  error.value = null;
-  success.value = false;
-};
+// Initialize inquiry composables for domain-specific submissions
+const businessInquiry = useBusinessInquirySubmission();
+const mediaInquiry = useMediaInquirySubmission();
 
 // Input filtering functions
 const filterNameInput = (value: string): string => {
@@ -919,28 +894,31 @@ const handleBusinessSubmit = async (e: Event) => {
     return;
   }
 
-  // Reset hook state
-  reset();
+  // Reset business inquiry state
+  businessInquiry.reset();
 
-  // Prepare data for standardized Contact API submission
-  const submissionData: ContactSubmission = {
-    name: businessForm.contactName,
+  // Prepare data for Business Inquiry API submission
+  const submissionData: BusinessInquirySubmission = {
+    organization_name: businessForm.organizationName,
+    contact_name: businessForm.contactName,
+    title: businessForm.title || undefined,
     email: businessForm.email,
     phone: businessForm.phone || undefined,
-    subject: `Business Inquiry - ${businessForm.inquiryType || 'General'}`,
-    message: `Organization: ${businessForm.organizationName}\nContact: ${businessForm.contactName}\nTitle: ${businessForm.title}\nInquiry Type: ${businessForm.inquiryType || 'Not specified'}\nIndustry: ${businessForm.industry || 'Not specified'}\n\nMessage:\n${businessForm.message}`,
+    inquiry_type: businessForm.inquiryType || undefined,
+    industry: businessForm.industry || undefined,
+    message: businessForm.message,
   };
 
   try {
-    // Submit using standardized hook
-    const response = await submitContact(submissionData);
+    // Submit using business inquiry composable
+    await businessInquiry.submitInquiry(submissionData);
 
-    if (response) {
-      console.log('✅ Business inquiry submitted successfully:', response);
+    if (businessInquiry.isSuccess.value) {
+      console.log('✅ Business inquiry submitted successfully:', businessInquiry.response.value);
 
       // Set success state
       submitStatus.business = 'success';
-      const referenceMsg = response.id ? ` Your reference ID is: ${response.id}` : '';
+      const referenceMsg = businessInquiry.response.value?.inquiry_id ? ` Your reference ID is: ${businessInquiry.response.value.inquiry_id}` : '';
       submitMessages.business = `Thank you! Your business inquiry has been submitted successfully. We will review your request and respond within 24-48 hours.${referenceMsg}`;
 
       // Reset form on success
@@ -957,11 +935,11 @@ const handleBusinessSubmit = async (e: Event) => {
       Object.keys(businessErrors).forEach(key => (businessErrors[key] = null));
       Object.keys(businessTouched).forEach(key => (businessTouched[key] = false));
     } else {
-      // Handle hook error state
+      // Handle business inquiry error state
       submitStatus.business = 'error';
       submitMessages.business =
-        error ||
-        'Unable to submit your inquiry at this time. Please try again later or contact us directly.';
+        businessInquiry.error.value ||
+        'Unable to submit your business inquiry at this time. Please try again later or contact us directly.';
     }
   } finally {
     isSubmitting.business = false;
@@ -985,8 +963,8 @@ const handleMediaSubmit = async (e: Event) => {
     return;
   }
 
-  // Reset hook state
-  reset();
+  // Reset media inquiry state
+  mediaInquiry.reset();
 
   // Determine urgency based on deadline
   let urgency: 'low' | 'medium' | 'high' = 'medium';
@@ -1000,21 +978,25 @@ const handleMediaSubmit = async (e: Event) => {
     else urgency = 'low';
   }
 
-  // Prepare data for standardized Contact API submission
-  const submissionData: ContactSubmission = {
-    name: mediaForm.contactName,
+  // Prepare data for Media Inquiry API submission
+  const submissionData: MediaInquirySubmission = {
+    media_outlet: mediaForm.outlet,
+    contact_name: mediaForm.contactName,
+    title: mediaForm.title || undefined,
     email: mediaForm.email,
-    phone: mediaForm.phone,
-    subject: `Media Inquiry - ${mediaForm.mediaType || 'General'}${mediaForm.deadline ? ` (Deadline: ${mediaForm.deadline})` : ''}`,
-    message: `Media Outlet: ${mediaForm.outlet}\nContact: ${mediaForm.contactName}\nTitle: ${mediaForm.title}\nMedia Type: ${mediaForm.mediaType || 'Not specified'}\nDeadline: ${mediaForm.deadline || 'Not specified'}\nUrgency: ${urgency}\n\nStory Subject/Topic:\n${mediaForm.subject}`,
+    phone: mediaForm.phone || undefined,
+    media_type: mediaForm.mediaType || undefined,
+    deadline: mediaForm.deadline || undefined,
+    urgency: urgency,
+    subject: mediaForm.subject,
   };
 
   try {
-    // Submit using standardized hook
-    const response = await submitContact(submissionData);
+    // Submit using media inquiry composable
+    await mediaInquiry.submitInquiry(submissionData);
 
-    if (response) {
-      console.log('✅ Media inquiry submitted successfully:', response);
+    if (mediaInquiry.isSuccess.value) {
+      console.log('✅ Media inquiry submitted successfully:', mediaInquiry.response.value);
 
       // Set success state
       submitStatus.media = 'success';
@@ -1022,7 +1004,7 @@ const handleMediaSubmit = async (e: Event) => {
         urgency === 'high'
           ? ' Due to the urgent nature of your request, we will prioritize our response.'
           : '';
-      const referenceMsg = response.id ? ` Your reference ID is: ${response.id}` : '';
+      const referenceMsg = mediaInquiry.response.value?.inquiry_id ? ` Your reference ID is: ${mediaInquiry.response.value.inquiry_id}` : '';
       submitMessages.media = `Thank you! Your media inquiry has been submitted successfully. We will respond within 4-8 hours for standard requests.${urgencyNote}${referenceMsg}`;
 
       // Reset form on success
@@ -1039,10 +1021,10 @@ const handleMediaSubmit = async (e: Event) => {
       Object.keys(mediaErrors).forEach(key => (mediaErrors[key] = null));
       Object.keys(mediaTouched).forEach(key => (mediaTouched[key] = false));
     } else {
-      // Handle hook error state
+      // Handle media inquiry error state
       submitStatus.media = 'error';
       submitMessages.media =
-        error ||
+        mediaInquiry.error.value ||
         'Unable to submit your media inquiry at this time. Please try again later or contact us directly.';
     }
   } finally {
