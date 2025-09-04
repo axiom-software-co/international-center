@@ -14,9 +14,27 @@
 
 - note : stop using the term 'medical-grade' ( this is implicit and there is no need to mention it in the naming system )
 
-- note : we do not need cloudfalre CDN for now
 - note : do not work with github actions for now
 
+- note : currently we do not own a website domain in cloudflare 
+
+[deployment secrets]
+
+- you can use the authenticated azure cli for deployment with pulumi
+
+CLOUDFLARE_ACCOUNT_ID="a71f1b4cc92fea4a215a8468b3390350"
+CLOUDFLARE_API_TOKEN="WjlWxu5Lz-DwSPHXB8NlNcB4iMjd_uvR7Q06-bI-6HY.5YIkJX1L_OgIJqwrkasR"
+CLOUDFLARE_ZONE_ID="2bdbd19afb3154b1768c0a80bc65b7d9"
+CLOUDFLARE_ZONE_NAME="axiomcloud.dev"
+
+HASHICORP_CLIENT_ID="lfNhxsGjHnhffHi9Ze5qJg39LjzRdwxX"
+HASHICORP_CLIENT_SECRET="i2KHbAbH9BwKnm2-olJ4-R5pO5rrjMK_x4WOH3rG2U-jURNW8CyWPaaxrg1LTIZT"
+
+UPSTASH_API_KEY="bcf68703-8e1a-4611-a21d-aebd2857f437"
+
+CLOUD_AMQP="46c20467-552b-4645-9189-47f69bc78df8"
+
+GRAFANA_CLOUD_ACCESS_POLICY_TOKEN="glc_eyJvIjoiMTA3Nzk3NSIsIm4iOiJwdWx1bWktcG9saWN5LXB1bHVtaS1wb2xpY3ktdG9rZW4iLCJrIjoiNUNCbHY5bjZaWHFIQko3MzUxb0EwUDcxIiwibSI6eyJyIjoidXMifX0="
 
 [ important project related rules to follow ]
 
@@ -25,6 +43,14 @@
 - test-driven development ( red phase , green phase , refactor phase ) ( tests drive and validate the design of our architecture ) ( creating new methods from refactoring should not require us to write new tests , this violates the contract-first testing principle ) ( you are allowed to modify the project and tests implementations as you see fit , since project and/or tests abstractions and/or implementations sometimes need to be updated ) ( when planning a new TDD cycle , provide a list of all the files you intend to edit and what you intend to do in each phase )
 
 - use pulumi for local development environment ( using podman instead of docker ) 
+
+
+# architecture layers
+
+- the highest layer is the frontend
+- the middle layer is the backend services 
+- the lowest layer is the deployment environments layer
+
 
 # architecture patterns
 
@@ -45,12 +71,6 @@
 - singletons can only depend on singletons
 
 - the result pattern is an anti pattern ( go has built in error handling ) 
-
-## architecture layers
-
-- the highest layer is the frontend
-- the lowest layer is the infrastructure layer
-- lower layers should not depend on nor be aware of higher layers
 
 ## database migrations
 
@@ -89,7 +109,7 @@
 
 ## api versioning
 
--
+- 
 
 ## observability
 
@@ -120,9 +140,8 @@
 
 - trunk based development for version control
 
-# stack
 
-- note : azure container apps manages dapr ( we have to create it manually in development environment for a similar environment ) 
+# stack
 
 ## public website
 
@@ -130,31 +149,33 @@
 - vue
 - tailwind
 - shadcn-vue
+
+- public api gateway for dynamic data
+
 - vite
 - vitest
 - pinia
 - bun runtime
 
-- public api gateway for dynamic data
-
 - do not use react
 - do not do UI design testing
 
-- cloudflare pages
-
 ## apis and events and public and admin api gateways
 
-- golang
-- golang-migrate
-- slog
+- golang for apis
 
-- sql
+- slog for logging
 
-- dapr apis
+- golang-migrate for migrations
+- sql migration files 
+
+- dapr resources apis
 
 - feature flags
 
 ## dapr stateless services
+
+- note : azure container apps manages dapr ( we have to create it manually in development environment for a similar environment ) 
 
 - orchestrator : dapr control plan container for production and local development 
 
@@ -186,18 +207,18 @@
 - relational database ( includes configuration store and state store and identity storage and services storage ) : azure manged postgre hosted for production ( postgre container for local development ) 
 - file storage : azure blob storage hosted for production ( azurite blob storage emulator and azurite-data containers for local development https://github.com/Azure/Azurite )
 
-## grafana cloud observability 
+## telemetry observability 
 
-- objeservability : grafana , mimir , loki , tempo , pyroscope in container with their respective data volumes containers ( grafana-data , mimir-data , loki-data , tempo-data , pyroscope-data ) for production and local development 
+- objeservability : grafana , mimir , loki , tempo , pyroscope in container with their respective data volumes containers ( grafana-data , mimir-data , loki-data , tempo-data , pyroscope-data ) for local development ( grafana cloud for production ) 
 
-## content delivery
+## website content delivery
 
 - website hosting : cloudflare pages
-- content delivery netowkr : cloudflare cdn
+- content delivery network : cloudflare cdn
 
 ## persistent storage migrations
 
-- go migrations runner
+- golang-migate in pulumi
 
 - development :
     approach : Aggressive - always migrate to latest
@@ -219,19 +240,24 @@
 
 ## deployment ( staging , production )
 
+- pulumi golang
+
 - state storage : azure blob storage ( pulumi state storage container ) ( manually created using the azure cli ) 
+
 - github secrets : ( azure authentication , pulumi state storage , grafana cloud authentication , hashicorp vault cloud authentication ) ( manually created using the azure cli , cloudflare cli , grafana cli , hashicorp vault cli , github cli ) 
 
 - github version control
+
 - github container registry
 
-- pulumi cli and go sdk
 
 [ important general rules to follow ]
 
 - ultrathink and deep dive and be comprehensive and be professional
 
 - this is nixos and the admin password is 'unsecure'
+
+- fix issues as they arise 
 
 - be causious of technical debt
 - be causious of overengineering
@@ -245,8 +271,8 @@
 
 - critical axiom rule : do not stage and commit and push unless I explicitly ask you to
 
-# Task Management Context Guidelines
 
+# Task Management Context Guidelines
 
 - task descriptions must include WHY ( business reason , compliance requirement , architectural decision , so forth )
 - task descriptions must include SCOPE ( which APIs , which components , which environments , so forth )
