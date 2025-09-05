@@ -1369,3 +1369,297 @@ func TestResearchService_RemoveFeaturedResearch(t *testing.T) {
 		})
 	}
 }
+
+// RED PHASE - Domain enum validation tests (will fail until IsValid methods are implemented)
+
+func TestResearchType_IsValid(t *testing.T) {
+	tests := []struct {
+		name         string
+		researchType ResearchType
+		want         bool
+	}{
+		{
+			name:         "valid clinical study",
+			researchType: ResearchTypeClinicalStudy,
+			want:         true,
+		},
+		{
+			name:         "valid case report",
+			researchType: ResearchTypeCaseReport,
+			want:         true,
+		},
+		{
+			name:         "valid systematic review",
+			researchType: ResearchTypeSystematicReview,
+			want:         true,
+		},
+		{
+			name:         "valid meta analysis",
+			researchType: ResearchTypeMetaAnalysis,
+			want:         true,
+		},
+		{
+			name:         "valid editorial",
+			researchType: ResearchTypeEditorial,
+			want:         true,
+		},
+		{
+			name:         "valid commentary",
+			researchType: ResearchTypeCommentary,
+			want:         true,
+		},
+		{
+			name:         "invalid empty research type",
+			researchType: ResearchType(""),
+			want:         false,
+		},
+		{
+			name:         "invalid unknown research type",
+			researchType: ResearchType("unknown"),
+			want:         false,
+		},
+		{
+			name:         "invalid mixed case research type",
+			researchType: ResearchType("Clinical_Study"),
+			want:         false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// This will fail until we implement ResearchType.IsValid() method
+			got := tt.researchType.IsValid()
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestPublishingStatus_IsValid(t *testing.T) {
+	tests := []struct {
+		name   string
+		status PublishingStatus
+		want   bool
+	}{
+		{
+			name:   "valid draft status",
+			status: PublishingStatusDraft,
+			want:   true,
+		},
+		{
+			name:   "valid published status",
+			status: PublishingStatusPublished,
+			want:   true,
+		},
+		{
+			name:   "valid archived status",
+			status: PublishingStatusArchived,
+			want:   true,
+		},
+		{
+			name:   "invalid empty status",
+			status: PublishingStatus(""),
+			want:   false,
+		},
+		{
+			name:   "invalid unknown status",
+			status: PublishingStatus("unknown"),
+			want:   false,
+		},
+		{
+			name:   "invalid mixed case status",
+			status: PublishingStatus("Draft"),
+			want:   false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// This will fail until we implement PublishingStatus.IsValid() method
+			got := tt.status.IsValid()
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+// RED PHASE - Validation helper tests (will fail until helper functions match expected behavior)
+
+func TestValidateResearchTitle(t *testing.T) {
+	tests := []struct {
+		name      string
+		title     string
+		wantError bool
+		errorMsg  string
+	}{
+		{
+			name:      "valid research title",
+			title:     "Clinical Study on Patient Outcomes",
+			wantError: false,
+		},
+		{
+			name:      "valid title with maximum length",
+			title:     strings.Repeat("a", 255),
+			wantError: false,
+		},
+		{
+			name:      "valid title with minimum length",
+			title:     "ab",
+			wantError: false,
+		},
+		{
+			name:      "invalid empty title",
+			title:     "",
+			wantError: true,
+			errorMsg:  "title is required",
+		},
+		{
+			name:      "invalid whitespace-only title",
+			title:     "   ",
+			wantError: true,
+			errorMsg:  "title is required",
+		},
+		{
+			name:      "invalid title too short",
+			title:     "a",
+			wantError: true,
+			errorMsg:  "title must be between 2 and 255 characters",
+		},
+		{
+			name:      "invalid title too long",
+			title:     strings.Repeat("a", 256),
+			wantError: true,
+			errorMsg:  "title must be between 2 and 255 characters",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// This will fail until we implement validateResearchTitle function
+			err := validateResearchTitle(tt.title)
+			if tt.wantError {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errorMsg)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestValidateResearchAbstract(t *testing.T) {
+	tests := []struct {
+		name      string
+		abstract  string
+		wantError bool
+		errorMsg  string
+	}{
+		{
+			name:      "valid research abstract",
+			abstract:  "This study examines the effects of various treatment protocols on patient recovery outcomes in clinical settings",
+			wantError: false,
+		},
+		{
+			name:      "valid abstract with minimum length",
+			abstract:  "This abstract meets the minimum requirement for length",
+			wantError: false,
+		},
+		{
+			name:      "invalid empty abstract",
+			abstract:  "",
+			wantError: true,
+			errorMsg:  "abstract is required",
+		},
+		{
+			name:      "invalid whitespace-only abstract",
+			abstract:  "   ",
+			wantError: true,
+			errorMsg:  "abstract is required",
+		},
+		{
+			name:      "invalid abstract too short",
+			abstract:  "Too short",
+			wantError: true,
+			errorMsg:  "abstract must be between 20 and 2000 characters",
+		},
+		{
+			name:      "invalid abstract too long",
+			abstract:  strings.Repeat("a", 2001),
+			wantError: true,
+			errorMsg:  "abstract must be between 20 and 2000 characters",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// This will fail until we implement validateResearchAbstract function
+			err := validateResearchAbstract(tt.abstract)
+			if tt.wantError {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errorMsg)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestValidateResearchAuthorNames(t *testing.T) {
+	tests := []struct {
+		name        string
+		authorNames string
+		wantError   bool
+		errorMsg    string
+	}{
+		{
+			name:        "valid author names",
+			authorNames: "Dr. John Smith, Dr. Jane Doe",
+			wantError:   false,
+		},
+		{
+			name:        "valid single author",
+			authorNames: "Dr. John Smith",
+			wantError:   false,
+		},
+		{
+			name:        "valid author names minimum length",
+			authorNames: "ab",
+			wantError:   false,
+		},
+		{
+			name:        "invalid empty author names",
+			authorNames: "",
+			wantError:   true,
+			errorMsg:    "author names is required",
+		},
+		{
+			name:        "invalid whitespace-only author names",
+			authorNames: "   ",
+			wantError:   true,
+			errorMsg:    "author names is required",
+		},
+		{
+			name:        "invalid author names too short",
+			authorNames: "a",
+			wantError:   true,
+			errorMsg:    "author names must be between 2 and 500 characters",
+		},
+		{
+			name:        "invalid author names too long",
+			authorNames: strings.Repeat("a", 501),
+			wantError:   true,
+			errorMsg:    "author names must be between 2 and 500 characters",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// This will fail until we implement validateResearchAuthorNames function
+			err := validateResearchAuthorNames(tt.authorNames)
+			if tt.wantError {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errorMsg)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}

@@ -1,6 +1,7 @@
 package research
 
 import (
+	"strings"
 	"time"
 
 	"github.com/axiom-software-co/international-center/src/backend/internal/shared/domain"
@@ -25,6 +26,27 @@ const (
 	PublishingStatusPublished PublishingStatus = "published"
 	PublishingStatusArchived  PublishingStatus = "archived"
 )
+
+// IsValid checks if the research type is valid
+func (rt ResearchType) IsValid() bool {
+	switch rt {
+	case ResearchTypeClinicalStudy, ResearchTypeCaseReport, ResearchTypeSystematicReview,
+		 ResearchTypeMetaAnalysis, ResearchTypeEditorial, ResearchTypeCommentary:
+		return true
+	default:
+		return false
+	}
+}
+
+// IsValid checks if the publishing status is valid  
+func (ps PublishingStatus) IsValid() bool {
+	switch ps {
+	case PublishingStatusDraft, PublishingStatusPublished, PublishingStatusArchived:
+		return true
+	default:
+		return false
+	}
+}
 
 // Research represents the main research entity matching TABLES-RESEARCH.md
 type Research struct {
@@ -105,12 +127,12 @@ func (r *Research) Validate() error {
 		return err
 	}
 	
-	if err := domain.ValidateEnum("research_type", string(r.ResearchType), getValidResearchTypes()); err != nil {
-		return err
+	if !r.ResearchType.IsValid() {
+		return domain.NewValidationError("invalid research type")
 	}
 	
-	if err := domain.ValidateEnum("publishing_status", string(r.PublishingStatus), getValidPublishingStatuses()); err != nil {
-		return err
+	if !r.PublishingStatus.IsValid() {
+		return domain.NewValidationError("invalid publishing status")
 	}
 	
 	if err := domain.ValidateHTTPSURL("image_url", r.ImageURL); err != nil {
@@ -234,23 +256,64 @@ func (fr *FeaturedResearch) SetDefaults() {
 	}
 }
 
-// Utility functions for enum validation
+// Validation helper functions following established domain patterns
 
-func getValidResearchTypes() []string {
-	return []string{
-		string(ResearchTypeClinicalStudy),
-		string(ResearchTypeCaseReport),
-		string(ResearchTypeSystematicReview),
-		string(ResearchTypeMetaAnalysis),
-		string(ResearchTypeEditorial),
-		string(ResearchTypeCommentary),
+func validateResearchTitle(title string) error {
+	if strings.TrimSpace(title) == "" {
+		return domain.NewValidationError("title is required")
 	}
+	
+	if len(title) < 2 {
+		return domain.NewValidationError("title must be between 2 and 255 characters")
+	}
+	
+	if len(title) > 255 {
+		return domain.NewValidationError("title must be between 2 and 255 characters")
+	}
+	
+	return nil
 }
 
-func getValidPublishingStatuses() []string {
-	return []string{
-		string(PublishingStatusDraft),
-		string(PublishingStatusPublished),
-		string(PublishingStatusArchived),
+func validateResearchAbstract(abstract string) error {
+	if strings.TrimSpace(abstract) == "" {
+		return domain.NewValidationError("abstract is required")
 	}
+	
+	if len(abstract) < 20 {
+		return domain.NewValidationError("abstract must be between 20 and 2000 characters")
+	}
+	
+	if len(abstract) > 2000 {
+		return domain.NewValidationError("abstract must be between 20 and 2000 characters")
+	}
+	
+	return nil
+}
+
+func validateResearchAuthorNames(authorNames string) error {
+	if strings.TrimSpace(authorNames) == "" {
+		return domain.NewValidationError("author names is required")
+	}
+	
+	if len(authorNames) < 2 {
+		return domain.NewValidationError("author names must be between 2 and 500 characters")
+	}
+	
+	if len(authorNames) > 500 {
+		return domain.NewValidationError("author names must be between 2 and 500 characters")
+	}
+	
+	return nil
+}
+
+// Comprehensive validation helper functions matching established domain patterns
+
+// IsValidResearchType checks if the given string is a valid research type
+func IsValidResearchType(researchType string) bool {
+	return ResearchType(researchType).IsValid()
+}
+
+// IsValidPublishingStatus checks if the given string is a valid publishing status
+func IsValidPublishingStatus(status string) bool {
+	return PublishingStatus(status).IsValid()
 }
