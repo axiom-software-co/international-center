@@ -18,7 +18,7 @@ import (
 // MediaAPIApplication represents the media API application
 type MediaAPIApplication struct {
 	daprClient      *dapr.Client
-	mediaRepository *media.MediaInquiryRepository
+	mediaRepository *media.MediaRepository
 	mediaService    *media.MediaService
 	mediaHandler    *media.MediaHandler
 	server          *http.Server
@@ -55,7 +55,7 @@ func NewMediaAPIApplication() (*MediaAPIApplication, error) {
 	}
 	
 	// Initialize media repository
-	mediaRepository := media.NewMediaInquiryRepository(daprClient)
+	mediaRepository := media.NewMediaRepository(daprClient)
 	
 	// Initialize media service
 	mediaService := media.NewMediaService(mediaRepository)

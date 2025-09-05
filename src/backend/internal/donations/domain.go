@@ -1,7 +1,6 @@
 package donations
 
 import (
-	"context"
 	"fmt"
 	"net/mail"
 	"regexp"
@@ -503,12 +502,3 @@ type InquiryFilters struct {
 	Offset       *int              `json:"offset,omitempty"`
 }
 
-// Repository Interface
-
-type DonationsRepositoryInterface interface {
-	SaveInquiry(ctx context.Context, inquiry *DonationsInquiry) error
-	GetInquiry(ctx context.Context, inquiryID string) (*DonationsInquiry, error)
-	DeleteInquiry(ctx context.Context, inquiryID string, userID string) error
-	ListInquiries(ctx context.Context, filters InquiryFilters) ([]*DonationsInquiry, error)
-	PublishAuditEvent(ctx context.Context, entityType domain.EntityType, entityID string, operationType domain.AuditEventType, userID string, beforeData, afterData interface{}) error
-}

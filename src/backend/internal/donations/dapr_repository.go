@@ -10,16 +10,16 @@ import (
 	"github.com/google/uuid"
 )
 
-// DonationsInquiryRepository implements donations inquiry data access using Dapr state store and pub/sub
-type DonationsInquiryRepository struct {
+// DonationsRepository implements donations inquiry data access using Dapr state store and pub/sub
+type DonationsRepository struct {
 	stateStore *dapr.StateStore
 	bindings   *dapr.Bindings
 	pubsub     *dapr.PubSub
 }
 
-// NewDonationsInquiryRepository creates a new donations repository
-func NewDonationsInquiryRepository(client *dapr.Client) *DonationsInquiryRepository {
-	return &DonationsInquiryRepository{
+// NewDonationsRepository creates a new donations repository
+func NewDonationsRepository(client *dapr.Client) *DonationsRepository {
+	return &DonationsRepository{
 		stateStore: dapr.NewStateStore(client),
 		bindings:   dapr.NewBindings(client),
 		pubsub:     dapr.NewPubSub(client),
@@ -29,7 +29,7 @@ func NewDonationsInquiryRepository(client *dapr.Client) *DonationsInquiryReposit
 // Donations inquiry operations
 
 // SaveInquiry saves donations inquiry to Dapr state store
-func (r *DonationsInquiryRepository) SaveInquiry(ctx context.Context, inquiry *DonationsInquiry) error {
+func (r *DonationsRepository) SaveInquiry(ctx context.Context, inquiry *DonationsInquiry) error {
 	key := r.stateStore.CreateKey("donations", "inquiry", inquiry.InquiryID)
 	
 	err := r.stateStore.Save(ctx, key, inquiry, nil)
@@ -130,7 +130,7 @@ func (r *DonationsInquiryRepository) SaveInquiry(ctx context.Context, inquiry *D
 }
 
 // GetInquiry retrieves a donations inquiry by ID from Dapr state store
-func (r *DonationsInquiryRepository) GetInquiry(ctx context.Context, inquiryID string) (*DonationsInquiry, error) {
+func (r *DonationsRepository) GetInquiry(ctx context.Context, inquiryID string) (*DonationsInquiry, error) {
 	key := r.stateStore.CreateKey("donations", "inquiry", inquiryID)
 	
 	var inquiry DonationsInquiry
@@ -152,7 +152,7 @@ func (r *DonationsInquiryRepository) GetInquiry(ctx context.Context, inquiryID s
 }
 
 // DeleteInquiry soft deletes a donations inquiry
-func (r *DonationsInquiryRepository) DeleteInquiry(ctx context.Context, inquiryID string, userID string) error {
+func (r *DonationsRepository) DeleteInquiry(ctx context.Context, inquiryID string, userID string) error {
 	inquiry, err := r.GetInquiry(ctx, inquiryID)
 	if err != nil {
 		return err
@@ -168,7 +168,7 @@ func (r *DonationsInquiryRepository) DeleteInquiry(ctx context.Context, inquiryI
 }
 
 // ListInquiries retrieves donations inquiries with filtering
-func (r *DonationsInquiryRepository) ListInquiries(ctx context.Context, filters InquiryFilters) ([]*DonationsInquiry, error) {
+func (r *DonationsRepository) ListInquiries(ctx context.Context, filters InquiryFilters) ([]*DonationsInquiry, error) {
 	// For this minimal GREEN phase implementation, return empty list
 	// In a production system, this would use proper database queries or indexed searches
 	// This will be improved in the REFACTOR phase
@@ -177,7 +177,7 @@ func (r *DonationsInquiryRepository) ListInquiries(ctx context.Context, filters 
 }
 
 // PublishAuditEvent publishes an audit event for compliance logging
-func (r *DonationsInquiryRepository) PublishAuditEvent(ctx context.Context, entityType domain.EntityType, entityID string, operationType domain.AuditEventType, userID string, beforeData, afterData interface{}) error {
+func (r *DonationsRepository) PublishAuditEvent(ctx context.Context, entityType domain.EntityType, entityID string, operationType domain.AuditEventType, userID string, beforeData, afterData interface{}) error {
 	correlationID := domain.GetCorrelationID(ctx)
 	if correlationID == "" {
 		correlationID = uuid.New().String()

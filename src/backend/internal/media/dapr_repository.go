@@ -10,16 +10,16 @@ import (
 	"github.com/google/uuid"
 )
 
-// MediaInquiryRepository implements media inquiry data access using Dapr state store and pub/sub
-type MediaInquiryRepository struct {
+// MediaRepository implements media inquiry data access using Dapr state store and pub/sub
+type MediaRepository struct {
 	stateStore *dapr.StateStore
 	bindings   *dapr.Bindings
 	pubsub     *dapr.PubSub
 }
 
-// NewMediaInquiryRepository creates a new media repository
-func NewMediaInquiryRepository(client *dapr.Client) *MediaInquiryRepository {
-	return &MediaInquiryRepository{
+// NewMediaRepository creates a new media repository
+func NewMediaRepository(client *dapr.Client) *MediaRepository {
+	return &MediaRepository{
 		stateStore: dapr.NewStateStore(client),
 		bindings:   dapr.NewBindings(client),
 		pubsub:     dapr.NewPubSub(client),
@@ -29,7 +29,7 @@ func NewMediaInquiryRepository(client *dapr.Client) *MediaInquiryRepository {
 // Media inquiry operations
 
 // SaveInquiry saves media inquiry to Dapr state store
-func (r *MediaInquiryRepository) SaveInquiry(ctx context.Context, inquiry *MediaInquiry) error {
+func (r *MediaRepository) SaveInquiry(ctx context.Context, inquiry *MediaInquiry) error {
 	key := r.stateStore.CreateKey("media", "inquiry", inquiry.InquiryID)
 	
 	err := r.stateStore.Save(ctx, key, inquiry, nil)
@@ -126,7 +126,7 @@ func (r *MediaInquiryRepository) SaveInquiry(ctx context.Context, inquiry *Media
 }
 
 // GetInquiry retrieves a media inquiry by ID from Dapr state store
-func (r *MediaInquiryRepository) GetInquiry(ctx context.Context, inquiryID string) (*MediaInquiry, error) {
+func (r *MediaRepository) GetInquiry(ctx context.Context, inquiryID string) (*MediaInquiry, error) {
 	key := r.stateStore.CreateKey("media", "inquiry", inquiryID)
 	
 	var inquiry MediaInquiry
@@ -148,7 +148,7 @@ func (r *MediaInquiryRepository) GetInquiry(ctx context.Context, inquiryID strin
 }
 
 // DeleteInquiry soft deletes a media inquiry
-func (r *MediaInquiryRepository) DeleteInquiry(ctx context.Context, inquiryID string, userID string) error {
+func (r *MediaRepository) DeleteInquiry(ctx context.Context, inquiryID string, userID string) error {
 	inquiry, err := r.GetInquiry(ctx, inquiryID)
 	if err != nil {
 		return err
@@ -164,7 +164,7 @@ func (r *MediaInquiryRepository) DeleteInquiry(ctx context.Context, inquiryID st
 }
 
 // ListInquiries retrieves media inquiries with filtering
-func (r *MediaInquiryRepository) ListInquiries(ctx context.Context, filters InquiryFilters) ([]*MediaInquiry, error) {
+func (r *MediaRepository) ListInquiries(ctx context.Context, filters InquiryFilters) ([]*MediaInquiry, error) {
 	// For this minimal GREEN phase implementation, return empty list
 	// In a production system, this would use proper database queries or indexed searches
 	// This will be improved in the REFACTOR phase
@@ -173,7 +173,7 @@ func (r *MediaInquiryRepository) ListInquiries(ctx context.Context, filters Inqu
 }
 
 // PublishAuditEvent publishes an audit event for compliance logging
-func (r *MediaInquiryRepository) PublishAuditEvent(ctx context.Context, entityType domain.EntityType, entityID string, operationType domain.AuditEventType, userID string, beforeData, afterData interface{}) error {
+func (r *MediaRepository) PublishAuditEvent(ctx context.Context, entityType domain.EntityType, entityID string, operationType domain.AuditEventType, userID string, beforeData, afterData interface{}) error {
 	correlationID := domain.GetCorrelationID(ctx)
 	if correlationID == "" {
 		correlationID = uuid.New().String()

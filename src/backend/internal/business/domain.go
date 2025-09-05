@@ -1,7 +1,6 @@
 package business
 
 import (
-	"context"
 	"net"
 	"time"
 
@@ -234,14 +233,3 @@ func IsAdminUser(userID string) bool {
 	return len(userID) > 6 && userID[:6] == "admin-"
 }
 
-// BusinessRepositoryInterface defines the interface for business inquiry data operations
-type BusinessRepositoryInterface interface {
-	// Business inquiry operations
-	SaveInquiry(ctx context.Context, inquiry *BusinessInquiry) error
-	GetInquiry(ctx context.Context, inquiryID string) (*BusinessInquiry, error)
-	DeleteInquiry(ctx context.Context, inquiryID string, userID string) error
-	ListInquiries(ctx context.Context, filters InquiryFilters) ([]*BusinessInquiry, error)
-	
-	// Audit operations
-	PublishAuditEvent(ctx context.Context, entityType domain.EntityType, entityID string, operationType domain.AuditEventType, userID string, beforeData, afterData interface{}) error
-}

@@ -10,16 +10,16 @@ import (
 	"github.com/google/uuid"
 )
 
-// BusinessInquiryRepository implements business inquiry data access using Dapr state store and pub/sub
-type BusinessInquiryRepository struct {
+// BusinessRepository implements business inquiry data access using Dapr state store and pub/sub
+type BusinessRepository struct {
 	stateStore *dapr.StateStore
 	bindings   *dapr.Bindings
 	pubsub     *dapr.PubSub
 }
 
-// NewBusinessInquiryRepository creates a new business repository
-func NewBusinessInquiryRepository(client *dapr.Client) *BusinessInquiryRepository {
-	return &BusinessInquiryRepository{
+// NewBusinessRepository creates a new business repository
+func NewBusinessRepository(client *dapr.Client) *BusinessRepository {
+	return &BusinessRepository{
 		stateStore: dapr.NewStateStore(client),
 		bindings:   dapr.NewBindings(client),
 		pubsub:     dapr.NewPubSub(client),
@@ -29,7 +29,7 @@ func NewBusinessInquiryRepository(client *dapr.Client) *BusinessInquiryRepositor
 // Business inquiry operations
 
 // SaveInquiry saves business inquiry to Dapr state store
-func (r *BusinessInquiryRepository) SaveInquiry(ctx context.Context, inquiry *BusinessInquiry) error {
+func (r *BusinessRepository) SaveInquiry(ctx context.Context, inquiry *BusinessInquiry) error {
 	key := r.stateStore.CreateKey("business", "inquiry", inquiry.InquiryID)
 	
 	err := r.stateStore.Save(ctx, key, inquiry, nil)
@@ -97,7 +97,7 @@ func (r *BusinessInquiryRepository) SaveInquiry(ctx context.Context, inquiry *Bu
 }
 
 // GetInquiry retrieves a business inquiry by ID from Dapr state store
-func (r *BusinessInquiryRepository) GetInquiry(ctx context.Context, inquiryID string) (*BusinessInquiry, error) {
+func (r *BusinessRepository) GetInquiry(ctx context.Context, inquiryID string) (*BusinessInquiry, error) {
 	key := r.stateStore.CreateKey("business", "inquiry", inquiryID)
 	
 	var inquiry BusinessInquiry
@@ -119,7 +119,7 @@ func (r *BusinessInquiryRepository) GetInquiry(ctx context.Context, inquiryID st
 }
 
 // DeleteInquiry soft deletes a business inquiry
-func (r *BusinessInquiryRepository) DeleteInquiry(ctx context.Context, inquiryID string, userID string) error {
+func (r *BusinessRepository) DeleteInquiry(ctx context.Context, inquiryID string, userID string) error {
 	inquiry, err := r.GetInquiry(ctx, inquiryID)
 	if err != nil {
 		return err
@@ -135,7 +135,7 @@ func (r *BusinessInquiryRepository) DeleteInquiry(ctx context.Context, inquiryID
 }
 
 // ListInquiries retrieves business inquiries with filtering
-func (r *BusinessInquiryRepository) ListInquiries(ctx context.Context, filters InquiryFilters) ([]*BusinessInquiry, error) {
+func (r *BusinessRepository) ListInquiries(ctx context.Context, filters InquiryFilters) ([]*BusinessInquiry, error) {
 	// For this minimal GREEN phase implementation, return empty list
 	// In a production system, this would use proper database queries or indexed searches
 	// This will be improved in the REFACTOR phase
@@ -144,7 +144,7 @@ func (r *BusinessInquiryRepository) ListInquiries(ctx context.Context, filters I
 }
 
 // PublishAuditEvent publishes an audit event for compliance logging
-func (r *BusinessInquiryRepository) PublishAuditEvent(ctx context.Context, entityType domain.EntityType, entityID string, operationType domain.AuditEventType, userID string, beforeData, afterData interface{}) error {
+func (r *BusinessRepository) PublishAuditEvent(ctx context.Context, entityType domain.EntityType, entityID string, operationType domain.AuditEventType, userID string, beforeData, afterData interface{}) error {
 	correlationID := domain.GetCorrelationID(ctx)
 	if correlationID == "" {
 		correlationID = uuid.New().String()

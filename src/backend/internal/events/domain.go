@@ -780,27 +780,3 @@ func IsAdminUser(userID string) bool {
 	return strings.HasPrefix(userID, "admin-")
 }
 
-// Repository interface for events domain
-type EventsRepositoryInterface interface {
-	// Event operations
-	SaveEvent(ctx context.Context, event *Event) error
-	GetEvent(ctx context.Context, eventID string) (*Event, error)
-	DeleteEvent(ctx context.Context, eventID string, userID string) error
-	
-	// Event category operations
-	SaveEventCategory(ctx context.Context, category *EventCategory) error
-	GetEventCategory(ctx context.Context, categoryID string) (*EventCategory, error)
-	DeleteEventCategory(ctx context.Context, categoryID string, userID string) error
-	GetDefaultUnassignedCategory(ctx context.Context) (*EventCategory, error)
-	
-	// Featured event operations
-	SaveFeaturedEvent(ctx context.Context, featuredEvent *FeaturedEvent) error
-	GetFeaturedEvent(ctx context.Context) (*FeaturedEvent, error)
-	DeleteFeaturedEvent(ctx context.Context) error
-	
-	// Event registration operations
-	GetEventRegistrations(ctx context.Context, eventID string) ([]*EventRegistration, error)
-	
-	// Audit operations
-	PublishAuditEvent(ctx context.Context, entityType domain.EntityType, entityID string, operationType domain.AuditEventType, userID string, beforeData, afterData interface{}) error
-}

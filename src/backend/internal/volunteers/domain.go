@@ -82,32 +82,4 @@ type VolunteerApplication struct {
 	DeletedAt *time.Time `json:"deleted_at,omitempty"`
 }
 
-// VolunteerRepositoryInterface defines the contract for volunteer data access
-type VolunteerRepositoryInterface interface {
-	// Volunteer application operations
-	SaveVolunteerApplication(ctx context.Context, application *VolunteerApplication) error
-	GetVolunteerApplication(ctx context.Context, applicationID string) (*VolunteerApplication, error)
-	GetAllVolunteerApplications(ctx context.Context, limit, offset int) ([]*VolunteerApplication, error)
-	GetVolunteerApplicationsByStatus(ctx context.Context, status ApplicationStatus, limit, offset int) ([]*VolunteerApplication, error)
-	GetVolunteerApplicationsByPriority(ctx context.Context, priority ApplicationPriority, limit, offset int) ([]*VolunteerApplication, error)
-	GetVolunteerApplicationsByInterest(ctx context.Context, interest VolunteerInterest, limit, offset int) ([]*VolunteerApplication, error)
-	SearchVolunteerApplications(ctx context.Context, searchTerm string, limit, offset int) ([]*VolunteerApplication, error)
-	DeleteVolunteerApplication(ctx context.Context, applicationID string) error
-
-	// Audit operations
-	PublishAuditEvent(ctx context.Context, entityType domain.EntityType, entityID string, operationType domain.AuditEventType, userID string, beforeData, afterData interface{}) error
-	GetVolunteerApplicationAudit(ctx context.Context, applicationID string, userID string, limit int, offset int) ([]*domain.AuditEvent, error)
-}
-
-// VolunteerService implements business logic for volunteer operations
-type VolunteerService struct {
-	repository VolunteerRepositoryInterface
-}
-
-// NewVolunteerService creates a new volunteer service
-func NewVolunteerService(repository VolunteerRepositoryInterface) *VolunteerService {
-	return &VolunteerService{
-		repository: repository,
-	}
-}
 

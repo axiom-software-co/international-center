@@ -18,7 +18,7 @@ import (
 // DonationsAPIApplication represents the donations API application
 type DonationsAPIApplication struct {
 	daprClient          *dapr.Client
-	donationsRepository *donations.DonationsInquiryRepository
+	donationsRepository *donations.DonationsRepository
 	donationsService    *donations.DonationsService
 	donationsHandler    *donations.DonationsHandler
 	server              *http.Server
@@ -55,7 +55,7 @@ func NewDonationsAPIApplication() (*DonationsAPIApplication, error) {
 	}
 	
 	// Initialize donations repository
-	donationsRepository := donations.NewDonationsInquiryRepository(daprClient)
+	donationsRepository := donations.NewDonationsRepository(daprClient)
 	
 	// Initialize donations service
 	donationsService := donations.NewDonationsService(donationsRepository)

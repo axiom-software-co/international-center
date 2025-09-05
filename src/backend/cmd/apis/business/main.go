@@ -18,7 +18,7 @@ import (
 // BusinessAPIApplication represents the business API application
 type BusinessAPIApplication struct {
 	daprClient         *dapr.Client
-	businessRepository *business.BusinessInquiryRepository
+	businessRepository *business.BusinessRepository
 	businessService    *business.BusinessService
 	businessHandler    *business.BusinessHandler
 	server             *http.Server
@@ -55,7 +55,7 @@ func NewBusinessAPIApplication() (*BusinessAPIApplication, error) {
 	}
 	
 	// Initialize business repository
-	businessRepository := business.NewBusinessInquiryRepository(daprClient)
+	businessRepository := business.NewBusinessRepository(daprClient)
 	
 	// Initialize business service
 	businessService := business.NewBusinessService(businessRepository)

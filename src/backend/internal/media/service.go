@@ -8,6 +8,15 @@ import (
 	"github.com/axiom-software-co/international-center/src/backend/internal/shared/domain"
 )
 
+// MediaRepositoryInterface defines the interface for media inquiry data operations
+type MediaRepositoryInterface interface {
+	SaveInquiry(ctx context.Context, inquiry *MediaInquiry) error
+	GetInquiry(ctx context.Context, inquiryID string) (*MediaInquiry, error)
+	DeleteInquiry(ctx context.Context, inquiryID string, userID string) error
+	ListInquiries(ctx context.Context, filters InquiryFilters) ([]*MediaInquiry, error)
+	PublishAuditEvent(ctx context.Context, entityType domain.EntityType, entityID string, operationType domain.AuditEventType, userID string, beforeData, afterData interface{}) error
+}
+
 // MediaService provides business logic for media inquiry operations
 type MediaService struct {
 	repository MediaRepositoryInterface

@@ -1,7 +1,6 @@
 package media
 
 import (
-	"context"
 	"fmt"
 	"net/mail"
 	"regexp"
@@ -485,12 +484,3 @@ func IsAdminUser(userID string) bool {
 	return len(userID) > 6 && userID[:6] == "admin-"
 }
 
-// Repository Interface
-
-type MediaRepositoryInterface interface {
-	SaveInquiry(ctx context.Context, inquiry *MediaInquiry) error
-	GetInquiry(ctx context.Context, inquiryID string) (*MediaInquiry, error)
-	DeleteInquiry(ctx context.Context, inquiryID string, userID string) error
-	ListInquiries(ctx context.Context, filters InquiryFilters) ([]*MediaInquiry, error)
-	PublishAuditEvent(ctx context.Context, entityType domain.EntityType, entityID string, operationType domain.AuditEventType, userID string, beforeData, afterData interface{}) error
-}
