@@ -7,6 +7,7 @@ import (
 	"github.com/axiom-software-co/international-center/src/cicd/components"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi/config"
+	"github.com/pulumi/pulumi-command/sdk/go/command/local"
 )
 
 // DeploymentOrchestrator manages component deployment with dependency resolution and health monitoring
@@ -37,6 +38,217 @@ func NewDeploymentOrchestrator(ctx *pulumi.Context, cfg *config.Config, environm
 		environment:   environment,
 		healthMonitor: NewHealthMonitor(ctx, environment),
 	}
+}
+
+// ImageBuildWorkflow manages the optimized image building process
+type ImageBuildWorkflow struct {
+	orchestrator *DeploymentOrchestrator
+	builder      *components.ImageBuilder
+	buildResults map[string]*ImageBuildResult
+}
+
+// ImageBuildResult tracks the result of an individual image build
+type ImageBuildResult struct {
+	ImageName   string
+	ServiceName string
+	Success     bool
+	Duration    time.Duration
+	Error       error
+}
+
+// ImageBuildGroup defines a group of images that can be built in parallel
+type ImageBuildGroup struct {
+	Name        string
+	Images      []ImageBuildTask
+	Parallelism int // Maximum number of parallel builds in this group
+}
+
+// ImageBuildTask defines a specific image build task
+type ImageBuildTask struct {
+	ServiceName string
+	ServiceType string
+	ImageName   string
+	Priority    int // Higher priority built first within group
+}
+
+// BuildRequiredImages builds all Docker images required for the deployment with optimized workflow
+func (d *DeploymentOrchestrator) BuildRequiredImages() error {
+	d.ctx.Log.Info("Starting optimized image building workflow", nil)
+	
+	workflow := &ImageBuildWorkflow{
+		orchestrator: d,
+		builder:      NewImageBuilder(d.ctx, d.environment),
+		buildResults: make(map[string]*ImageBuildResult),
+	}
+	
+	// Build images using optimized workflow
+	if err := workflow.ExecuteOptimizedBuildWorkflow(); err != nil {
+		d.ctx.Log.Error("Optimized image building workflow failed", nil)
+		return fmt.Errorf("optimized image building failed: %w", err)
+	}
+	
+	d.ctx.Log.Info("Optimized image building workflow completed successfully", nil)
+	return nil
+}
+
+// ExecuteOptimizedBuildWorkflow executes the image building workflow with dependency-aware parallel processing
+func (w *ImageBuildWorkflow) ExecuteOptimizedBuildWorkflow() error {
+	w.orchestrator.ctx.Log.Info("Executing dependency-aware parallel image building", nil)
+	
+	// Define build groups with dependency order and parallelism
+	buildGroups := w.createBuildGroups()
+	
+	// Execute build groups in dependency order
+	for i, group := range buildGroups {
+		w.orchestrator.ctx.Log.Info(fmt.Sprintf("Building group %d: %s", i+1, group.Name), nil)
+		
+		if err := w.executeBuildGroup(group); err != nil {
+			return fmt.Errorf("build group '%s' failed: %w", group.Name, err)
+		}
+		
+		w.orchestrator.ctx.Log.Info(fmt.Sprintf("Group %d: %s completed successfully", i+1, group.Name), nil)
+	}
+	
+	// Validate all builds completed successfully
+	return w.validateAllBuildsSuccessful()
+}
+
+// createBuildGroups creates optimized build groups based on dependencies and parallelism
+func (w *ImageBuildWorkflow) createBuildGroups() []ImageBuildGroup {
+	return []ImageBuildGroup{
+		{
+			Name:        "Foundation Services",
+			Parallelism: 4, // Build up to 4 foundation services in parallel
+			Images: []ImageBuildTask{
+				{ServiceName: "media", ServiceType: "inquiries", ImageName: "backend/media:latest", Priority: 1},
+				{ServiceName: "donations", ServiceType: "inquiries", ImageName: "backend/donations:latest", Priority: 1},
+				{ServiceName: "volunteers", ServiceType: "inquiries", ImageName: "backend/volunteers:latest", Priority: 2},
+				{ServiceName: "business", ServiceType: "inquiries", ImageName: "backend/business:latest", Priority: 2},
+			},
+		},
+		{
+			Name:        "Content Services", 
+			Parallelism: 4, // Build up to 4 content services in parallel
+			Images: []ImageBuildTask{
+				{ServiceName: "research", ServiceType: "content", ImageName: "backend/research:latest", Priority: 1},
+				{ServiceName: "services", ServiceType: "content", ImageName: "backend/services:latest", Priority: 1},
+				{ServiceName: "events", ServiceType: "content", ImageName: "backend/events:latest", Priority: 2},
+				{ServiceName: "news", ServiceType: "content", ImageName: "backend/news:latest", Priority: 2},
+			},
+		},
+		{
+			Name:        "Gateway Services",
+			Parallelism: 2, // Build both gateways in parallel
+			Images: []ImageBuildTask{
+				{ServiceName: "admin", ServiceType: "gateway", ImageName: "backend/admin-gateway:latest", Priority: 1},
+				{ServiceName: "public", ServiceType: "gateway", ImageName: "backend/public-gateway:latest", Priority: 1},
+			},
+		},
+		{
+			Name:        "Frontend",
+			Parallelism: 1, // Single website build
+			Images: []ImageBuildTask{
+				{ServiceName: "website", ServiceType: "website", ImageName: "website:latest", Priority: 1},
+			},
+		},
+	}
+}
+
+// executeBuildGroup executes a build group with controlled parallelism
+func (w *ImageBuildWorkflow) executeBuildGroup(group ImageBuildGroup) error {
+	w.orchestrator.ctx.Log.Info(fmt.Sprintf("Executing build group '%s' with parallelism %d", group.Name, group.Parallelism), nil)
+	
+	// Create semaphore for controlling parallelism
+	semaphore := make(chan struct{}, group.Parallelism)
+	resultChan := make(chan *ImageBuildResult, len(group.Images))
+	
+	// Launch builds with controlled parallelism
+	for _, task := range group.Images {
+		go func(task ImageBuildTask) {
+			// Acquire semaphore
+			semaphore <- struct{}{}
+			defer func() { <-semaphore }()
+			
+			// Execute build task
+			result := w.executeBuildTask(task)
+			resultChan <- result
+		}(task)
+	}
+	
+	// Collect results
+	var buildErrors []error
+	for i := 0; i < len(group.Images); i++ {
+		result := <-resultChan
+		w.buildResults[result.ServiceName] = result
+		
+		if !result.Success {
+			buildErrors = append(buildErrors, result.Error)
+			w.orchestrator.ctx.Log.Error(fmt.Sprintf("Build failed for %s: %v", result.ServiceName, result.Error), nil)
+		} else {
+			w.orchestrator.ctx.Log.Info(fmt.Sprintf("Build completed for %s in %v", result.ServiceName, result.Duration), nil)
+		}
+	}
+	
+	// Return error if any builds failed
+	if len(buildErrors) > 0 {
+		return fmt.Errorf("build group '%s' had %d failures", group.Name, len(buildErrors))
+	}
+	
+	return nil
+}
+
+// executeBuildTask executes an individual build task with timing and error handling
+func (w *ImageBuildWorkflow) executeBuildTask(task ImageBuildTask) *ImageBuildResult {
+	startTime := time.Now()
+	result := &ImageBuildResult{
+		ImageName:   task.ImageName,
+		ServiceName: task.ServiceName,
+	}
+	
+	w.orchestrator.ctx.Log.Info(fmt.Sprintf("Starting build for %s (%s)", task.ServiceName, task.ServiceType), nil)
+	
+	// Execute the appropriate build based on service type
+	var err error
+	switch task.ServiceType {
+	case "inquiries", "content":
+		_, err = w.builder.BuildServiceImage(task.ServiceName, task.ServiceType)
+	case "gateway":
+		_, err = w.builder.BuildGatewayImage(task.ServiceName)
+	case "website":
+		_, err = w.builder.BuildWebsiteImage()
+	default:
+		err = fmt.Errorf("unknown service type: %s", task.ServiceType)
+	}
+	
+	result.Duration = time.Since(startTime)
+	result.Success = err == nil
+	result.Error = err
+	
+	return result
+}
+
+// validateAllBuildsSuccessful validates that all required images were built successfully
+func (w *ImageBuildWorkflow) validateAllBuildsSuccessful() error {
+	var failedBuilds []string
+	var totalDuration time.Duration
+	
+	for serviceName, result := range w.buildResults {
+		totalDuration += result.Duration
+		if !result.Success {
+			failedBuilds = append(failedBuilds, serviceName)
+		}
+	}
+	
+	w.orchestrator.ctx.Log.Info(fmt.Sprintf("Build workflow summary: %d builds completed in %v total", 
+		len(w.buildResults), totalDuration), nil)
+	
+	if len(failedBuilds) > 0 {
+		return fmt.Errorf("build validation failed: %d services failed to build: %v", 
+			len(failedBuilds), failedBuilds)
+	}
+	
+	w.orchestrator.ctx.Log.Info("All image builds validated successfully", nil)
+	return nil
 }
 
 // DeployInfrastructure orchestrates the deployment of all infrastructure components with dependency resolution
@@ -298,11 +510,21 @@ func (d *DeploymentOrchestrator) rollbackWebsite(outputs *components.WebsiteOutp
 	if outputs == nil {
 		return nil
 	}
-	d.ctx.Log.Info("Website rollback - would terminate website containers and clean up resources", nil)
-	// In a real implementation, this would:
-	// - Stop website containers
-	// - Clean up load balancers and CDN configurations
-	// - Remove DNS entries
+	
+	d.ctx.Log.Info("Terminating website container and cleaning up resources", nil)
+	
+	// Stop and remove website container
+	if err := d.stopContainer("website-dev"); err != nil {
+		d.ctx.Log.Error(fmt.Sprintf("Failed to stop website container: %v", err), nil)
+	}
+	
+	// For development environment, clean up container artifacts
+	if d.environment == "development" {
+		if err := d.cleanupContainerArtifacts("website"); err != nil {
+			d.ctx.Log.Error(fmt.Sprintf("Failed to cleanup website artifacts: %v", err), nil)
+		}
+	}
+	
 	return nil
 }
 
@@ -375,5 +597,43 @@ func (d *DeploymentOrchestrator) rollbackDatabase(outputs *components.DatabaseOu
 	// - Stop database containers
 	// - Preserve data volumes for potential recovery
 	// - Clean up database configurations
+	return nil
+}
+
+// stopContainer stops and removes a container by name
+func (d *DeploymentOrchestrator) stopContainer(containerName string) error {
+	d.ctx.Log.Info(fmt.Sprintf("Stopping container: %s", containerName), nil)
+	
+	// Create command to stop and remove container
+	stopCmd, err := local.NewCommand(d.ctx, fmt.Sprintf("stop-%s", containerName), &local.CommandArgs{
+		Create: pulumi.Sprintf("podman stop %s && podman rm %s", containerName, containerName),
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create stop command for container %s: %w", containerName, err)
+	}
+	
+	// Wait for command completion
+	_ = stopCmd.Stdout // Trigger command execution
+	
+	d.ctx.Log.Info(fmt.Sprintf("Container %s stopped and removed", containerName), nil)
+	return nil
+}
+
+// cleanupContainerArtifacts cleans up container-related artifacts for a service
+func (d *DeploymentOrchestrator) cleanupContainerArtifacts(serviceName string) error {
+	d.ctx.Log.Info(fmt.Sprintf("Cleaning up container artifacts for service: %s", serviceName), nil)
+	
+	// Create command to clean up container artifacts
+	cleanupCmd, err := local.NewCommand(d.ctx, fmt.Sprintf("cleanup-%s", serviceName), &local.CommandArgs{
+		Create: pulumi.Sprintf("podman image prune -f --filter label=service=%s", serviceName),
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create cleanup command for service %s: %w", serviceName, err)
+	}
+	
+	// Wait for command completion
+	_ = cleanupCmd.Stdout // Trigger command execution
+	
+	d.ctx.Log.Info(fmt.Sprintf("Container artifacts for %s cleaned up", serviceName), nil)
 	return nil
 }

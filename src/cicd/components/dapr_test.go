@@ -26,9 +26,9 @@ func TestDaprComponent_DevelopmentEnvironment(t *testing.T) {
 			controlPlaneURL := args[2].(string)
 			sidecarConfig := args[3].(string)
 
-			assert.Equal(t, "self_hosted", deploymentType, "Development should use self-hosted Dapr")
+			assert.Equal(t, "podman_dapr", deploymentType, "Development should use self-hosted Dapr")
 			assert.Equal(t, 3500, runtimePort, "Should use standard Dapr runtime port")
-			assert.Contains(t, controlPlaneURL, "http://127.0.0.1:9090", "Should use local control plane")
+			assert.Contains(t, controlPlaneURL, "http://127.0.0.1:50005", "Should use local control plane")
 			assert.Equal(t, "development", sidecarConfig, "Should use development sidecar config")
 			return nil
 		})

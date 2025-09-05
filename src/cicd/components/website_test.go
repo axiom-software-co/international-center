@@ -293,6 +293,7 @@ func (mocks *WebsiteMocks) NewResource(args pulumi.MockResourceArgs) (string, re
 		if args.Name == "website-dev" {
 			outputs["name"] = resource.NewStringProperty("website-dev-container")
 			outputs["image"] = resource.NewStringProperty("node:20-alpine")
+			outputs["id"] = resource.NewStringProperty("website-dev-container-id")
 			outputs["ports"] = resource.NewArrayProperty([]resource.PropertyValue{
 				resource.NewObjectProperty(resource.PropertyMap{
 					"internal": resource.NewNumberProperty(3000),

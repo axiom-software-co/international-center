@@ -5,8 +5,6 @@ import (
 
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi/config"
-	"github.com/pulumi/pulumi-docker/sdk/v4/go/docker"
-	"github.com/pulumi/pulumi-command/sdk/go/command/local"
 )
 
 // ServicesOutputs represents the outputs from services component
@@ -53,107 +51,22 @@ func deployDevelopmentServices(ctx *pulumi.Context, cfg *config.Config) (*Servic
 	publicGatewayURL := pulumi.String("http://127.0.0.1:9001").ToStringOutput()
 	adminGatewayURL := pulumi.String("http://127.0.0.1:9000").ToStringOutput()
 
-	// Deploy inquiries services containers (media, donations, volunteers, business)
-	inquiriesServices := pulumi.Map{}
-	inquiriesServiceNames := []string{"media", "donations", "volunteers", "business"}
-	for i, serviceName := range inquiriesServiceNames {
-		basePort := 8080 + i
-		
-		// Create Podman container using Command provider for each inquiries service
-		containerCmd, err := local.NewCommand(ctx, fmt.Sprintf("%s-container", serviceName), &local.CommandArgs{
-			Create: pulumi.Sprintf("podman run -d --name %s-dev -p %d:%d -e DAPR_HTTP_PORT=3500 -e DAPR_GRPC_PORT=%d backend/%s:latest", serviceName, basePort, basePort, 50001+i, serviceName),
-			Delete: pulumi.Sprintf("podman rm -f %s-dev", serviceName),
-		})
-		if err != nil {
-			return nil, err
-		}
-		
-		// Create Dapr sidecar for each inquiries service
-		daprCmd, err := local.NewCommand(ctx, fmt.Sprintf("%s-dapr-sidecar", serviceName), &local.CommandArgs{
-			Create: pulumi.Sprintf("podman run -d --name %s-dapr --network=container:%s-dev daprio/daprd:latest dapr run --app-id %s-api --app-port %d --dapr-http-port 3500 --dapr-grpc-port %d --components-path /tmp/components", serviceName, serviceName, serviceName, basePort, 50001+i),
-			Delete: pulumi.Sprintf("podman rm -f %s-dapr", serviceName),
-		}, pulumi.DependsOn([]pulumi.Resource{containerCmd}))
-		if err != nil {
-			return nil, err
-		}
-		
-		inquiriesServices[serviceName] = pulumi.Map{
-			"container_id":      containerCmd.Stdout,
-			"container_status":  pulumi.String("running"),
-			"host_port":         pulumi.Int(basePort),
-			"health_endpoint":   pulumi.Sprintf("http://localhost:%d/health", basePort),
-			"dapr_app_id":       pulumi.Sprintf("%s-api", serviceName),
-			"dapr_sidecar_id":   daprCmd.Stdout,
-		}
+	// Deploy inquiries services using factory
+	inquiriesServices, err := DeployInquiriesServices(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to deploy inquiries services: %w", err)
 	}
 
-	// Deploy content services containers (research, services, events, news)
-	contentServices := pulumi.Map{}
-	contentServiceNames := []string{"research", "services", "events", "news"}
-	for i, serviceName := range contentServiceNames {
-		basePort := 8090 + i
-		
-		// Create Podman container using Command provider for each content service
-		containerCmd, err := local.NewCommand(ctx, fmt.Sprintf("%s-container", serviceName), &local.CommandArgs{
-			Create: pulumi.Sprintf("podman run -d --name %s-dev -p %d:%d -e DAPR_HTTP_PORT=3500 -e DAPR_GRPC_PORT=%d backend/%s:latest", serviceName, basePort, basePort, 50010+i, serviceName),
-			Delete: pulumi.Sprintf("podman rm -f %s-dev", serviceName),
-		})
-		if err != nil {
-			return nil, err
-		}
-		
-		// Create Dapr sidecar for each content service
-		daprCmd, err := local.NewCommand(ctx, fmt.Sprintf("%s-dapr-sidecar", serviceName), &local.CommandArgs{
-			Create: pulumi.Sprintf("podman run -d --name %s-dapr --network=container:%s-dev daprio/daprd:latest dapr run --app-id %s-api --app-port %d --dapr-http-port 3500 --dapr-grpc-port %d --components-path /tmp/components", serviceName, serviceName, serviceName, basePort, 50010+i),
-			Delete: pulumi.Sprintf("podman rm -f %s-dapr", serviceName),
-		}, pulumi.DependsOn([]pulumi.Resource{containerCmd}))
-		if err != nil {
-			return nil, err
-		}
-		
-		contentServices[serviceName] = pulumi.Map{
-			"container_id":      containerCmd.Stdout,
-			"container_status":  pulumi.String("running"),
-			"host_port":         pulumi.Int(basePort),
-			"health_endpoint":   pulumi.Sprintf("http://localhost:%d/health", basePort),
-			"dapr_app_id":       pulumi.Sprintf("%s-api", serviceName),
-			"dapr_sidecar_id":   daprCmd.Stdout,
-		}
+	// Deploy content services using factory
+	contentServices, err := DeployContentServices(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to deploy content services: %w", err)
 	}
 
-	// Deploy gateway services containers (admin, public)
-	gatewayServices := pulumi.Map{}
-	gatewayNames := []string{"admin", "public"}
-	gatewayPorts := []int{9000, 9001}
-	for i, gatewayName := range gatewayNames {
-		basePort := gatewayPorts[i]
-		
-		// Create Podman container for each gateway service
-		containerCmd, err := local.NewCommand(ctx, fmt.Sprintf("%s-gateway-container", gatewayName), &local.CommandArgs{
-			Create: pulumi.Sprintf("podman run -d --name %s-gateway-dev -p %d:%d -e DAPR_HTTP_PORT=3500 -e DAPR_GRPC_PORT=%d backend/%s-gateway:latest", gatewayName, basePort, basePort, 50020+i, gatewayName),
-			Delete: pulumi.Sprintf("podman rm -f %s-gateway-dev", gatewayName),
-		})
-		if err != nil {
-			return nil, err
-		}
-		
-		// Create Dapr sidecar for each gateway service
-		daprCmd, err := local.NewCommand(ctx, fmt.Sprintf("%s-gateway-dapr-sidecar", gatewayName), &local.CommandArgs{
-			Create: pulumi.Sprintf("podman run -d --name %s-gateway-dapr --network=container:%s-gateway-dev daprio/daprd:latest dapr run --app-id %s-gateway --app-port %d --dapr-http-port 3500 --dapr-grpc-port %d --components-path /tmp/components", gatewayName, gatewayName, gatewayName, basePort, 50020+i),
-			Delete: pulumi.Sprintf("podman rm -f %s-gateway-dapr", gatewayName),
-		}, pulumi.DependsOn([]pulumi.Resource{containerCmd}))
-		if err != nil {
-			return nil, err
-		}
-		
-		gatewayServices[gatewayName] = pulumi.Map{
-			"container_id":      containerCmd.Stdout,
-			"container_status":  pulumi.String("running"),
-			"host_port":         pulumi.Int(basePort),
-			"health_endpoint":   pulumi.Sprintf("http://localhost:%d/health", basePort),
-			"dapr_app_id":       pulumi.Sprintf("%s-gateway", gatewayName),
-			"dapr_sidecar_id":   daprCmd.Stdout,
-		}
+	// Deploy gateway services using factory
+	gatewayServices, err := DeployGatewayServices(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to deploy gateway services: %w", err)
 	}
 
 	// Maintain backward compatibility with APIServices for staging/production environments

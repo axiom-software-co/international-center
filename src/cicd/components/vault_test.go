@@ -26,7 +26,7 @@ func TestVaultComponent_DevelopmentEnvironment(t *testing.T) {
 			authMethod := args[2].(string)
 			secretEngine := args[3].(string)
 
-			assert.Equal(t, "local_container", vaultType, "Development should use local Vault container")
+			assert.Equal(t, "podman_vault", vaultType, "Development should use local Vault container")
 			assert.Contains(t, vaultAddress, "http://127.0.0.1:8200", "Should use local Vault address")
 			assert.Equal(t, "dev_token", authMethod, "Should use development token auth")
 			assert.Equal(t, "secret", secretEngine, "Should use KV secret engine")

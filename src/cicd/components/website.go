@@ -5,7 +5,6 @@ import (
 
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi/config"
-	"github.com/pulumi/pulumi-command/sdk/go/command/local"
 )
 
 // WebsiteOutputs represents the outputs from website component
@@ -42,14 +41,9 @@ func DeployWebsite(ctx *pulumi.Context, cfg *config.Config, environment string) 
 // deployDevelopmentWebsite deploys Podman container for development
 func deployDevelopmentWebsite(ctx *pulumi.Context, cfg *config.Config) (*WebsiteOutputs, error) {
 	// For development, we use Podman container running the Astro website
-	
-	// Create website container using Command provider
-	containerCmd, err := local.NewCommand(ctx, "website-container", &local.CommandArgs{
-		Create: pulumi.String("podman run -d --name website-dev -p 3000:3000 -e NODE_ENV=development website:latest"),
-		Delete: pulumi.String("podman rm -f website-dev"),
-	})
+	containerCmd, err := DeployWebsiteContainer(ctx)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to deploy website container: %w", err)
 	}
 
 	deploymentType := pulumi.String("podman_container").ToStringOutput()

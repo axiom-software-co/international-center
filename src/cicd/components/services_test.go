@@ -221,16 +221,24 @@ func TestServicesComponent_EnvironmentParity(t *testing.T) {
 				}
 
 				// Verify all environments provide required outputs
-				pulumi.All(outputs.DeploymentType, outputs.InquiriesServices, outputs.ContentServices, outputs.GatewayServices).ApplyT(func(args []interface{}) error {
+				pulumi.All(outputs.DeploymentType, outputs.InquiriesServices, outputs.ContentServices, outputs.GatewayServices, outputs.APIServices).ApplyT(func(args []interface{}) error {
 					deploymentType := args[0].(string)
 					inquiriesServices := args[1].(map[string]interface{})
 					contentServices := args[2].(map[string]interface{})
 					gatewayServices := args[3].(map[string]interface{})
+					apiServices := args[4].(map[string]interface{})
 
 					assert.NotEmpty(t, deploymentType, "All environments should provide deployment type")
-					assert.NotEmpty(t, inquiriesServices, "All environments should provide inquiries services")
-					assert.NotEmpty(t, contentServices, "All environments should provide content services")
 					assert.NotEmpty(t, gatewayServices, "All environments should provide gateway services")
+					
+					// Different architectures for different environments
+					if env == "development" {
+						assert.NotEmpty(t, inquiriesServices, "Development should provide inquiries services")
+						assert.NotEmpty(t, contentServices, "Development should provide content services")
+					} else {
+						// Staging and production use APIServices instead of InquiriesServices/ContentServices
+						assert.NotEmpty(t, apiServices, "Staging and production should provide API services")
+					}
 					return nil
 				})
 

@@ -1,5 +1,8 @@
 name: international-center-cicd
-runtime: go
+runtime:
+  name: go
+  options:
+    binary: ./pulumi-program
 description: Component-first infrastructure deployment for International Center platform
 
 config:

@@ -26,7 +26,7 @@ func TestDatabaseComponent_DevelopmentEnvironment(t *testing.T) {
 			connectionString := args[2].(string)
 			port := args[3].(int)
 
-			assert.Equal(t, "container", deploymentType, "Development should use container deployment type")
+			assert.Equal(t, "podman_container", deploymentType, "Development should use container deployment type")
 			assert.Equal(t, "postgresql", instanceType, "Development should use PostgreSQL instance type")
 			assert.Contains(t, connectionString, "postgresql://", "Should generate PostgreSQL connection string")
 			assert.Equal(t, 5432, port, "Should use standard PostgreSQL port")

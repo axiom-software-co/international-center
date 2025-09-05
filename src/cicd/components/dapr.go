@@ -32,17 +32,8 @@ func DeployDapr(ctx *pulumi.Context, cfg *config.Config, environment string) (*D
 	}
 }
 
-// deployDevelopmentDapr deploys self-hosted Dapr for development
+// deployDevelopmentDapr deploys Dapr control plane for development
 func deployDevelopmentDapr(ctx *pulumi.Context, cfg *config.Config) (*DaprOutputs, error) {
-	// Create Redis container for Dapr state store and pub/sub
-	redisContainer, err := local.NewCommand(ctx, "redis-container", &local.CommandArgs{
-		Create: pulumi.String("podman run -d --name redis-dev -p 6379:6379 redis:7-alpine"),
-		Delete: pulumi.String("podman stop redis-dev && podman rm redis-dev"),
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to create Redis container: %w", err)
-	}
-
 	// Create Dapr placement service container
 	daprPlacementContainer, err := local.NewCommand(ctx, "dapr-placement-container", &local.CommandArgs{
 		Create: pulumi.String("podman run -d --name dapr-placement-dev -p 50005:50005 daprio/dapr:1.12.0 ./placement -port 50005"),
@@ -63,7 +54,7 @@ func deployDevelopmentDapr(ctx *pulumi.Context, cfg *config.Config) (*DaprOutput
 	policyEnabled := pulumi.Bool(true).ToBoolOutput()
 
 	// Add dependency on container creation
-	controlPlaneURL = pulumi.All(redisContainer.Stdout, daprPlacementContainer.Stdout).ApplyT(func(args []interface{}) string {
+	controlPlaneURL = pulumi.All(daprPlacementContainer.Stdout).ApplyT(func(args []interface{}) string {
 		return "http://127.0.0.1:50005"
 	}).(pulumi.StringOutput)
 

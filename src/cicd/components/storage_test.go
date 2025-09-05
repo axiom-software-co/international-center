@@ -26,7 +26,7 @@ func TestStorageComponent_DevelopmentEnvironment(t *testing.T) {
 			accountName := args[2].(string)
 			containerName := args[3].(string)
 
-			assert.Equal(t, "azurite", storageType, "Development should use Azurite emulator")
+			assert.Equal(t, "azurite_podman", storageType, "Development should use Azurite emulator")
 			assert.Contains(t, connectionString, "AccountName=devstoreaccount1", "Should use Azurite default connection string")
 			assert.Equal(t, "devstoreaccount1", accountName, "Should use Azurite default account name")
 			assert.Equal(t, "international-center-dev", containerName, "Should use development container name")
