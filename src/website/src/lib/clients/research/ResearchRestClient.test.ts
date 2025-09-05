@@ -166,14 +166,9 @@ describe('ResearchRestClient', () => {
   describe('getResearchArticles', () => {
     it('should fetch research articles with proper query parameters', async () => {
       const mockResponse: ResearchResponse = {
-        data: [],
-        pagination: {
-          page: 1,
-          pageSize: 10,
-          total: 0,
-          totalPages: 0
-        },
-        success: true
+        research: [],
+        count: 0,
+        correlation_id: 'test-correlation-id'
       };
 
       mockFetch.mockResolvedValueOnce(createMockResponse(mockResponse));
@@ -199,14 +194,9 @@ describe('ResearchRestClient', () => {
 
     it('should handle empty parameters', async () => {
       const mockResponse: ResearchResponse = {
-        data: [],
-        pagination: {
-          page: 1,
-          pageSize: 10,
-          total: 0,
-          totalPages: 0
-        },
-        success: true
+        research: [],
+        count: 0,
+        correlation_id: 'test-correlation-id'
       };
 
       mockFetch.mockResolvedValueOnce(createMockResponse(mockResponse));
@@ -248,23 +238,19 @@ describe('ResearchRestClient', () => {
         deleted_by: null,
       };
 
+      // Unified contract response structure: {research: [], count: number, correlation_id: string}
       const mockResponse: ResearchResponse = {
-        data: [mockDatabaseResearch as any],
-        pagination: {
-          page: 1,
-          pageSize: 10,
-          total: 1,
-          totalPages: 1
-        },
-        success: true
+        research: [mockDatabaseResearch as any],
+        count: 1,
+        correlation_id: 'schema-test-correlation-id'
       };
 
       mockFetch.mockResolvedValueOnce(createMockResponse(mockResponse));
 
       const result = await client.getResearchArticles();
       
-      expect(result.data).toHaveLength(1);
-      const research = result.data[0];
+      expect(result.research).toHaveLength(1);
+      const research = result.research[0];
       
       // Validate database schema required fields
       expect(research.research_id).toBeDefined();
@@ -298,8 +284,8 @@ describe('ResearchRestClient', () => {
       };
 
       const mockResponse: ResearchArticleResponse = {
-        data: mockDatabaseResearch as any,
-        success: true
+        research: mockDatabaseResearch as any,
+        correlation_id: 'slug-correlation-id'
       };
 
       mockFetch.mockResolvedValueOnce(createMockResponse(mockResponse));
@@ -312,10 +298,10 @@ describe('ResearchRestClient', () => {
           method: 'GET'
         })
       );
-      expect(result.data.slug).toBe('slug-research-article');
-      expect(result.data.research_id).toBeDefined();
-      expect(result.data.abstract).toBeDefined();
-      expect(result.data.author_names).toBeDefined();
+      expect(result.research.slug).toBe('slug-research-article');
+      expect(result.research.research_id).toBeDefined();
+      expect(result.research.abstract).toBeDefined();
+      expect(result.research.author_names).toBeDefined();
     }, 5000);
 
     it('should throw error for empty slug', async () => {
@@ -324,8 +310,8 @@ describe('ResearchRestClient', () => {
 
     it('should encode special characters in slug', async () => {
       const mockResponse: ResearchArticleResponse = {
-        data: {} as any,
-        success: true
+        research: {} as any,
+        correlation_id: 'test-correlation-id'
       };
 
       mockFetch.mockResolvedValueOnce(createMockResponse(mockResponse));
@@ -342,8 +328,8 @@ describe('ResearchRestClient', () => {
   describe('getResearchArticleById', () => {
     it('should fetch research article by ID', async () => {
       const mockResponse: ResearchArticleResponse = {
-        data: {} as any,
-        success: true
+        research: {} as any,
+        correlation_id: 'test-correlation-id'
       };
 
       mockFetch.mockResolvedValueOnce(createMockResponse(mockResponse));
@@ -366,14 +352,9 @@ describe('ResearchRestClient', () => {
   describe('getFeaturedResearch', () => {
     it('should fetch featured research articles', async () => {
       const mockResponse: ResearchResponse = {
-        data: [],
-        pagination: {
-          page: 1,
-          pageSize: 10,
-          total: 0,
-          totalPages: 0
-        },
-        success: true
+        research: [],
+        count: 0,
+        correlation_id: 'test-correlation-id'
       };
 
       mockFetch.mockResolvedValueOnce(createMockResponse(mockResponse));
@@ -447,14 +428,9 @@ describe('ResearchRestClient', () => {
 
     it('should encode search query properly', async () => {
       const mockResponse: ResearchResponse = {
-        data: [],
-        pagination: {
-          page: 1,
-          pageSize: 10,
-          total: 0,
-          totalPages: 0
-        },
-        success: true
+        research: [],
+        count: 0,
+        correlation_id: 'test-correlation-id'
       };
 
       mockFetch.mockResolvedValueOnce(createMockResponse(mockResponse));
@@ -495,14 +471,9 @@ describe('ResearchRestClient', () => {
 
     it('should fetch recent research articles with custom limit', async () => {
       const mockResponse: ResearchResponse = {
-        data: [],
-        pagination: {
-          page: 1,
-          pageSize: 10,
-          total: 0,
-          totalPages: 0
-        },
-        success: true
+        research: [],
+        count: 0,
+        correlation_id: 'test-correlation-id'
       };
 
       mockFetch.mockResolvedValueOnce(createMockResponse(mockResponse));
@@ -521,14 +492,9 @@ describe('ResearchRestClient', () => {
   describe('getResearchByCategory', () => {
     it('should fetch research articles by category', async () => {
       const mockResponse: ResearchResponse = {
-        data: [],
-        pagination: {
-          page: 1,
-          pageSize: 10,
-          total: 0,
-          totalPages: 0
-        },
-        success: true
+        research: [],
+        count: 0,
+        correlation_id: 'test-correlation-id'
       };
 
       mockFetch.mockResolvedValueOnce(createMockResponse(mockResponse));
@@ -549,14 +515,9 @@ describe('ResearchRestClient', () => {
 
     it('should encode category name', async () => {
       const mockResponse: ResearchResponse = {
-        data: [],
-        pagination: {
-          page: 1,
-          pageSize: 10,
-          total: 0,
-          totalPages: 0
-        },
-        success: true
+        research: [],
+        count: 0,
+        correlation_id: 'test-correlation-id'
       };
 
       mockFetch.mockResolvedValueOnce(createMockResponse(mockResponse));
@@ -573,14 +534,9 @@ describe('ResearchRestClient', () => {
   describe('getResearchByIndustry', () => {
     it('should fetch research articles by industry', async () => {
       const mockResponse: ResearchResponse = {
-        data: [],
-        pagination: {
-          page: 1,
-          pageSize: 10,
-          total: 0,
-          totalPages: 0
-        },
-        success: true
+        research: [],
+        count: 0,
+        correlation_id: 'test-correlation-id'
       };
 
       mockFetch.mockResolvedValueOnce(createMockResponse(mockResponse));
@@ -659,6 +615,85 @@ describe('ResearchRestClient', () => {
       mockFetch.mockResolvedValueOnce(malformedResponse);
 
       await expect(client.getResearchArticles()).rejects.toThrow('Invalid JSON');
+    }, 5000);
+  });
+
+  describe('Shared Cache Behavior', () => {
+    it('should use shared RestClientCache for caching operations', async () => {
+      const mockResearchResponse: ResearchResponse = {
+        research: [{
+          article_id: 'cache-test-uuid',
+          title: 'Cache Test Research Article',
+          summary: 'Testing cache behavior',
+          slug: 'cache-test-research-article',
+          category_id: 'category-uuid',
+          publication_timestamp: '2024-03-15T14:30:00Z',
+          publishing_status: 'published',
+          tags: ['cache', 'test'],
+          article_type: 'study',
+          priority_level: 'normal',
+          created_on: '2024-01-01T00:00:00Z',
+          is_deleted: false,
+          deleted_on: null,
+          deleted_by: null,
+        }],
+        count: 1,
+        correlation_id: 'cache-correlation-id'
+      };
+
+      mockFetch.mockResolvedValueOnce(createMockResponse(mockResearchResponse));
+
+      // Clear cache before test
+      client.clearCache();
+
+      // First request should hit the API
+      const firstResult = await client.getResearchArticles();
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      expect(firstResult).toEqual(mockResearchResponse);
+
+      // Second request should use cache (no additional fetch call)
+      const secondResult = await client.getResearchArticles();
+      expect(mockFetch).toHaveBeenCalledTimes(1); // Still 1, not 2
+      expect(secondResult).toEqual(mockResearchResponse);
+    }, 5000);
+
+    it('should provide cache performance metrics via shared cache', async () => {
+      // Clear cache and reset metrics
+      client.clearCache();
+
+      // Initial metrics should show empty state
+      const initialMetrics = client.getMetrics();
+      expect(initialMetrics.totalRequests).toBe(0);
+      expect(initialMetrics.cacheHits).toBe(0);
+      expect(initialMetrics.cacheMisses).toBe(0);
+      expect(initialMetrics.errorCount).toBe(0);
+    }, 5000);
+
+    it('should provide cache statistics via shared cache', async () => {
+      // Clear cache before test
+      client.clearCache();
+
+      const initialStats = client.getCacheStats();
+      expect(initialStats).toHaveProperty('size');
+      expect(initialStats).toHaveProperty('hitRate');
+      expect(typeof initialStats.size).toBe('number');
+      expect(typeof initialStats.hitRate).toBe('number');
+    }, 5000);
+
+    it('should clear all cache entries and reset metrics', async () => {
+      // Clear cache before test
+      client.clearCache();
+
+      // Verify cache is cleared
+      const stats = client.getCacheStats();
+      expect(stats.size).toBe(0);
+
+      // Verify metrics are reset
+      const metrics = client.getMetrics();
+      expect(metrics.totalRequests).toBe(0);
+      expect(metrics.cacheHits).toBe(0);
+      expect(metrics.cacheMisses).toBe(0);
+      expect(metrics.errorCount).toBe(0);
     }, 5000);
   });
 });

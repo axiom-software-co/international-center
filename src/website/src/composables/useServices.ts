@@ -1,7 +1,8 @@
-// Services Composables - Vue 3 Composition API with Direct Client Integration
+// Services Composables - Vue 3 Composition API with Store Delegation
 
-import { type Ref, ref, isRef, unref, watch, onMounted, computed, nextTick } from 'vue';
-import { servicesClient } from '../lib/clients';
+import { type Ref, ref, isRef, unref, watch, onMounted, computed } from 'vue';
+import { storeToRefs } from 'pinia';
+import { useServicesStore } from '../stores/services';
 import type { Service, ServiceCategory, GetServicesParams, SearchServicesParams } from '../lib/clients/services/types';
 
 // Domain-specific type aliases
@@ -21,36 +22,19 @@ export interface UseServicesOptions extends GetServicesParams {
   immediate?: boolean;
 }
 
-// Explicit main list composable
+// Main list composable - delegates to store
 export function useServices(options: UseServicesOptions = {}): UseServicesResult {
   const { enabled = true, immediate = true, ...params } = options;
+  const store = useServicesStore();
+  const { services, loading, error, total, totalPages } = storeToRefs(store);
   
-  const services = ref<Service[]>([]);
-  const loading = ref(false);
-  const error = ref<string | null>(null);
-  const total = ref(0);
+  // Local refs for pagination
   const page = ref(params.page || 1);
   const pageSize = ref(params.pageSize || 10);
-  
-  const totalPages = computed(() => Math.ceil(total.value / pageSize.value) || 0);
 
   const fetchServices = async () => {
     if (!enabled) return;
-    
-    loading.value = true;
-    error.value = null;
-    
-    try {
-      const response = await servicesClient.getServices(params);
-      services.value = response.services;
-      total.value = response.count;
-    } catch (err) {
-      error.value = err instanceof Error ? err.message : 'Failed to fetch services';
-      services.value = [];
-      total.value = 0;
-    } finally {
-      loading.value = false;
-    }
+    await store.fetchServices(params);
   };
 
   // Watch for parameter changes
@@ -80,32 +64,20 @@ export interface UseServiceResult {
   refetch: () => Promise<void>;
 }
 
-// Explicit single item composable
+// Single item composable - delegates to store
 export function useService(slug: Ref<string | null> | string | null): UseServiceResult {
   const slugRef = isRef(slug) ? slug : ref(slug);
-  const service = ref<Service | null>(null);
-  const loading = ref(false);
-  const error = ref<string | null>(null);
+  const store = useServicesStore();
+  const { service, loading, error } = storeToRefs(store);
 
   const fetchService = async () => {
     const currentSlug = unref(slugRef);
     if (!currentSlug) {
-      service.value = null;
+      store.service = null;
       return;
     }
 
-    loading.value = true;
-    error.value = null;
-    
-    try {
-      const response = await servicesClient.getServiceBySlug(currentSlug);
-      service.value = response.service;
-    } catch (err) {
-      error.value = err instanceof Error ? err.message : 'Failed to fetch service';
-      service.value = null;
-    } finally {
-      loading.value = false;
-    }
+    await store.fetchService(currentSlug);
   };
 
   // Watch for slug changes and call immediately
@@ -113,7 +85,7 @@ export function useService(slug: Ref<string | null> | string | null): UseService
     if (newSlug) {
       fetchService();
     } else {
-      service.value = null;
+      store.service = null;
     }
   }, { immediate: true });
 
@@ -132,30 +104,21 @@ export interface UseFeaturedServicesResult {
   refetch: () => Promise<void>;
 }
 
-// Explicit featured services composable
+// Featured services composable - delegates to store
 export function useFeaturedServices(limit?: Ref<number | undefined> | number | undefined): UseFeaturedServicesResult {
   const limitRef = isRef(limit) ? limit : ref(limit);
-  const services = ref<Service[]>([]);
-  const loading = ref(false);
-  const error = ref<string | null>(null);
+  const store = useServicesStore();
+  const { featuredServices: services, loading, error } = storeToRefs(store);
 
   const fetchFeaturedServices = async () => {
-    loading.value = true;
-    error.value = null;
-    
-    try {
-      const response = await servicesClient.getFeaturedServices(unref(limitRef));
-      services.value = response.services;
-    } catch (err) {
-      error.value = err instanceof Error ? err.message : 'Failed to fetch featured services';
-      services.value = [];
-    } finally {
-      loading.value = false;
-    }
+    await store.fetchFeaturedServices(unref(limitRef));
   };
 
-  // Watch for limit changes and fetch immediately
-  watch(limitRef, fetchFeaturedServices, { immediate: true });
+  // Trigger initial fetch
+  fetchFeaturedServices();
+  
+  // Watch for limit changes
+  watch(limitRef, fetchFeaturedServices);
 
   return {
     services,
@@ -172,31 +135,17 @@ export interface UseServiceCategoriesResult {
   refetch: () => Promise<void>;
 }
 
-// Explicit categories composable
+// Categories composable - delegates to store
 export function useServiceCategories(): UseServiceCategoriesResult {
-  const categories = ref<ServiceCategory[]>([]);
-  const loading = ref(false);
-  const error = ref<string | null>(null);
+  const store = useServicesStore();
+  const { categories, loading, error } = storeToRefs(store);
 
   const fetchCategories = async () => {
-    loading.value = true;
-    error.value = null;
-    
-    try {
-      const response = await servicesClient.getServiceCategories();
-      categories.value = response.categories;
-    } catch (err) {
-      error.value = err instanceof Error ? err.message : 'Failed to fetch service categories';
-      categories.value = [];
-    } finally {
-      loading.value = false;
-    }
+    await store.fetchServiceCategories();
   };
 
   // Trigger initial fetch immediately
-  onMounted(() => {
-    fetchCategories();
-  });
+  fetchCategories();
 
   return {
     categories,
@@ -217,12 +166,12 @@ export interface UseSearchServicesResult {
   search: (query: string, options?: Partial<SearchServicesParams>) => Promise<void>;
 }
 
-// Explicit search composable
+// Search composable - delegates to store
 export function useSearchServices(): UseSearchServicesResult {
-  const results = ref<Service[]>([]);
-  const loading = ref(false);
-  const error = ref<string | null>(null);
-  const total = ref(0);
+  const store = useServicesStore();
+  const { searchResults: results, loading, error, searchTotal: total } = storeToRefs(store);
+  
+  // Local refs for search-specific pagination
   const page = ref(1);
   const pageSize = ref(10);
 
@@ -240,20 +189,7 @@ export function useSearchServices(): UseSearchServicesResult {
     page.value = searchParams.page;
     pageSize.value = searchParams.pageSize;
 
-    loading.value = true;
-    error.value = null;
-    
-    try {
-      const response = await servicesClient.searchServices(searchParams);
-      results.value = response.services;
-      total.value = response.count;
-    } catch (err) {
-      error.value = err instanceof Error ? err.message : 'Failed to search services';
-      results.value = [];
-      total.value = 0;
-    } finally {
-      loading.value = false;
-    }
+    await store.searchServices(searchParams);
   };
 
   return {

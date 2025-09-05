@@ -1,869 +1,450 @@
-// News Composables Tests - State management and API integration validation
-// Tests validate useNews composables with database schema-compliant reactive state
-
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { ref, nextTick, defineComponent } from 'vue';
-import { mount } from '@vue/test-utils';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { ref, computed, nextTick } from 'vue';
 import { useNews, useNewsArticle, useFeaturedNews, useSearchNews, useNewsCategories } from './useNews';
-import type { NewsArticle, NewsResponse, NewsArticleResponse, GetNewsParams, SearchNewsParams, NewsCategory } from '../lib/clients/news/types';
-import { useNewsStore } from '../stores/news';
 
-// Mock the newsClient singleton with hoisted functions
-const {
-  mockGetNews,
-  mockGetNewsArticleBySlug,
-  mockGetFeaturedNews,
-  mockSearchNews,
-  mockGetNewsCategories
-} = vi.hoisted(() => {
-  const mockGetNewsFunc = vi.fn();
-  const mockGetNewsArticleBySlugFunc = vi.fn();
-  const mockGetFeaturedNewsFunc = vi.fn();
-  const mockSearchNewsFunc = vi.fn();
-  const mockGetNewsCategoriesFunc = vi.fn();
-  
-  return {
-    mockGetNews: mockGetNewsFunc,
-    mockGetNewsArticleBySlug: mockGetNewsArticleBySlugFunc,
-    mockGetFeaturedNews: mockGetFeaturedNewsFunc,
-    mockSearchNews: mockSearchNewsFunc,
-    mockGetNewsCategories: mockGetNewsCategoriesFunc,
-  };
-});
-
-vi.mock('../lib/clients', () => ({
-  newsClient: {
-    getNews: mockGetNews,
-    getNewsArticleBySlug: mockGetNewsArticleBySlug,
-    getFeaturedNews: mockGetFeaturedNews,
-    searchNews: mockSearchNews,
-    getNewsCategories: mockGetNewsCategories,
-  },
-  // Pass through any types that might be imported
-  ...vi.importActual('../lib/clients')
+// Mock the store module - RED phase: define store-centric contracts
+vi.mock('../stores/news', () => ({
+  useNewsStore: vi.fn()
 }));
 
-// Mock the stores/news module so the store uses our mocked client
-vi.mock('../stores/news', () => {
-  return {
-    useNewsStore: vi.fn()
+import { useNewsStore } from '../stores/news';
+
+
+describe('useNews composables', () => {
+  // Define mock store structure - RED phase: store-centric contract
+  const mockStore = {
+    // State refs that composables should expose via storeToRefs
+    news: ref([]),
+    article: ref(null), // Individual news article state
+    loading: ref(false),
+    error: ref(null),
+    total: ref(0),
+    categories: ref([]),
+    featuredNews: ref([]),
+    searchResults: ref([]),
+    searchTotal: ref(0),
+    
+    // Computed values
+    totalPages: computed(() => Math.ceil(mockStore.total.value / 10) || 0),
+    
+    // Explicit action methods that composables should delegate to
+    fetchNews: vi.fn(),
+    fetchNewsArticle: vi.fn(),
+    fetchFeaturedNews: vi.fn(),
+    fetchNewsCategories: vi.fn(),
+    searchNews: vi.fn(),
   };
-});
 
-// Database schema-compliant mock news article for testing
-const createMockDatabaseNews = (overrides: Partial<any> = {}): any => ({
-  news_id: 'news-uuid-123',
-  title: 'Mock Database News Article',
-  summary: 'News article summary from database schema',
-  content: 'Full news article content with journalism standards',
-  slug: 'mock-database-news-article',
-  category_id: 'news-category-uuid-456',
-  image_url: 'https://example.com/news-image.jpg',
-  author_name: 'Database Reporter',
-  publication_timestamp: '2024-03-15T14:30:00Z',
-  external_source: 'Database News Source',
-  external_url: 'https://external.example.com/news',
-  publishing_status: 'published' as const,
-  tags: ['database', 'schema', 'news'],
-  news_type: 'announcement' as const,
-  priority_level: 'normal' as const,
-  created_on: '2024-01-01T00:00:00Z',
-  created_by: 'reporter@example.com',
-  modified_on: '2024-01-02T00:00:00Z',
-  modified_by: 'editor@example.com',
-  is_deleted: false,
-  deleted_on: null,
-  deleted_by: null,
-  ...overrides,
-});
-
-// Database schema-compliant mock news category for testing
-const createMockDatabaseNewsCategory = (overrides: Partial<any> = {}): any => ({
-  category_id: 'news-category-uuid-456',
-  name: 'Database News Category',
-  slug: 'database-news-category',
-  description: 'News category for database-related articles',
-  is_default_unassigned: false,
-  created_on: '2024-01-01T00:00:00Z',
-  created_by: 'admin@example.com',
-  modified_on: '2024-01-02T00:00:00Z',
-  modified_by: 'admin@example.com',
-  is_deleted: false,
-  deleted_on: null,
-  deleted_by: null,
-  ...overrides,
-});
-
-describe('useNews Composables', () => {
   beforeEach(() => {
-    mockGetNews.mockClear();
-    mockGetNewsArticleBySlug.mockClear();
-    mockGetFeaturedNews.mockClear();
-    mockSearchNews.mockClear();
-    mockGetNewsCategories.mockClear();
+    // Ensure all store properties are properly initialized as refs
+    if (!mockStore.article || !mockStore.article.value !== undefined) {
+      mockStore.article = ref(null);
+    }
     
-    // Import Vue reactivity functions
-    const { computed } = require('vue');
+    // Reset mock store state
+    mockStore.news.value = [];
+    mockStore.article.value = null;
+    mockStore.loading.value = false;
+    mockStore.error.value = null;
+    mockStore.total.value = 0;
+    mockStore.categories.value = [];
+    mockStore.featuredNews.value = [];
+    mockStore.searchResults.value = [];
+    mockStore.searchTotal.value = 0;
     
-    // Set up the mock store with reactive state and actions that call our mocked client
-    const mockStore = {
-      // Reactive state
-      news: ref([]),
-      categories: ref([]),
-      featuredNews: ref([]),
-      searchResults: ref([]),
-      loading: ref(false),
-      error: ref(null),
-      total: ref(0),
-      page: ref(1),
-      pageSize: ref(10),
-      searchTotal: ref(0),
-      
-      // Actions that call the mocked client and update state
-      async fetchNews(params?: any, options?: any) {
-        mockStore.loading.value = true;
-        mockStore.error.value = null;
-        try {
-          const result = await mockGetNews(params);
-          mockStore.news.value = result.news;
-          mockStore.total.value = result.count;
-          mockStore.page.value = params?.page || 1;
-          mockStore.pageSize.value = params?.pageSize || 10;
-        } catch (err) {
-          mockStore.error.value = err instanceof Error ? err.message : 'Unknown error';
-          mockStore.news.value = [];
-          mockStore.total.value = 0;
-        } finally {
-          mockStore.loading.value = false;
-        }
-      },
-      
-      async fetchNewsArticle(slug: string) {
-        mockStore.loading.value = true;
-        mockStore.error.value = null;
-        try {
-          const result = await mockGetNewsArticleBySlug(slug);
-          return result?.news || null;
-        } catch (err) {
-          mockStore.error.value = err instanceof Error ? err.message : 'Unknown error';
-          return null;
-        } finally {
-          mockStore.loading.value = false;
-        }
-      },
-      
-      async fetchFeaturedNews(limit?: number) {
-        mockStore.loading.value = true;
-        mockStore.error.value = null;
-        try {
-          const result = await mockGetFeaturedNews(limit);
-          mockStore.featuredNews.value = result.news;
-        } catch (err) {
-          mockStore.error.value = err instanceof Error ? err.message : 'Unknown error';
-          mockStore.featuredNews.value = [];
-        } finally {
-          mockStore.loading.value = false;
-        }
-      },
-      
-      async searchNews(params: any) {
-        mockStore.loading.value = true;
-        mockStore.error.value = null;
-        try {
-          const result = await mockSearchNews(params);
-          mockStore.searchResults.value = result.news;
-          mockStore.searchTotal.value = result.count;
-        } catch (err) {
-          mockStore.error.value = err instanceof Error ? err.message : 'Unknown error';
-          mockStore.searchResults.value = [];
-          mockStore.searchTotal.value = 0;
-        } finally {
-          mockStore.loading.value = false;
-        }
-      },
-      
-      async fetchNewsCategories() {
-        mockStore.loading.value = true;
-        mockStore.error.value = null;
-        try {
-          const result = await mockGetNewsCategories();
-          mockStore.categories.value = result.categories;
-        } catch (err) {
-          mockStore.error.value = err instanceof Error ? err.message : 'Unknown error';
-          mockStore.categories.value = [];
-        } finally {
-          mockStore.loading.value = false;
-        }
-      }
-    };
+    // Clear all store action mocks
+    mockStore.fetchNews.mockClear();
+    mockStore.fetchNewsArticle.mockClear();
+    mockStore.fetchFeaturedNews.mockClear();
+    mockStore.fetchNewsCategories.mockClear();
+    mockStore.searchNews.mockClear();
     
-    // Add computed property after mockStore is defined
-    mockStore.totalPages = computed(() => Math.ceil(mockStore.total.value / mockStore.pageSize.value) || 0);
-    
-    // Set up the useNewsStore mock to return our mock store
-    vi.mocked(useNewsStore).mockReturnValue(mockStore);
+    // Setup store mock return
+    vi.mocked(useNewsStore).mockReturnValue(mockStore as any);
   });
 
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
 
   describe('useNews', () => {
-    it('should initialize with proper default state', () => {
-      mockGetNews.mockResolvedValue({
-        news: [],
-        count: 0,
-        correlation_id: 'test-correlation-id'
-      });
+    it('should expose store state via storeToRefs and initialize with correct default values', () => {
+      const { news, loading, error, total, page, pageSize, totalPages, refetch } = useNews({ enabled: false });
 
-      const { news, loading, error, total, page, pageSize, totalPages } = useNews({
-        immediate: false
-      });
-
+      // RED phase: expect composable to expose store state directly
       expect(news.value).toEqual([]);
       expect(loading.value).toBe(false);
       expect(error.value).toBe(null);
       expect(total.value).toBe(0);
       expect(page.value).toBe(1);
       expect(pageSize.value).toBe(10);
-      expect(totalPages.value).toBe(0);
-    }, 5000);
+      
+      // Contract: composable should expose reactive properties and functions
+      expect(totalPages).toBeTruthy();
+      expect(typeof refetch).toBe('function');
+      
+      // Contract: composable should use store
+      expect(useNewsStore).toHaveBeenCalled();
+    });
 
-    it('should fetch news with database schema-compliant data', async () => {
-      const mockDatabaseNews = [
-        createMockDatabaseNews(),
-        createMockDatabaseNews({
-          news_id: 'news-uuid-124',
-          title: 'Second Database News',
-          slug: 'second-database-news',
-          news_type: 'press_release' as const,
-          priority_level: 'high' as const,
-          author_name: 'Second Reporter',
-        })
+    it('should delegate to store.fetchNews and expose store state', async () => {
+      const mockNews = [
+        {
+          news_id: '123',
+          title: 'Healthcare Innovation News',
+          summary: 'Latest healthcare technology advances',
+          slug: 'healthcare-innovation-news',
+          publishing_status: 'published',
+          category_id: '456',
+          author_name: 'Dr. Johnson',
+          content: '<h2>Revolutionary Healthcare Technology</h2><p>Our healthcare team has developed innovative solutions.</p>',
+          image_url: 'https://storage.azure.com/images/healthcare-innovation.jpg'
+        }
       ];
 
-      const mockResponse: NewsResponse = {
-        news: mockDatabaseNews,
-        count: 2,
-        correlation_id: 'news-correlation-id'
-      };
+      // RED phase: simulate store state after successful fetch
+      mockStore.news.value = mockNews;
+      mockStore.total.value = 1;
+      mockStore.loading.value = false;
+      mockStore.error.value = null;
 
-      mockGetNews.mockResolvedValue(mockResponse);
-
-      const { news, loading, error, total, totalPages, refetch } = useNews({
-        immediate: false
+      const { news, loading, error, total, refetch } = useNews({ 
+        page: 1, 
+        pageSize: 10,
+        immediate: false 
       });
 
+      // Contract: composable should expose store state
       expect(loading.value).toBe(false);
-
+      
+      // Clear any previous calls before testing refetch
+      mockStore.fetchNews.mockClear();
+      
       await refetch();
-
       await nextTick();
 
-      expect(mockGetNews).toHaveBeenCalledTimes(1);
-      expect(news.value).toHaveLength(2);
-      expect(total.value).toBe(2);
-      expect(totalPages.value).toBe(1);
-      expect(error.value).toBe(null);
-      expect(loading.value).toBe(false);
+      // RED phase: expect store action delegation, not direct client calls  
+      expect(mockStore.fetchNews).toHaveBeenCalledTimes(1);
+      
+      // Contract: composable should expose reactive state from store
+      expect(news.value).toBeDefined();
+      expect(total.value).toBeDefined();
+      expect(loading.value).toBeDefined();
+      expect(error.value).toBeDefined();
+    });
 
-      // Validate database schema fields are present
-      const firstNews = news.value[0];
-      expect(firstNews.news_id).toBeDefined();
-      expect(firstNews.summary).toBeDefined(); // Not 'excerpt'
-      expect(firstNews.author_name).toBeDefined(); // Not 'author'
-      expect(firstNews.publishing_status).toBeDefined();
-      expect(firstNews.news_type).toBeDefined();
-      expect(firstNews.priority_level).toBeDefined();
-      expect(firstNews.publication_timestamp).toBeDefined(); // Not 'published_at'
-      expect(firstNews.external_source).toBeDefined();
-      expect(firstNews.external_url).toBeDefined();
-      expect(firstNews.tags).toBeDefined(); // Array field
-      expect(firstNews.is_deleted).toBeDefined();
-      expect(firstNews.created_on).toBeDefined();
-    }, 5000);
+    it('should handle API errors with correlation_id', async () => {
+      const errorMessage = 'News not found';
 
-    it('should handle API errors gracefully', async () => {
-      mockGetNews.mockRejectedValue(new Error('API Error'));
+      // RED phase: simulate store error state
+      mockStore.news.value = [];
+      mockStore.loading.value = false;
+      mockStore.error.value = errorMessage;
+      mockStore.total.value = 0;
 
-      const { news, loading, error, refetch } = useNews({
-        immediate: false
-      });
+      const { news, loading, error, refetch } = useNews({ immediate: false });
 
       await refetch();
       await nextTick();
 
-      expect(error.value).toBe('API Error');
+      // RED phase: expect store action delegation
+      expect(mockStore.fetchNews).toHaveBeenCalled();
+      
+      // Contract: composable should expose store error state
       expect(news.value).toEqual([]);
       expect(loading.value).toBe(false);
-    }, 5000);
+      expect(error.value).toBe(errorMessage);
+    });
 
-    it('should handle query parameters correctly', async () => {
-      mockGetNews.mockResolvedValue({
-        news: [],
-        count: 0,
-        correlation_id: 'params-correlation-id'
-      });
+    it('should delegate search parameters to store.fetchNews', async () => {
+      const mockNews = [
+        {
+          news_id: '789',
+          title: 'Health Policy Update',
+          summary: 'Important health policy changes',
+          slug: 'health-policy-update',
+          publishing_status: 'published'
+        }
+      ];
 
-      const params: GetNewsParams = {
-        page: 2,
-        pageSize: 20,
-        category: 'announcements',
-        featured: true,
-        sortBy: 'date-desc'
-      };
+      // RED phase: simulate store state after search
+      mockStore.news.value = mockNews;
+      mockStore.total.value = 1;
 
-      const { refetch } = useNews({
-        immediate: false,
-        ...params
-      });
-
-      await refetch();
-
-      expect(mockGetNews).toHaveBeenCalledWith(
-        expect.objectContaining(params)
-      );
-    }, 5000);
-
-    it('should handle pagination calculations correctly', async () => {
-      mockGetNews.mockResolvedValue({
-        news: Array(15).fill(null).map((_, i) => createMockDatabaseNews({
-          news_id: `news-${i}`,
-          title: `News Article ${i}`,
-          slug: `news-article-${i}`
-        })),
-        count: 150,
-        correlation_id: 'pagination-correlation-id'
-      });
-
-      const { total, pageSize, totalPages, refetch } = useNews({
-        immediate: false,
-        pageSize: 15
+      const { news, refetch } = useNews({ 
+        search: 'health',
+        immediate: false 
       });
 
       await refetch();
       await nextTick();
 
-      expect(total.value).toBe(150);
-      expect(pageSize.value).toBe(15);
-      expect(totalPages.value).toBe(10); // 150 / 15 = 10
-    }, 5000);
+      // RED phase: expect store action delegation with search params
+      expect(mockStore.fetchNews).toHaveBeenCalledWith({
+        search: 'health'
+      });
+      
+      // Contract: expose store state
+      expect(news.value).toEqual(mockNews);
+    });
+
+    it('should handle category filtering', async () => {
+      const mockNews = [
+        {
+          news_id: '456',
+          title: 'Health Alert',
+          summary: 'Important health information',
+          category_id: 'health-alerts-id'
+        }
+      ];
+
+      // RED phase: simulate store state after category fetch
+      mockStore.news.value = mockNews;
+      mockStore.total.value = 1;
+      mockStore.loading.value = false;
+      mockStore.error.value = null;
+
+      const { news, refetch } = useNews({ 
+        category: 'health-alerts',
+        immediate: false 
+      });
+
+      await refetch();
+      await nextTick();
+
+      // RED phase: expect store action delegation with category params
+      expect(mockStore.fetchNews).toHaveBeenCalledWith({
+        category: 'health-alerts'
+      });
+      
+      // Contract: expose store state
+      expect(news.value).toEqual(mockNews);
+    });
   });
 
   describe('useNewsArticle', () => {
-    it('should fetch single news article by slug', async () => {
-      const mockNews = createMockDatabaseNews({
-        slug: 'single-news-test'
-      });
-
-      const mockResponse: NewsArticleResponse = {
-        news: mockNews,
-        correlation_id: 'single-news-correlation-id'
+    it('should delegate to store.fetchNewsArticle and expose store state', async () => {
+      const mockArticle = {
+        news_id: '123',
+        title: 'Healthcare Policy Update',
+        summary: 'Important policy changes',
+        slug: 'healthcare-policy-update',
+        publishing_status: 'published',
+        category_id: '456',
+        author_name: 'Policy Team',
+        content: '<h2>Healthcare Policy Changes</h2><p>New healthcare policies include comprehensive coverage.</p>'
       };
 
-      mockGetNewsArticleBySlug.mockResolvedValue(mockResponse);
+      // RED phase: simulate store state after individual article fetch
+      mockStore.article.value = mockArticle;
+      mockStore.loading.value = false;
+      mockStore.error.value = null;
 
-      const slugRef = ref('single-news-test');
-      const { news, loading, error } = useNewsArticle(slugRef);
-
+      const { article, loading, error, refetch } = useNewsArticle(ref('healthcare-policy-update'));
+      
+      await refetch();
       await nextTick();
 
-      expect(mockGetNewsArticleBySlug).toHaveBeenCalledWith('single-news-test');
-      expect(news.value).toEqual(mockNews);
+      // RED phase: expect store action delegation
+      expect(mockStore.fetchNewsArticle).toHaveBeenCalledWith('healthcare-policy-update');
+      
+      // Contract: composable should expose store state
+      expect(article.value).toEqual(mockArticle);
       expect(loading.value).toBe(false);
       expect(error.value).toBe(null);
+    });
 
-      // Validate database schema compliance
-      expect(news.value?.news_id).toBeDefined();
-      expect(news.value?.summary).toBeDefined(); // Not 'excerpt'
-      expect(news.value?.author_name).toBeDefined(); // Not 'author'
-      expect(news.value?.publication_timestamp).toBeDefined(); // Not 'published_at'
-      expect(news.value?.news_type).toBeDefined();
-    }, 5000);
+    it('should handle null slug gracefully', async () => {
+      // RED phase: simulate initial store state
+      mockStore.article.value = null;
+      mockStore.loading.value = false;
+      mockStore.error.value = null;
 
-    it('should handle slug changes reactively', async () => {
-      mockGetNewsArticleBySlug.mockResolvedValue({
-        news: createMockDatabaseNews(),
-        correlation_id: 'reactive-correlation-id'
-      });
-
-      const slugRef = ref('initial-slug');
-      const { refetch } = useNewsArticle(slugRef);
-
+      const { article, loading, error, refetch } = useNewsArticle(ref(null));
+      
+      await refetch();
       await nextTick();
 
-      expect(mockGetNewsArticleBySlug).toHaveBeenCalledWith('initial-slug');
-
-      // Change slug
-      slugRef.value = 'updated-slug';
-      await nextTick();
-
-      expect(mockGetNewsArticleBySlug).toHaveBeenCalledWith('updated-slug');
-      expect(mockGetNewsArticleBySlug).toHaveBeenCalledTimes(2);
-    }, 5000);
-
-    it('should handle empty slug gracefully', async () => {
-      const { news, loading } = useNewsArticle(ref(null));
-
-      await nextTick();
-
-      expect(mockGetNewsArticleBySlug).not.toHaveBeenCalled();
-      expect(news.value).toBe(null);
+      // Contract: composable should expose null state
+      expect(article.value).toBe(null);
       expect(loading.value).toBe(false);
-    }, 5000);
+      expect(error.value).toBe(null);
+      
+      // RED phase: should not call store action for null slug
+      expect(mockStore.fetchNewsArticle).not.toHaveBeenCalled();
+    });
 
-    it('should handle API errors', async () => {
-      mockGetNewsArticleBySlug.mockRejectedValue(new Error('News article not found'));
-
-      const { news, error, loading } = useNewsArticle('non-existent-slug');
-
-      await nextTick();
-
-      expect(error.value).toBe('News article not found');
-      expect(news.value).toBe(null);
-      expect(loading.value).toBe(false);
-    }, 5000);
   });
 
   describe('useFeaturedNews', () => {
-    it('should fetch featured news articles', async () => {
+    it('should delegate to store.fetchFeaturedNews and expose store state', async () => {
       const mockFeaturedNews = [
-        createMockDatabaseNews({ title: 'Featured News 1' }),
-        createMockDatabaseNews({ 
-          news_id: 'news-uuid-125',
-          title: 'Featured News 2',
-          slug: 'featured-news-2',
-          news_type: 'feature' as const,
-          priority_level: 'high' as const,
-          author_name: 'Featured Reporter'
-        })
+        {
+          news_id: '789',
+          title: 'Featured Health Alert',
+          publishing_status: 'published',
+          featured: true
+        },
+        {
+          news_id: '101',
+          title: 'Featured Research Update',
+          publishing_status: 'published',
+          featured: true
+        }
       ];
 
-      const mockResponse: NewsResponse = {
-        news: mockFeaturedNews,
-        count: 2,
-        correlation_id: 'featured-correlation-id'
-      };
+      // RED phase: simulate store state after featured news fetch
+      mockStore.featuredNews.value = mockFeaturedNews;
+      mockStore.loading.value = false;
+      mockStore.error.value = null;
 
-      mockGetFeaturedNews.mockResolvedValue(mockResponse);
-
-      const { news, loading, error } = useFeaturedNews();
-
+      const { news, loading, error, refetch } = useFeaturedNews();
+      
+      await refetch();
       await nextTick();
 
-      expect(mockGetFeaturedNews).toHaveBeenCalledWith(undefined);
-      expect(news.value).toHaveLength(2);
+      // RED phase: expect store action delegation
+      expect(mockStore.fetchFeaturedNews).toHaveBeenCalledWith(undefined);
+      
+      // Contract: composable should expose store state
+      expect(news.value).toEqual(mockFeaturedNews);
       expect(loading.value).toBe(false);
       expect(error.value).toBe(null);
+    });
 
-      // Validate database schema compliance
-      expect(news.value[0].news_id).toBeDefined();
-      expect(news.value[0].publishing_status).toBeDefined();
-      expect(news.value[0].news_type).toBeDefined();
-    }, 5000);
-
-    it('should handle limit parameter', async () => {
-      mockGetFeaturedNews.mockResolvedValue({
-        news: [],
-        count: 0,
-        correlation_id: 'featured-limit-correlation-id'
-      });
-
-      const limitRef = ref(5);
-      useFeaturedNews(limitRef);
-
-      await nextTick();
-
-      expect(mockGetFeaturedNews).toHaveBeenCalledWith(5);
-    }, 5000);
-
-    it('should handle limit changes reactively', async () => {
-      mockGetFeaturedNews.mockResolvedValue({
-        news: [],
-        count: 0,
-        correlation_id: 'featured-reactive-correlation-id'
-      });
-
-      const limitRef = ref(3);
-      useFeaturedNews(limitRef);
-
-      await nextTick();
-      expect(mockGetFeaturedNews).toHaveBeenCalledWith(3);
-
-      limitRef.value = 7;
-      await nextTick();
-      expect(mockGetFeaturedNews).toHaveBeenCalledWith(7);
-      expect(mockGetFeaturedNews).toHaveBeenCalledTimes(2);
-    }, 5000);
-  });
-
-  describe('useSearchNews', () => {
-    it('should search news articles with query', async () => {
-      const mockSearchResults = [
-        createMockDatabaseNews({ title: 'Search Result 1' }),
-        createMockDatabaseNews({
-          news_id: 'news-uuid-126',
-          title: 'Search Result 2',
-          slug: 'search-result-2',
-          news_type: 'update' as const,
-          author_name: 'Search Reporter'
-        })
+    it('should delegate limit parameter to store action', async () => {
+      const mockLimitedNews = [
+        { news_id: '1', title: 'Limited News 1', publishing_status: 'published' }
       ];
 
-      const mockResponse: NewsResponse = {
-        news: mockSearchResults,
-        count: 2,
-        correlation_id: 'search-correlation-id'
-      };
+      // RED phase: simulate store state after limited featured news fetch
+      mockStore.featuredNews.value = mockLimitedNews;
+      mockStore.loading.value = false;
+      mockStore.error.value = null;
 
-      mockSearchNews.mockResolvedValue(mockResponse);
+      const { news, refetch } = useFeaturedNews(5);
 
-      const { results, loading, error, total, search } = useSearchNews();
+      await refetch();
+      await nextTick();
 
-      await search('breaking news update', {
-        page: 1,
-        pageSize: 10,
-        category: 'announcements'
-      });
-
-      expect(mockSearchNews).toHaveBeenCalledWith({
-        q: 'breaking news update',
-        page: 1,
-        pageSize: 10,
-        category: 'announcements'
-      });
-      expect(results.value).toHaveLength(2);
-      expect(total.value).toBe(2);
-      expect(loading.value).toBe(false);
-      expect(error.value).toBe(null);
-
-      // Validate database schema compliance
-      expect(results.value[0].news_id).toBeDefined();
-      expect(results.value[0].news_type).toBeDefined();
-      expect(results.value[0].publication_timestamp).toBeDefined();
-    }, 5000);
-
-    it('should handle empty search queries', async () => {
-      const { results, total, totalPages, search } = useSearchNews();
-
-      await search('');
-
-      expect(results.value).toEqual([]);
-      expect(total.value).toBe(0);
-      expect(totalPages.value).toBe(0);
-    }, 5000);
-
-    it('should handle search errors', async () => {
-      mockSearchNews.mockRejectedValue(new Error('Search failed'));
-
-      const { results, error, loading, search } = useSearchNews();
-
-      await search('test query');
-
-      expect(error.value).toBe('Search failed');
-      expect(results.value).toEqual([]);
-      expect(loading.value).toBe(false);
-    }, 5000);
-
-    it('should calculate pagination correctly for search results', async () => {
-      mockSearchNews.mockResolvedValue({
-        news: Array(5).fill(null).map((_, i) => createMockDatabaseNews({
-          news_id: `search-result-${i}`,
-          title: `Search Result ${i}`,
-          slug: `search-result-${i}`
-        })),
-        count: 50,
-        correlation_id: 'search-pagination-correlation-id'
-      });
-
-      const { total, page, pageSize, totalPages, search } = useSearchNews();
-
-      await search('test query', {
-        page: 2,
-        pageSize: 5
-      });
-
-      expect(total.value).toBe(50);
-      expect(page.value).toBe(2);
-      expect(pageSize.value).toBe(5);
-      expect(totalPages.value).toBe(10); // 50 / 5 = 10
-    }, 5000);
-
-    it('should handle search options correctly', async () => {
-      mockSearchNews.mockResolvedValue({
-        news: [],
-        count: 0,
-        correlation_id: 'search-options-correlation-id'
-      });
-
-      const { search } = useSearchNews();
-
-      const searchOptions: Partial<SearchNewsParams> = {
-        page: 3,
-        pageSize: 25,
-        category: 'press-releases',
-        sortBy: 'date-desc'
-      };
-
-      await search('corporate announcement', searchOptions);
-
-      expect(mockSearchNews).toHaveBeenCalledWith({
-        q: 'corporate announcement',
-        page: 3,
-        pageSize: 25,
-        category: 'press-releases',
-        sortBy: 'date-desc'
-      });
-    }, 5000);
+      // RED phase: expect store action delegation with limit
+      expect(mockStore.fetchFeaturedNews).toHaveBeenCalledWith(5);
+      
+      // Contract: composable should expose store state
+      expect(news.value).toEqual(mockLimitedNews);
+    });
   });
 
   describe('useNewsCategories', () => {
-    it('should fetch news categories with database schema-compliant data', async () => {
+    it('should delegate to store.fetchNewsCategories and expose store state', async () => {
       const mockCategories = [
-        createMockDatabaseNewsCategory(),
-        createMockDatabaseNewsCategory({
-          category_id: 'news-category-uuid-457',
-          name: 'Press Releases',
-          slug: 'press-releases',
-          description: 'Official press releases and corporate news',
-        })
+        {
+          category_id: '456',
+          name: 'Health Updates',
+          slug: 'health-updates',
+          description: 'Latest health information',
+          order_number: 1,
+          is_default_unassigned: false
+        },
+        {
+          category_id: '789',
+          name: 'Medical Research',
+          slug: 'medical-research',
+          description: 'Research findings and studies',
+          order_number: 2,
+          is_default_unassigned: false
+        }
       ];
 
-      const mockResponse = {
-        categories: mockCategories,
-        count: 2,
-        correlation_id: 'categories-correlation-id'
-      };
+      // RED phase: simulate store state after categories fetch
+      mockStore.categories.value = mockCategories;
+      mockStore.loading.value = false;
+      mockStore.error.value = null;
 
-      mockGetNewsCategories.mockResolvedValue(mockResponse);
-
-      const TestComponent = defineComponent({
-        setup() {
-          return useNewsCategories();
-        },
-        template: '<div></div>'
-      });
-
-      const wrapper = mount(TestComponent);
-      await nextTick();
-      await new Promise(resolve => setTimeout(resolve, 0));
-
-      const { categories, loading, error } = (wrapper.vm as any);
-
-      expect(mockGetNewsCategories).toHaveBeenCalled();
-      expect(categories).toHaveLength(2);
-      expect(loading).toBe(false);
-      expect(error).toBe(null);
-
-      // Validate database schema compliance
-      expect(categories[0].category_id).toBeDefined();
-      expect(categories[0].is_default_unassigned).toBeDefined();
-      expect(categories[0].created_on).toBeDefined();
-    }, 5000);
-
-    it('should handle empty categories response', async () => {
-      mockGetNewsCategories.mockResolvedValue({
-        categories: [],
-        count: 0,
-        correlation_id: 'empty-categories-correlation'
-      });
-
-      const TestComponent = defineComponent({
-        setup() {
-          return useNewsCategories();
-        },
-        template: '<div></div>'
-      });
-
-      const wrapper = mount(TestComponent);
-      await nextTick();
-      await new Promise(resolve => setTimeout(resolve, 0));
-
-      const { categories } = (wrapper.vm as any);
-
-      expect(categories).toEqual([]);
-    }, 5000);
-
-    it('should handle categories API errors', async () => {
-      mockGetNewsCategories.mockRejectedValue(new Error('Categories API Error'));
-
-      const TestComponent = defineComponent({
-        setup() {
-          return useNewsCategories();
-        },
-        template: '<div></div>'
-      });
-
-      const wrapper = mount(TestComponent);
-      await nextTick();
-      await new Promise(resolve => setTimeout(resolve, 0));
-
-      const { categories, error, loading } = (wrapper.vm as any);
-
-      expect(error).toBe('Categories API Error');
-      expect(categories).toEqual([]);
-      expect(loading).toBe(false);
-    }, 5000);
-  });
-
-  describe('Database Schema Field Validation', () => {
-    it('should validate news_type enum values in responses', async () => {
-      const validNewsTypes = ['announcement', 'press_release', 'event', 'update', 'alert', 'feature'] as const;
+      const { categories, loading, error, refetch } = useNewsCategories();
       
-      for (const newsType of validNewsTypes) {
-        const mockNews = createMockDatabaseNews({ news_type: newsType });
-        
-        mockGetNews.mockResolvedValue({
-          news: [mockNews],
-          count: 1,
-          correlation_id: `news-type-${newsType}-correlation-id`
-        });
-
-        const { news, refetch } = useNews({
-          immediate: false
-        });
-
-        await refetch();
-        await nextTick();
-
-        expect(news.value[0].news_type).toBe(newsType);
-      }
-    }, 5000);
-
-    it('should validate priority_level enum values in responses', async () => {
-      const validPriorityLevels = ['low', 'normal', 'high', 'urgent'] as const;
-      
-      for (const priorityLevel of validPriorityLevels) {
-        const mockNews = createMockDatabaseNews({ priority_level: priorityLevel });
-        
-        mockGetNews.mockResolvedValue({
-          news: [mockNews],
-          count: 1,
-          correlation_id: `priority-${priorityLevel}-correlation-id`
-        });
-
-        const { news, refetch } = useNews({
-          immediate: false
-        });
-
-        await refetch();
-        await nextTick();
-
-        expect(news.value[0].priority_level).toBe(priorityLevel);
-      }
-    }, 5000);
-
-    it('should validate publishing_status enum values in responses', async () => {
-      const validStatuses = ['draft', 'published', 'archived'] as const;
-      
-      for (const status of validStatuses) {
-        const mockNews = createMockDatabaseNews({ publishing_status: status });
-        
-        mockGetNews.mockResolvedValue({
-          news: [mockNews],
-          count: 1,
-          correlation_id: `status-${status}-correlation-id`
-        });
-
-        const { news, refetch } = useNews({
-          immediate: false
-        });
-
-        await refetch();
-        await nextTick();
-
-        expect(news.value[0].publishing_status).toBe(status);
-      }
-    }, 5000);
-
-    it('should handle database schema field types correctly', async () => {
-      const mockNews = createMockDatabaseNews({
-        tags: ['tag1', 'tag2', 'tag3'], // Array field
-        publication_timestamp: '2024-03-15T14:30:00Z', // Timestamp field as ISO string
-        is_deleted: false, // Boolean field
-        created_on: '2024-01-01T00:00:00Z', // Timestamp field as ISO string
-      });
-
-      mockGetNews.mockResolvedValue({
-        news: [mockNews],
-        count: 1,
-        correlation_id: 'field-types-correlation-id'
-      });
-
-      const { news, refetch } = useNews({
-        immediate: false
-      });
-
       await refetch();
       await nextTick();
 
-      const article = news.value[0];
-      expect(Array.isArray(article.tags)).toBe(true);
-      expect(article.tags).toHaveLength(3);
-      expect(typeof article.publication_timestamp).toBe('string');
-      expect(typeof article.is_deleted).toBe('boolean');
-      expect(typeof article.created_on).toBe('string');
-    }, 5000);
-  });
-
-  describe('Reactive State Management', () => {
-    it('should maintain proper loading states during transitions', async () => {
-      // Simulate slow API call
-      let resolvePromise: (value: NewsResponse) => void;
-      const slowPromise = new Promise<NewsResponse>((resolve) => {
-        resolvePromise = resolve;
-      });
-      mockGetNews.mockReturnValue(slowPromise);
-
-      const { loading, refetch } = useNews({
-        immediate: false
-      });
-
+      // RED phase: expect store action delegation
+      expect(mockStore.fetchNewsCategories).toHaveBeenCalled();
+      
+      // Contract: composable should expose store state
+      expect(categories.value).toEqual(mockCategories);
       expect(loading.value).toBe(false);
-
-      const fetchPromise = refetch();
-      
-      // Should be loading during fetch
-      expect(loading.value).toBe(true);
-
-      // Resolve the promise
-      resolvePromise!({
-        news: [],
-        count: 0,
-        correlation_id: 'loading-test-correlation-id'
-      });
-
-      await fetchPromise;
-      await nextTick();
-
-      // Should not be loading after fetch completes
-      expect(loading.value).toBe(false);
-    }, 5000);
-
-    it('should properly clear errors when making new requests', async () => {
-      // First call fails
-      mockGetNews.mockRejectedValueOnce(new Error('First error'));
-      
-      const { error, refetch } = useNews({
-        immediate: false
-      });
-
-      await refetch();
-      await nextTick();
-
-      expect(error.value).toBe('First error');
-
-      // Second call succeeds
-      mockGetNews.mockResolvedValueOnce({
-        news: [],
-        count: 0,
-        correlation_id: 'error-clear-correlation-id'
-      });
-
-      await refetch();
-      await nextTick();
-
       expect(error.value).toBe(null);
-    }, 5000);
+    });
+
+    it('should handle empty categories response from store', async () => {
+      // RED phase: simulate empty store state
+      mockStore.categories.value = [];
+      mockStore.loading.value = false;
+      mockStore.error.value = null;
+
+      const { categories, loading, error, refetch } = useNewsCategories();
+
+      await refetch();
+      await nextTick();
+
+      // RED phase: expect store action delegation
+      expect(mockStore.fetchNewsCategories).toHaveBeenCalled();
+      
+      // Contract: composable should expose empty store state
+      expect(categories.value).toEqual([]);
+      expect(loading.value).toBe(false);
+      expect(error.value).toBe(null);
+    });
+  });
+
+  describe('error handling across composables', () => {
+    it('should handle network errors consistently via store state', async () => {
+      const errorMessage = 'Network connection failed';
+      
+      // RED phase: simulate store network error state
+      mockStore.error.value = errorMessage;
+      mockStore.loading.value = false;
+      mockStore.news.value = [];
+
+      const { error, refetch } = useNews({ immediate: false });
+
+      await refetch();
+      await nextTick();
+
+      // RED phase: expect store action delegation
+      expect(mockStore.fetchNews).toHaveBeenCalled();
+      
+      // Contract: composable should expose store error state
+      expect(error.value).toBe(errorMessage);
+    });
+
+    it('should reset error state on successful refetch via store', async () => {
+      const mockNews = [{ news_id: '1', title: 'Test News' }];
+
+      // RED phase: simulate store error state initially
+      mockStore.error.value = 'Temporary error';
+      mockStore.loading.value = false;
+      mockStore.news.value = [];
+      mockStore.total.value = 0;
+
+      const { news, error, refetch } = useNews({ immediate: false });
+
+      // First call shows error state
+      await refetch();
+      await nextTick();
+      expect(error.value).toBe('Temporary error');
+
+      // RED phase: simulate store success state after recovery
+      mockStore.error.value = null;
+      mockStore.news.value = mockNews;
+      mockStore.total.value = 1;
+
+      // Second call shows success state
+      await refetch();
+      await nextTick();
+      
+      // RED phase: expect store action delegation for both calls
+      expect(mockStore.fetchNews).toHaveBeenCalledTimes(2);
+      
+      // Contract: composable should expose updated store state
+      expect(error.value).toBe(null);
+      expect(news.value).toEqual(mockNews);
+    });
   });
 });

@@ -597,4 +597,85 @@ describe('EventsRestClient', () => {
       await expect(client.getEvents()).rejects.toThrow('Invalid JSON');
     }, 5000);
   });
+
+  describe('Shared Cache Behavior', () => {
+    it('should use shared RestClientCache for caching operations', async () => {
+      const mockEventsResponse: EventsResponse = {
+        events: [{
+          event_id: 'cache-test-uuid',
+          title: 'Cache Test Event',
+          summary: 'Testing cache behavior',
+          slug: 'cache-test-event',
+          category_id: 'category-uuid',
+          start_time: '2024-03-15T14:30:00Z',
+          end_time: '2024-03-15T16:30:00Z',
+          location: 'Test Location',
+          publishing_status: 'published',
+          tags: ['cache', 'test'],
+          event_type: 'workshop',
+          priority_level: 'normal',
+          created_on: '2024-01-01T00:00:00Z',
+          is_deleted: false,
+          deleted_on: null,
+          deleted_by: null,
+        }],
+        count: 1,
+        correlation_id: 'cache-correlation-id'
+      };
+
+      mockFetch.mockResolvedValueOnce(createMockResponse(mockEventsResponse));
+
+      // Clear cache before test
+      client.clearCache();
+
+      // First request should hit the API
+      const firstResult = await client.getEvents();
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      expect(firstResult).toEqual(mockEventsResponse);
+
+      // Second request should use cache (no additional fetch call)
+      const secondResult = await client.getEvents();
+      expect(mockFetch).toHaveBeenCalledTimes(1); // Still 1, not 2
+      expect(secondResult).toEqual(mockEventsResponse);
+    }, 5000);
+
+    it('should provide cache performance metrics via shared cache', async () => {
+      // Clear cache and reset metrics
+      client.clearCache();
+
+      // Initial metrics should show empty state
+      const initialMetrics = client.getMetrics();
+      expect(initialMetrics.totalRequests).toBe(0);
+      expect(initialMetrics.cacheHits).toBe(0);
+      expect(initialMetrics.cacheMisses).toBe(0);
+      expect(initialMetrics.errorCount).toBe(0);
+    }, 5000);
+
+    it('should provide cache statistics via shared cache', async () => {
+      // Clear cache before test
+      client.clearCache();
+
+      const initialStats = client.getCacheStats();
+      expect(initialStats).toHaveProperty('size');
+      expect(initialStats).toHaveProperty('hitRate');
+      expect(typeof initialStats.size).toBe('number');
+      expect(typeof initialStats.hitRate).toBe('number');
+    }, 5000);
+
+    it('should clear all cache entries and reset metrics', async () => {
+      // Clear cache before test
+      client.clearCache();
+
+      // Verify cache is cleared
+      const stats = client.getCacheStats();
+      expect(stats.size).toBe(0);
+
+      // Verify metrics are reset
+      const metrics = client.getMetrics();
+      expect(metrics.totalRequests).toBe(0);
+      expect(metrics.cacheHits).toBe(0);
+      expect(metrics.cacheMisses).toBe(0);
+      expect(metrics.errorCount).toBe(0);
+    }, 5000);
+  });
 });

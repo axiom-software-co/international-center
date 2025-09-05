@@ -29,6 +29,7 @@ import {
 export const useEventsStore = defineStore('events', {
   state: (): EventsStoreState => ({
     events: [],
+    event: null,
     categories: [],
     featuredEvents: [],
     searchResults: [],
@@ -88,7 +89,8 @@ export const useEventsStore = defineStore('events', {
         () => eventsClient.getEventBySlug(slug),
         'Failed to fetch event'
       );
-      return result?.event || null;
+      this.event = result?.event || null;
+      return this.event;
     },
 
     async fetchFeaturedEvents(limit?: number): Promise<void> {

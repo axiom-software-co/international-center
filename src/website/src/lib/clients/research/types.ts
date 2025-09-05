@@ -76,11 +76,30 @@ export interface FeaturedResearch {
   modified_by?: string;
 }
 
-// API Response types
-export type ResearchResponse = StandardRestResponse<ResearchArticle>;
-export type ResearchArticleResponse = SingleRestResponse<ResearchArticle>;
-export type ResearchCategoriesResponse = SingleRestResponse<ResearchCategory[]>;
-export type FeaturedResearchResponse = SingleRestResponse<FeaturedResearch>;
+// Unified contract-compliant API Response types
+// Following unified domain response structure: {[domain]: T[], count: number, correlation_id: string}
+export interface ResearchResponse {
+  research: ResearchArticle[];
+  count: number;
+  correlation_id: string;
+}
+
+export interface ResearchArticleResponse {
+  research: ResearchArticle;
+  correlation_id: string;
+}
+
+export interface ResearchCategoriesResponse {
+  categories: ResearchCategory[];
+  count: number;
+  correlation_id: string;
+}
+
+export interface FeaturedResearchResponse {
+  research: ResearchArticle[];
+  count: number;
+  correlation_id: string;
+}
 
 // Query parameter interfaces
 export interface GetResearchParams extends PaginationParams, FilterParams {

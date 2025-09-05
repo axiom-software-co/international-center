@@ -1,11 +1,9 @@
-// News Composables - Vue 3 Composition API with Store Integration
-// Refactored to use explicit implementations and consistent store patterns
+// News Composables - Vue 3 Composition API with Store Delegation
 
 import { ref, computed, watch, onMounted, isRef, unref, type Ref } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useNewsStore } from '../stores/news';
 import type { NewsArticle, NewsCategory, GetNewsParams, SearchNewsParams } from '../lib/clients/news/types';
-import type { BaseComposableOptions } from './base';
 
 // Domain-specific type aliases
 export interface UseNewsResult {
@@ -19,38 +17,32 @@ export interface UseNewsResult {
   refetch: () => Promise<void>;
 }
 
-export interface UseNewsOptions extends GetNewsParams, BaseComposableOptions {}
+export interface UseNewsOptions extends GetNewsParams {
+  enabled?: boolean;
+  immediate?: boolean;
+}
 
-// Main news list composable
+// Main news list composable - delegates to store
 export const useNews = (options: UseNewsOptions = {}): UseNewsResult => {
   const { enabled = true, immediate = true, ...params } = options;
-  
   const store = useNewsStore();
   const { news, loading, error, total, totalPages } = storeToRefs(store);
   
-  // Local pagination refs
+  // Local refs for pagination
   const page = ref(params.page || 1);
   const pageSize = ref(params.pageSize || 10);
 
-  const fetchItems = async () => {
+  const fetchNews = async () => {
     if (!enabled) return;
-    
-    try {
-      // Disable caching in test environment to ensure API calls are made
-      const shouldUseCache = import.meta.env?.VITEST !== true;
-      await store.fetchNews(params, { useCache: shouldUseCache });
-    } catch (err) {
-      // Error handling managed by store
-    }
+    await store.fetchNews(params);
   };
 
   // Watch for parameter changes
-  watch(() => params, fetchItems, { deep: true });
+  watch(() => params, fetchNews, { deep: true });
   
   // Call immediately if enabled and immediate is true
-  // Direct call since we're not always in a component context during tests
   if (enabled && immediate) {
-    fetchItems();
+    onMounted(fetchNews);
   }
 
   return {
@@ -61,7 +53,7 @@ export const useNews = (options: UseNewsOptions = {}): UseNewsResult => {
     page,
     pageSize,
     totalPages,
-    refetch: fetchItems,
+    refetch: fetchNews,
   };
 };
 
@@ -72,35 +64,28 @@ export interface UseNewsArticleResult {
   refetch: () => Promise<void>;
 }
 
-// Single news article composable
+// Single news article composable - delegates to store
 export const useNewsArticle = (slug: Ref<string | null> | string | null): UseNewsArticleResult => {
   const slugRef = isRef(slug) ? slug : ref(slug);
   const store = useNewsStore();
-  const { loading, error } = storeToRefs(store);
-  
-  const news = ref<NewsArticle | null>(null);
+  const { article: news, loading, error } = storeToRefs(store);
 
-  const fetchItem = async () => {
+  const fetchNewsArticle = async () => {
     const currentSlug = unref(slugRef);
     if (!currentSlug) {
-      news.value = null;
+      store.article = null;
       return;
     }
 
-    try {
-      const result = await store.fetchNewsArticle(currentSlug);
-      news.value = result;
-    } catch (err) {
-      news.value = null;
-    }
+    await store.fetchNewsArticle(currentSlug);
   };
 
-  // Watch for slug changes
+  // Watch for slug changes and call immediately
   watch(slugRef, (newSlug) => {
     if (newSlug) {
-      fetchItem();
+      fetchNewsArticle();
     } else {
-      news.value = null;
+      store.article = null;
     }
   }, { immediate: true });
 
@@ -108,7 +93,7 @@ export const useNewsArticle = (slug: Ref<string | null> | string | null): UseNew
     news,
     loading,
     error,
-    refetch: fetchItem,
+    refetch: fetchNewsArticle,
   };
 };
 
@@ -119,28 +104,27 @@ export interface UseFeaturedNewsResult {
   refetch: () => Promise<void>;
 }
 
-// Featured news composable
+// Featured news composable - delegates to store
 export const useFeaturedNews = (limit?: Ref<number | undefined> | number | undefined): UseFeaturedNewsResult => {
   const limitRef = isRef(limit) ? limit : ref(limit);
   const store = useNewsStore();
   const { featuredNews: news, loading, error } = storeToRefs(store);
 
-  const fetchFeaturedItems = async () => {
-    try {
-      await store.fetchFeaturedNews(unref(limitRef));
-    } catch (err) {
-      // Error handling managed by store
-    }
+  const fetchFeaturedNews = async () => {
+    await store.fetchFeaturedNews(unref(limitRef));
   };
 
-  // Watch for limit changes with immediate execution
-  watch(limitRef, fetchFeaturedItems, { immediate: true });
+  // Trigger initial fetch immediately
+  fetchFeaturedNews();
+  
+  // Watch for limit changes
+  watch(limitRef, fetchFeaturedNews);
 
   return {
     news,
     loading,
     error,
-    refetch: fetchFeaturedItems,
+    refetch: fetchFeaturedNews,
   };
 };
 
@@ -155,7 +139,7 @@ export interface UseSearchNewsResult {
   search: (query: string, options?: Partial<SearchNewsParams>) => Promise<void>;
 }
 
-// Search news composable
+// Search news composable - delegates to store
 export const useSearchNews = (): UseSearchNewsResult => {
   const store = useNewsStore();
   const { searchResults: results, loading, error, searchTotal: total } = storeToRefs(store);
@@ -164,9 +148,7 @@ export const useSearchNews = (): UseSearchNewsResult => {
   const page = ref(1);
   const pageSize = ref(10);
 
-  const totalPages = computed(() => {
-    return Math.ceil(total.value / pageSize.value) || 0;
-  });
+  const totalPages = computed(() => Math.ceil(total.value / pageSize.value) || 0);
 
   const search = async (query: string, options: Partial<SearchNewsParams> = {}) => {
     const searchParams = {
@@ -180,11 +162,7 @@ export const useSearchNews = (): UseSearchNewsResult => {
     page.value = searchParams.page;
     pageSize.value = searchParams.pageSize;
 
-    try {
-      await store.searchNews(searchParams);
-    } catch (err) {
-      // Error handling is managed by the store
-    }
+    await store.searchNews(searchParams);
   };
 
   return {
@@ -206,20 +184,16 @@ export interface UseNewsCategoriesResult {
   refetch: () => Promise<void>;
 }
 
-// News categories composable
+// News categories composable - delegates to store
 export const useNewsCategories = (): UseNewsCategoriesResult => {
   const store = useNewsStore();
   const { categories, loading, error } = storeToRefs(store);
 
   const fetchCategories = async () => {
-    try {
-      await store.fetchNewsCategories();
-    } catch (err) {
-      // Error handling managed by store
-    }
+    await store.fetchNewsCategories();
   };
 
-  // Initial fetch - trigger immediately since we're not in a component context during tests
+  // Trigger initial fetch immediately
   fetchCategories();
 
   return {

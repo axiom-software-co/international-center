@@ -1,11 +1,9 @@
-// Research Composables - Vue 3 Composition API with Store Integration
-// Refactored to use explicit implementations and consistent store patterns
+// Research Composables - Vue 3 Composition API with Store Delegation
 
-import { ref, computed, watch, onMounted, isRef, unref, type Ref } from 'vue';
+import { ref, computed, watch, onMounted, isRef, unref, nextTick, type Ref } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useResearchStore } from '../stores/research';
 import type { ResearchArticle, ResearchCategory, GetResearchParams, SearchResearchParams } from '../lib/clients/research/types';
-import type { BaseComposableOptions } from './base';
 
 // Domain-specific type aliases
 export interface UseResearchArticlesResult {
@@ -19,38 +17,32 @@ export interface UseResearchArticlesResult {
   refetch: () => Promise<void>;
 }
 
-export interface UseResearchArticlesOptions extends GetResearchParams, BaseComposableOptions {}
+export interface UseResearchArticlesOptions extends GetResearchParams {
+  enabled?: boolean;
+  immediate?: boolean;
+}
 
-// Main research articles composable
+// Main research articles composable - delegates to store
 export const useResearchArticles = (options: UseResearchArticlesOptions = {}): UseResearchArticlesResult => {
   const { enabled = true, immediate = true, ...params } = options;
-  
   const store = useResearchStore();
   const { research, loading, error, total, totalPages } = storeToRefs(store);
   
-  // Local pagination refs
+  // Local refs for pagination
   const page = ref(params.page || 1);
   const pageSize = ref(params.pageSize || 10);
 
-  const fetchItems = async () => {
+  const fetchResearch = async () => {
     if (!enabled) return;
-    
-    try {
-      // Disable caching in test environment to ensure API calls are made
-      const shouldUseCache = import.meta.env?.VITEST !== true;
-      await store.fetchResearch(params, { useCache: shouldUseCache });
-    } catch (err) {
-      // Error handling managed by store
-    }
+    await store.fetchResearch(params);
   };
 
   // Watch for parameter changes
-  watch(() => params, fetchItems, { deep: true });
+  watch(() => params, fetchResearch, { deep: true });
   
   // Call immediately if enabled and immediate is true
-  // Direct call since we're not always in a component context during tests
   if (enabled && immediate) {
-    fetchItems();
+    onMounted(fetchResearch);
   }
 
   return {
@@ -61,7 +53,7 @@ export const useResearchArticles = (options: UseResearchArticlesOptions = {}): U
     page,
     pageSize,
     totalPages,
-    refetch: fetchItems,
+    refetch: fetchResearch,
   };
 };
 
@@ -81,35 +73,28 @@ export interface UseResearchArticleResult {
   refetch: () => Promise<void>;
 }
 
-// Single research article composable
+// Single research article composable - delegates to store
 export const useResearchArticle = (slug: Ref<string | null> | string | null): UseResearchArticleResult => {
   const slugRef = isRef(slug) ? slug : ref(slug);
   const store = useResearchStore();
-  const { loading, error } = storeToRefs(store);
-  
-  const article = ref<ResearchArticle | null>(null);
+  const { article, loading, error } = storeToRefs(store);
 
-  const fetchItem = async () => {
+  const fetchResearchArticle = async () => {
     const currentSlug = unref(slugRef);
     if (!currentSlug) {
-      article.value = null;
+      store.article = null;
       return;
     }
 
-    try {
-      const result = await store.fetchResearchArticle(currentSlug);
-      article.value = result;
-    } catch (err) {
-      article.value = null;
-    }
+    await store.fetchResearchArticle(currentSlug);
   };
 
-  // Watch for slug changes
+  // Watch for slug changes and call immediately
   watch(slugRef, (newSlug) => {
     if (newSlug) {
-      fetchItem();
+      fetchResearchArticle();
     } else {
-      article.value = null;
+      store.article = null;
     }
   }, { immediate: true });
 
@@ -117,7 +102,7 @@ export const useResearchArticle = (slug: Ref<string | null> | string | null): Us
     article,
     loading,
     error,
-    refetch: fetchItem,
+    refetch: fetchResearchArticle,
   };
 };
 

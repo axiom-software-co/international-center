@@ -29,6 +29,7 @@ import {
 export const useServicesStore = defineStore('services', {
   state: (): ServicesStoreState => ({
     services: [],
+    service: null,
     categories: [],
     featuredServices: [],
     searchResults: [],
@@ -75,7 +76,8 @@ export const useServicesStore = defineStore('services', {
         () => servicesClient.getServiceBySlug(slug),
         'Failed to fetch service'
       );
-      return result?.service || null;
+      this.service = result?.service || null;
+      return this.service;
     },
 
     async fetchFeaturedServices(limit?: number): Promise<void> {

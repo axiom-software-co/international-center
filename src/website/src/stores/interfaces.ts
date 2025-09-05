@@ -56,6 +56,7 @@ export interface CacheOptions {
 // NEWS STORE INTERFACES
 export interface NewsStoreState extends BaseStoreState {
   news: NewsArticle[];
+  article: NewsArticle | null; // Individual news article state
   categories: NewsCategory[];
   featuredNews: NewsArticle[];
   searchResults: NewsArticle[];
@@ -87,6 +88,7 @@ export interface NewsStore extends NewsStoreState, NewsStoreActions, NewsStoreGe
 // SERVICES STORE INTERFACES
 export interface ServicesStoreState extends BaseStoreState {
   services: Service[];
+  service: Service | null; // Individual service state
   categories: ServiceCategory[];
   featuredServices: Service[];
   searchResults: Service[];
@@ -118,6 +120,7 @@ export interface ServicesStore extends ServicesStoreState, ServicesStoreActions,
 // EVENTS STORE INTERFACES
 export interface EventsStoreState extends BaseStoreState {
   events: Event[];
+  event: Event | null; // Individual event state
   categories: EventCategory[];
   featuredEvents: Event[];
   searchResults: Event[];
@@ -151,6 +154,7 @@ export interface EventsStore extends EventsStoreState, EventsStoreActions, Event
 // RESEARCH STORE INTERFACES
 export interface ResearchStoreState extends BaseStoreState {
   research: ResearchArticle[];
+  article: ResearchArticle | null; // Individual research article state
   categories: ResearchCategory[];
   featuredResearch: ResearchArticle[];
   searchResults: ResearchArticle[];

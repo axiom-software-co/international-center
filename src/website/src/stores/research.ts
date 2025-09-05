@@ -29,6 +29,7 @@ import {
 export const useResearchStore = defineStore('research', {
   state: (): ResearchStoreState => ({
     research: [],
+    article: null,
     categories: [],
     featuredResearch: [],
     searchResults: [],
@@ -96,7 +97,8 @@ export const useResearchStore = defineStore('research', {
         () => researchClient.getResearchBySlug(slug),
         'Failed to fetch research article'
       );
-      return result?.research || null;
+      this.article = result?.research || null;
+      return this.article;
     },
 
     async fetchFeaturedResearch(limit?: number): Promise<void> {

@@ -28,6 +28,7 @@ import {
 export const useNewsStore = defineStore('news', {
   state: (): NewsStoreState => ({
     news: [],
+    article: null,
     categories: [],
     featuredNews: [],
     searchResults: [],
@@ -81,7 +82,8 @@ export const useNewsStore = defineStore('news', {
         () => newsClient.getNewsArticleBySlug(slug),
         'Failed to fetch news article'
       );
-      return result?.news || null;
+      this.article = result?.news || null;
+      return this.article;
     },
 
     async fetchFeaturedNews(limit?: number): Promise<void> {

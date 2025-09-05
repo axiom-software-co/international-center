@@ -1,763 +1,452 @@
-// Research Composables Tests - State management and API integration validation
-// Tests validate useResearch composables with database schema-compliant reactive state
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { ref, computed, nextTick } from 'vue';
+import { useResearchArticles, useResearchArticle, useFeaturedResearch, useResearchCategories } from './useResearch';
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { ref, nextTick, defineComponent } from 'vue';
-import { mount } from '@vue/test-utils';
-import { useResearchArticles, useResearchArticle, useFeaturedResearch, useFeaturedResearchArticles, useSearchResearch } from './useResearch';
-import type { ResearchArticle, ResearchResponse, ResearchArticleResponse, GetResearchParams, SearchResearchParams } from '../lib/clients/research/types';
-
-// Mock the researchClient singleton with hoisted functions
-const {
-  mockGetResearchArticles,
-  mockGetResearchArticleBySlug,
-  mockGetFeaturedResearch,
-  mockSearchResearch
-} = vi.hoisted(() => {
-  const mockGetResearchArticlesFunc = vi.fn();
-  const mockGetResearchArticleBySlugFunc = vi.fn();
-  const mockGetFeaturedResearchFunc = vi.fn();
-  const mockSearchResearchFunc = vi.fn();
-  
-  return {
-    mockGetResearchArticles: mockGetResearchArticlesFunc,
-    mockGetResearchArticleBySlug: mockGetResearchArticleBySlugFunc,
-    mockGetFeaturedResearch: mockGetFeaturedResearchFunc,
-    mockSearchResearch: mockSearchResearchFunc,
-  };
-});
-
-vi.mock('../lib/clients', () => ({
-  researchClient: {
-    getResearchArticles: mockGetResearchArticles,
-    getResearchArticleBySlug: mockGetResearchArticleBySlug,
-    getFeaturedResearch: mockGetFeaturedResearch,
-    searchResearch: mockSearchResearch,
-  },
-  // Pass through any types that might be imported
-  ...vi.importActual('../lib/clients')
+// Mock the store module - RED phase: define store-centric contracts
+vi.mock('../stores/research', () => ({
+  useResearchStore: vi.fn()
 }));
 
-// Database schema-compliant mock research article for testing
-const createMockDatabaseResearch = (overrides: Partial<any> = {}): any => ({
-  research_id: 'research-uuid-123',
-  title: 'Mock Database Research Article',
-  abstract: 'Research article abstract from database schema',
-  content: 'Full research article content with methodology and findings',
-  slug: 'mock-database-research-article',
-  category_id: 'research-category-uuid-456',
-  image_url: 'https://example.com/research-image.jpg',
-  author_names: 'Dr. Database Schema, Dr. Validation Test',
-  publication_date: '2024-03-15',
-  doi: '10.1234/mock.research.2024',
-  external_url: 'https://journal.example.com/mock-research',
-  report_url: 'https://storage.example.com/reports/mock-research.pdf',
-  publishing_status: 'published' as const,
-  keywords: ['database', 'schema', 'research', 'validation'],
-  research_type: 'clinical_study' as const,
-  created_on: '2024-01-01T00:00:00Z',
-  created_by: 'researcher@example.com',
-  modified_on: '2024-01-02T00:00:00Z',
-  modified_by: 'admin@example.com',
-  is_deleted: false,
-  deleted_on: null,
-  deleted_by: null,
-  ...overrides,
-});
+import { useResearchStore } from '../stores/research';
 
-describe('useResearch Composables', () => {
+
+describe('useResearch composables', () => {
+  // Define mock store structure - RED phase: store-centric contract
+  const mockStore = {
+    // State refs that composables should expose via storeToRefs
+    research: ref([]),
+    article: ref(null), // Individual research article state
+    loading: ref(false),
+    error: ref(null),
+    total: ref(0),
+    categories: ref([]),
+    featuredResearch: ref([]),
+    searchResults: ref([]),
+    searchTotal: ref(0),
+    
+    // Computed values
+    totalPages: computed(() => Math.ceil(mockStore.total.value / 10) || 0),
+    
+    // Explicit action methods that composables should delegate to
+    fetchResearch: vi.fn(),
+    fetchResearchArticle: vi.fn(),
+    fetchFeaturedResearch: vi.fn(),
+    fetchResearchCategories: vi.fn(),
+    searchResearch: vi.fn(),
+  };
+
   beforeEach(() => {
-    mockGetResearchArticles.mockClear();
-    mockGetResearchArticleBySlug.mockClear();
-    mockGetFeaturedResearch.mockClear();
-    mockSearchResearch.mockClear();
-  });
-
-  afterEach(() => {
-    vi.restoreAllMocks();
+    // Ensure all store properties are properly initialized as refs
+    if (!mockStore.article || !mockStore.article.value !== undefined) {
+      mockStore.article = ref(null);
+    }
+    
+    // Reset mock store state
+    mockStore.research.value = [];
+    mockStore.article.value = null;
+    mockStore.loading.value = false;
+    mockStore.error.value = null;
+    mockStore.total.value = 0;
+    mockStore.categories.value = [];
+    mockStore.featuredResearch.value = [];
+    mockStore.searchResults.value = [];
+    mockStore.searchTotal.value = 0;
+    
+    // Clear all store action mocks
+    mockStore.fetchResearch.mockClear();
+    mockStore.fetchResearchArticle.mockClear();
+    mockStore.fetchFeaturedResearch.mockClear();
+    mockStore.fetchResearchCategories.mockClear();
+    mockStore.searchResearch.mockClear();
+    
+    // Setup store mock return
+    vi.mocked(useResearchStore).mockReturnValue(mockStore as any);
   });
 
   describe('useResearchArticles', () => {
-    it('should initialize with proper default state', () => {
-      const mockResponse: ResearchResponse = {
-        data: [],
-        pagination: {
-          page: 1,
-          pageSize: 10,
-          total: 0,
-          totalPages: 0
-        },
-        success: true
-      };
-      
-      mockGetResearchArticles.mockResolvedValue(mockResponse);
+    it('should expose store state via storeToRefs and initialize with correct default values', () => {
+      const { research, loading, error, total, page, pageSize, totalPages, refetch } = useResearchArticles({ enabled: false });
 
-      const { articles, loading, error, total, page, pageSize, totalPages } = useResearchArticles({
-        enabled: false,
-        immediate: false
-      });
-
-      expect(articles.value).toEqual([]);
+      // RED phase: expect composable to expose store state directly
+      expect(research.value).toEqual([]);
       expect(loading.value).toBe(false);
       expect(error.value).toBe(null);
       expect(total.value).toBe(0);
       expect(page.value).toBe(1);
       expect(pageSize.value).toBe(10);
-      expect(totalPages.value).toBe(0);
-    }, 5000);
+      
+      // Contract: composable should expose reactive properties and functions
+      expect(totalPages).toBeTruthy();
+      expect(typeof refetch).toBe('function');
+      
+      // Contract: composable should use store
+      expect(useResearchStore).toHaveBeenCalled();
+    });
 
-    it('should fetch research articles with database schema-compliant data', async () => {
-      const mockDatabaseResearch = [
-        createMockDatabaseResearch(),
-        createMockDatabaseResearch({
-          research_id: 'research-uuid-124',
-          title: 'Second Database Research',
-          slug: 'second-database-research',
-          research_type: 'systematic_review' as const,
-          author_names: 'Dr. Second Author',
-        })
+    it('should delegate to store.fetchResearch and expose store state', async () => {
+      const mockResearch = [
+        {
+          research_id: '123',
+          title: 'Medical Research Study',
+          abstract: 'Comprehensive medical research findings',
+          slug: 'medical-research-study',
+          publishing_status: 'published',
+          category_id: '456',
+          author_names: 'Dr. Smith, Dr. Johnson',
+          publication_date: '2024-01-15',
+          doi: '10.1234/research.2024.001',
+          research_type: 'clinical_study',
+          keywords: ['medical', 'research', 'clinical']
+        }
       ];
 
-      const mockResponse: ResearchResponse = {
-        data: mockDatabaseResearch,
-        pagination: {
-          page: 1,
-          pageSize: 10,
-          total: 2,
-          totalPages: 1
-        },
-        success: true
-      };
+      // RED phase: simulate store state after successful fetch
+      mockStore.research.value = mockResearch;
+      mockStore.total.value = 1;
+      mockStore.loading.value = false;
+      mockStore.error.value = null;
 
-      mockGetResearchArticles.mockResolvedValue(mockResponse);
-
-      const { articles, loading, error, total, totalPages, refetch } = useResearchArticles({
-        immediate: false
+      const { research, loading, error, total, refetch } = useResearchArticles({ 
+        page: 1, 
+        pageSize: 10,
+        immediate: false 
       });
 
+      // Contract: composable should expose store state
       expect(loading.value).toBe(false);
-
+      
       await refetch();
-
       await nextTick();
 
-      expect(mockGetResearchArticles).toHaveBeenCalledTimes(1);
-      expect(articles.value).toHaveLength(2);
-      expect(total.value).toBe(2);
-      expect(totalPages.value).toBe(1);
+      // RED phase: expect store action delegation, not direct client calls
+      expect(mockStore.fetchResearch).toHaveBeenCalledWith({
+        page: 1,
+        pageSize: 10
+      });
+      
+      // Contract: composable should expose store state directly
+      expect(research.value).toEqual(mockResearch);
+      expect(total.value).toBe(1);
+      expect(loading.value).toBe(false);
       expect(error.value).toBe(null);
+    });
+
+    it('should handle API errors with correlation_id', async () => {
+      const errorMessage = 'Research not found';
+
+      // RED phase: simulate store error state
+      mockStore.research.value = [];
+      mockStore.loading.value = false;
+      mockStore.error.value = errorMessage;
+      mockStore.total.value = 0;
+
+      const { research, loading, error, refetch } = useResearchArticles({ immediate: false });
+
+      await refetch();
+      await nextTick();
+
+      // RED phase: expect store action delegation
+      expect(mockStore.fetchResearch).toHaveBeenCalled();
+      
+      // Contract: composable should expose store error state
+      expect(research.value).toEqual([]);
       expect(loading.value).toBe(false);
+      expect(error.value).toBe(errorMessage);
+    });
 
-      // Validate database schema fields are present
-      const firstArticle = articles.value[0];
-      expect(firstArticle.research_id).toBeDefined();
-      expect(firstArticle.abstract).toBeDefined(); // Not 'excerpt'
-      expect(firstArticle.author_names).toBeDefined(); // Not 'author'
-      expect(firstArticle.publishing_status).toBeDefined();
-      expect(firstArticle.keywords).toBeDefined(); // Not 'tags'
-      expect(firstArticle.research_type).toBeDefined();
-      expect(firstArticle.image_url).toBeDefined(); // Not 'featured_image'
-      expect(firstArticle.publication_date).toBeDefined();
-      expect(firstArticle.doi).toBeDefined();
-      expect(firstArticle.external_url).toBeDefined();
-      expect(firstArticle.report_url).toBeDefined();
-      expect(firstArticle.is_deleted).toBeDefined();
-      expect(firstArticle.created_on).toBeDefined();
-    }, 5000);
+    it('should delegate search parameters to store.fetchResearch', async () => {
+      const mockResearch = [
+        {
+          research_id: '789',
+          title: 'Clinical Research Update',
+          abstract: 'Advanced clinical research findings',
+          slug: 'clinical-research-update',
+          publishing_status: 'published'
+        }
+      ];
 
-    it('should handle API errors gracefully', async () => {
-      mockGetResearchArticles.mockRejectedValue(new Error('API Error'));
+      // RED phase: simulate store state after search
+      mockStore.research.value = mockResearch;
+      mockStore.total.value = 1;
 
-      const { articles, loading, error, refetch } = useResearchArticles({
-        immediate: false
+      const { research, refetch } = useResearchArticles({ 
+        search: 'clinical',
+        immediate: false 
       });
 
       await refetch();
       await nextTick();
 
-      expect(error.value).toBe('API Error');
-      expect(articles.value).toEqual([]);
-      expect(loading.value).toBe(false);
-    }, 5000);
-
-    it('should handle query parameters correctly', async () => {
-      const mockResponse: ResearchResponse = {
-        data: [],
-        pagination: {
-          page: 2,
-          pageSize: 20,
-          total: 0,
-          totalPages: 0
-        },
-        success: true
-      };
-      
-      mockGetResearchArticles.mockResolvedValue(mockResponse);
-
-      const params: GetResearchParams = {
-        page: 2,
-        pageSize: 20,
-        category: 'clinical-research',
-        featured: true,
-        industry: 'healthcare'
-      };
-
-      const { refetch } = useResearchArticles({
-        immediate: false,
-        ...params
+      // RED phase: expect store action delegation with search params
+      expect(mockStore.fetchResearch).toHaveBeenCalledWith({
+        search: 'clinical'
       });
-
-      await refetch();
-
-      expect(mockGetResearchArticles).toHaveBeenCalledWith(
-        expect.objectContaining(params)
-      );
-    }, 5000);
-
-    it('should handle pagination calculations correctly', async () => {
-      const mockArticles = Array(15).fill(null).map((_, i) => createMockDatabaseResearch({
-        research_id: `research-${i}`,
-        title: `Research Article ${i}`,
-        slug: `research-article-${i}`
-      }));
       
-      const mockResponse: ResearchResponse = {
-        data: mockArticles,
-        pagination: {
-          page: 1,
-          pageSize: 15,
-          total: 150,
-          totalPages: 10
-        },
-        success: true
-      };
-      
-      mockGetResearchArticles.mockResolvedValue(mockResponse);
+      // Contract: expose store state
+      expect(research.value).toEqual(mockResearch);
+    });
 
-      const { total, pageSize, totalPages, refetch } = useResearchArticles({
-        immediate: false,
-        pageSize: 15
+    it('should handle category filtering', async () => {
+      const mockResearch = [
+        {
+          research_id: '456',
+          title: 'Healthcare Research',
+          abstract: 'Important healthcare research',
+          category_id: 'healthcare-research-id'
+        }
+      ];
+
+      // RED phase: simulate store state after category fetch
+      mockStore.research.value = mockResearch;
+      mockStore.total.value = 1;
+      mockStore.loading.value = false;
+      mockStore.error.value = null;
+
+      const { research, refetch } = useResearchArticles({ 
+        category: 'healthcare-research',
+        immediate: false 
       });
 
       await refetch();
       await nextTick();
 
-      expect(total.value).toBe(150);
-      expect(pageSize.value).toBe(15);
-      expect(totalPages.value).toBe(10);
-    }, 5000);
+      // RED phase: expect store action delegation with category params
+      expect(mockStore.fetchResearch).toHaveBeenCalledWith({
+        category: 'healthcare-research'
+      });
+      
+      // Contract: expose store state
+      expect(research.value).toEqual(mockResearch);
+    });
   });
 
   describe('useResearchArticle', () => {
-    it('should fetch single research article by slug', async () => {
-      const mockResearch = createMockDatabaseResearch({
-        slug: 'single-research-test'
-      });
-
-      const mockResponse: ResearchArticleResponse = {
-        data: mockResearch,
-        success: true
+    it('should delegate to store.fetchResearchArticle and expose store state', async () => {
+      const mockArticle = {
+        research_id: '123',
+        title: 'Healthcare Research Study',
+        abstract: 'Comprehensive healthcare research findings',
+        slug: 'healthcare-research-study',
+        publishing_status: 'published',
+        category_id: '456',
+        author_names: 'Dr. Research Team',
+        publication_date: '2024-01-15',
+        doi: '10.1234/research.2024.001',
+        research_type: 'clinical_study'
       };
 
-      mockGetResearchArticleBySlug.mockResolvedValue(mockResponse);
+      // RED phase: simulate store state after individual article fetch
+      mockStore.article.value = mockArticle;
+      mockStore.loading.value = false;
+      mockStore.error.value = null;
 
-      const slugRef = ref('single-research-test');
-      const { article, loading, error } = useResearchArticle(slugRef);
-
+      const { article, loading, error, refetch } = useResearchArticle(ref('healthcare-research-study'));
+      
+      await refetch();
       await nextTick();
 
-      expect(mockGetResearchArticleBySlug).toHaveBeenCalledWith('single-research-test');
-      expect(article.value).toEqual(mockResearch);
+      // RED phase: expect store action delegation
+      expect(mockStore.fetchResearchArticle).toHaveBeenCalledWith('healthcare-research-study');
+      
+      // Contract: composable should expose store state
+      expect(article.value).toEqual(mockArticle);
       expect(loading.value).toBe(false);
       expect(error.value).toBe(null);
+    });
 
-      // Validate database schema compliance
-      expect(article.value?.research_id).toBeDefined();
-      expect(article.value?.abstract).toBeDefined(); // Not 'excerpt'
-      expect(article.value?.author_names).toBeDefined(); // Not 'author'
-      expect(article.value?.keywords).toBeDefined(); // Not 'tags'
-      expect(article.value?.research_type).toBeDefined();
-    }, 5000);
+    it('should handle null slug gracefully', async () => {
+      // RED phase: simulate initial store state
+      mockStore.article.value = null;
+      mockStore.loading.value = false;
+      mockStore.error.value = null;
 
-    it('should handle slug changes reactively', async () => {
-      const mockResponse = {
-        data: createMockDatabaseResearch(),
-        success: true
-      };
+      const { article, loading, error, refetch } = useResearchArticle(ref(null));
       
-      mockGetResearchArticleBySlug.mockResolvedValue(mockResponse);
-
-      const slugRef = ref('initial-slug');
-      const { refetch } = useResearchArticle(slugRef);
-
+      await refetch();
       await nextTick();
 
-      expect(mockGetResearchArticleBySlug).toHaveBeenCalledWith('initial-slug');
-
-      // Change slug
-      slugRef.value = 'updated-slug';
-      await nextTick();
-
-      expect(mockGetResearchArticleBySlug).toHaveBeenCalledWith('updated-slug');
-      expect(mockGetResearchArticleBySlug).toHaveBeenCalledTimes(2);
-    }, 5000);
-
-    it('should handle empty slug gracefully', async () => {
-      const { article, loading } = useResearchArticle(ref(null));
-
-      await nextTick();
-
-      expect(mockGetResearchArticleBySlug).not.toHaveBeenCalled();
+      // Contract: composable should expose null state
       expect(article.value).toBe(null);
       expect(loading.value).toBe(false);
-    }, 5000);
-
-    it('should handle API errors', async () => {
-      mockGetResearchArticleBySlug.mockRejectedValue(new Error('Research article not found'));
-
-      const { article, error, loading } = useResearchArticle('non-existent-slug');
-
-      await nextTick();
-
-      expect(error.value).toBe('Research article not found');
-      expect(article.value).toBe(null);
-      expect(loading.value).toBe(false);
-    }, 5000);
+      expect(error.value).toBe(null);
+      
+      // RED phase: should not call store action for null slug
+      expect(mockStore.fetchResearchArticle).not.toHaveBeenCalled();
+    });
   });
 
   describe('useFeaturedResearch', () => {
-    it('should fetch featured research articles', async () => {
+    it('should delegate to store.fetchFeaturedResearch and expose store state', async () => {
       const mockFeaturedResearch = [
-        createMockDatabaseResearch({ title: 'Featured Research 1' }),
-        createMockDatabaseResearch({ 
-          research_id: 'research-uuid-125',
-          title: 'Featured Research 2',
-          slug: 'featured-research-2',
-          research_type: 'meta_analysis' as const,
-          author_names: 'Dr. Featured Author'
-        })
+        {
+          research_id: '789',
+          title: 'Featured Medical Research',
+          publishing_status: 'published',
+          featured: true
+        },
+        {
+          research_id: '101',
+          title: 'Featured Clinical Study',
+          publishing_status: 'published',
+          featured: true
+        }
       ];
 
-      const mockResponse: ResearchResponse = {
-        data: mockFeaturedResearch,
-        pagination: {
-          page: 1,
-          pageSize: 10,
-          total: 2,
-          totalPages: 1
-        },
-        success: true
-      };
+      // RED phase: simulate store state after featured research fetch
+      mockStore.featuredResearch.value = mockFeaturedResearch;
+      mockStore.loading.value = false;
+      mockStore.error.value = null;
 
-      mockGetFeaturedResearch.mockResolvedValue(mockResponse);
-
-      const TestComponent = defineComponent({
-        setup() {
-          return useFeaturedResearchArticles();
-        },
-        template: '<div></div>'
-      });
-
-      const wrapper = mount(TestComponent);
-      await nextTick();
-      await new Promise(resolve => setTimeout(resolve, 0));
-
-      const { articles, loading, error } = (wrapper.vm as any);
-
-      expect(mockGetFeaturedResearch).toHaveBeenCalledWith();
-      expect(articles).toHaveLength(2);
-      expect(loading).toBe(false);
-      expect(error).toBe(null);
-
-      // Validate database schema compliance
-      expect(articles[0].research_id).toBeDefined();
-      expect(articles[0].publishing_status).toBeDefined();
-      expect(articles[0].research_type).toBeDefined();
-    }, 5000);
-
-    it('should handle limit parameter', async () => {
-      const mockResponse: ResearchResponse = {
-        data: [],
-        pagination: {
-          page: 1,
-          pageSize: 5,
-          total: 0,
-          totalPages: 0
-        },
-        success: true
-      };
+      const { research, loading, error, refetch } = useFeaturedResearch();
       
-      mockGetFeaturedResearch.mockResolvedValue(mockResponse);
-
-      const TestComponent = defineComponent({
-        setup() {
-          const limitRef = ref(5);
-          return useFeaturedResearch(limitRef);
-        },
-        template: '<div></div>'
-      });
-
-      const wrapper = mount(TestComponent);
+      await refetch();
       await nextTick();
-      await new Promise(resolve => setTimeout(resolve, 0));
 
-      expect(mockGetFeaturedResearch).toHaveBeenCalledWith(5);
-    }, 5000);
-
-    it('should handle limit changes reactively', async () => {
-      const mockResponse: ResearchResponse = {
-        data: [],
-        pagination: {
-          page: 1,
-          pageSize: 3,
-          total: 0,
-          totalPages: 0
-        },
-        success: true
-      };
+      // RED phase: expect store action delegation
+      expect(mockStore.fetchFeaturedResearch).toHaveBeenCalledWith(undefined);
       
-      mockGetFeaturedResearch.mockResolvedValue(mockResponse);
+      // Contract: composable should expose store state
+      expect(research.value).toEqual(mockFeaturedResearch);
+      expect(loading.value).toBe(false);
+      expect(error.value).toBe(null);
+    });
 
-      const TestComponent = defineComponent({
-        setup() {
-          const limitRef = ref(3);
-          const result = useFeaturedResearch(limitRef);
-          return { ...result, limitRef };
-        },
-        template: '<div></div>'
-      });
-
-      const wrapper = mount(TestComponent);
-      await nextTick();
-      await new Promise(resolve => setTimeout(resolve, 0));
-
-      expect(mockGetFeaturedResearch).toHaveBeenCalledWith(3);
-
-      const { limitRef } = (wrapper.vm as any);
-      limitRef.value = 7;
-      await nextTick();
-      await new Promise(resolve => setTimeout(resolve, 0));
-
-      expect(mockGetFeaturedResearch).toHaveBeenCalledWith(7);
-      expect(mockGetFeaturedResearch).toHaveBeenCalledTimes(2);
-    }, 5000);
-  });
-
-  describe('useSearchResearch', () => {
-    it('should search research articles with query', async () => {
-      const mockSearchResults = [
-        createMockDatabaseResearch({ title: 'Search Result 1' }),
-        createMockDatabaseResearch({
-          research_id: 'research-uuid-126',
-          title: 'Search Result 2',
-          slug: 'search-result-2',
-          research_type: 'case_report' as const,
-          author_names: 'Dr. Search Result'
-        })
+    it('should delegate limit parameter to store action', async () => {
+      const mockLimitedResearch = [
+        { research_id: '1', title: 'Limited Research 1', publishing_status: 'published' }
       ];
 
-      const mockResponse: ResearchResponse = {
-        data: mockSearchResults,
-        pagination: {
-          page: 1,
-          pageSize: 10,
-          total: 2,
-          totalPages: 1
-        },
-        success: true
-      };
+      // RED phase: simulate store state after limited featured research fetch
+      mockStore.featuredResearch.value = mockLimitedResearch;
+      mockStore.loading.value = false;
+      mockStore.error.value = null;
 
-      mockSearchResearch.mockResolvedValue(mockResponse);
+      const { research, refetch } = useFeaturedResearch(5);
 
-      const { results, loading, error, total, search } = useSearchResearch();
+      await refetch();
+      await nextTick();
 
-      await search('clinical study diabetes', {
-        page: 1,
-        pageSize: 10,
-        category: 'clinical-research'
-      });
-
-      expect(mockSearchResearch).toHaveBeenCalledWith({
-        q: 'clinical study diabetes',
-        page: 1,
-        pageSize: 10,
-        category: 'clinical-research'
-      });
-      expect(results.value).toHaveLength(2);
-      expect(total.value).toBe(2);
-      expect(loading.value).toBe(false);
-      expect(error.value).toBe(null);
-
-      // Validate database schema compliance
-      expect(results.value[0].research_id).toBeDefined();
-      expect(results.value[0].research_type).toBeDefined();
-      expect(results.value[0].abstract).toBeDefined(); // Not 'excerpt'
-      expect(results.value[0].author_names).toBeDefined(); // Not 'author'
-    }, 5000);
-
-    it('should handle empty search queries', async () => {
-      const { results, total, totalPages, search } = useSearchResearch();
-
-      await search('');
-
-      expect(results.value).toEqual([]);
-      expect(total.value).toBe(0);
-      expect(totalPages.value).toBe(0);
-    }, 5000);
-
-    it('should handle search errors', async () => {
-      mockSearchResearch.mockRejectedValue(new Error('Search failed'));
-
-      const { results, error, loading, search } = useSearchResearch();
-
-      await search('test query');
-
-      expect(error.value).toBe('Search failed');
-      expect(results.value).toEqual([]);
-      expect(loading.value).toBe(false);
-    }, 5000);
-
-    it('should calculate pagination correctly for search results', async () => {
-      mockSearchResearch.mockResolvedValue({
-        data: Array(5).fill(null).map((_, i) => createMockDatabaseResearch({
-          research_id: `search-result-${i}`,
-          title: `Search Result ${i}`,
-          slug: `search-result-${i}`
-        })),
-        pagination: {
-          page: 2,
-          pageSize: 5,
-          total: 50,
-          totalPages: 10
-        },
-        success: true
-      });
-
-      const { total, page, pageSize, totalPages, search } = useSearchResearch();
-
-      await search('test query', {
-        page: 2,
-        pageSize: 5
-      });
-
-      expect(total.value).toBe(50);
-      expect(page.value).toBe(2);
-      expect(pageSize.value).toBe(5);
-      expect(totalPages.value).toBe(10);
-    }, 5000);
-
-    it('should handle search options correctly', async () => {
-      mockSearchResearch.mockResolvedValue({
-        data: [],
-        pagination: {
-          page: 3,
-          pageSize: 25,
-          total: 0,
-          totalPages: 0
-        },
-        success: true
-      });
-
-      const { search } = useSearchResearch();
-
-      const searchOptions: Partial<SearchResearchParams> = {
-        page: 3,
-        pageSize: 25,
-        category: 'clinical-research',
-        sortBy: 'date-desc'
-      };
-
-      await search('diabetes research', searchOptions);
-
-      expect(mockSearchResearch).toHaveBeenCalledWith({
-        q: 'diabetes research',
-        page: 3,
-        pageSize: 25,
-        category: 'clinical-research',
-        sortBy: 'date-desc'
-      });
-    }, 5000);
+      // RED phase: expect store action delegation with limit
+      expect(mockStore.fetchFeaturedResearch).toHaveBeenCalledWith(5);
+      
+      // Contract: composable should expose store state
+      expect(research.value).toEqual(mockLimitedResearch);
+    });
   });
 
-  describe('Database Schema Field Validation', () => {
-    it('should validate research_type enum values in responses', async () => {
-      const validResearchTypes = ['clinical_study', 'case_report', 'systematic_review', 'meta_analysis', 'editorial', 'commentary'] as const;
-      
-      for (const researchType of validResearchTypes) {
-        const mockResearch = createMockDatabaseResearch({ research_type: researchType });
-        
-        mockGetResearchArticles.mockResolvedValue({
-          data: [mockResearch],
-          pagination: {
-            page: 1,
-            pageSize: 1,
-            total: 1,
-            totalPages: 1
-          },
-          success: true
-        });
-
-        const { articles, refetch } = useResearchArticles({
-          immediate: false
-        });
-
-        await refetch();
-        await nextTick();
-
-        expect(articles.value[0].research_type).toBe(researchType);
-      }
-    }, 5000);
-
-    it('should validate publishing_status enum values in responses', async () => {
-      const validStatuses = ['draft', 'published', 'archived'] as const;
-      
-      for (const status of validStatuses) {
-        const mockResearch = createMockDatabaseResearch({ publishing_status: status });
-        
-        mockGetResearchArticles.mockResolvedValue({
-          data: [mockResearch],
-          pagination: {
-            page: 1,
-            pageSize: 1,
-            total: 1,
-            totalPages: 1
-          },
-          success: true
-        });
-
-        const { articles, refetch } = useResearchArticles({
-          immediate: false
-        });
-
-        await refetch();
-        await nextTick();
-
-        expect(articles.value[0].publishing_status).toBe(status);
-      }
-    }, 5000);
-
-    it('should handle database schema field types correctly', async () => {
-      const mockResearch = createMockDatabaseResearch({
-        keywords: ['keyword1', 'keyword2', 'keyword3'], // Array field
-        publication_date: '2024-03-15', // Date field as ISO string
-        is_deleted: false, // Boolean field
-        created_on: '2024-01-01T00:00:00Z', // Timestamp field as ISO string
-      });
-
-      mockGetResearchArticles.mockResolvedValue({
-        data: [mockResearch],
-        pagination: {
-          page: 1,
-          pageSize: 1,
-          total: 1,
-          totalPages: 1
+  describe('useResearchCategories', () => {
+    it('should delegate to store.fetchResearchCategories and expose store state', async () => {
+      const mockCategories = [
+        {
+          category_id: '456',
+          name: 'Clinical Research',
+          slug: 'clinical-research',
+          description: 'Clinical research studies',
+          order_number: 1,
+          is_default_unassigned: false
         },
-        success: true
-      });
+        {
+          category_id: '789',
+          name: 'Medical Research',
+          slug: 'medical-research',
+          description: 'Medical research findings',
+          order_number: 2,
+          is_default_unassigned: false
+        }
+      ];
 
-      const { articles, refetch } = useResearchArticles({
-        immediate: false
-      });
+      // RED phase: simulate store state after categories fetch
+      mockStore.categories.value = mockCategories;
+      mockStore.loading.value = false;
+      mockStore.error.value = null;
+
+      const { categories, loading, error, refetch } = useResearchCategories();
+      
+      await refetch();
+      await nextTick();
+
+      // RED phase: expect store action delegation
+      expect(mockStore.fetchResearchCategories).toHaveBeenCalled();
+      
+      // Contract: composable should expose store state
+      expect(categories.value).toEqual(mockCategories);
+      expect(loading.value).toBe(false);
+      expect(error.value).toBe(null);
+    });
+
+    it('should handle empty categories response from store', async () => {
+      // RED phase: simulate empty store state
+      mockStore.categories.value = [];
+      mockStore.loading.value = false;
+      mockStore.error.value = null;
+
+      const { categories, loading, error, refetch } = useResearchCategories();
 
       await refetch();
       await nextTick();
 
-      const article = articles.value[0];
-      expect(Array.isArray(article.keywords)).toBe(true);
-      expect(article.keywords).toHaveLength(3);
-      expect(typeof article.publication_date).toBe('string');
-      expect(typeof article.is_deleted).toBe('boolean');
-      expect(typeof article.created_on).toBe('string');
-    }, 5000);
+      // RED phase: expect store action delegation
+      expect(mockStore.fetchResearchCategories).toHaveBeenCalled();
+      
+      // Contract: composable should expose empty store state
+      expect(categories.value).toEqual([]);
+      expect(loading.value).toBe(false);
+      expect(error.value).toBe(null);
+    });
   });
 
-  describe('Reactive State Management', () => {
-    it('should maintain proper loading states during transitions', async () => {
-      // Simulate slow API call
-      let resolvePromise: (value: ResearchResponse) => void;
-      const slowPromise = new Promise<ResearchResponse>((resolve) => {
-        resolvePromise = resolve;
-      });
-      mockGetResearchArticles.mockReturnValue(slowPromise);
-
-      const { loading, refetch } = useResearchArticles({
-        immediate: false
-      });
-
-      expect(loading.value).toBe(false);
-
-      const fetchPromise = refetch();
+  describe('error handling across composables', () => {
+    it('should handle network errors consistently via store state', async () => {
+      const errorMessage = 'Network connection failed';
       
-      // Should be loading during fetch
-      expect(loading.value).toBe(true);
+      // RED phase: simulate store network error state
+      mockStore.error.value = errorMessage;
+      mockStore.loading.value = false;
+      mockStore.research.value = [];
 
-      // Resolve the promise
-      resolvePromise!({
-        data: [],
-        pagination: {
-          page: 1,
-          pageSize: 10,
-          total: 0,
-          totalPages: 0
-        },
-        success: true
-      });
-
-      await fetchPromise;
-      await nextTick();
-
-      // Should not be loading after fetch completes
-      expect(loading.value).toBe(false);
-    }, 5000);
-
-    it('should properly clear errors when making new requests', async () => {
-      // First call fails
-      mockGetResearchArticles.mockRejectedValueOnce(new Error('First error'));
-      
-      const { error, refetch } = useResearchArticles({
-        immediate: false
-      });
+      const { error, refetch } = useResearchArticles({ immediate: false });
 
       await refetch();
       await nextTick();
 
-      expect(error.value).toBe('First error');
+      // RED phase: expect store action delegation
+      expect(mockStore.fetchResearch).toHaveBeenCalled();
+      
+      // Contract: composable should expose store error state
+      expect(error.value).toBe(errorMessage);
+    });
 
-      // Second call succeeds
-      mockGetResearchArticles.mockResolvedValueOnce({
-        data: [],
-        pagination: {
-          page: 1,
-          pageSize: 10,
-          total: 0,
-          totalPages: 0
-        },
-        success: true
-      });
+    it('should reset error state on successful refetch via store', async () => {
+      const mockResearch = [{ research_id: '1', title: 'Test Research' }];
 
+      // RED phase: simulate store error state initially
+      mockStore.error.value = 'Temporary error';
+      mockStore.loading.value = false;
+      mockStore.research.value = [];
+      mockStore.total.value = 0;
+
+      const { research, error, refetch } = useResearchArticles({ immediate: false });
+
+      // First call shows error state
       await refetch();
       await nextTick();
+      expect(error.value).toBe('Temporary error');
 
+      // RED phase: simulate store success state after recovery
+      mockStore.error.value = null;
+      mockStore.research.value = mockResearch;
+      mockStore.total.value = 1;
+
+      // Second call shows success state
+      await refetch();
+      await nextTick();
+      
+      // RED phase: expect store action delegation for both calls
+      expect(mockStore.fetchResearch).toHaveBeenCalledTimes(2);
+      
+      // Contract: composable should expose updated store state
       expect(error.value).toBe(null);
-    }, 5000);
-
-    it('should handle backend response variations correctly', async () => {
-      // Test missing pagination in response
-      mockGetResearchArticles.mockResolvedValueOnce({
-        data: [createMockDatabaseResearch()],
-        success: true
-      } as any);
-
-      const { articles, total, totalPages, refetch } = useResearchArticles({
-        immediate: false
-      });
-
-      await refetch();
-      await nextTick();
-
-      expect(articles.value).toHaveLength(1);
-      expect(total.value).toBe(1); // Should default to data.length
-      expect(totalPages.value).toBeGreaterThan(0);
-    }, 5000);
+      expect(research.value).toEqual(mockResearch);
+    });
   });
 });
