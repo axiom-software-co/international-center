@@ -4,6 +4,24 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ResearchRestClient } from './ResearchRestClient';
 import type { ResearchArticle, ResearchResponse, ResearchArticleResponse, GetResearchParams, SearchResearchParams } from './types';
+import { mockFetch } from '../../../test/setup';
+
+// Simple mock response helper for this test file
+const createMockResponse = (data: any, status = 200, ok = true) => {
+  const statusText = status === 200 ? 'OK' :
+                     status === 400 ? 'Bad Request' :
+                     status === 404 ? 'Not Found' :
+                     status === 429 ? 'Too Many Requests' :
+                     status === 500 ? 'Internal Server Error' : 'Unknown';
+  
+  return {
+    ok,
+    status,
+    statusText,
+    headers: { get: () => 'application/json' },
+    json: () => Promise.resolve(data)
+  };
+};
 
 // Database schema validation - ResearchArticle interface must match TABLES-RESEARCH.md exactly
 interface DatabaseSchemaResearch {
@@ -46,12 +64,13 @@ interface DatabaseSchemaResearch {
 
 describe('ResearchRestClient', () => {
   let client: ResearchRestClient;
-  let mockFetch: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
-    mockFetch = vi.fn();
-    global.fetch = mockFetch;
     client = new ResearchRestClient();
+    
+    // Ensure completely clean mock state for each test
+    mockFetch.mockReset();
+    mockFetch.mockClear();
   });
 
   afterEach(() => {
@@ -157,10 +176,7 @@ describe('ResearchRestClient', () => {
         success: true
       };
 
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => mockResponse,
-      });
+      mockFetch.mockResolvedValueOnce(createMockResponse(mockResponse));
 
       const params: GetResearchParams = {
         page: 1,
@@ -193,10 +209,7 @@ describe('ResearchRestClient', () => {
         success: true
       };
 
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => mockResponse,
-      });
+      mockFetch.mockResolvedValueOnce(createMockResponse(mockResponse));
 
       const result = await client.getResearchArticles();
 
@@ -246,10 +259,7 @@ describe('ResearchRestClient', () => {
         success: true
       };
 
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => mockResponse,
-      });
+      mockFetch.mockResolvedValueOnce(createMockResponse(mockResponse));
 
       const result = await client.getResearchArticles();
       
@@ -292,10 +302,7 @@ describe('ResearchRestClient', () => {
         success: true
       };
 
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => mockResponse,
-      });
+      mockFetch.mockResolvedValueOnce(createMockResponse(mockResponse));
 
       const result = await client.getResearchArticleBySlug('slug-research-article');
 
@@ -321,10 +328,7 @@ describe('ResearchRestClient', () => {
         success: true
       };
 
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => mockResponse,
-      });
+      mockFetch.mockResolvedValueOnce(createMockResponse(mockResponse));
 
       await client.getResearchArticleBySlug('research with spaces & special chars');
 
@@ -342,10 +346,7 @@ describe('ResearchRestClient', () => {
         success: true
       };
 
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => mockResponse,
-      });
+      mockFetch.mockResolvedValueOnce(createMockResponse(mockResponse));
 
       await client.getResearchArticleById('research-uuid-123');
 
@@ -375,10 +376,7 @@ describe('ResearchRestClient', () => {
         success: true
       };
 
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => mockResponse,
-      });
+      mockFetch.mockResolvedValueOnce(createMockResponse(mockResponse));
 
       await client.getFeaturedResearch();
 
@@ -402,10 +400,7 @@ describe('ResearchRestClient', () => {
         success: true
       };
 
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => mockResponse,
-      });
+      mockFetch.mockResolvedValueOnce(createMockResponse(mockResponse));
 
       await client.getFeaturedResearch(5);
 
@@ -431,10 +426,7 @@ describe('ResearchRestClient', () => {
         success: true
       };
 
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => mockResponse,
-      });
+      mockFetch.mockResolvedValueOnce(createMockResponse(mockResponse));
 
       const params: SearchResearchParams = {
         q: 'clinical study diabetes',
@@ -465,10 +457,7 @@ describe('ResearchRestClient', () => {
         success: true
       };
 
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => mockResponse,
-      });
+      mockFetch.mockResolvedValueOnce(createMockResponse(mockResponse));
 
       await client.searchResearch({ q: 'research with special & chars' });
 
@@ -492,10 +481,7 @@ describe('ResearchRestClient', () => {
         success: true
       };
 
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => mockResponse,
-      });
+      mockFetch.mockResolvedValueOnce(createMockResponse(mockResponse));
 
       await client.getRecentResearch();
 
@@ -519,10 +505,7 @@ describe('ResearchRestClient', () => {
         success: true
       };
 
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => mockResponse,
-      });
+      mockFetch.mockResolvedValueOnce(createMockResponse(mockResponse));
 
       await client.getRecentResearch(10);
 
@@ -548,10 +531,7 @@ describe('ResearchRestClient', () => {
         success: true
       };
 
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => mockResponse,
-      });
+      mockFetch.mockResolvedValueOnce(createMockResponse(mockResponse));
 
       await client.getResearchByCategory('clinical-research');
 
@@ -579,10 +559,7 @@ describe('ResearchRestClient', () => {
         success: true
       };
 
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => mockResponse,
-      });
+      mockFetch.mockResolvedValueOnce(createMockResponse(mockResponse));
 
       await client.getResearchByCategory('medical research studies');
 
@@ -606,10 +583,7 @@ describe('ResearchRestClient', () => {
         success: true
       };
 
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => mockResponse,
-      });
+      mockFetch.mockResolvedValueOnce(createMockResponse(mockResponse));
 
       await client.getResearchByIndustry('healthcare');
 
@@ -637,10 +611,7 @@ describe('ResearchRestClient', () => {
         success: true
       };
 
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => mockResponse,
-      });
+      mockFetch.mockResolvedValueOnce(createMockResponse(mockResponse));
 
       await client.getResearchByIndustry('healthcare', {
         page: 2,
@@ -659,28 +630,35 @@ describe('ResearchRestClient', () => {
 
   describe('Error Handling', () => {
     it('should handle network errors', async () => {
-      mockFetch.mockRejectedValueOnce(new Error('Network error'));
+      const networkError = new Error('Network error');
+      networkError.name = 'NetworkError';
+      mockFetch.mockRejectedValue(networkError);
 
       await expect(client.getResearchArticles()).rejects.toThrow('Network error');
     }, 5000);
 
     it('should handle HTTP error responses', async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: false,
-        status: 404,
-        statusText: 'Not Found'
-      });
+      const errorData = {
+        error: {
+          code: 'NOT_FOUND',
+          message: 'Research articles not found',
+          correlation_id: 'error-404-research'
+        }
+      };
+      
+      mockFetch.mockResolvedValueOnce(createMockResponse(errorData, 404, false));
 
       await expect(client.getResearchArticles()).rejects.toThrow();
     }, 5000);
 
     it('should handle malformed JSON responses', async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => { throw new Error('Invalid JSON'); }
-      });
+      const malformedResponse = createMockResponse(null, 200, true);
+      // Override the json method to simulate parsing error
+      malformedResponse.json = vi.fn().mockRejectedValue(new Error('Invalid JSON'));
+      
+      mockFetch.mockResolvedValueOnce(malformedResponse);
 
-      await expect(client.getResearchArticles()).rejects.toThrow();
+      await expect(client.getResearchArticles()).rejects.toThrow('Invalid JSON');
     }, 5000);
   });
 });

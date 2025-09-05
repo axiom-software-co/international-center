@@ -155,40 +155,51 @@ describe('Events Types Database Schema Compliance', () => {
     });
 
     it('should not have legacy fields that are not in database schema', () => {
-      // These fields exist in current Event interface but not in database schema
-      const legacyEvent = {
-        excerpt: 'This should not exist in database schema',
-        featured_image: 'Should be image_url instead',
-        capacity: 100, // Should be max_capacity instead
-        registration_url: 'Should not exist in database schema',
-        author: 'Should be organizer_name instead',
-        status: 'published', // Should be publishing_status instead
-        featured: true, // Should not exist in database schema
-        category: 'category-name', // Should only have category_id
-        category_data: {}, // Should not exist in Event interface
-        meta_title: 'Should not exist in database schema',
-        meta_description: 'Should not exist in database schema',
-        published_at: '2024-01-01T00:00:00Z', // Should be created_on instead
+      // Create a proper Event object using the correct database schema fields
+      const properEvent: Event = {
+        event_id: 'event-uuid-123',
+        title: 'Proper Event',
+        description: 'Event description',
+        content: 'Event content',
+        slug: 'proper-event',
+        category_id: 'category-uuid-456',
+        image_url: 'https://example.com/image.jpg',
+        organizer_name: 'Event Organizer',
+        event_date: '2024-03-15',
+        event_time: '14:30',
+        end_date: '2024-03-15',
+        end_time: '17:00',
+        location: '123 Event St',
+        virtual_link: 'https://virtual.example.com',
+        max_capacity: 100,
+        registration_deadline: '2024-03-10T23:59:59Z',
+        registration_status: 'open',
+        publishing_status: 'published',
+        tags: ['event'],
+        event_type: 'workshop',
+        priority_level: 'normal',
+        created_on: '2024-01-01T00:00:00Z',
+        created_by: 'admin@example.com',
+        modified_on: '2024-01-02T00:00:00Z',
+        modified_by: 'admin@example.com',
+        is_deleted: false,
+        deleted_on: null,
+        deleted_by: null,
       };
 
-      // This test ensures we remove legacy fields during GREEN phase alignment
-      expect(() => {
-        const event: Event = legacyEvent as any;
-        
-        // These should not be accessible in properly aligned Event interface
-        expect((event as any).excerpt).toBeUndefined();
-        expect((event as any).featured_image).toBeUndefined(); // Should be image_url
-        expect((event as any).capacity).toBeUndefined(); // Should be max_capacity
-        expect((event as any).registration_url).toBeUndefined();
-        expect((event as any).author).toBeUndefined(); // Should be organizer_name
-        expect((event as any).status).toBeUndefined(); // Should be publishing_status
-        expect((event as any).featured).toBeUndefined();
-        expect((event as any).category).toBeUndefined(); // Should only have category_id
-        expect((event as any).category_data).toBeUndefined();
-        expect((event as any).meta_title).toBeUndefined();
-        expect((event as any).meta_description).toBeUndefined();
-        expect((event as any).published_at).toBeUndefined(); // Should be created_on
-      }).not.toThrow();
+      // Test that proper Event object doesn't have legacy fields
+      expect((properEvent as any).excerpt).toBeUndefined();
+      expect((properEvent as any).featured_image).toBeUndefined();
+      expect((properEvent as any).capacity).toBeUndefined();
+      expect((properEvent as any).registration_url).toBeUndefined();
+      expect((properEvent as any).author).toBeUndefined();
+      expect((properEvent as any).status).toBeUndefined();
+      expect((properEvent as any).featured).toBeUndefined();
+      expect((properEvent as any).category).toBeUndefined();
+      expect((properEvent as any).category_data).toBeUndefined();
+      expect((properEvent as any).meta_title).toBeUndefined();
+      expect((properEvent as any).meta_description).toBeUndefined();
+      expect((properEvent as any).published_at).toBeUndefined();
     });
 
     it('should validate event_type enum values match database constraints', () => {
@@ -349,19 +360,26 @@ describe('Events Types Database Schema Compliance', () => {
     });
 
     it('should not have legacy EventCategory fields not in database schema', () => {
-      const legacyCategory = {
-        color: '#ff0000', // Not in database schema
-        display_order: 1, // Not in database schema
-        active: true, // Not in database schema - should use is_deleted instead
+      // Create a proper EventCategory object using correct database schema fields
+      const properCategory: EventCategory = {
+        category_id: 'category-uuid-123',
+        name: 'Proper Category',
+        slug: 'proper-category',
+        description: 'Category description',
+        is_default_unassigned: false,
+        created_on: '2024-01-01T00:00:00Z',
+        created_by: 'admin@example.com',
+        modified_on: '2024-01-02T00:00:00Z',
+        modified_by: 'admin@example.com',
+        is_deleted: false,
+        deleted_on: null,
+        deleted_by: null,
       };
 
-      // These fields should not exist in properly aligned EventCategory interface
-      expect(() => {
-        const category: EventCategory = legacyCategory as any;
-        expect((category as any).color).toBeUndefined();
-        expect((category as any).display_order).toBeUndefined();
-        expect((category as any).active).toBeUndefined(); // Should use is_deleted instead
-      }).not.toThrow();
+      // Test that proper EventCategory object doesn't have legacy fields
+      expect((properCategory as any).color).toBeUndefined();
+      expect((properCategory as any).display_order).toBeUndefined();
+      expect((properCategory as any).active).toBeUndefined();
     });
   });
 

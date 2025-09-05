@@ -5,13 +5,17 @@ import (
 
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi/config"
+	"github.com/pulumi/pulumi-docker/sdk/v4/go/docker"
+	"github.com/pulumi/pulumi-command/sdk/go/command/local"
 )
 
 // ServicesOutputs represents the outputs from services component
 type ServicesOutputs struct {
 	DeploymentType        pulumi.StringOutput
-	APIServices           pulumi.MapOutput
+	InquiriesServices     pulumi.MapOutput
+	ContentServices       pulumi.MapOutput
 	GatewayServices       pulumi.MapOutput
+	APIServices           pulumi.MapOutput // Kept for backward compatibility with staging/production
 	PublicGatewayURL      pulumi.StringOutput
 	AdminGatewayURL       pulumi.StringOutput
 	HealthCheckEnabled    pulumi.BoolOutput
@@ -36,13 +40,10 @@ func DeployServices(ctx *pulumi.Context, cfg *config.Config, environment string)
 	}
 }
 
-// deployDevelopmentServices deploys local containers for development
+// deployDevelopmentServices deploys Podman containers for development
 func deployDevelopmentServices(ctx *pulumi.Context, cfg *config.Config) (*ServicesOutputs, error) {
-	// For development, we use local Docker containers
-	// In a real implementation, this would create docker container resources
-	// For now, we'll return the expected outputs for testing
-
-	deploymentType := pulumi.String("containers").ToStringOutput()
+	// For development, we use Podman containers
+	deploymentType := pulumi.String("podman_containers").ToStringOutput()
 	healthCheckEnabled := pulumi.Bool(true).ToBoolOutput()
 	daprSidecarEnabled := pulumi.Bool(true).ToBoolOutput()
 	observabilityEnabled := pulumi.Bool(true).ToBoolOutput()
@@ -52,78 +53,118 @@ func deployDevelopmentServices(ctx *pulumi.Context, cfg *config.Config) (*Servic
 	publicGatewayURL := pulumi.String("http://127.0.0.1:9001").ToStringOutput()
 	adminGatewayURL := pulumi.String("http://127.0.0.1:9000").ToStringOutput()
 
-	// Configure API services
-	apiServices := pulumi.Map{
-		"business": pulumi.Map{
-			"image":        pulumi.String("backend/business:latest"),
-			"port":         pulumi.Int(8080),
-			"health_check": pulumi.String("/health"),
-			"dapr_app_id":  pulumi.String("business-api"),
-		},
-		"donations": pulumi.Map{
-			"image":        pulumi.String("backend/donations:latest"),
-			"port":         pulumi.Int(8081),
-			"health_check": pulumi.String("/health"),
-			"dapr_app_id":  pulumi.String("donations-api"),
-		},
-		"events": pulumi.Map{
-			"image":        pulumi.String("backend/events:latest"),
-			"port":         pulumi.Int(8082),
-			"health_check": pulumi.String("/health"),
-			"dapr_app_id":  pulumi.String("events-api"),
-		},
-		"media": pulumi.Map{
-			"image":        pulumi.String("backend/media:latest"),
-			"port":         pulumi.Int(8083),
-			"health_check": pulumi.String("/health"),
-			"dapr_app_id":  pulumi.String("media-api"),
-		},
-		"news": pulumi.Map{
-			"image":        pulumi.String("backend/news:latest"),
-			"port":         pulumi.Int(8084),
-			"health_check": pulumi.String("/health"),
-			"dapr_app_id":  pulumi.String("news-api"),
-		},
-		"research": pulumi.Map{
-			"image":        pulumi.String("backend/research:latest"),
-			"port":         pulumi.Int(8085),
-			"health_check": pulumi.String("/health"),
-			"dapr_app_id":  pulumi.String("research-api"),
-		},
-		"services": pulumi.Map{
-			"image":        pulumi.String("backend/services:latest"),
-			"port":         pulumi.Int(8086),
-			"health_check": pulumi.String("/health"),
-			"dapr_app_id":  pulumi.String("services-api"),
-		},
-		"volunteers": pulumi.Map{
-			"image":        pulumi.String("backend/volunteers:latest"),
-			"port":         pulumi.Int(8087),
-			"health_check": pulumi.String("/health"),
-			"dapr_app_id":  pulumi.String("volunteers-api"),
-		},
+	// Deploy inquiries services containers (media, donations, volunteers, business)
+	inquiriesServices := pulumi.Map{}
+	inquiriesServiceNames := []string{"media", "donations", "volunteers", "business"}
+	for i, serviceName := range inquiriesServiceNames {
+		basePort := 8080 + i
+		
+		// Create Podman container using Command provider for each inquiries service
+		containerCmd, err := local.NewCommand(ctx, fmt.Sprintf("%s-container", serviceName), &local.CommandArgs{
+			Create: pulumi.Sprintf("podman run -d --name %s-dev -p %d:%d -e DAPR_HTTP_PORT=3500 -e DAPR_GRPC_PORT=%d backend/%s:latest", serviceName, basePort, basePort, 50001+i, serviceName),
+			Delete: pulumi.Sprintf("podman rm -f %s-dev", serviceName),
+		})
+		if err != nil {
+			return nil, err
+		}
+		
+		// Create Dapr sidecar for each inquiries service
+		daprCmd, err := local.NewCommand(ctx, fmt.Sprintf("%s-dapr-sidecar", serviceName), &local.CommandArgs{
+			Create: pulumi.Sprintf("podman run -d --name %s-dapr --network=container:%s-dev daprio/daprd:latest dapr run --app-id %s-api --app-port %d --dapr-http-port 3500 --dapr-grpc-port %d --components-path /tmp/components", serviceName, serviceName, serviceName, basePort, 50001+i),
+			Delete: pulumi.Sprintf("podman rm -f %s-dapr", serviceName),
+		}, pulumi.DependsOn([]pulumi.Resource{containerCmd}))
+		if err != nil {
+			return nil, err
+		}
+		
+		inquiriesServices[serviceName] = pulumi.Map{
+			"container_id":      containerCmd.Stdout,
+			"container_status":  pulumi.String("running"),
+			"host_port":         pulumi.Int(basePort),
+			"health_endpoint":   pulumi.Sprintf("http://localhost:%d/health", basePort),
+			"dapr_app_id":       pulumi.Sprintf("%s-api", serviceName),
+			"dapr_sidecar_id":   daprCmd.Stdout,
+		}
 	}
 
-	// Configure gateway services
-	gatewayServices := pulumi.Map{
-		"admin": pulumi.Map{
-			"image":        pulumi.String("backend/admin-gateway:latest"),
-			"port":         pulumi.Int(9000),
-			"health_check": pulumi.String("/health"),
-			"dapr_app_id":  pulumi.String("admin-gateway"),
-		},
-		"public": pulumi.Map{
-			"image":        pulumi.String("backend/public-gateway:latest"),
-			"port":         pulumi.Int(9001),
-			"health_check": pulumi.String("/health"),
-			"dapr_app_id":  pulumi.String("public-gateway"),
-		},
+	// Deploy content services containers (research, services, events, news)
+	contentServices := pulumi.Map{}
+	contentServiceNames := []string{"research", "services", "events", "news"}
+	for i, serviceName := range contentServiceNames {
+		basePort := 8090 + i
+		
+		// Create Podman container using Command provider for each content service
+		containerCmd, err := local.NewCommand(ctx, fmt.Sprintf("%s-container", serviceName), &local.CommandArgs{
+			Create: pulumi.Sprintf("podman run -d --name %s-dev -p %d:%d -e DAPR_HTTP_PORT=3500 -e DAPR_GRPC_PORT=%d backend/%s:latest", serviceName, basePort, basePort, 50010+i, serviceName),
+			Delete: pulumi.Sprintf("podman rm -f %s-dev", serviceName),
+		})
+		if err != nil {
+			return nil, err
+		}
+		
+		// Create Dapr sidecar for each content service
+		daprCmd, err := local.NewCommand(ctx, fmt.Sprintf("%s-dapr-sidecar", serviceName), &local.CommandArgs{
+			Create: pulumi.Sprintf("podman run -d --name %s-dapr --network=container:%s-dev daprio/daprd:latest dapr run --app-id %s-api --app-port %d --dapr-http-port 3500 --dapr-grpc-port %d --components-path /tmp/components", serviceName, serviceName, serviceName, basePort, 50010+i),
+			Delete: pulumi.Sprintf("podman rm -f %s-dapr", serviceName),
+		}, pulumi.DependsOn([]pulumi.Resource{containerCmd}))
+		if err != nil {
+			return nil, err
+		}
+		
+		contentServices[serviceName] = pulumi.Map{
+			"container_id":      containerCmd.Stdout,
+			"container_status":  pulumi.String("running"),
+			"host_port":         pulumi.Int(basePort),
+			"health_endpoint":   pulumi.Sprintf("http://localhost:%d/health", basePort),
+			"dapr_app_id":       pulumi.Sprintf("%s-api", serviceName),
+			"dapr_sidecar_id":   daprCmd.Stdout,
+		}
 	}
+
+	// Deploy gateway services containers (admin, public)
+	gatewayServices := pulumi.Map{}
+	gatewayNames := []string{"admin", "public"}
+	gatewayPorts := []int{9000, 9001}
+	for i, gatewayName := range gatewayNames {
+		basePort := gatewayPorts[i]
+		
+		// Create Podman container for each gateway service
+		containerCmd, err := local.NewCommand(ctx, fmt.Sprintf("%s-gateway-container", gatewayName), &local.CommandArgs{
+			Create: pulumi.Sprintf("podman run -d --name %s-gateway-dev -p %d:%d -e DAPR_HTTP_PORT=3500 -e DAPR_GRPC_PORT=%d backend/%s-gateway:latest", gatewayName, basePort, basePort, 50020+i, gatewayName),
+			Delete: pulumi.Sprintf("podman rm -f %s-gateway-dev", gatewayName),
+		})
+		if err != nil {
+			return nil, err
+		}
+		
+		// Create Dapr sidecar for each gateway service
+		daprCmd, err := local.NewCommand(ctx, fmt.Sprintf("%s-gateway-dapr-sidecar", gatewayName), &local.CommandArgs{
+			Create: pulumi.Sprintf("podman run -d --name %s-gateway-dapr --network=container:%s-gateway-dev daprio/daprd:latest dapr run --app-id %s-gateway --app-port %d --dapr-http-port 3500 --dapr-grpc-port %d --components-path /tmp/components", gatewayName, gatewayName, gatewayName, basePort, 50020+i),
+			Delete: pulumi.Sprintf("podman rm -f %s-gateway-dapr", gatewayName),
+		}, pulumi.DependsOn([]pulumi.Resource{containerCmd}))
+		if err != nil {
+			return nil, err
+		}
+		
+		gatewayServices[gatewayName] = pulumi.Map{
+			"container_id":      containerCmd.Stdout,
+			"container_status":  pulumi.String("running"),
+			"host_port":         pulumi.Int(basePort),
+			"health_endpoint":   pulumi.Sprintf("http://localhost:%d/health", basePort),
+			"dapr_app_id":       pulumi.Sprintf("%s-gateway", gatewayName),
+			"dapr_sidecar_id":   daprCmd.Stdout,
+		}
+	}
+
+	// Maintain backward compatibility with APIServices for staging/production environments
+	apiServices := pulumi.Map{}
 
 	return &ServicesOutputs{
 		DeploymentType:        deploymentType,
-		APIServices:           apiServices.ToMapOutput(),
+		InquiriesServices:     inquiriesServices.ToMapOutput(),
+		ContentServices:       contentServices.ToMapOutput(),
 		GatewayServices:       gatewayServices.ToMapOutput(),
+		APIServices:           apiServices.ToMapOutput(),
 		PublicGatewayURL:      publicGatewayURL,
 		AdminGatewayURL:       adminGatewayURL,
 		HealthCheckEnabled:    healthCheckEnabled,
@@ -219,8 +260,14 @@ func deployStagingServices(ctx *pulumi.Context, cfg *config.Config) (*ServicesOu
 		},
 	}
 
+	// For staging, use APIServices instead of InquiriesServices/ContentServices
+	emptyInquiries := pulumi.Map{}
+	emptyContent := pulumi.Map{}
+
 	return &ServicesOutputs{
 		DeploymentType:        deploymentType,
+		InquiriesServices:     emptyInquiries.ToMapOutput(),
+		ContentServices:       emptyContent.ToMapOutput(),
 		APIServices:           apiServices.ToMapOutput(),
 		GatewayServices:       gatewayServices.ToMapOutput(),
 		PublicGatewayURL:      publicGatewayURL,
@@ -318,8 +365,14 @@ func deployProductionServices(ctx *pulumi.Context, cfg *config.Config) (*Service
 		},
 	}
 
+	// For production, use APIServices instead of InquiriesServices/ContentServices
+	emptyInquiries := pulumi.Map{}
+	emptyContent := pulumi.Map{}
+
 	return &ServicesOutputs{
 		DeploymentType:        deploymentType,
+		InquiriesServices:     emptyInquiries.ToMapOutput(),
+		ContentServices:       emptyContent.ToMapOutput(),
 		APIServices:           apiServices.ToMapOutput(),
 		GatewayServices:       gatewayServices.ToMapOutput(),
 		PublicGatewayURL:      publicGatewayURL,

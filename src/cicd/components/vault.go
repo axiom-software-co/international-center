@@ -3,6 +3,7 @@ package components
 import (
 	"fmt"
 
+	"github.com/pulumi/pulumi-command/sdk/go/command/local"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi/config"
 )
@@ -33,16 +34,26 @@ func DeployVault(ctx *pulumi.Context, cfg *config.Config, environment string) (*
 
 // deployDevelopmentVault deploys local Vault container for development
 func deployDevelopmentVault(ctx *pulumi.Context, cfg *config.Config) (*VaultOutputs, error) {
-	// For development, we use local Vault container
-	// In a real implementation, this would create a docker container resource
-	// For now, we'll return the expected outputs for testing
+	// Create Vault container using Podman
+	vaultContainer, err := local.NewCommand(ctx, "vault-container", &local.CommandArgs{
+		Create: pulumi.String("podman run -d --name vault-dev -p 8200:8200 -e VAULT_DEV_ROOT_TOKEN_ID=dev-token -e VAULT_DEV_LISTEN_ADDRESS=0.0.0.0:8200 hashicorp/vault:latest"),
+		Delete: pulumi.String("podman stop vault-dev && podman rm vault-dev"),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Vault container: %w", err)
+	}
 
-	vaultType := pulumi.String("local_container").ToStringOutput()
+	vaultType := pulumi.String("podman_vault").ToStringOutput()
 	vaultAddress := pulumi.String("http://127.0.0.1:8200").ToStringOutput()
 	authMethod := pulumi.String("dev_token").ToStringOutput()
 	secretEngine := pulumi.String("secret").ToStringOutput()
 	clusterTier := pulumi.String("development").ToStringOutput()
 	auditEnabled := pulumi.Bool(false).ToBoolOutput()
+
+	// Add dependency on container creation
+	vaultAddress = pulumi.All(vaultContainer.Stdout).ApplyT(func(args []interface{}) string {
+		return "http://127.0.0.1:8200"
+	}).(pulumi.StringOutput)
 
 	return &VaultOutputs{
 		VaultType:     vaultType,

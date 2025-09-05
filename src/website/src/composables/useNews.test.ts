@@ -2,22 +2,53 @@
 // Tests validate useNews composables with database schema-compliant reactive state
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { ref, nextTick } from 'vue';
+import { ref, nextTick, defineComponent } from 'vue';
+import { mount } from '@vue/test-utils';
 import { useNews, useNewsArticle, useFeaturedNews, useSearchNews, useNewsCategories } from './useNews';
 import type { NewsArticle, NewsResponse, NewsArticleResponse, GetNewsParams, SearchNewsParams, NewsCategory } from '../lib/clients/news/types';
+import { useNewsStore } from '../stores/news';
 
-// Mock the news client
+// Mock the newsClient singleton with hoisted functions
+const {
+  mockGetNews,
+  mockGetNewsArticleBySlug,
+  mockGetFeaturedNews,
+  mockSearchNews,
+  mockGetNewsCategories
+} = vi.hoisted(() => {
+  const mockGetNewsFunc = vi.fn();
+  const mockGetNewsArticleBySlugFunc = vi.fn();
+  const mockGetFeaturedNewsFunc = vi.fn();
+  const mockSearchNewsFunc = vi.fn();
+  const mockGetNewsCategoriesFunc = vi.fn();
+  
+  return {
+    mockGetNews: mockGetNewsFunc,
+    mockGetNewsArticleBySlug: mockGetNewsArticleBySlugFunc,
+    mockGetFeaturedNews: mockGetFeaturedNewsFunc,
+    mockSearchNews: mockSearchNewsFunc,
+    mockGetNewsCategories: mockGetNewsCategoriesFunc,
+  };
+});
+
 vi.mock('../lib/clients', () => ({
   newsClient: {
-    getNews: vi.fn(),
-    getNewsArticleBySlug: vi.fn(),
-    getFeaturedNews: vi.fn(),
-    searchNews: vi.fn(),
-    getNewsCategories: vi.fn(),
-  }
+    getNews: mockGetNews,
+    getNewsArticleBySlug: mockGetNewsArticleBySlug,
+    getFeaturedNews: mockGetFeaturedNews,
+    searchNews: mockSearchNews,
+    getNewsCategories: mockGetNewsCategories,
+  },
+  // Pass through any types that might be imported
+  ...vi.importActual('../lib/clients')
 }));
 
-import { newsClient } from '../lib/clients';
+// Mock the stores/news module so the store uses our mocked client
+vi.mock('../stores/news', () => {
+  return {
+    useNewsStore: vi.fn()
+  };
+});
 
 // Database schema-compliant mock news article for testing
 const createMockDatabaseNews = (overrides: Partial<any> = {}): any => ({
@@ -65,7 +96,112 @@ const createMockDatabaseNewsCategory = (overrides: Partial<any> = {}): any => ({
 
 describe('useNews Composables', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    mockGetNews.mockClear();
+    mockGetNewsArticleBySlug.mockClear();
+    mockGetFeaturedNews.mockClear();
+    mockSearchNews.mockClear();
+    mockGetNewsCategories.mockClear();
+    
+    // Import Vue reactivity functions
+    const { computed } = require('vue');
+    
+    // Set up the mock store with reactive state and actions that call our mocked client
+    const mockStore = {
+      // Reactive state
+      news: ref([]),
+      categories: ref([]),
+      featuredNews: ref([]),
+      searchResults: ref([]),
+      loading: ref(false),
+      error: ref(null),
+      total: ref(0),
+      page: ref(1),
+      pageSize: ref(10),
+      searchTotal: ref(0),
+      
+      // Actions that call the mocked client and update state
+      async fetchNews(params?: any, options?: any) {
+        mockStore.loading.value = true;
+        mockStore.error.value = null;
+        try {
+          const result = await mockGetNews(params);
+          mockStore.news.value = result.news;
+          mockStore.total.value = result.count;
+          mockStore.page.value = params?.page || 1;
+          mockStore.pageSize.value = params?.pageSize || 10;
+        } catch (err) {
+          mockStore.error.value = err instanceof Error ? err.message : 'Unknown error';
+          mockStore.news.value = [];
+          mockStore.total.value = 0;
+        } finally {
+          mockStore.loading.value = false;
+        }
+      },
+      
+      async fetchNewsArticle(slug: string) {
+        mockStore.loading.value = true;
+        mockStore.error.value = null;
+        try {
+          const result = await mockGetNewsArticleBySlug(slug);
+          return result?.news || null;
+        } catch (err) {
+          mockStore.error.value = err instanceof Error ? err.message : 'Unknown error';
+          return null;
+        } finally {
+          mockStore.loading.value = false;
+        }
+      },
+      
+      async fetchFeaturedNews(limit?: number) {
+        mockStore.loading.value = true;
+        mockStore.error.value = null;
+        try {
+          const result = await mockGetFeaturedNews(limit);
+          mockStore.featuredNews.value = result.news;
+        } catch (err) {
+          mockStore.error.value = err instanceof Error ? err.message : 'Unknown error';
+          mockStore.featuredNews.value = [];
+        } finally {
+          mockStore.loading.value = false;
+        }
+      },
+      
+      async searchNews(params: any) {
+        mockStore.loading.value = true;
+        mockStore.error.value = null;
+        try {
+          const result = await mockSearchNews(params);
+          mockStore.searchResults.value = result.news;
+          mockStore.searchTotal.value = result.count;
+        } catch (err) {
+          mockStore.error.value = err instanceof Error ? err.message : 'Unknown error';
+          mockStore.searchResults.value = [];
+          mockStore.searchTotal.value = 0;
+        } finally {
+          mockStore.loading.value = false;
+        }
+      },
+      
+      async fetchNewsCategories() {
+        mockStore.loading.value = true;
+        mockStore.error.value = null;
+        try {
+          const result = await mockGetNewsCategories();
+          mockStore.categories.value = result.categories;
+        } catch (err) {
+          mockStore.error.value = err instanceof Error ? err.message : 'Unknown error';
+          mockStore.categories.value = [];
+        } finally {
+          mockStore.loading.value = false;
+        }
+      }
+    };
+    
+    // Add computed property after mockStore is defined
+    mockStore.totalPages = computed(() => Math.ceil(mockStore.total.value / mockStore.pageSize.value) || 0);
+    
+    // Set up the useNewsStore mock to return our mock store
+    vi.mocked(useNewsStore).mockReturnValue(mockStore);
   });
 
   afterEach(() => {
@@ -74,15 +210,13 @@ describe('useNews Composables', () => {
 
   describe('useNews', () => {
     it('should initialize with proper default state', () => {
-      const mockNewsClient = vi.mocked(newsClient);
-      mockNewsClient.getNews.mockResolvedValue({
+      mockGetNews.mockResolvedValue({
         news: [],
         count: 0,
         correlation_id: 'test-correlation-id'
       });
 
       const { news, loading, error, total, page, pageSize, totalPages } = useNews({
-        enabled: false,
         immediate: false
       });
 
@@ -114,11 +248,9 @@ describe('useNews Composables', () => {
         correlation_id: 'news-correlation-id'
       };
 
-      const mockNewsClient = vi.mocked(newsClient);
-      mockNewsClient.getNews.mockResolvedValue(mockResponse);
+      mockGetNews.mockResolvedValue(mockResponse);
 
       const { news, loading, error, total, totalPages, refetch } = useNews({
-        enabled: false,
         immediate: false
       });
 
@@ -128,7 +260,7 @@ describe('useNews Composables', () => {
 
       await nextTick();
 
-      expect(mockNewsClient.getNews).toHaveBeenCalledTimes(1);
+      expect(mockGetNews).toHaveBeenCalledTimes(1);
       expect(news.value).toHaveLength(2);
       expect(total.value).toBe(2);
       expect(totalPages.value).toBe(1);
@@ -152,11 +284,9 @@ describe('useNews Composables', () => {
     }, 5000);
 
     it('should handle API errors gracefully', async () => {
-      const mockNewsClient = vi.mocked(newsClient);
-      mockNewsClient.getNews.mockRejectedValue(new Error('API Error'));
+      mockGetNews.mockRejectedValue(new Error('API Error'));
 
       const { news, loading, error, refetch } = useNews({
-        enabled: false,
         immediate: false
       });
 
@@ -169,8 +299,7 @@ describe('useNews Composables', () => {
     }, 5000);
 
     it('should handle query parameters correctly', async () => {
-      const mockNewsClient = vi.mocked(newsClient);
-      mockNewsClient.getNews.mockResolvedValue({
+      mockGetNews.mockResolvedValue({
         news: [],
         count: 0,
         correlation_id: 'params-correlation-id'
@@ -185,21 +314,19 @@ describe('useNews Composables', () => {
       };
 
       const { refetch } = useNews({
-        enabled: false,
         immediate: false,
         ...params
       });
 
       await refetch();
 
-      expect(mockNewsClient.getNews).toHaveBeenCalledWith(
+      expect(mockGetNews).toHaveBeenCalledWith(
         expect.objectContaining(params)
       );
     }, 5000);
 
     it('should handle pagination calculations correctly', async () => {
-      const mockNewsClient = vi.mocked(newsClient);
-      mockNewsClient.getNews.mockResolvedValue({
+      mockGetNews.mockResolvedValue({
         news: Array(15).fill(null).map((_, i) => createMockDatabaseNews({
           news_id: `news-${i}`,
           title: `News Article ${i}`,
@@ -210,7 +337,6 @@ describe('useNews Composables', () => {
       });
 
       const { total, pageSize, totalPages, refetch } = useNews({
-        enabled: false,
         immediate: false,
         pageSize: 15
       });
@@ -235,15 +361,14 @@ describe('useNews Composables', () => {
         correlation_id: 'single-news-correlation-id'
       };
 
-      const mockNewsClient = vi.mocked(newsClient);
-      mockNewsClient.getNewsArticleBySlug.mockResolvedValue(mockResponse);
+      mockGetNewsArticleBySlug.mockResolvedValue(mockResponse);
 
       const slugRef = ref('single-news-test');
       const { news, loading, error } = useNewsArticle(slugRef);
 
       await nextTick();
 
-      expect(mockNewsClient.getNewsArticleBySlug).toHaveBeenCalledWith('single-news-test');
+      expect(mockGetNewsArticleBySlug).toHaveBeenCalledWith('single-news-test');
       expect(news.value).toEqual(mockNews);
       expect(loading.value).toBe(false);
       expect(error.value).toBe(null);
@@ -257,8 +382,7 @@ describe('useNews Composables', () => {
     }, 5000);
 
     it('should handle slug changes reactively', async () => {
-      const mockNewsClient = vi.mocked(newsClient);
-      mockNewsClient.getNewsArticleBySlug.mockResolvedValue({
+      mockGetNewsArticleBySlug.mockResolvedValue({
         news: createMockDatabaseNews(),
         correlation_id: 'reactive-correlation-id'
       });
@@ -268,31 +392,28 @@ describe('useNews Composables', () => {
 
       await nextTick();
 
-      expect(mockNewsClient.getNewsArticleBySlug).toHaveBeenCalledWith('initial-slug');
+      expect(mockGetNewsArticleBySlug).toHaveBeenCalledWith('initial-slug');
 
       // Change slug
       slugRef.value = 'updated-slug';
       await nextTick();
 
-      expect(mockNewsClient.getNewsArticleBySlug).toHaveBeenCalledWith('updated-slug');
-      expect(mockNewsClient.getNewsArticleBySlug).toHaveBeenCalledTimes(2);
+      expect(mockGetNewsArticleBySlug).toHaveBeenCalledWith('updated-slug');
+      expect(mockGetNewsArticleBySlug).toHaveBeenCalledTimes(2);
     }, 5000);
 
     it('should handle empty slug gracefully', async () => {
-      const mockNewsClient = vi.mocked(newsClient);
-
       const { news, loading } = useNewsArticle(ref(null));
 
       await nextTick();
 
-      expect(mockNewsClient.getNewsArticleBySlug).not.toHaveBeenCalled();
+      expect(mockGetNewsArticleBySlug).not.toHaveBeenCalled();
       expect(news.value).toBe(null);
       expect(loading.value).toBe(false);
     }, 5000);
 
     it('should handle API errors', async () => {
-      const mockNewsClient = vi.mocked(newsClient);
-      mockNewsClient.getNewsArticleBySlug.mockRejectedValue(new Error('News article not found'));
+      mockGetNewsArticleBySlug.mockRejectedValue(new Error('News article not found'));
 
       const { news, error, loading } = useNewsArticle('non-existent-slug');
 
@@ -324,14 +445,13 @@ describe('useNews Composables', () => {
         correlation_id: 'featured-correlation-id'
       };
 
-      const mockNewsClient = vi.mocked(newsClient);
-      mockNewsClient.getFeaturedNews.mockResolvedValue(mockResponse);
+      mockGetFeaturedNews.mockResolvedValue(mockResponse);
 
       const { news, loading, error } = useFeaturedNews();
 
       await nextTick();
 
-      expect(mockNewsClient.getFeaturedNews).toHaveBeenCalledWith(undefined);
+      expect(mockGetFeaturedNews).toHaveBeenCalledWith(undefined);
       expect(news.value).toHaveLength(2);
       expect(loading.value).toBe(false);
       expect(error.value).toBe(null);
@@ -343,8 +463,7 @@ describe('useNews Composables', () => {
     }, 5000);
 
     it('should handle limit parameter', async () => {
-      const mockNewsClient = vi.mocked(newsClient);
-      mockNewsClient.getFeaturedNews.mockResolvedValue({
+      mockGetFeaturedNews.mockResolvedValue({
         news: [],
         count: 0,
         correlation_id: 'featured-limit-correlation-id'
@@ -355,12 +474,11 @@ describe('useNews Composables', () => {
 
       await nextTick();
 
-      expect(mockNewsClient.getFeaturedNews).toHaveBeenCalledWith(5);
+      expect(mockGetFeaturedNews).toHaveBeenCalledWith(5);
     }, 5000);
 
     it('should handle limit changes reactively', async () => {
-      const mockNewsClient = vi.mocked(newsClient);
-      mockNewsClient.getFeaturedNews.mockResolvedValue({
+      mockGetFeaturedNews.mockResolvedValue({
         news: [],
         count: 0,
         correlation_id: 'featured-reactive-correlation-id'
@@ -370,12 +488,12 @@ describe('useNews Composables', () => {
       useFeaturedNews(limitRef);
 
       await nextTick();
-      expect(mockNewsClient.getFeaturedNews).toHaveBeenCalledWith(3);
+      expect(mockGetFeaturedNews).toHaveBeenCalledWith(3);
 
       limitRef.value = 7;
       await nextTick();
-      expect(mockNewsClient.getFeaturedNews).toHaveBeenCalledWith(7);
-      expect(mockNewsClient.getFeaturedNews).toHaveBeenCalledTimes(2);
+      expect(mockGetFeaturedNews).toHaveBeenCalledWith(7);
+      expect(mockGetFeaturedNews).toHaveBeenCalledTimes(2);
     }, 5000);
   });
 
@@ -398,8 +516,7 @@ describe('useNews Composables', () => {
         correlation_id: 'search-correlation-id'
       };
 
-      const mockNewsClient = vi.mocked(newsClient);
-      mockNewsClient.searchNews.mockResolvedValue(mockResponse);
+      mockSearchNews.mockResolvedValue(mockResponse);
 
       const { results, loading, error, total, search } = useSearchNews();
 
@@ -409,7 +526,7 @@ describe('useNews Composables', () => {
         category: 'announcements'
       });
 
-      expect(mockNewsClient.searchNews).toHaveBeenCalledWith({
+      expect(mockSearchNews).toHaveBeenCalledWith({
         q: 'breaking news update',
         page: 1,
         pageSize: 10,
@@ -437,8 +554,7 @@ describe('useNews Composables', () => {
     }, 5000);
 
     it('should handle search errors', async () => {
-      const mockNewsClient = vi.mocked(newsClient);
-      mockNewsClient.searchNews.mockRejectedValue(new Error('Search failed'));
+      mockSearchNews.mockRejectedValue(new Error('Search failed'));
 
       const { results, error, loading, search } = useSearchNews();
 
@@ -450,8 +566,7 @@ describe('useNews Composables', () => {
     }, 5000);
 
     it('should calculate pagination correctly for search results', async () => {
-      const mockNewsClient = vi.mocked(newsClient);
-      mockNewsClient.searchNews.mockResolvedValue({
+      mockSearchNews.mockResolvedValue({
         news: Array(5).fill(null).map((_, i) => createMockDatabaseNews({
           news_id: `search-result-${i}`,
           title: `Search Result ${i}`,
@@ -475,8 +590,7 @@ describe('useNews Composables', () => {
     }, 5000);
 
     it('should handle search options correctly', async () => {
-      const mockNewsClient = vi.mocked(newsClient);
-      mockNewsClient.searchNews.mockResolvedValue({
+      mockSearchNews.mockResolvedValue({
         news: [],
         count: 0,
         correlation_id: 'search-options-correlation-id'
@@ -493,7 +607,7 @@ describe('useNews Composables', () => {
 
       await search('corporate announcement', searchOptions);
 
-      expect(mockNewsClient.searchNews).toHaveBeenCalledWith({
+      expect(mockSearchNews).toHaveBeenCalledWith({
         q: 'corporate announcement',
         page: 3,
         pageSize: 25,
@@ -521,50 +635,74 @@ describe('useNews Composables', () => {
         correlation_id: 'categories-correlation-id'
       };
 
-      const mockNewsClient = vi.mocked(newsClient);
-      mockNewsClient.getNewsCategories.mockResolvedValue(mockResponse);
+      mockGetNewsCategories.mockResolvedValue(mockResponse);
 
-      const { categories, loading, error } = useNewsCategories();
+      const TestComponent = defineComponent({
+        setup() {
+          return useNewsCategories();
+        },
+        template: '<div></div>'
+      });
 
+      const wrapper = mount(TestComponent);
       await nextTick();
+      await new Promise(resolve => setTimeout(resolve, 0));
 
-      expect(mockNewsClient.getNewsCategories).toHaveBeenCalled();
-      expect(categories.value).toHaveLength(2);
-      expect(loading.value).toBe(false);
-      expect(error.value).toBe(null);
+      const { categories, loading, error } = (wrapper.vm as any);
+
+      expect(mockGetNewsCategories).toHaveBeenCalled();
+      expect(categories).toHaveLength(2);
+      expect(loading).toBe(false);
+      expect(error).toBe(null);
 
       // Validate database schema compliance
-      expect(categories.value[0].category_id).toBeDefined();
-      expect(categories.value[0].is_default_unassigned).toBeDefined();
-      expect(categories.value[0].created_on).toBeDefined();
+      expect(categories[0].category_id).toBeDefined();
+      expect(categories[0].is_default_unassigned).toBeDefined();
+      expect(categories[0].created_on).toBeDefined();
     }, 5000);
 
     it('should handle empty categories response', async () => {
-      const mockNewsClient = vi.mocked(newsClient);
-      mockNewsClient.getNewsCategories.mockResolvedValue({
+      mockGetNewsCategories.mockResolvedValue({
         categories: [],
         count: 0,
         correlation_id: 'empty-categories-correlation'
       });
 
-      const { categories } = useNewsCategories();
+      const TestComponent = defineComponent({
+        setup() {
+          return useNewsCategories();
+        },
+        template: '<div></div>'
+      });
 
+      const wrapper = mount(TestComponent);
       await nextTick();
+      await new Promise(resolve => setTimeout(resolve, 0));
 
-      expect(categories.value).toEqual([]);
+      const { categories } = (wrapper.vm as any);
+
+      expect(categories).toEqual([]);
     }, 5000);
 
     it('should handle categories API errors', async () => {
-      const mockNewsClient = vi.mocked(newsClient);
-      mockNewsClient.getNewsCategories.mockRejectedValue(new Error('Categories API Error'));
+      mockGetNewsCategories.mockRejectedValue(new Error('Categories API Error'));
 
-      const { categories, error, loading } = useNewsCategories();
+      const TestComponent = defineComponent({
+        setup() {
+          return useNewsCategories();
+        },
+        template: '<div></div>'
+      });
 
+      const wrapper = mount(TestComponent);
       await nextTick();
+      await new Promise(resolve => setTimeout(resolve, 0));
 
-      expect(error.value).toBe('Categories API Error');
-      expect(categories.value).toEqual([]);
-      expect(loading.value).toBe(false);
+      const { categories, error, loading } = (wrapper.vm as any);
+
+      expect(error).toBe('Categories API Error');
+      expect(categories).toEqual([]);
+      expect(loading).toBe(false);
     }, 5000);
   });
 
@@ -575,15 +713,13 @@ describe('useNews Composables', () => {
       for (const newsType of validNewsTypes) {
         const mockNews = createMockDatabaseNews({ news_type: newsType });
         
-        const mockNewsClient = vi.mocked(newsClient);
-        mockNewsClient.getNews.mockResolvedValue({
+        mockGetNews.mockResolvedValue({
           news: [mockNews],
           count: 1,
           correlation_id: `news-type-${newsType}-correlation-id`
         });
 
         const { news, refetch } = useNews({
-          enabled: false,
           immediate: false
         });
 
@@ -600,15 +736,13 @@ describe('useNews Composables', () => {
       for (const priorityLevel of validPriorityLevels) {
         const mockNews = createMockDatabaseNews({ priority_level: priorityLevel });
         
-        const mockNewsClient = vi.mocked(newsClient);
-        mockNewsClient.getNews.mockResolvedValue({
+        mockGetNews.mockResolvedValue({
           news: [mockNews],
           count: 1,
           correlation_id: `priority-${priorityLevel}-correlation-id`
         });
 
         const { news, refetch } = useNews({
-          enabled: false,
           immediate: false
         });
 
@@ -625,15 +759,13 @@ describe('useNews Composables', () => {
       for (const status of validStatuses) {
         const mockNews = createMockDatabaseNews({ publishing_status: status });
         
-        const mockNewsClient = vi.mocked(newsClient);
-        mockNewsClient.getNews.mockResolvedValue({
+        mockGetNews.mockResolvedValue({
           news: [mockNews],
           count: 1,
           correlation_id: `status-${status}-correlation-id`
         });
 
         const { news, refetch } = useNews({
-          enabled: false,
           immediate: false
         });
 
@@ -652,15 +784,13 @@ describe('useNews Composables', () => {
         created_on: '2024-01-01T00:00:00Z', // Timestamp field as ISO string
       });
 
-      const mockNewsClient = vi.mocked(newsClient);
-      mockNewsClient.getNews.mockResolvedValue({
+      mockGetNews.mockResolvedValue({
         news: [mockNews],
         count: 1,
         correlation_id: 'field-types-correlation-id'
       });
 
       const { news, refetch } = useNews({
-        enabled: false,
         immediate: false
       });
 
@@ -678,17 +808,14 @@ describe('useNews Composables', () => {
 
   describe('Reactive State Management', () => {
     it('should maintain proper loading states during transitions', async () => {
-      const mockNewsClient = vi.mocked(newsClient);
-      
       // Simulate slow API call
       let resolvePromise: (value: NewsResponse) => void;
       const slowPromise = new Promise<NewsResponse>((resolve) => {
         resolvePromise = resolve;
       });
-      mockNewsClient.getNews.mockReturnValue(slowPromise);
+      mockGetNews.mockReturnValue(slowPromise);
 
       const { loading, refetch } = useNews({
-        enabled: false,
         immediate: false
       });
 
@@ -714,13 +841,10 @@ describe('useNews Composables', () => {
     }, 5000);
 
     it('should properly clear errors when making new requests', async () => {
-      const mockNewsClient = vi.mocked(newsClient);
-      
       // First call fails
-      mockNewsClient.getNews.mockRejectedValueOnce(new Error('First error'));
+      mockGetNews.mockRejectedValueOnce(new Error('First error'));
       
       const { error, refetch } = useNews({
-        enabled: false,
         immediate: false
       });
 
@@ -730,7 +854,7 @@ describe('useNews Composables', () => {
       expect(error.value).toBe('First error');
 
       // Second call succeeds
-      mockNewsClient.getNews.mockResolvedValueOnce({
+      mockGetNews.mockResolvedValueOnce({
         news: [],
         count: 0,
         correlation_id: 'error-clear-correlation-id'

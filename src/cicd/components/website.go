@@ -5,11 +5,14 @@ import (
 
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi/config"
+	"github.com/pulumi/pulumi-command/sdk/go/command/local"
 )
 
 // WebsiteOutputs represents the outputs from website component
 type WebsiteOutputs struct {
 	DeploymentType        pulumi.StringOutput
+	ContainerID           pulumi.StringOutput
+	ContainerStatus       pulumi.StringOutput
 	ServerURL             pulumi.StringOutput
 	BuildCommand          pulumi.StringOutput
 	BuildDirectory        pulumi.StringOutput
@@ -36,18 +39,27 @@ func DeployWebsite(ctx *pulumi.Context, cfg *config.Config, environment string) 
 	}
 }
 
-// deployDevelopmentWebsite deploys local development server for development
+// deployDevelopmentWebsite deploys Podman container for development
 func deployDevelopmentWebsite(ctx *pulumi.Context, cfg *config.Config) (*WebsiteOutputs, error) {
-	// For development, we use local Astro development server
-	// In a real implementation, this would create a docker container resource
-	// For now, we'll return the expected outputs for testing
+	// For development, we use Podman container running the Astro website
+	
+	// Create website container using Command provider
+	containerCmd, err := local.NewCommand(ctx, "website-container", &local.CommandArgs{
+		Create: pulumi.String("podman run -d --name website-dev -p 3000:3000 -e NODE_ENV=development website:latest"),
+		Delete: pulumi.String("podman rm -f website-dev"),
+	})
+	if err != nil {
+		return nil, err
+	}
 
-	deploymentType := pulumi.String("local_server").ToStringOutput()
+	deploymentType := pulumi.String("podman_container").ToStringOutput()
+	containerID := containerCmd.Stdout
+	containerStatus := pulumi.String("running").ToStringOutput()
 	serverURL := pulumi.String("http://localhost:3000").ToStringOutput()
-	buildCommand := pulumi.String("npm run dev").ToStringOutput()
+	buildCommand := pulumi.String("npm run build").ToStringOutput()
 	buildDirectory := pulumi.String("dist").ToStringOutput()
 	nodeVersion := pulumi.String("20.11.0").ToStringOutput()
-	cdnEnabled := pulumi.Bool(true).ToBoolOutput()
+	cdnEnabled := pulumi.Bool(false).ToBoolOutput()
 	cachePolicy := pulumi.String("none").ToStringOutput()
 	compressionEnabled := pulumi.Bool(true).ToBoolOutput()
 	securityHeaders := pulumi.Bool(true).ToBoolOutput()
@@ -56,6 +68,8 @@ func deployDevelopmentWebsite(ctx *pulumi.Context, cfg *config.Config) (*Website
 
 	return &WebsiteOutputs{
 		DeploymentType:        deploymentType,
+		ContainerID:           containerID,
+		ContainerStatus:       containerStatus,
 		ServerURL:             serverURL,
 		BuildCommand:          buildCommand,
 		BuildDirectory:        buildDirectory,
@@ -76,6 +90,8 @@ func deployStagingWebsite(ctx *pulumi.Context, cfg *config.Config) (*WebsiteOutp
 	// For now, we'll return the expected outputs for testing
 
 	deploymentType := pulumi.String("cloudflare_pages").ToStringOutput()
+	containerID := pulumi.String("").ToStringOutput() // N/A for Cloudflare Pages
+	containerStatus := pulumi.String("").ToStringOutput() // N/A for Cloudflare Pages
 	serverURL := pulumi.String("https://staging.international-center.org").ToStringOutput()
 	buildCommand := pulumi.String("npm run build").ToStringOutput()
 	buildDirectory := pulumi.String("dist").ToStringOutput()
@@ -89,6 +105,8 @@ func deployStagingWebsite(ctx *pulumi.Context, cfg *config.Config) (*WebsiteOutp
 
 	return &WebsiteOutputs{
 		DeploymentType:        deploymentType,
+		ContainerID:           containerID,
+		ContainerStatus:       containerStatus,
 		ServerURL:             serverURL,
 		BuildCommand:          buildCommand,
 		BuildDirectory:        buildDirectory,
@@ -109,6 +127,8 @@ func deployProductionWebsite(ctx *pulumi.Context, cfg *config.Config) (*WebsiteO
 	// For now, we'll return the expected outputs for testing
 
 	deploymentType := pulumi.String("cloudflare_pages").ToStringOutput()
+	containerID := pulumi.String("").ToStringOutput() // N/A for Cloudflare Pages
+	containerStatus := pulumi.String("").ToStringOutput() // N/A for Cloudflare Pages
 	serverURL := pulumi.String("https://international-center.org").ToStringOutput()
 	buildCommand := pulumi.String("npm run build").ToStringOutput()
 	buildDirectory := pulumi.String("dist").ToStringOutput()
@@ -122,6 +142,8 @@ func deployProductionWebsite(ctx *pulumi.Context, cfg *config.Config) (*WebsiteO
 
 	return &WebsiteOutputs{
 		DeploymentType:        deploymentType,
+		ContainerID:           containerID,
+		ContainerStatus:       containerStatus,
 		ServerURL:             serverURL,
 		BuildCommand:          buildCommand,
 		BuildDirectory:        buildDirectory,

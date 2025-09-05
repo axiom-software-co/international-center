@@ -91,13 +91,14 @@ export interface GetResearchParams extends PaginationParams, FilterParams {
   publication_date_to?: string; // YYYY-MM-DD
   author_names?: string; // Author name filter
   doi?: string; // DOI filter
+  industry?: string; // Industry filter
   featured?: boolean; // Query for featured research
   sortBy?: 'publication_date_asc' | 'publication_date_desc' | 'created_on_asc' | 'created_on_desc' | 'title_asc' | 'title_desc';
 }
 
 export interface SearchResearchParams extends PaginationParams {
   q: string; // Search query
-  category_id?: string;
+  category?: string;
   research_type?: ResearchType;
   publishing_status?: PublishingStatus;
   publication_date_from?: string;

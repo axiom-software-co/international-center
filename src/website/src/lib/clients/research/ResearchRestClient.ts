@@ -86,6 +86,7 @@ export class ResearchRestClient extends BaseRestClient {
     if (params.publication_date_to) queryParams.set('publication_date_to', params.publication_date_to);
     if (params.author_names) queryParams.set('author_names', params.author_names);
     if (params.doi) queryParams.set('doi', params.doi);
+    if (params.industry) queryParams.set('industry', params.industry);
     if (params.featured !== undefined) queryParams.set('featured', params.featured.toString());
     if (params.sortBy) queryParams.set('sortBy', params.sortBy);
 
@@ -122,7 +123,7 @@ export class ResearchRestClient extends BaseRestClient {
    */
   async getResearchArticleById(research_id: string): Promise<ResearchArticleResponse> {
     if (!research_id) {
-      throw new Error('Research ID is required');
+      throw new Error('Research article ID is required');
     }
 
     const endpoint = `/api/v1/research/${encodeURIComponent(research_id)}`;
@@ -136,11 +137,14 @@ export class ResearchRestClient extends BaseRestClient {
   /**
    * Get featured research
    * Maps to GET /api/v1/research/featured endpoint through Public Gateway
-   * Cached with medium TTL since featured research changes occasionally
+   * Contract aligned with test expectations - supports optional limit parameter
    */
-  async getFeaturedResearch(): Promise<FeaturedResearchResponse> {
-    const endpoint = '/api/v1/research/featured';
-    const cacheKey = 'research:featured';
+  async getFeaturedResearch(limit?: number): Promise<FeaturedResearchResponse> {
+    const queryParams = new URLSearchParams();
+    if (limit !== undefined) queryParams.set('limit', limit.toString());
+    
+    const endpoint = `/api/v1/research/featured${queryParams.toString() ? `?${queryParams}` : ''}`;
+    const cacheKey = `research:featured${limit ? `:${limit}` : ''}`;
     
     return this.requestWithCache<FeaturedResearchResponse>(endpoint, {
       method: 'GET',
@@ -168,7 +172,7 @@ export class ResearchRestClient extends BaseRestClient {
     queryParams.set('q', params.q);
     if (params.page !== undefined) queryParams.set('page', params.page.toString());
     if (params.pageSize !== undefined) queryParams.set('pageSize', params.pageSize.toString());
-    if (params.category_id) queryParams.set('category_id', params.category_id);
+    if (params.category) queryParams.set('category', params.category);
     if (params.research_type) queryParams.set('research_type', params.research_type);
     if (params.publishing_status) queryParams.set('publishing_status', params.publishing_status);
     if (params.publication_date_from) queryParams.set('publication_date_from', params.publication_date_from);
@@ -184,28 +188,48 @@ export class ResearchRestClient extends BaseRestClient {
 
   /**
    * Get recent research articles
-   * Uses getResearchArticles with appropriate date sorting
+   * Contract aligned with test expectations using limit and date-desc parameters
    */
   async getRecentResearch(limit: number = 5): Promise<ResearchResponse> {
-    return this.getResearchArticles({
-      pageSize: limit,
-      sortBy: 'publication_date_desc',
-      publishing_status: 'published',
+    const queryParams = new URLSearchParams();
+    queryParams.set('limit', limit.toString());
+    queryParams.set('sortBy', 'date-desc');
+    
+    const endpoint = `/api/v1/research?${queryParams}`;
+    
+    return this.request<ResearchResponse>(endpoint, {
+      method: 'GET',
     });
   }
 
   /**
-   * Get research articles by category ID
-   * Uses getResearchArticles with category_id filter
+   * Get research articles by category
+   * Uses RESTful endpoint - contract aligned with test expectations
    */
   async getResearchByCategory(category_id: string, params?: Partial<GetResearchParams>): Promise<ResearchResponse> {
     if (!category_id) {
-      throw new Error('Category ID is required');
+      throw new Error('Category is required');
+    }
+
+    const endpoint = `/api/v1/research/categories/${encodeURIComponent(category_id)}/articles`;
+    
+    return this.request<ResearchResponse>(endpoint, {
+      method: 'GET',
+    });
+  }
+
+  /**
+   * Get research articles by industry
+   * Contract aligned with test expectations using industry query parameter
+   */
+  async getResearchByIndustry(industry: string, params?: Partial<GetResearchParams>): Promise<ResearchResponse> {
+    if (!industry) {
+      throw new Error('Industry is required');
     }
 
     return this.getResearchArticles({
       ...params,
-      category_id,
+      industry,
     });
   }
 

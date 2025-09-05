@@ -1,7 +1,8 @@
 package main
 
 import (
-	"github.com/axiom-software-co/international-center/src/cicd/components"
+	"fmt"
+	
 	"github.com/axiom-software-co/international-center/src/cicd/shared"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi/config"
@@ -9,7 +10,7 @@ import (
 
 func main() {
 	pulumi.Run(func(ctx *pulumi.Context) error {
-		cfg := config.New(ctx, "")
+		cfg := config.New(ctx, "international-center-cicd")
 		environment := cfg.Require("environment")
 		
 		ctx.Log.Info("Starting International Center infrastructure deployment", nil)
@@ -31,67 +32,35 @@ func main() {
 	})
 }
 
-// deployDevelopmentInfrastructure deploys complete infrastructure for development environment
+// deployDevelopmentInfrastructure deploys complete infrastructure for development environment using orchestration
 func deployDevelopmentInfrastructure(ctx *pulumi.Context, cfg *config.Config) error {
 	environment := "development"
 	
-	// Load and validate environment configuration
-	_, err := shared.LoadEnvironmentConfig(ctx, environment)
+	// Create deployment orchestrator
+	orchestrator := shared.NewDeploymentOrchestrator(ctx, cfg, environment)
+	
+	// Deploy infrastructure with orchestration and health monitoring
+	outputs, err := orchestrator.DeployInfrastructure()
 	if err != nil {
 		return err
 	}
 	
-	// Deploy components in dependency order
-	ctx.Log.Info("Deploying database component", nil)
-	databaseOutputs, err := components.DeployDatabase(ctx, cfg, environment)
-	if err != nil {
-		return err
-	}
-
-	ctx.Log.Info("Deploying storage component", nil)
-	storageOutputs, err := components.DeployStorage(ctx, cfg, environment)
-	if err != nil {
-		return err
-	}
-
-	ctx.Log.Info("Deploying vault component", nil)
-	vaultOutputs, err := components.DeployVault(ctx, cfg, environment)
-	if err != nil {
-		return err
-	}
-
-	ctx.Log.Info("Deploying observability component", nil)
-	observabilityOutputs, err := components.DeployObservability(ctx, cfg, environment)
-	if err != nil {
-		return err
-	}
-
-	ctx.Log.Info("Deploying dapr component", nil)
-	daprOutputs, err := components.DeployDapr(ctx, cfg, environment)
-	if err != nil {
-		return err
-	}
-
-	ctx.Log.Info("Deploying services component", nil)
-	_, err = components.DeployServices(ctx, cfg, environment)
-	if err != nil {
-		return err
-	}
-
-	ctx.Log.Info("Deploying website component", nil)
-	websiteOutputs, err := components.DeployWebsite(ctx, cfg, environment)
-	if err != nil {
-		return err
-	}
-
 	// Export key outputs for development
 	ctx.Export("environment", pulumi.String(environment))
-	ctx.Export("database_connection_string", databaseOutputs.ConnectionString)
-	ctx.Export("storage_connection_string", storageOutputs.ConnectionString)
-	ctx.Export("vault_address", vaultOutputs.VaultAddress)
-	ctx.Export("grafana_url", observabilityOutputs.GrafanaURL)
-	ctx.Export("dapr_control_plane_url", daprOutputs.ControlPlaneURL)
-	ctx.Export("website_url", websiteOutputs.ServerURL)
+	ctx.Export("database_connection_string", outputs.Database.ConnectionString)
+	ctx.Export("storage_connection_string", outputs.Storage.ConnectionString)
+	ctx.Export("vault_address", outputs.Vault.VaultAddress)
+	ctx.Export("grafana_url", outputs.Observability.GrafanaURL)
+	ctx.Export("dapr_control_plane_url", outputs.Dapr.ControlPlaneURL)
+	ctx.Export("public_gateway_url", outputs.Services.PublicGatewayURL)
+	ctx.Export("admin_gateway_url", outputs.Services.AdminGatewayURL)
+	ctx.Export("website_url", outputs.Website.ServerURL)
+	
+	// Export deployment health status
+	health := orchestrator.GetDeploymentHealth(outputs)
+	for component, healthy := range health {
+		ctx.Export(fmt.Sprintf("%s_healthy", component), pulumi.Bool(healthy))
+	}
 
 	ctx.Log.Info("Development infrastructure deployment completed successfully", nil)
 	return nil
@@ -100,74 +69,31 @@ func deployDevelopmentInfrastructure(ctx *pulumi.Context, cfg *config.Config) er
 func deployStagingInfrastructure(ctx *pulumi.Context, cfg *config.Config) error {
 	environment := "staging"
 	
-	// Load and validate environment configuration
-	_, err := shared.LoadEnvironmentConfig(ctx, environment)
+	// Create deployment orchestrator
+	orchestrator := shared.NewDeploymentOrchestrator(ctx, cfg, environment)
+	
+	// Deploy infrastructure with orchestration and health monitoring
+	outputs, err := orchestrator.DeployInfrastructure()
 	if err != nil {
 		return err
 	}
 	
-	// Load configuration for validation
-	envConfig, err := shared.LoadEnvironmentConfig(ctx, environment)
-	if err != nil {
-		return err
-	}
-	
-	// Validate required configuration for staging
-	if err := shared.ValidateConfiguration(envConfig, environment); err != nil {
-		return err
-	}
-
-	// Deploy components in dependency order
-	ctx.Log.Info("Deploying database component", nil)
-	databaseOutputs, err := components.DeployDatabase(ctx, cfg, environment)
-	if err != nil {
-		return err
-	}
-
-	ctx.Log.Info("Deploying storage component", nil)
-	storageOutputs, err := components.DeployStorage(ctx, cfg, environment)
-	if err != nil {
-		return err
-	}
-
-	ctx.Log.Info("Deploying vault component", nil)
-	vaultOutputs, err := components.DeployVault(ctx, cfg, environment)
-	if err != nil {
-		return err
-	}
-
-	ctx.Log.Info("Deploying observability component", nil)
-	observabilityOutputs, err := components.DeployObservability(ctx, cfg, environment)
-	if err != nil {
-		return err
-	}
-
-	ctx.Log.Info("Deploying dapr component", nil)
-	daprOutputs, err := components.DeployDapr(ctx, cfg, environment)
-	if err != nil {
-		return err
-	}
-
-	ctx.Log.Info("Deploying services component", nil)
-	_, err = components.DeployServices(ctx, cfg, environment)
-	if err != nil {
-		return err
-	}
-
-	ctx.Log.Info("Deploying website component", nil)
-	websiteOutputs, err := components.DeployWebsite(ctx, cfg, environment)
-	if err != nil {
-		return err
-	}
-
 	// Export key outputs for staging
 	ctx.Export("environment", pulumi.String(environment))
-	ctx.Export("database_connection_string", databaseOutputs.ConnectionString)
-	ctx.Export("storage_connection_string", storageOutputs.ConnectionString)
-	ctx.Export("vault_address", vaultOutputs.VaultAddress)
-	ctx.Export("grafana_url", observabilityOutputs.GrafanaURL)
-	ctx.Export("dapr_control_plane_url", daprOutputs.ControlPlaneURL)
-	ctx.Export("website_url", websiteOutputs.ServerURL)
+	ctx.Export("database_connection_string", outputs.Database.ConnectionString)
+	ctx.Export("storage_connection_string", outputs.Storage.ConnectionString)
+	ctx.Export("vault_address", outputs.Vault.VaultAddress)
+	ctx.Export("grafana_url", outputs.Observability.GrafanaURL)
+	ctx.Export("dapr_control_plane_url", outputs.Dapr.ControlPlaneURL)
+	ctx.Export("public_gateway_url", outputs.Services.PublicGatewayURL)
+	ctx.Export("admin_gateway_url", outputs.Services.AdminGatewayURL)
+	ctx.Export("website_url", outputs.Website.ServerURL)
+	
+	// Export deployment health status
+	health := orchestrator.GetDeploymentHealth(outputs)
+	for component, healthy := range health {
+		ctx.Export(fmt.Sprintf("%s_healthy", component), pulumi.Bool(healthy))
+	}
 
 	ctx.Log.Info("Staging infrastructure deployment completed successfully", nil)
 	return nil
@@ -176,68 +102,31 @@ func deployStagingInfrastructure(ctx *pulumi.Context, cfg *config.Config) error 
 func deployProductionInfrastructure(ctx *pulumi.Context, cfg *config.Config) error {
 	environment := "production"
 	
-	// Load and validate environment configuration
-	envConfig, err := shared.LoadEnvironmentConfig(ctx, environment)
+	// Create deployment orchestrator
+	orchestrator := shared.NewDeploymentOrchestrator(ctx, cfg, environment)
+	
+	// Deploy infrastructure with orchestration and health monitoring
+	outputs, err := orchestrator.DeployInfrastructure()
 	if err != nil {
 		return err
 	}
 	
-	// Validate required configuration for production
-	if err := shared.ValidateConfiguration(envConfig, environment); err != nil {
-		return err
-	}
-
-	// Deploy components in dependency order with production policies
-	ctx.Log.Info("Deploying database component", nil)
-	databaseOutputs, err := components.DeployDatabase(ctx, cfg, environment)
-	if err != nil {
-		return err
-	}
-
-	ctx.Log.Info("Deploying storage component", nil)
-	storageOutputs, err := components.DeployStorage(ctx, cfg, environment)
-	if err != nil {
-		return err
-	}
-
-	ctx.Log.Info("Deploying vault component", nil)
-	vaultOutputs, err := components.DeployVault(ctx, cfg, environment)
-	if err != nil {
-		return err
-	}
-
-	ctx.Log.Info("Deploying observability component", nil)
-	observabilityOutputs, err := components.DeployObservability(ctx, cfg, environment)
-	if err != nil {
-		return err
-	}
-
-	ctx.Log.Info("Deploying dapr component", nil)
-	daprOutputs, err := components.DeployDapr(ctx, cfg, environment)
-	if err != nil {
-		return err
-	}
-
-	ctx.Log.Info("Deploying services component", nil)
-	_, err = components.DeployServices(ctx, cfg, environment)
-	if err != nil {
-		return err
-	}
-
-	ctx.Log.Info("Deploying website component", nil)
-	websiteOutputs, err := components.DeployWebsite(ctx, cfg, environment)
-	if err != nil {
-		return err
-	}
-
 	// Export key outputs for production
 	ctx.Export("environment", pulumi.String(environment))
-	ctx.Export("database_connection_string", databaseOutputs.ConnectionString)
-	ctx.Export("storage_connection_string", storageOutputs.ConnectionString)
-	ctx.Export("vault_address", vaultOutputs.VaultAddress)
-	ctx.Export("grafana_url", observabilityOutputs.GrafanaURL)
-	ctx.Export("dapr_control_plane_url", daprOutputs.ControlPlaneURL)
-	ctx.Export("website_url", websiteOutputs.ServerURL)
+	ctx.Export("database_connection_string", outputs.Database.ConnectionString)
+	ctx.Export("storage_connection_string", outputs.Storage.ConnectionString)
+	ctx.Export("vault_address", outputs.Vault.VaultAddress)
+	ctx.Export("grafana_url", outputs.Observability.GrafanaURL)
+	ctx.Export("dapr_control_plane_url", outputs.Dapr.ControlPlaneURL)
+	ctx.Export("public_gateway_url", outputs.Services.PublicGatewayURL)
+	ctx.Export("admin_gateway_url", outputs.Services.AdminGatewayURL)
+	ctx.Export("website_url", outputs.Website.ServerURL)
+	
+	// Export deployment health status
+	health := orchestrator.GetDeploymentHealth(outputs)
+	for component, healthy := range health {
+		ctx.Export(fmt.Sprintf("%s_healthy", component), pulumi.Bool(healthy))
+	}
 
 	ctx.Log.Info("Production infrastructure deployment completed successfully", nil)
 	return nil

@@ -4,6 +4,18 @@
 
 import { BaseRestClient } from '../rest/BaseRestClient';
 import { config } from '../../environments';
+import {
+  DomainRestClientConfig,
+  createGetListMethod,
+  createGetBySlugMethod,
+  createGetByIdMethod,
+  createGetFeaturedMethod,
+  createSearchMethod,
+  createGetCategoriesMethod,
+  createGetRecentMethod,
+  createGetByCategoryMethod,
+  createCRUDMethods
+} from '../rest/DomainRestClientFactory';
 import type {
   Event,
   EventsResponse,
@@ -43,12 +55,17 @@ export class EventsRestClient extends BaseRestClient {
     errorCount: 0,
   };
   
-  // Cache TTL values in milliseconds
-  private static readonly CACHE_TTL = {
-    CATEGORIES: 15 * 60 * 1000, // 15 minutes - categories change infrequently
-    FEATURED: 5 * 60 * 1000, // 5 minutes - featured events change occasionally  
-    EVENT_DETAIL: 2 * 60 * 1000, // 2 minutes - individual events may be updated
-    EVENT_LIST: 30 * 1000, // 30 seconds - lists change more frequently
+  // Domain configuration for factory methods
+  private static readonly DOMAIN_CONFIG: DomainRestClientConfig = {
+    domain: 'events',
+    baseEndpoint: '/api/v1/events',
+    itemsField: 'events',
+    cacheTTL: {
+      categories: 15 * 60 * 1000, // 15 minutes - categories change infrequently
+      featured: 5 * 60 * 1000, // 5 minutes - featured events change occasionally  
+      detail: 2 * 60 * 1000, // 2 minutes - individual events may be updated
+      list: 30 * 1000, // 30 seconds - lists change more frequently
+    }
   };
 
   constructor() {
@@ -69,89 +86,16 @@ export class EventsRestClient extends BaseRestClient {
     setInterval(() => this.clearExpiredCache(), 5 * 60 * 1000);
   }
 
-  /**
-   * Get all events with optional filtering and pagination
-   * Maps to GET /api/v1/events endpoint through Public Gateway
-   * Uses database schema-compliant query parameters with caching
-   */
-  async getEvents(params: GetEventsParams = {}): Promise<EventsResponse> {
-    const queryParams = new URLSearchParams();
-    
-    if (params.page !== undefined) queryParams.set('page', params.page.toString());
-    if (params.pageSize !== undefined) queryParams.set('pageSize', params.pageSize.toString());
-    if (params.category_id) queryParams.set('category_id', params.category_id);
-    if (params.event_type) queryParams.set('event_type', params.event_type);
-    if (params.publishing_status) queryParams.set('publishing_status', params.publishing_status);
-    if (params.registration_status) queryParams.set('registration_status', params.registration_status);
-    if (params.priority_level) queryParams.set('priority_level', params.priority_level);
-    if (params.event_date_from) queryParams.set('event_date_from', params.event_date_from);
-    if (params.event_date_to) queryParams.set('event_date_to', params.event_date_to);
-    if (params.organizer_name) queryParams.set('organizer_name', params.organizer_name);
-    if (params.featured !== undefined) queryParams.set('featured', params.featured.toString());
-    if (params.sortBy) queryParams.set('sortBy', params.sortBy);
+  // Factory-generated methods
+  getEvents = createGetListMethod<GetEventsParams, EventsResponse>(this, EventsRestClient.DOMAIN_CONFIG);
 
-    const endpoint = `/api/v1/events${queryParams.toString() ? `?${queryParams}` : ''}`;
-    const cacheKey = `events:${endpoint}`;
-    
-    return this.requestWithCache<EventsResponse>(endpoint, {
-      method: 'GET',
-    }, cacheKey, EventsRestClient.CACHE_TTL.EVENT_LIST);
-  }
+  getEventBySlug = createGetBySlugMethod<EventResponse>(this, EventsRestClient.DOMAIN_CONFIG, 'Event');
 
-  /**
-   * Get event by slug
-   * Maps to GET /api/v1/events/slug/{slug} endpoint through Public Gateway
-   * Cached for performance
-   */
-  async getEventBySlug(slug: string): Promise<EventResponse> {
-    if (!slug) {
-      throw new Error('Event slug is required');
-    }
+  getEventById = createGetByIdMethod<EventResponse>(this, EventsRestClient.DOMAIN_CONFIG, 'Event');
 
-    const endpoint = `/api/v1/events/slug/${encodeURIComponent(slug)}`;
-    const cacheKey = `event:slug:${slug}`;
-    
-    return this.requestWithCache<EventResponse>(endpoint, {
-      method: 'GET',
-    }, cacheKey, EventsRestClient.CACHE_TTL.EVENT_DETAIL);
-  }
+  getFeaturedEvents = createGetFeaturedMethod<FeaturedEventResponse>(this, EventsRestClient.DOMAIN_CONFIG, '/published');
 
-  /**
-   * Get event by event_id (database primary key)
-   * Maps to GET /api/v1/events/{event_id} endpoint through Public Gateway
-   * Cached for performance
-   */
-  async getEventById(event_id: string): Promise<EventResponse> {
-    if (!event_id) {
-      throw new Error('Event ID is required');
-    }
-
-    const endpoint = `/api/v1/events/${encodeURIComponent(event_id)}`;
-    const cacheKey = `event:id:${event_id}`;
-    
-    return this.requestWithCache<EventResponse>(endpoint, {
-      method: 'GET',
-    }, cacheKey, EventsRestClient.CACHE_TTL.EVENT_DETAIL);
-  }
-
-  /**
-   * Get featured events
-   * Maps to GET /api/v1/events/featured endpoint through Public Gateway
-   * Cached with medium TTL since featured events change occasionally
-   */
-  async getFeaturedEvents(): Promise<FeaturedEventResponse> {
-    const endpoint = '/api/v1/events/featured';
-    const cacheKey = 'events:featured';
-    
-    return this.requestWithCache<FeaturedEventResponse>(endpoint, {
-      method: 'GET',
-    }, cacheKey, EventsRestClient.CACHE_TTL.FEATURED);
-  }
-
-  /**
-   * Get published events
-   * Uses getEvents with publishing_status filter
-   */
+  // Convenience methods
   async getPublishedEvents(params: Partial<GetEventsParams> = {}): Promise<EventsResponse> {
     return this.getEvents({
       ...params,
@@ -159,153 +103,21 @@ export class EventsRestClient extends BaseRestClient {
     });
   }
 
-  /**
-   * Search events
-   * Uses GET /api/v1/events/search endpoint with database schema-compliant parameters
-   */
-  async searchEvents(params: SearchEventsParams): Promise<EventsResponse> {
-    const queryParams = new URLSearchParams();
-    
-    queryParams.set('q', params.q);
-    if (params.page !== undefined) queryParams.set('page', params.page.toString());
-    if (params.pageSize !== undefined) queryParams.set('pageSize', params.pageSize.toString());
-    if (params.category_id) queryParams.set('category_id', params.category_id);
-    if (params.event_type) queryParams.set('event_type', params.event_type);
-    if (params.publishing_status) queryParams.set('publishing_status', params.publishing_status);
-    if (params.event_date_from) queryParams.set('event_date_from', params.event_date_from);
-    if (params.event_date_to) queryParams.set('event_date_to', params.event_date_to);
-    if (params.sortBy) queryParams.set('sortBy', params.sortBy);
+  searchEvents = createSearchMethod<SearchEventsParams, EventsResponse>(this, EventsRestClient.DOMAIN_CONFIG, false);
 
-    const endpoint = `/api/v1/events/search?${queryParams}`;
-    
-    return this.request<EventsResponse>(endpoint, {
-      method: 'GET',
-    });
-  }
+  getRecentEvents = createGetRecentMethod<EventsResponse>(this, EventsRestClient.DOMAIN_CONFIG);
 
-  /**
-   * Get recent events
-   * Uses getEvents with appropriate date sorting
-   */
-  async getRecentEvents(limit: number = 5): Promise<EventsResponse> {
-    return this.getEvents({
-      pageSize: limit,
-      sortBy: 'event_date_desc',
-      publishing_status: 'published',
-    });
-  }
+  getEventsByCategory = createGetByCategoryMethod<EventsResponse>(this, EventsRestClient.DOMAIN_CONFIG);
 
-  /**
-   * Get events by category ID
-   * Uses getEvents with category_id filter
-   */
-  async getEventsByCategory(category_id: string, params?: Partial<GetEventsParams>): Promise<EventsResponse> {
-    if (!category_id) {
-      throw new Error('Category ID is required');
-    }
+  getEventCategories = createGetCategoriesMethod<EventCategoriesResponse>(this, EventsRestClient.DOMAIN_CONFIG);
 
-    return this.getEvents({
-      ...params,
-      category_id,
-    });
-  }
+  // CRUD operations
+  private crudMethods = createCRUDMethods<CreateEventParams, UpdateEventParams, EventResponse>(this, EventsRestClient.DOMAIN_CONFIG);
+  createEvent = this.crudMethods.create;
+  updateEvent = this.crudMethods.update;
+  deleteEvent = this.crudMethods.delete;
 
-  /**
-   * Get event categories
-   * Maps to GET /api/v1/events/categories endpoint through Public Gateway
-   * Heavily cached since categories change infrequently
-   */
-  async getEventCategories(): Promise<EventCategoriesResponse> {
-    const endpoint = '/api/v1/events/categories';
-    const cacheKey = 'events:categories';
-    
-    return this.requestWithCache<EventCategoriesResponse>(endpoint, {
-      method: 'GET',
-    }, cacheKey, EventsRestClient.CACHE_TTL.CATEGORIES);
-  }
 
-  /**
-   * Create new event
-   * Maps to POST /api/v1/events endpoint through Admin Gateway
-   * Clears relevant cache entries after creation
-   */
-  async createEvent(params: CreateEventParams): Promise<EventResponse> {
-    const endpoint = '/api/v1/events';
-    
-    try {
-      const result = await this.request<EventResponse>(endpoint, {
-        method: 'POST',
-        body: JSON.stringify(params),
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-      
-      // Invalidate relevant caches
-      this.invalidateCachePattern('events:');
-      
-      return result;
-    } catch (error) {
-      this.metrics.errorCount++;
-      throw error;
-    }
-  }
-
-  /**
-   * Update existing event
-   * Maps to PUT /api/v1/events/{event_id} endpoint through Admin Gateway
-   * Clears relevant cache entries after update
-   */
-  async updateEvent(params: UpdateEventParams): Promise<EventResponse> {
-    const { event_id, ...updateData } = params;
-    const endpoint = `/api/v1/events/${encodeURIComponent(event_id)}`;
-    
-    try {
-      const result = await this.request<EventResponse>(endpoint, {
-        method: 'PUT',
-        body: JSON.stringify(updateData),
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-      
-      // Invalidate specific event caches and event lists
-      this.invalidateCacheKey(`event:id:${event_id}`);
-      this.invalidateCachePattern('events:');
-      
-      return result;
-    } catch (error) {
-      this.metrics.errorCount++;
-      throw error;
-    }
-  }
-
-  /**
-   * Delete event (soft delete)
-   * Maps to DELETE /api/v1/events/{event_id} endpoint through Admin Gateway
-   * Clears relevant cache entries after deletion
-   */
-  async deleteEvent(event_id: string): Promise<void> {
-    if (!event_id) {
-      throw new Error('Event ID is required');
-    }
-
-    const endpoint = `/api/v1/events/${encodeURIComponent(event_id)}`;
-    
-    try {
-      await this.request<void>(endpoint, {
-        method: 'DELETE',
-      });
-      
-      // Invalidate specific event caches and event lists
-      this.invalidateCacheKey(`event:id:${event_id}`);
-      this.invalidateCachePattern('events:');
-      this.invalidateCachePattern('event:');
-    } catch (error) {
-      this.metrics.errorCount++;
-      throw error;
-    }
-  }
 
   // Performance optimization methods
   

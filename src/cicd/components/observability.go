@@ -3,6 +3,7 @@ package components
 import (
 	"fmt"
 
+	"github.com/pulumi/pulumi-command/sdk/go/command/local"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi/config"
 )
@@ -34,17 +35,53 @@ func DeployObservability(ctx *pulumi.Context, cfg *config.Config, environment st
 
 // deployDevelopmentObservability deploys local Grafana stack for development
 func deployDevelopmentObservability(ctx *pulumi.Context, cfg *config.Config) (*ObservabilityOutputs, error) {
-	// For development, we use local containers with Grafana, Prometheus, Loki, etc.
-	// In a real implementation, this would create docker container resources
-	// For now, we'll return the expected outputs for testing
+	// Create Grafana container
+	grafanaContainer, err := local.NewCommand(ctx, "grafana-container", &local.CommandArgs{
+		Create: pulumi.String("podman run -d --name grafana-dev -p 3000:3000 -e GF_SECURITY_ADMIN_PASSWORD=admin grafana/grafana:latest"),
+		Delete: pulumi.String("podman stop grafana-dev && podman rm grafana-dev"),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Grafana container: %w", err)
+	}
 
-	stackType := pulumi.String("local_containers").ToStringOutput()
+	// Create Prometheus container
+	prometheusContainer, err := local.NewCommand(ctx, "prometheus-container", &local.CommandArgs{
+		Create: pulumi.String("podman run -d --name prometheus-dev -p 9091:9090 prom/prometheus:latest"),
+		Delete: pulumi.String("podman stop prometheus-dev && podman rm prometheus-dev"),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Prometheus container: %w", err)
+	}
+
+	// Create Loki container
+	lokiContainer, err := local.NewCommand(ctx, "loki-container", &local.CommandArgs{
+		Create: pulumi.String("podman run -d --name loki-dev -p 3100:3100 grafana/loki:latest -config.file=/etc/loki/local-config.yaml"),
+		Delete: pulumi.String("podman stop loki-dev && podman rm loki-dev"),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Loki container: %w", err)
+	}
+
+	stackType := pulumi.String("podman_containers").ToStringOutput()
 	grafanaURL := pulumi.String("http://127.0.0.1:3000").ToStringOutput()
-	prometheusURL := pulumi.String("http://127.0.0.1:9090").ToStringOutput()
+	prometheusURL := pulumi.String("http://127.0.0.1:9091").ToStringOutput()
 	lokiURL := pulumi.String("http://127.0.0.1:3100").ToStringOutput()
 	retentionDays := pulumi.Int(7).ToIntOutput()
 	auditLogging := pulumi.Bool(true).ToBoolOutput()
 	alertingEnabled := pulumi.Bool(true).ToBoolOutput()
+
+	// Add dependency on container creation
+	grafanaURL = pulumi.All(grafanaContainer.Stdout).ApplyT(func(args []interface{}) string {
+		return "http://127.0.0.1:3000"
+	}).(pulumi.StringOutput)
+
+	prometheusURL = pulumi.All(prometheusContainer.Stdout).ApplyT(func(args []interface{}) string {
+		return "http://127.0.0.1:9091"
+	}).(pulumi.StringOutput)
+
+	lokiURL = pulumi.All(lokiContainer.Stdout).ApplyT(func(args []interface{}) string {
+		return "http://127.0.0.1:3100"
+	}).(pulumi.StringOutput)
 
 	return &ObservabilityOutputs{
 		StackType:        stackType,

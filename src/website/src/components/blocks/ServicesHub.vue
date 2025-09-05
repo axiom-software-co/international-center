@@ -1,12 +1,10 @@
 <template>
   <div>
     <!-- Error State -->
-    <div v-if="error" class="text-center py-12">
+    <div v-if="servicesError" class="text-center py-12">
       <div class="max-w-md mx-auto">
         <h3 class="text-lg font-semibold text-gray-900 mb-2">Services Temporarily Unavailable</h3>
-        <p class="text-gray-600 mb-4">
-          We're experiencing technical difficulties. Please try again later.
-        </p>
+        <p class="text-gray-600 mb-4">{{ servicesError }}</p>
         <a
           href="/"
           class="inline-block px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
@@ -17,16 +15,18 @@
     </div>
 
     <!-- Loading State -->
-    <div v-else-if="isLoading">
+    <div v-else-if="servicesLoading || categoriesLoading">
       <!-- Filter Section Loading -->
       <section class="pt-8 lg:pt-12">
         <div class="container mx-auto px-4">
           <div class="animate-pulse">
-            <div class="flex flex-wrap gap-2 justify-center">
-              <div class="h-10 bg-gray-300 rounded w-20"></div>
-              <div class="h-10 bg-gray-300 rounded w-24"></div>
-              <div class="h-10 bg-gray-300 rounded w-28"></div>
-              <div class="h-10 bg-gray-300 rounded w-22"></div>
+            <div class="bg-gray-50 dark:bg-gray-800/50 rounded py-3 px-6">
+              <div class="flex flex-wrap gap-2 justify-center">
+                <div class="h-10 bg-gray-300 rounded w-20"></div>
+                <div class="h-10 bg-gray-300 rounded w-24"></div>
+                <div class="h-10 bg-gray-300 rounded w-28"></div>
+                <div class="h-10 bg-gray-300 rounded w-22"></div>
+              </div>
             </div>
           </div>
         </div>
@@ -71,42 +71,44 @@
       <!-- Filter Section -->
       <section class="pt-8 lg:pt-12">
         <div class="container mx-auto px-4">
-          <ServicesFilter :filter-options="filterOptions" />
+          <ServicesFilter
+            :enable-delivery-mode-filter="true"
+            :enable-category-filter="false"
+            @filtered-services="handleFilteredServices"
+          />
         </div>
       </section>
 
       <!-- Services Categories -->
       <section class="pt-6 lg:pt-10 pb-8 lg:pb-12">
         <div class="container mx-auto px-4">
-          <div v-if="serviceCategories.length === 0" class="text-center py-12">
+          <div v-if="displayedServices.length === 0" class="text-center py-12">
             <div class="max-w-md mx-auto">
               <h3 class="text-lg font-semibold text-gray-900 mb-2">
-                Services Temporarily Unavailable
+                No Services Found
               </h3>
               <p class="text-gray-600 text-sm">
-                We're unable to load service information at the moment.
+                No services match your current filter criteria.
               </p>
             </div>
           </div>
 
           <div v-else class="space-y-12 lg:space-y-16">
-            <div v-for="category in serviceCategories" :key="category.id" class="service-category">
+            <div v-for="category in groupedServices" :key="category.category_id" class="service-category">
               <div class="mb-8">
                 <h2 class="text-3xl font-semibold lg:text-4xl text-gray-900 dark:text-white mb-2">
-                  {{ category.title }}
+                  {{ category.name }}
                 </h2>
                 <div class="w-12 h-px bg-black dark:bg-white"></div>
               </div>
 
               <div class="grid gap-4 sm:gap-6 md:grid-cols-2 lg:grid-cols-3" role="list">
-                <a
+                <RouterLink
                   v-for="service in category.services"
-                  :key="service.href"
-                  :href="service.href"
+                  :key="service.service_id"
+                  :to="`/services/${service.slug}`"
                   class="block group service-card rounded-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-                  :data-available="service.available"
-                  v-bind="getServiceDataAttributes(service)"
-                  :aria-label="`${service.name} - ${service.available ? 'Available now' : 'Coming soon'}`"
+                  :aria-label="`${service.title} - ${getServiceStatus(service)}`"
                   role="listitem"
                 >
                   <div
@@ -117,9 +119,10 @@
                       <h3
                         class="text-lg font-semibold text-gray-900 dark:text-white group-hover:text-gray-700 dark:group-hover:text-gray-300 transition-colors leading-tight"
                       >
-                        {{ service.name }}
+                        {{ service.title }}
                       </h3>
                       <Badge
+                        v-if="service.publishing_status === 'published'"
                         variant="outline"
                         class="ml-2 px-2 py-0.5 text-xs font-medium border border-green-300 bg-green-50 text-green-700 rounded shrink-0"
                       >
@@ -134,20 +137,20 @@
 
                     <!-- Service Details -->
                     <div class="space-y-3">
-                      <!-- Duration -->
+                      <!-- Delivery Mode -->
                       <div class="flex items-center text-sm text-gray-600 dark:text-gray-400">
                         <span
                           class="w-3 h-px bg-black dark:bg-white mr-3 mt-0.5 flex-shrink-0"
                         ></span>
-                        Duration: {{ service.duration }}
+                        Type: {{ formatDeliveryMode(service.delivery_mode) }}
                       </div>
 
-                      <!-- Delivery Modes -->
-                      <div class="flex items-center text-sm text-gray-600 dark:text-gray-400">
+                      <!-- Order info if available -->
+                      <div v-if="service.order_number" class="flex items-center text-sm text-gray-600 dark:text-gray-400">
                         <span
                           class="w-3 h-px bg-black dark:bg-white mr-3 mt-0.5 flex-shrink-0"
                         ></span>
-                        Available: {{ getDeliveryModes(service) }}
+                        Order: #{{ service.order_number }}
                       </div>
                     </div>
 
@@ -157,24 +160,22 @@
                         <span
                           class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide"
                         >
-                          {{ service.available ? 'Available Now' : 'Coming Soon' }}
+                          {{ getServiceStatus(service) }}
                         </span>
-                        <div class="flex space-x-1" aria-label="Service delivery modes">
+                        <div class="flex space-x-1" aria-label="Service delivery mode">
                           <div
-                            v-for="(mode, index) in service.delivery_modes"
-                            :key="mode"
-                            :class="['w-2 h-2 rounded-full', getDeliveryModeColor(index)]"
-                            :title="`${mode.charAt(0).toUpperCase() + mode.slice(1)} Service`"
+                            :class="['w-2 h-2 rounded-full', getDeliveryModeColor(service.delivery_mode)]"
+                            :title="formatDeliveryMode(service.delivery_mode)"
                             aria-hidden="true"
                           ></div>
                           <span class="sr-only">
-                            Service types: {{ getDeliveryModes(service) }}
+                            Service type: {{ formatDeliveryMode(service.delivery_mode) }}
                           </span>
                         </div>
                       </div>
                     </div>
                   </div>
-                </a>
+                </RouterLink>
               </div>
             </div>
           </div>
@@ -185,99 +186,80 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, computed, onMounted } from 'vue';
+import { RouterLink } from 'vue-router';
 import { Badge } from '../vue-ui';
 import ServicesFilter from '../ServicesFilter.vue';
+import { useServices, useServiceCategories } from '../../composables/useServices';
+import type { Service } from '../../lib/clients/services/types';
 
-const serviceCategories = ref<any[]>([]);
-const isLoading = ref(false);
-const error = ref<string | null>(null);
-const filterOptions = ref<Array<{ value: string; label: string }>>([
-  { value: 'all', label: 'Show All' },
-]);
+// Reactive data from stores
+const { services, loading: servicesLoading, error: servicesError } = useServices();
+const { categories, loading: categoriesLoading } = useServiceCategories();
 
-const getDeliveryModes = (service: any): string => {
-  if (Array.isArray(service.delivery_modes) && service.delivery_modes.length > 0) {
-    return service.delivery_modes
-      .map((mode: string) => mode.charAt(0).toUpperCase() + mode.slice(1))
-      .join(', ');
-  }
-  return 'Contact for details';
+// Filtered services state
+const displayedServices = ref<Service[]>([]);
+
+// Grouped services by category for display
+const groupedServices = computed(() => {
+  const grouped = new Map();
+  
+  displayedServices.value.forEach(service => {
+    const category = categories.value.find(cat => cat.category_id === service.category_id);
+    if (!category) return;
+    
+    if (!grouped.has(category.category_id)) {
+      grouped.set(category.category_id, {
+        category_id: category.category_id,
+        name: category.name,
+        slug: category.slug,
+        services: []
+      });
+    }
+    
+    grouped.get(category.category_id).services.push(service);
+  });
+  
+  // Sort by category order
+  return Array.from(grouped.values()).sort((a, b) => {
+    const categoryA = categories.value.find(cat => cat.category_id === a.category_id);
+    const categoryB = categories.value.find(cat => cat.category_id === b.category_id);
+    return (categoryA?.order_number || 0) - (categoryB?.order_number || 0);
+  });
+});
+
+// Handle filtered services from ServicesFilter component
+const handleFilteredServices = (filteredServices: Service[]) => {
+  displayedServices.value = filteredServices;
 };
 
-const getServiceDataAttributes = (service: any): Record<string, any> => {
-  const attributes: Record<string, any> = {};
-
-  if (Array.isArray(service.delivery_modes)) {
-    service.delivery_modes.forEach((mode: string) => {
-      attributes[`data-${mode}`] = 'true';
-    });
-  }
-
-  return attributes;
+// Utility functions
+const formatDeliveryMode = (deliveryMode: string): string => {
+  const modes = {
+    mobile_service: 'Mobile Service',
+    outpatient_service: 'Outpatient Service',
+    inpatient_service: 'Inpatient Service',
+  };
+  return modes[deliveryMode as keyof typeof modes] || deliveryMode;
 };
 
-const getDeliveryModeColor = (index: number): string => {
-  const colors = [
-    'bg-blue-400',
-    'bg-green-400',
-    'bg-purple-400',
-    'bg-orange-400',
-    'bg-pink-400',
-    'bg-indigo-400',
-    'bg-teal-400',
-    'bg-red-400',
-  ];
-  return colors[index % colors.length];
+const getServiceStatus = (service: Service): string => {
+  return service.publishing_status === 'published' ? 'Available Now' : 'Coming Soon';
 };
 
+const getDeliveryModeColor = (deliveryMode: string): string => {
+  const colors = {
+    mobile_service: 'bg-blue-400',
+    outpatient_service: 'bg-green-400',
+    inpatient_service: 'bg-purple-400',
+  };
+  return colors[deliveryMode as keyof typeof colors] || 'bg-gray-400';
+};
+
+// Initialize data on mount
 onMounted(async () => {
-  try {
-    isLoading.value = true;
-    error.value = null;
-
-    const { loadServicesPageData } = await import('../../lib/navigation-data');
-    const servicesData = await loadServicesPageData();
-    console.log('🔍 [ServicesHub] Client-side data loaded:', servicesData);
-
-    // Update reactive state with new data
-    serviceCategories.value = servicesData.serviceCategories;
-
-    // Calculate available filter options from actual services data
-    const availableFilters = new Set<string>();
-
-    // Always include 'Show All' option
-    const dynamicFilterOptions = [{ value: 'all', label: 'Show All' }];
-
-    // Analyze all services to determine which delivery modes are available
-    servicesData.serviceCategories.forEach(category => {
-      category.services.forEach((service: any) => {
-        if (Array.isArray(service.delivery_modes)) {
-          service.delivery_modes.forEach((mode: string) => {
-            availableFilters.add(mode);
-          });
-        }
-      });
-    });
-
-    // Add filter options based on what's actually available in the data
-    Array.from(availableFilters)
-      .sort()
-      .forEach(mode => {
-        const label = `${mode.charAt(0).toUpperCase() + mode.slice(1)} Services`;
-        dynamicFilterOptions.push({ value: mode, label });
-      });
-
-    filterOptions.value = dynamicFilterOptions;
-  } catch (err: any) {
-    console.error('❌ [ServicesHub] Client-side data loading failed:', err);
-    error.value = 'Failed to load services. Please try again later.';
-    serviceCategories.value = [];
-    // Reset to default filter options on error
-    filterOptions.value = [{ value: 'all', label: 'Show All' }];
-  } finally {
-    isLoading.value = false;
-  }
+  // Initial load - show all services
+  displayedServices.value = services.value.filter(service => service.publishing_status === 'published');
 });
 </script>
 

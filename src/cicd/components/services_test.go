@@ -19,24 +19,40 @@ func TestServicesComponent_DevelopmentEnvironment(t *testing.T) {
 			return err
 		}
 
-		// Verify development environment generates local container configurations
-		pulumi.All(outputs.DeploymentType, outputs.APIServices, outputs.GatewayServices).ApplyT(func(args []interface{}) error {
+		// Verify development environment deploys Podman containers
+		pulumi.All(outputs.DeploymentType, outputs.InquiriesServices, outputs.ContentServices, outputs.GatewayServices).ApplyT(func(args []interface{}) error {
 			deploymentType := args[0].(string)
-			apiServices := args[1].(map[string]interface{})
-			gatewayServices := args[2].(map[string]interface{})
+			inquiriesServices := args[1].(map[string]interface{})
+			contentServices := args[2].(map[string]interface{})
+			gatewayServices := args[3].(map[string]interface{})
 
-			assert.Equal(t, "containers", deploymentType, "Development should use local containers")
+			assert.Equal(t, "podman_containers", deploymentType, "Development should use Podman containers")
 			
-			// Verify all 8 API services are configured
-			expectedAPIs := []string{"business", "donations", "events", "media", "news", "research", "services", "volunteers"}
-			for _, api := range expectedAPIs {
-				assert.Contains(t, apiServices, api, "Should configure %s API service", api)
+			// Verify all 4 inquiries services containers are deployed
+			expectedInquiriesServices := []string{"media", "donations", "volunteers", "business"}
+			for _, serviceName := range expectedInquiriesServices {
+				assert.Contains(t, inquiriesServices, serviceName, "Should deploy %s inquiries service container", serviceName)
+				serviceConfig := inquiriesServices[serviceName].(map[string]interface{})
+				assert.Contains(t, serviceConfig, "container_id", "%s should have container_id", serviceName)
+				assert.Contains(t, serviceConfig, "container_status", "%s should have container_status", serviceName)
 			}
 			
-			// Verify both gateway services are configured
+			// Verify all 4 content services containers are deployed
+			expectedContentServices := []string{"research", "services", "events", "news"}
+			for _, serviceName := range expectedContentServices {
+				assert.Contains(t, contentServices, serviceName, "Should deploy %s content service container", serviceName)
+				serviceConfig := contentServices[serviceName].(map[string]interface{})
+				assert.Contains(t, serviceConfig, "container_id", "%s should have container_id", serviceName)
+				assert.Contains(t, serviceConfig, "container_status", "%s should have container_status", serviceName)
+			}
+			
+			// Verify both gateway services containers are deployed
 			expectedGateways := []string{"admin", "public"}
 			for _, gateway := range expectedGateways {
-				assert.Contains(t, gatewayServices, gateway, "Should configure %s gateway service", gateway)
+				assert.Contains(t, gatewayServices, gateway, "Should deploy %s gateway service container", gateway)
+				gatewayConfig := gatewayServices[gateway].(map[string]interface{})
+				assert.Contains(t, gatewayConfig, "container_id", "%s gateway should have container_id", gateway)
+				assert.Contains(t, gatewayConfig, "container_status", "%s gateway should have container_status", gateway)
 			}
 
 			return nil
@@ -134,8 +150,8 @@ func TestServicesComponent_ProductionEnvironment(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-// TestServicesComponent_ServiceConfiguration tests service-specific configurations
-func TestServicesComponent_ServiceConfiguration(t *testing.T) {
+// TestServicesComponent_ContainerConfiguration tests deployed container configurations
+func TestServicesComponent_ContainerConfiguration(t *testing.T) {
 	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
 		cfg := config.New(ctx, "")
 
@@ -144,20 +160,42 @@ func TestServicesComponent_ServiceConfiguration(t *testing.T) {
 			return err
 		}
 
-		// Verify service configuration includes required parameters
-		pulumi.All(outputs.APIServices).ApplyT(func(args []interface{}) error {
-			apiServices := args[0].(map[string]interface{})
+		// Verify inquiries services containers have required deployment attributes
+		pulumi.All(outputs.InquiriesServices).ApplyT(func(args []interface{}) error {
+			inquiriesServices := args[0].(map[string]interface{})
 
-			// Each API service should have required configuration
-			for serviceName, serviceConfig := range apiServices {
+			// Each inquiries service container should have required attributes
+			for serviceName, serviceConfig := range inquiriesServices {
 				config, ok := serviceConfig.(map[string]interface{})
-				assert.True(t, ok, "Service %s should have configuration map", serviceName)
+				assert.True(t, ok, "Inquiries service %s should have container configuration", serviceName)
 				
-				// Verify each service has required configuration
-				assert.Contains(t, config, "image", "Service %s should have container image", serviceName)
-				assert.Contains(t, config, "port", "Service %s should have port configuration", serviceName)
-				assert.Contains(t, config, "health_check", "Service %s should have health check", serviceName)
+				// Verify each service has required container attributes
+				assert.Contains(t, config, "container_id", "Service %s should have container_id", serviceName)
+				assert.Contains(t, config, "container_status", "Service %s should have container_status", serviceName)
+				assert.Contains(t, config, "host_port", "Service %s should have host_port", serviceName)
+				assert.Contains(t, config, "health_endpoint", "Service %s should have health_endpoint", serviceName)
 				assert.Contains(t, config, "dapr_app_id", "Service %s should have Dapr app ID", serviceName)
+				assert.Contains(t, config, "dapr_sidecar_id", "Service %s should have Dapr sidecar container", serviceName)
+			}
+			return nil
+		})
+
+		// Verify content services containers have required deployment attributes  
+		pulumi.All(outputs.ContentServices).ApplyT(func(args []interface{}) error {
+			contentServices := args[0].(map[string]interface{})
+
+			// Each content service container should have required attributes
+			for serviceName, serviceConfig := range contentServices {
+				config, ok := serviceConfig.(map[string]interface{})
+				assert.True(t, ok, "Content service %s should have container configuration", serviceName)
+				
+				// Verify each service has required container attributes
+				assert.Contains(t, config, "container_id", "Service %s should have container_id", serviceName)
+				assert.Contains(t, config, "container_status", "Service %s should have container_status", serviceName)
+				assert.Contains(t, config, "host_port", "Service %s should have host_port", serviceName)
+				assert.Contains(t, config, "health_endpoint", "Service %s should have health_endpoint", serviceName)
+				assert.Contains(t, config, "dapr_app_id", "Service %s should have Dapr app ID", serviceName)
+				assert.Contains(t, config, "dapr_sidecar_id", "Service %s should have Dapr sidecar container", serviceName)
 			}
 			return nil
 		})
@@ -183,13 +221,15 @@ func TestServicesComponent_EnvironmentParity(t *testing.T) {
 				}
 
 				// Verify all environments provide required outputs
-				pulumi.All(outputs.DeploymentType, outputs.APIServices, outputs.GatewayServices).ApplyT(func(args []interface{}) error {
+				pulumi.All(outputs.DeploymentType, outputs.InquiriesServices, outputs.ContentServices, outputs.GatewayServices).ApplyT(func(args []interface{}) error {
 					deploymentType := args[0].(string)
-					apiServices := args[1].(map[string]interface{})
-					gatewayServices := args[2].(map[string]interface{})
+					inquiriesServices := args[1].(map[string]interface{})
+					contentServices := args[2].(map[string]interface{})
+					gatewayServices := args[3].(map[string]interface{})
 
 					assert.NotEmpty(t, deploymentType, "All environments should provide deployment type")
-					assert.NotEmpty(t, apiServices, "All environments should provide API services")
+					assert.NotEmpty(t, inquiriesServices, "All environments should provide inquiries services")
+					assert.NotEmpty(t, contentServices, "All environments should provide content services")
 					assert.NotEmpty(t, gatewayServices, "All environments should provide gateway services")
 					return nil
 				})

@@ -99,9 +99,9 @@
 
       <!-- Donation Interest -->
       <div class="space-y-2">
-        <label for="donationInterest" class="text-sm font-medium text-gray-900">Area of Interest</label>
+        <label for="largeInterest" class="text-sm font-medium text-gray-900">Area of Interest</label>
         <select
-          id="donationInterest"
+          id="largeInterest"
           v-model="form.interest"
           @blur="() => handleBlur('interest', form.interest)"
           :class="[
@@ -127,9 +127,9 @@
 
       <!-- Estimated Amount -->
       <div class="space-y-2">
-        <label for="estimatedAmount" class="text-sm font-medium text-gray-900">Estimated Donation Amount</label>
+        <label for="largeAmount" class="text-sm font-medium text-gray-900">Estimated Donation Amount</label>
         <select
-          id="estimatedAmount"
+          id="largeAmount"
           v-model="form.amount"
           @blur="() => handleBlur('amount', form.amount)"
           :class="[

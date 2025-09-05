@@ -1,10 +1,10 @@
-// Services Composables - Vue 3 Composition API composables for services data
-// Provides clean interface for Vue components to interact with services domain
+// Services Composables - Vue 3 Composition API with Direct Client Integration
 
-import { ref, computed, onMounted, watch, type Ref } from 'vue';
+import { type Ref, ref, isRef, unref, watch, onMounted, computed, nextTick } from 'vue';
 import { servicesClient } from '../lib/clients';
-import type { Service, GetServicesParams, ServiceCategory } from '../lib/clients';
+import type { Service, ServiceCategory, GetServicesParams, SearchServicesParams } from '../lib/clients/services/types';
 
+// Domain-specific type aliases
 export interface UseServicesResult {
   services: Ref<Service[]>;
   loading: Ref<boolean>;
@@ -21,44 +21,33 @@ export interface UseServicesOptions extends GetServicesParams {
   immediate?: boolean;
 }
 
+// Explicit main list composable
 export function useServices(options: UseServicesOptions = {}): UseServicesResult {
   const { enabled = true, immediate = true, ...params } = options;
-
+  
   const services = ref<Service[]>([]);
-  const loading = ref(enabled && immediate);
+  const loading = ref(false);
   const error = ref<string | null>(null);
   const total = ref(0);
   const page = ref(params.page || 1);
   const pageSize = ref(params.pageSize || 10);
-  const totalPages = ref(0);
+  
+  const totalPages = computed(() => Math.ceil(total.value / pageSize.value) || 0);
 
   const fetchServices = async () => {
     if (!enabled) return;
-
+    
+    loading.value = true;
+    error.value = null;
+    
     try {
-      loading.value = true;
-      error.value = null;
-
-      // Backend returns: { services: [...], count: number, correlation_id: string }
       const response = await servicesClient.getServices(params);
-
-      if (response.services) {
-        services.value = response.services;
-        total.value = response.count || response.services.length;
-        // Calculate pagination from current params since backend doesn't return pagination info
-        page.value = params.page || 1;
-        pageSize.value = params.pageSize || 10;
-        totalPages.value = Math.ceil(total.value / pageSize.value);
-      } else {
-        throw new Error('Failed to fetch services');
-      }
+      services.value = response.services;
+      total.value = response.count;
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch services';
-      error.value = errorMessage;
-      console.error('Error fetching services:', err);
+      error.value = err instanceof Error ? err.message : 'Failed to fetch services';
       services.value = [];
       total.value = 0;
-      totalPages.value = 0;
     } finally {
       loading.value = false;
     }
@@ -67,7 +56,8 @@ export function useServices(options: UseServicesOptions = {}): UseServicesResult
   // Watch for parameter changes
   watch(() => params, fetchServices, { deep: true });
   
-  if (immediate) {
+  // Call immediately if enabled and immediate is true
+  if (enabled && immediate) {
     onMounted(fetchServices);
   }
 
@@ -90,44 +80,42 @@ export interface UseServiceResult {
   refetch: () => Promise<void>;
 }
 
+// Explicit single item composable
 export function useService(slug: Ref<string | null> | string | null): UseServiceResult {
-  const slugRef = typeof slug === 'string' ? ref(slug) : slug || ref(null);
-  
+  const slugRef = isRef(slug) ? slug : ref(slug);
   const service = ref<Service | null>(null);
-  const loading = ref(!!slugRef.value);
+  const loading = ref(false);
   const error = ref<string | null>(null);
 
   const fetchService = async () => {
-    if (!slugRef.value) {
+    const currentSlug = unref(slugRef);
+    if (!currentSlug) {
       service.value = null;
-      loading.value = false;
       return;
     }
 
+    loading.value = true;
+    error.value = null;
+    
     try {
-      loading.value = true;
-      error.value = null;
-
-      // Backend returns: { service: {...}, correlation_id: string }
-      const response = await servicesClient.getServiceBySlug(slugRef.value);
-      
-      if (response.service) {
-        service.value = response.service;
-      } else {
-        throw new Error('Failed to fetch service');
-      }
+      const response = await servicesClient.getServiceBySlug(currentSlug);
+      service.value = response.service;
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch service';
-      error.value = errorMessage;
-      console.error('Error fetching service:', err);
+      error.value = err instanceof Error ? err.message : 'Failed to fetch service';
       service.value = null;
     } finally {
       loading.value = false;
     }
   };
 
-  // Watch for slug changes
-  watch(slugRef, fetchService, { immediate: true });
+  // Watch for slug changes and call immediately
+  watch(slugRef, (newSlug) => {
+    if (newSlug) {
+      fetchService();
+    } else {
+      service.value = null;
+    }
+  }, { immediate: true });
 
   return {
     service,
@@ -144,42 +132,30 @@ export interface UseFeaturedServicesResult {
   refetch: () => Promise<void>;
 }
 
-export function useFeaturedServices(limit?: Ref<number> | number): UseFeaturedServicesResult {
-  const limitRef = typeof limit === 'number' ? ref(limit) : limit;
-  
+// Explicit featured services composable
+export function useFeaturedServices(limit?: Ref<number | undefined> | number | undefined): UseFeaturedServicesResult {
+  const limitRef = isRef(limit) ? limit : ref(limit);
   const services = ref<Service[]>([]);
-  const loading = ref(true);
+  const loading = ref(false);
   const error = ref<string | null>(null);
 
   const fetchFeaturedServices = async () => {
+    loading.value = true;
+    error.value = null;
+    
     try {
-      loading.value = true;
-      error.value = null;
-
-      // Backend returns: { services: [...], count: number, correlation_id: string }
-      const response = await servicesClient.getFeaturedServices(limitRef?.value);
-      
-      if (response.services) {
-        services.value = response.services;
-      } else {
-        throw new Error('Failed to fetch featured services');
-      }
+      const response = await servicesClient.getFeaturedServices(unref(limitRef));
+      services.value = response.services;
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch featured services';
-      error.value = errorMessage;
-      console.error('Error fetching featured services:', err);
+      error.value = err instanceof Error ? err.message : 'Failed to fetch featured services';
       services.value = [];
     } finally {
       loading.value = false;
     }
   };
 
-  // Watch for limit changes
-  if (limitRef) {
-    watch(limitRef, fetchFeaturedServices, { immediate: true });
-  } else {
-    onMounted(fetchFeaturedServices);
-  }
+  // Watch for limit changes and fetch immediately
+  watch(limitRef, fetchFeaturedServices, { immediate: true });
 
   return {
     services,
@@ -196,41 +172,37 @@ export interface UseServiceCategoriesResult {
   refetch: () => Promise<void>;
 }
 
+// Explicit categories composable
 export function useServiceCategories(): UseServiceCategoriesResult {
   const categories = ref<ServiceCategory[]>([]);
-  const loading = ref(true);
+  const loading = ref(false);
   const error = ref<string | null>(null);
 
-  const fetchServiceCategories = async () => {
+  const fetchCategories = async () => {
+    loading.value = true;
+    error.value = null;
+    
     try {
-      loading.value = true;
-      error.value = null;
-
-      // Backend returns: { categories: [...], count: number, correlation_id: string }
       const response = await servicesClient.getServiceCategories();
-      
-      if (response.categories) {
-        categories.value = response.categories;
-      } else {
-        throw new Error('Failed to fetch service categories');
-      }
+      categories.value = response.categories;
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch service categories';
-      error.value = errorMessage;
-      console.error('Error fetching service categories:', err);
+      error.value = err instanceof Error ? err.message : 'Failed to fetch service categories';
       categories.value = [];
     } finally {
       loading.value = false;
     }
   };
 
-  onMounted(fetchServiceCategories);
+  // Trigger initial fetch immediately
+  onMounted(() => {
+    fetchCategories();
+  });
 
   return {
     categories,
     loading,
     error,
-    refetch: fetchServiceCategories,
+    refetch: fetchCategories,
   };
 }
 
@@ -242,9 +214,10 @@ export interface UseSearchServicesResult {
   page: Ref<number>;
   pageSize: Ref<number>;
   totalPages: Ref<number>;
-  search: (query: string, options?: Partial<GetServicesParams>) => Promise<void>;
+  search: (query: string, options?: Partial<SearchServicesParams>) => Promise<void>;
 }
 
+// Explicit search composable
 export function useSearchServices(): UseSearchServicesResult {
   const results = ref<Service[]>([]);
   const loading = ref(false);
@@ -252,45 +225,32 @@ export function useSearchServices(): UseSearchServicesResult {
   const total = ref(0);
   const page = ref(1);
   const pageSize = ref(10);
-  const totalPages = ref(0);
 
-  const search = async (query: string, options: Partial<GetServicesParams> = {}) => {
-    if (!query.trim()) {
-      results.value = [];
-      total.value = 0;
-      totalPages.value = 0;
-      return;
-    }
+  const totalPages = computed(() => Math.ceil(total.value / pageSize.value) || 0);
 
+  const search = async (query: string, options: Partial<SearchServicesParams> = {}) => {
+    const searchParams = {
+      q: query,
+      page: options.page || 1,
+      pageSize: options.pageSize || 10,
+      ...options,
+    };
+
+    // Update local pagination refs
+    page.value = searchParams.page;
+    pageSize.value = searchParams.pageSize;
+
+    loading.value = true;
+    error.value = null;
+    
     try {
-      loading.value = true;
-      error.value = null;
-
-      // Backend returns: { services: [...], count: number, correlation_id: string }
-      const response = await servicesClient.searchServices({
-        q: query,
-        page: options.page || 1,
-        pageSize: options.pageSize || 10,
-        category: options.category,
-        ...options,
-      });
-
-      if (response.services) {
-        results.value = response.services;
-        total.value = response.count || response.services.length;
-        page.value = options.page || 1;
-        pageSize.value = options.pageSize || 10;
-        totalPages.value = Math.ceil(total.value / pageSize.value);
-      } else {
-        throw new Error('Failed to search services');
-      }
+      const response = await servicesClient.searchServices(searchParams);
+      results.value = response.services;
+      total.value = response.count;
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to search services';
-      error.value = errorMessage;
-      console.error('Error searching services:', err);
+      error.value = err instanceof Error ? err.message : 'Failed to search services';
       results.value = [];
       total.value = 0;
-      totalPages.value = 0;
     } finally {
       loading.value = false;
     }

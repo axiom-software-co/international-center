@@ -3,6 +3,7 @@ package components
 import (
 	"fmt"
 
+	"github.com/pulumi/pulumi-command/sdk/go/command/local"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi/config"
 )
@@ -33,16 +34,38 @@ func DeployDapr(ctx *pulumi.Context, cfg *config.Config, environment string) (*D
 
 // deployDevelopmentDapr deploys self-hosted Dapr for development
 func deployDevelopmentDapr(ctx *pulumi.Context, cfg *config.Config) (*DaprOutputs, error) {
-	// For development, we use self-hosted Dapr with local containers
-	// In a real implementation, this would create docker container resources for Dapr runtime
-	// For now, we'll return the expected outputs for testing
+	// Create Redis container for Dapr state store and pub/sub
+	redisContainer, err := local.NewCommand(ctx, "redis-container", &local.CommandArgs{
+		Create: pulumi.String("podman run -d --name redis-dev -p 6379:6379 redis:7-alpine"),
+		Delete: pulumi.String("podman stop redis-dev && podman rm redis-dev"),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Redis container: %w", err)
+	}
 
-	deploymentType := pulumi.String("self_hosted").ToStringOutput()
+	// Create Dapr placement service container
+	daprPlacementContainer, err := local.NewCommand(ctx, "dapr-placement-container", &local.CommandArgs{
+		Create: pulumi.String("podman run -d --name dapr-placement-dev -p 50005:50005 daprio/dapr:1.12.0 ./placement -port 50005"),
+		Delete: pulumi.String("podman stop dapr-placement-dev && podman rm dapr-placement-dev"),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Dapr placement container: %w", err)
+	}
+
+	// Note: Dapr sentry service is not needed for local development
+	// It requires Kubernetes configuration and is primarily for production mTLS certificate management
+
+	deploymentType := pulumi.String("podman_dapr").ToStringOutput()
 	runtimePort := pulumi.Int(3500).ToIntOutput()
-	controlPlaneURL := pulumi.String("http://127.0.0.1:9090").ToStringOutput()
+	controlPlaneURL := pulumi.String("http://127.0.0.1:50005").ToStringOutput()
 	sidecarConfig := pulumi.String("development").ToStringOutput()
 	middlewareEnabled := pulumi.Bool(true).ToBoolOutput()
 	policyEnabled := pulumi.Bool(true).ToBoolOutput()
+
+	// Add dependency on container creation
+	controlPlaneURL = pulumi.All(redisContainer.Stdout, daprPlacementContainer.Stdout).ApplyT(func(args []interface{}) string {
+		return "http://127.0.0.1:50005"
+	}).(pulumi.StringOutput)
 
 	return &DaprOutputs{
 		DeploymentType:    deploymentType,

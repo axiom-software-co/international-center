@@ -1,83 +1,56 @@
-// Events Composables Tests - State management and API integration validation
-// Tests validate useEvents composables with database schema-compliant reactive state
-
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ref, nextTick, defineComponent } from 'vue';
 import { mount } from '@vue/test-utils';
-import { useEvents, useEvent, useFeaturedEvents, useSearchEvents } from './useEvents';
-import type { Event, EventsResponse, EventResponse, GetEventsParams, SearchEventsParams } from '../lib/clients/events/types';
+import { useEvents, useEvent, useFeaturedEvents, useEventCategories } from './useEvents';
+import { useEventsStore } from '../stores/events';
+import { RestError } from '../lib/clients/rest/BaseRestClient';
 
-// Mock the EventsRestClient with hoisted functions
-const mockGetEvents = vi.fn();
-const mockGetEventBySlug = vi.fn();
-const mockGetFeaturedEvents = vi.fn();
-const mockSearchEvents = vi.fn();
-
-const MockedEventsRestClient = vi.fn().mockImplementation(() => ({
-  getEvents: mockGetEvents,
-  getEventBySlug: mockGetEventBySlug,
-  getFeaturedEvents: mockGetFeaturedEvents,
-  searchEvents: mockSearchEvents,
+// Mock the events store
+vi.mock('../stores/events', () => ({
+  useEventsStore: vi.fn()
 }));
 
-vi.mock('../lib/clients/events/EventsRestClient', () => ({
-  EventsRestClient: MockedEventsRestClient
-}));
+let mockStore: any;
 
-// Database schema-compliant mock event for testing
-const createMockDatabaseEvent = (overrides: Partial<any> = {}): any => ({
-  event_id: 'event-uuid-123',
-  title: 'Mock Database Event',
-  description: 'Event description from database',
-  content: 'Full event content',
-  slug: 'mock-database-event',
-  category_id: 'category-uuid-456',
-  image_url: 'https://example.com/event-image.jpg',
-  organizer_name: 'Event Organizer',
-  event_date: '2024-03-15',
-  event_time: '14:30',
-  end_date: '2024-03-15',
-  end_time: '17:00',
-  location: '123 Database St, Schema City',
-  virtual_link: 'https://virtual.example.com/event',
-  max_capacity: 100,
-  registration_deadline: '2024-03-10T23:59:59Z',
-  registration_status: 'open' as const,
-  publishing_status: 'published' as const,
-  tags: ['database', 'schema', 'event'],
-  event_type: 'workshop' as const,
-  priority_level: 'normal' as const,
-  created_on: '2024-01-01T00:00:00Z',
-  created_by: 'admin@example.com',
-  modified_on: '2024-01-02T00:00:00Z',
-  modified_by: 'admin@example.com',
-  is_deleted: false,
-  deleted_on: null,
-  deleted_by: null,
-  ...overrides,
-});
-
-describe('useEvents Composables', () => {
+describe('useEvents composables', () => {
   beforeEach(() => {
+    // Complete reset of all mocks and timers
     vi.clearAllMocks();
+    vi.clearAllTimers();
+    vi.resetAllMocks();
+    
+    // Create completely fresh mock store for each test with new refs
+    mockStore = {
+      events: ref([]),
+      categories: ref([]),
+      featuredEvents: ref([]),
+      searchResults: ref([]),
+      loading: ref(false),
+      error: ref(null),
+      total: ref(0),
+      totalPages: ref(0),
+      searchTotal: ref(0),
+      fetchEvents: vi.fn(),
+      fetchEvent: vi.fn(),
+      fetchFeaturedEvents: vi.fn(),
+      fetchEventCategories: vi.fn(),
+      searchEvents: vi.fn(),
+      setSearchResults: vi.fn()
+    };
+    
+    // Setup mock store return with fresh implementation
+    (useEventsStore as any).mockImplementation(() => mockStore);
   });
-
+  
   afterEach(() => {
+    // Additional cleanup after each test
     vi.restoreAllMocks();
+    vi.useRealTimers();
   });
 
   describe('useEvents', () => {
-    it('should initialize with proper default state', () => {
-      mockGetEvents.mockResolvedValue({
-        events: [],
-        count: 0,
-        correlation_id: 'test-correlation-id'
-      });
-
-      const { events, loading, error, total, page, pageSize, totalPages } = useEvents({
-        enabled: false,
-        immediate: false
-      });
+    it('should initialize with correct default values', () => {
+      const { events, loading, error, total, page, pageSize, totalPages } = useEvents({ enabled: false });
 
       expect(events.value).toEqual([]);
       expect(loading.value).toBe(false);
@@ -86,452 +59,526 @@ describe('useEvents Composables', () => {
       expect(page.value).toBe(1);
       expect(pageSize.value).toBe(10);
       expect(totalPages.value).toBe(0);
-    }, 5000);
+    });
 
-    it('should fetch events with database schema-compliant data', async () => {
-      const mockDatabaseEvents = [
-        createMockDatabaseEvent(),
-        createMockDatabaseEvent({
-          event_id: 'event-uuid-124',
-          title: 'Second Database Event',
-          slug: 'second-database-event',
-          event_type: 'seminar' as const,
-          priority_level: 'high' as const,
-        })
+    it('should fetch events with backend response format including content', async () => {
+      const mockEvents = [
+        {
+          event_id: '123',
+          title: 'Medical Conference 2024',
+          description: 'Annual medical conference',
+          slug: 'medical-conference-2024',
+          publishing_status: 'published',
+          category_id: '456',
+          event_type: 'conference',
+          content: '<h2>Medical Conference 2024</h2><p>Join us for the annual medical conference featuring leading experts in healthcare.</p>',
+          image_url: 'https://storage.azure.com/images/medical-conference.jpg',
+          event_date: '2024-06-15',
+          event_time: '09:00',
+          location: 'Convention Center, New York'
+        }
       ];
 
-      const mockResponse: EventsResponse = {
-        events: mockDatabaseEvents,
-        count: 2,
-        correlation_id: 'events-correlation-id'
-      };
+      // Pre-populate mock store state before component mounts
+      mockStore.events.value = mockEvents;
+      mockStore.total.value = 1;
+      mockStore.loading.value = false;
+      mockStore.error.value = null;
 
-      mockGetEvents.mockResolvedValue(mockResponse);
-
-      const { events, loading, error, total, totalPages, refetch } = useEvents({
-        enabled: false,
-        immediate: false
+      // Mock store behavior to maintain state
+      mockStore.fetchEvents.mockImplementation(async () => {
+        // State is already set above
       });
 
-      expect(loading.value).toBe(false);
-
-      await refetch();
-
-      await nextTick();
-
-      expect(mockGetEvents).toHaveBeenCalledTimes(1);
-      expect(events.value).toHaveLength(2);
-      expect(total.value).toBe(2);
-      expect(totalPages.value).toBe(1);
-      expect(error.value).toBe(null);
-      expect(loading.value).toBe(false);
-
-      // Validate database schema fields are present
-      const firstEvent = events.value[0];
-      expect(firstEvent.event_id).toBeDefined();
-      expect(firstEvent.description).toBeDefined();
-      expect(firstEvent.registration_status).toBeDefined();
-      expect(firstEvent.publishing_status).toBeDefined();
-      expect(firstEvent.event_type).toBeDefined();
-      expect(firstEvent.priority_level).toBeDefined();
-      expect(firstEvent.max_capacity).toBeDefined();
-      expect(firstEvent.is_deleted).toBeDefined();
-      expect(firstEvent.created_on).toBeDefined();
-    }, 5000);
-
-    it('should handle API errors gracefully', async () => {
-      mockGetEvents.mockRejectedValue(new Error('API Error'));
-
-      const { events, loading, error, refetch } = useEvents({
-        enabled: false,
-        immediate: false
+      const TestComponent = defineComponent({
+        setup() {
+          return useEvents({ 
+            page: 1, 
+            pageSize: 10,
+            immediate: false 
+          });
+        },
+        template: '<div></div>'
       });
 
+      const wrapper = mount(TestComponent);
+      const { events, loading, error, total, refetch } = (wrapper.vm as any);
+
+      expect(loading).toBe(false);
+      
       await refetch();
       await nextTick();
 
-      expect(error.value).toBe('API Error');
-      expect(events.value).toEqual([]);
-      expect(loading.value).toBe(false);
-    }, 5000);
-
-    it('should handle query parameters correctly', async () => {
-      mockGetEvents.mockResolvedValue({
-        events: [],
-        count: 0,
-        correlation_id: 'params-correlation-id'
-      });
-
-      const params: GetEventsParams = {
-        page: 2,
-        pageSize: 20,
-        category: 'healthcare',
-        featured: true,
-        sortBy: 'date-desc'
-      };
-
-      const { refetch } = useEvents({
-        enabled: false,
-        immediate: false,
-        ...params
-      });
-
-      await refetch();
-
-      expect(mockGetEvents).toHaveBeenCalledWith(
-        expect.objectContaining(params)
+      expect(events).toEqual(mockEvents);
+      expect(total).toBe(1);
+      expect(loading).toBe(false);
+      expect(error).toBe(null);
+      expect(mockStore.fetchEvents).toHaveBeenCalledWith(
+        { page: 1, pageSize: 10 }, 
+        { useCache: true }
       );
-    }, 5000);
+    });
 
-    it('should handle pagination calculations correctly', async () => {
-      mockGetEvents.mockResolvedValue({
-        events: Array(15).fill(null).map((_, i) => createMockDatabaseEvent({
-          event_id: `event-${i}`,
-          title: `Event ${i}`,
-          slug: `event-${i}`
-        })),
-        count: 150,
-        correlation_id: 'pagination-correlation-id'
+    it('should handle search parameter correctly', async () => {
+      const mockEvents = [
+        {
+          event_id: '789',
+          title: 'Medical Workshop',
+          description: 'Advanced medical procedures',
+          slug: 'medical-workshop',
+          publishing_status: 'published'
+        }
+      ];
+
+      // Pre-populate mock store state
+      mockStore.events.value = mockEvents;
+      mockStore.total.value = 1;
+      mockStore.loading.value = false;
+      mockStore.error.value = null;
+
+      // Mock store behavior
+      mockStore.fetchEvents.mockImplementation(async () => {
+        // State is already set above
       });
 
-      const { total, pageSize, totalPages, refetch } = useEvents({
-        enabled: false,
-        immediate: false,
-        pageSize: 15
+      const TestComponent = defineComponent({
+        setup() {
+          return useEvents({ 
+            search: 'medical',
+            immediate: false 
+          });
+        },
+        template: '<div></div>'
       });
+
+      const wrapper = mount(TestComponent);
+      const { events, refetch } = (wrapper.vm as any);
 
       await refetch();
       await nextTick();
 
-      expect(total.value).toBe(150);
-      expect(pageSize.value).toBe(15);
-      expect(totalPages.value).toBe(10); // 150 / 15 = 10
-    }, 5000);
+      expect(mockStore.fetchEvents).toHaveBeenCalledWith(
+        { search: 'medical' }, 
+        { useCache: true }
+      );
+      expect(events).toEqual(mockEvents);
+    });
+
+    it('should handle category filtering', async () => {
+      const mockEvents = [
+        {
+          event_id: '456',
+          title: 'Healthcare Seminar',
+          category_id: 'healthcare-id'
+        }
+      ];
+
+      // Pre-populate mock store state
+      mockStore.events.value = mockEvents;
+      mockStore.total.value = 1;
+      mockStore.loading.value = false;
+      mockStore.error.value = null;
+
+      // Mock store behavior
+      mockStore.fetchEvents.mockImplementation(async () => {
+        // State is already set above
+      });
+
+      const TestComponent = defineComponent({
+        setup() {
+          return useEvents({ 
+            category: 'healthcare',
+            immediate: false 
+          });
+        },
+        template: '<div></div>'
+      });
+
+      const wrapper = mount(TestComponent);
+      const { events, refetch } = (wrapper.vm as any);
+
+      await refetch();
+      await nextTick();
+
+      expect(mockStore.fetchEvents).toHaveBeenCalledWith(
+        { category: 'healthcare' }, 
+        { useCache: true }
+      );
+    });
+
+    it('should handle API errors with correlation_id', async () => {
+      const errorMessage = 'Events not found';
+
+      // Pre-populate mock store state for error
+      mockStore.events.value = [];
+      mockStore.total.value = 0;
+      mockStore.loading.value = false;
+      mockStore.error.value = errorMessage;
+
+      // Mock store behavior
+      mockStore.fetchEvents.mockImplementation(async () => {
+        // State is already set above
+      });
+
+      const TestComponent = defineComponent({
+        setup() {
+          return useEvents({ immediate: false });
+        },
+        template: '<div></div>'
+      });
+
+      const wrapper = mount(TestComponent);
+      const { events, loading, error, refetch } = (wrapper.vm as any);
+
+      await refetch();
+      await nextTick();
+
+      expect(events).toEqual([]);
+      expect(loading).toBe(false);
+      expect(error).toBe(errorMessage);
+    });
+
+    it('should handle rate limiting errors', async () => {
+      const errorMessage = 'Rate limit exceeded: Too many requests';
+
+      // Pre-populate mock store state for rate limit error
+      mockStore.events.value = [];
+      mockStore.total.value = 0;
+      mockStore.loading.value = false;
+      mockStore.error.value = errorMessage;
+
+      // Mock store behavior
+      mockStore.fetchEvents.mockImplementation(async () => {
+        // State is already set above
+      });
+
+      const TestComponent = defineComponent({
+        setup() {
+          return useEvents({ immediate: false });
+        },
+        template: '<div></div>'
+      });
+
+      const wrapper = mount(TestComponent);
+      const { error, refetch } = (wrapper.vm as any);
+
+      await refetch();
+      await nextTick();
+
+      expect(error).toBe(errorMessage);
+    });
   });
 
   describe('useEvent', () => {
-    it('should fetch single event by slug', async () => {
-      const mockEvent = createMockDatabaseEvent({
-        slug: 'single-event-test'
-      });
-
-      const mockResponse: EventResponse = {
-        event: mockEvent,
-        correlation_id: 'single-event-correlation-id'
+    it('should fetch event by slug with backend format', async () => {
+      const mockEvent = {
+        event_id: '123',
+        title: 'Medical Conference 2024',
+        description: 'Comprehensive medical conference',
+        slug: 'medical-conference',
+        publishing_status: 'published',
+        category_id: '456',
+        event_type: 'conference',
+        content: '<h2>Medical Conference 2024</h2><p>Join us for comprehensive medical training including:</p><ul><li>Advanced diagnostic techniques</li><li>Treatment protocols</li><li>Research presentations</li><li>Networking sessions</li></ul><p>Contact us to register.</p>'
       };
 
-      mockGetEventBySlug.mockResolvedValue(mockResponse);
+      // Pre-populate mock store state
+      mockStore.loading.value = false;
+      mockStore.error.value = null;
 
-      const slugRef = ref('single-event-test');
-      const { event, loading, error } = useEvent(slugRef);
+      // Mock store behavior
+      mockStore.fetchEvent.mockResolvedValueOnce(mockEvent);
 
-      await nextTick();
-
-      expect(mockGetEventBySlug).toHaveBeenCalledWith('single-event-test');
-      expect(event.value).toEqual(mockEvent);
-      expect(loading.value).toBe(false);
-      expect(error.value).toBe(null);
-
-      // Validate database schema compliance
-      expect(event.value?.event_id).toBeDefined();
-      expect(event.value?.description).toBeDefined();
-      expect(event.value?.registration_status).toBeDefined();
-    }, 5000);
-
-    it('should handle slug changes reactively', async () => {
-      mockGetEventBySlug.mockResolvedValue({
-        event: createMockDatabaseEvent(),
-        correlation_id: 'reactive-correlation-id'
+      const TestComponent = defineComponent({
+        setup() {
+          return useEvent(ref('medical-conference'));
+        },
+        template: '<div></div>'
       });
 
-      const slugRef = ref('initial-slug');
-      const { refetch } = useEvent(slugRef);
+      const wrapper = mount(TestComponent);
+      // Wait for initial fetch
+      await nextTick();
+      await new Promise(resolve => setTimeout(resolve, 0));
 
+      const { event, loading, error, refetch } = (wrapper.vm as any);
+
+      expect(event).toEqual(mockEvent);
+      expect(loading).toBe(false);
+      expect(error).toBe(null);
+      expect(mockStore.fetchEvent).toHaveBeenCalledWith('medical-conference');
+    });
+
+    it('should handle null slug gracefully', async () => {
+      // Pre-populate mock store state
+      mockStore.loading.value = false;
+      mockStore.error.value = null;
+
+      const TestComponent = defineComponent({
+        setup() {
+          return useEvent(ref(null));
+        },
+        template: '<div></div>'
+      });
+
+      const wrapper = mount(TestComponent);
       await nextTick();
 
-      expect(mockGetEventBySlug).toHaveBeenCalledWith('initial-slug');
+      const { event, loading } = (wrapper.vm as any);
+
+      expect(event).toBe(null);
+      expect(loading).toBe(false);
+      expect(mockStore.fetchEvent).not.toHaveBeenCalled();
+    });
+
+    it('should react to slug changes', async () => {
+      const mockEvent1 = { event_id: '1', title: 'Event 1', slug: 'event-1' };
+      const mockEvent2 = { event_id: '2', title: 'Event 2', slug: 'event-2' };
+
+      // Pre-populate mock store state
+      mockStore.loading.value = false;
+      mockStore.error.value = null;
+
+      // Mock store behavior for sequential calls
+      mockStore.fetchEvent
+        .mockResolvedValueOnce(mockEvent1)
+        .mockResolvedValueOnce(mockEvent2);
+
+      const slugRef = ref('event-1');
+      
+      const TestComponent = defineComponent({
+        setup() {
+          return useEvent(slugRef);
+        },
+        template: '<div></div>'
+      });
+
+      const wrapper = mount(TestComponent);
+      await nextTick();
+      await new Promise(resolve => setTimeout(resolve, 0));
+
+      const { event } = (wrapper.vm as any);
+      expect(event).toEqual(mockEvent1);
 
       // Change slug
-      slugRef.value = 'updated-slug';
+      slugRef.value = 'event-2';
       await nextTick();
+      await new Promise(resolve => setTimeout(resolve, 0));
 
-      expect(mockGetEventBySlug).toHaveBeenCalledWith('updated-slug');
-      expect(mockGetEventBySlug).toHaveBeenCalledTimes(2);
-    }, 5000);
-
-    it('should handle empty slug gracefully', async () => {
-
-      const { event, loading } = useEvent(ref(null));
-
-      await nextTick();
-
-      expect(mockGetEventBySlug).not.toHaveBeenCalled();
-      expect(event.value).toBe(null);
-      expect(loading.value).toBe(false);
-    }, 5000);
-
-    it('should handle API errors', async () => {
-      mockGetEventBySlug.mockRejectedValue(new Error('Event not found'));
-
-      const { event, error, loading } = useEvent('non-existent-slug');
-
-      await nextTick();
-
-      expect(error.value).toBe('Event not found');
-      expect(event.value).toBe(null);
-      expect(loading.value).toBe(false);
-    }, 5000);
+      expect(event).toEqual(mockEvent2);
+      expect(mockStore.fetchEvent).toHaveBeenCalledTimes(2);
+    });
   });
 
   describe('useFeaturedEvents', () => {
-    it('should fetch featured events', async () => {
+    it('should fetch published events for featured display', async () => {
       const mockFeaturedEvents = [
-        createMockDatabaseEvent({ title: 'Featured Event 1' }),
-        createMockDatabaseEvent({ 
-          event_id: 'event-uuid-125',
-          title: 'Featured Event 2',
-          slug: 'featured-event-2',
-          priority_level: 'high' as const
-        })
+        {
+          event_id: '789',
+          title: 'Featured Medical Seminar',
+          publishing_status: 'published',
+          featured: true
+        },
+        {
+          event_id: '101',
+          title: 'Featured Healthcare Workshop',
+          publishing_status: 'published',
+          featured: true
+        }
       ];
 
-      const mockResponse: EventsResponse = {
-        events: mockFeaturedEvents,
-        count: 2,
-        correlation_id: 'featured-correlation-id'
-      };
+      // Pre-populate mock store state
+      mockStore.featuredEvents.value = mockFeaturedEvents;
+      mockStore.loading.value = false;
+      mockStore.error.value = null;
 
-      mockGetFeaturedEvents.mockResolvedValue(mockResponse);
+      // Mock store behavior
+      mockStore.fetchFeaturedEvents.mockImplementation(async () => {
+        // State is already set above
+      });
 
-      const { events, loading, error } = useFeaturedEvents();
+      const TestComponent = defineComponent({
+        setup() {
+          return useFeaturedEvents();
+        },
+        template: '<div></div>'
+      });
 
+      const wrapper = mount(TestComponent);
       await nextTick();
+      await new Promise(resolve => setTimeout(resolve, 0));
 
-      expect(mockGetFeaturedEvents).toHaveBeenCalledWith(undefined);
-      expect(events.value).toHaveLength(2);
-      expect(loading.value).toBe(false);
-      expect(error.value).toBe(null);
+      const { events, loading, error } = (wrapper.vm as any);
 
-      // Validate database schema compliance
-      expect(events.value[0].event_id).toBeDefined();
-      expect(events.value[0].publishing_status).toBeDefined();
-    }, 5000);
+      expect(events).toEqual(mockFeaturedEvents);
+      expect(loading).toBe(false);
+      expect(error).toBe(null);
+      expect(mockStore.fetchFeaturedEvents).toHaveBeenCalledWith(undefined);
+    });
 
     it('should handle limit parameter', async () => {
-      mockGetFeaturedEvents.mockResolvedValue({
-        events: [],
-        count: 0,
-        correlation_id: 'featured-limit-correlation-id'
-      });
-
-      const limitRef = ref(5);
-      useFeaturedEvents(limitRef);
-
-      await nextTick();
-
-      expect(mockGetFeaturedEvents).toHaveBeenCalledWith(5);
-    }, 5000);
-
-    it('should handle limit changes reactively', async () => {
-      mockGetFeaturedEvents.mockResolvedValue({
-        events: [],
-        count: 0,
-        correlation_id: 'featured-reactive-correlation-id'
-      });
-
-      const limitRef = ref(3);
-      useFeaturedEvents(limitRef);
-
-      await nextTick();
-      expect(mockGetFeaturedEvents).toHaveBeenCalledWith(3);
-
-      limitRef.value = 7;
-      await nextTick();
-      expect(mockGetFeaturedEvents).toHaveBeenCalledWith(7);
-      expect(mockGetFeaturedEvents).toHaveBeenCalledTimes(2);
-    }, 5000);
-  });
-
-  describe('useSearchEvents', () => {
-    it('should search events with query', async () => {
-      const mockSearchResults = [
-        createMockDatabaseEvent({ title: 'Search Result 1' }),
-        createMockDatabaseEvent({
-          event_id: 'event-uuid-126',
-          title: 'Search Result 2',
-          slug: 'search-result-2',
-          event_type: 'conference' as const
-        })
+      const mockLimitedEvents = [
+        { event_id: '1', title: 'Event 1', publishing_status: 'published' }
       ];
 
-      const mockResponse: EventsResponse = {
-        events: mockSearchResults,
-        count: 2,
-        correlation_id: 'search-correlation-id'
-      };
+      // Pre-populate mock store state
+      mockStore.featuredEvents.value = mockLimitedEvents;
+      mockStore.loading.value = false;
+      mockStore.error.value = null;
 
-      mockSearchEvents.mockResolvedValue(mockResponse);
-
-      const { results, loading, error, total, search } = useSearchEvents();
-
-      await search('healthcare workshop', {
-        page: 1,
-        pageSize: 10,
-        category: 'medical'
+      // Mock store behavior
+      mockStore.fetchFeaturedEvents.mockImplementation(async () => {
+        // State is already set above
       });
 
-      expect(mockSearchEvents).toHaveBeenCalledWith({
-        q: 'healthcare workshop',
-        page: 1,
-        pageSize: 10,
-        category: 'medical'
-      });
-      expect(results.value).toHaveLength(2);
-      expect(total.value).toBe(2);
-      expect(loading.value).toBe(false);
-      expect(error.value).toBe(null);
+      const { events } = useFeaturedEvents(5);
 
-      // Validate database schema compliance
-      expect(results.value[0].event_id).toBeDefined();
-      expect(results.value[0].event_type).toBeDefined();
-    }, 5000);
+      await nextTick();
+      await new Promise(resolve => setTimeout(resolve, 0));
 
-    it('should handle empty search queries', async () => {
-      const { results, total, totalPages, search } = useSearchEvents();
-
-      await search('');
-
-      expect(results.value).toEqual([]);
-      expect(total.value).toBe(0);
-      expect(totalPages.value).toBe(0);
-    }, 5000);
-
-    it('should handle search errors', async () => {
-      mockSearchEvents.mockRejectedValue(new Error('Search failed'));
-
-      const { results, error, loading, search } = useSearchEvents();
-
-      await search('test query');
-
-      expect(error.value).toBe('Search failed');
-      expect(results.value).toEqual([]);
-      expect(loading.value).toBe(false);
-    }, 5000);
-
-    it('should calculate pagination correctly for search results', async () => {
-      mockSearchEvents.mockResolvedValue({
-        events: Array(5).fill(null).map((_, i) => createMockDatabaseEvent({
-          event_id: `search-result-${i}`,
-          title: `Search Result ${i}`,
-          slug: `search-result-${i}`
-        })),
-        count: 50,
-        correlation_id: 'search-pagination-correlation-id'
-      });
-
-      const { total, page, pageSize, totalPages, search } = useSearchEvents();
-
-      await search('test query', {
-        page: 2,
-        pageSize: 5
-      });
-
-      expect(total.value).toBe(50);
-      expect(page.value).toBe(2);
-      expect(pageSize.value).toBe(5);
-      expect(totalPages.value).toBe(10); // 50 / 5 = 10
-    }, 5000);
-
-    it('should handle search options correctly', async () => {
-      mockSearchEvents.mockResolvedValue({
-        events: [],
-        count: 0,
-        correlation_id: 'search-options-correlation-id'
-      });
-
-      const { search } = useSearchEvents();
-
-      const searchOptions: Partial<SearchEventsParams> = {
-        page: 3,
-        pageSize: 25,
-        category: 'healthcare',
-        sortBy: 'date-desc'
-      };
-
-      await search('medical conference', searchOptions);
-
-      expect(mockSearchEvents).toHaveBeenCalledWith({
-        q: 'medical conference',
-        page: 3,
-        pageSize: 25,
-        category: 'healthcare',
-        sortBy: 'date-desc'
-      });
-    }, 5000);
+      expect(mockStore.fetchFeaturedEvents).toHaveBeenCalledWith(5);
+    });
   });
 
-  describe('Reactive State Management', () => {
-    it('should maintain proper loading states during transitions', async () => {
-      
-      // Simulate slow API call
-      let resolvePromise: (value: EventsResponse) => void;
-      const slowPromise = new Promise<EventsResponse>((resolve) => {
-        resolvePromise = resolve;
+  describe('useEventCategories', () => {
+    it('should fetch categories with backend format', async () => {
+      const mockCategories = [
+        {
+          category_id: '456',
+          name: 'Medical Events',
+          slug: 'medical-events',
+          order_number: 1,
+          is_default_unassigned: false
+        },
+        {
+          category_id: '789',
+          name: 'Educational Events',
+          slug: 'educational-events',
+          order_number: 2,
+          is_default_unassigned: false
+        }
+      ];
+
+      // Pre-populate mock store state
+      mockStore.categories.value = mockCategories;
+      mockStore.loading.value = false;
+      mockStore.error.value = null;
+
+      // Mock store behavior
+      mockStore.fetchEventCategories.mockImplementation(async () => {
+        // State is already set above
       });
-      mockGetEvents.mockReturnValue(slowPromise);
 
-      const { loading, refetch } = useEvents({
-        enabled: false,
-        immediate: false
+      const TestComponent = defineComponent({
+        setup() {
+          return useEventCategories();
+        },
+        template: '<div></div>'
       });
 
-      expect(loading.value).toBe(false);
-
-      const fetchPromise = refetch();
-      
-      // Should be loading during fetch
-      expect(loading.value).toBe(true);
-
-      // Resolve the promise
-      resolvePromise!({
-        events: [],
-        count: 0,
-        correlation_id: 'loading-test-correlation-id'
-      });
-
-      await fetchPromise;
+      const wrapper = mount(TestComponent);
       await nextTick();
+      await new Promise(resolve => setTimeout(resolve, 0));
 
-      // Should not be loading after fetch completes
-      expect(loading.value).toBe(false);
-    }, 5000);
+      const { categories, loading, error } = (wrapper.vm as any);
 
-    it('should properly clear errors when making new requests', async () => {
-      
-      // First call fails
-      mockGetEvents.mockRejectedValueOnce(new Error('First error'));
-      
-      const { error, refetch } = useEvents({
-        enabled: false,
-        immediate: false
+      expect(categories).toEqual(mockCategories);
+      expect(loading).toBe(false);
+      expect(error).toBe(null);
+      expect(mockStore.fetchEventCategories).toHaveBeenCalled();
+    });
+
+    it('should handle empty categories response', async () => {
+      // Pre-populate mock store state for empty response
+      mockStore.categories.value = [];
+      mockStore.loading.value = false;
+      mockStore.error.value = null;
+
+      // Mock store behavior
+      mockStore.fetchEventCategories.mockImplementation(async () => {
+        // State is already set above
       });
+
+      const { categories } = useEventCategories();
+
+      await nextTick();
+      await new Promise(resolve => setTimeout(resolve, 0));
+
+      expect(categories.value).toEqual([]);
+    });
+  });
+
+  describe('error handling across composables', () => {
+    it('should handle network errors consistently', async () => {
+      const errorMessage = 'Network connection failed';
+      
+      // Pre-populate mock store state for network error
+      mockStore.events.value = [];
+      mockStore.total.value = 0;
+      mockStore.loading.value = false;
+      mockStore.error.value = errorMessage;
+
+      // Mock store behavior
+      mockStore.fetchEvents.mockImplementation(async () => {
+        // State is already set above
+      });
+
+      const { error, refetch } = useEvents({ immediate: false });
 
       await refetch();
       await nextTick();
 
-      expect(error.value).toBe('First error');
+      expect(error.value).toBe(errorMessage);
+    });
+
+    it('should handle timeout errors', async () => {
+      const errorMessage = 'Request timeout after 5000ms';
+      
+      // Pre-populate mock store state for timeout error
+      mockStore.loading.value = false;
+      mockStore.error.value = errorMessage;
+
+      // Mock store behavior
+      mockStore.fetchEvent.mockImplementation(async () => {
+        // State is already set above
+        return null;
+      });
+
+      const { error } = useEvent(ref('test-event'));
+
+      await nextTick();
+      await new Promise(resolve => setTimeout(resolve, 0));
+
+      expect(error.value).toBe(errorMessage);
+    });
+
+    it('should reset error state on successful refetch', async () => {
+      const mockEvents = [{ event_id: '1', title: 'Test Event' }];
+
+      // Mock store behavior for error then success
+      mockStore.fetchEvents
+        .mockImplementationOnce(async () => {
+          mockStore.error.value = 'Temporary error';
+          mockStore.events.value = [];
+          mockStore.loading.value = false;
+        })
+        .mockImplementationOnce(async () => {
+          mockStore.error.value = null;
+          mockStore.events.value = mockEvents;
+          mockStore.loading.value = false;
+        });
+
+      const { error, refetch } = useEvents({ immediate: false });
+
+      // First call fails
+      await refetch();
+      await nextTick();
+      expect(error.value).toBe('Temporary error');
 
       // Second call succeeds
-      mockGetEvents.mockResolvedValueOnce({
-        events: [],
-        count: 0,
-        correlation_id: 'error-clear-correlation-id'
-      });
-
       await refetch();
       await nextTick();
-
       expect(error.value).toBe(null);
-    }, 5000);
+    });
   });
 });

@@ -1,136 +1,115 @@
 <template>
-  <div class="bg-gray-50 dark:bg-gray-800/50 rounded py-3 px-6">
-    <div class="flex flex-wrap items-center gap-2">
-      <span class="text-sm text-gray-600 dark:text-gray-400 mr-2">Filter by:</span>
-
-      <!-- Mobile Dropdown - Hidden on md and up -->
-      <div class="md:hidden w-full">
-        <Select v-model="activeFilter" @update:modelValue="handleFilterChange">
-          <SelectTrigger class="w-full">
-            <SelectValue placeholder="Select filter" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem
-              v-for="option in props.filterOptions"
-              :key="option.value"
-              :value="option.value"
-            >
-              {{ option.label }}
-            </SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
-      <!-- Desktop Buttons - Hidden on mobile -->
-      <div class="hidden md:flex md:flex-wrap md:items-center md:gap-2">
-        <button
-          v-for="option in props.filterOptions"
-          :key="option.value"
-          :class="[
-            'filter-btn px-3 py-1 text-sm font-medium rounded transition-colors',
-            activeFilter === option.value
-              ? 'active bg-blue-500 text-white border-blue-500'
-              : 'border border-gray-300 bg-white text-gray-900 md:hover:bg-gray-50',
-          ]"
-          :data-filter="option.value"
-          @click="handleFilterChange(option.value)"
-        >
-          {{ option.label }}
-        </button>
-      </div>
-    </div>
-  </div>
+  <!-- Delivery Mode Filter -->
+  <GenericFilter
+    v-if="deliveryModeConfig"
+    filter-name="delivery_mode"
+    label="Filter by"
+    placeholder="Select delivery mode"
+    :options="deliveryModeConfig.options"
+    :model-value="currentDeliveryMode"
+    @filter-change="handleDeliveryModeChange"
+  />
+  
+  <!-- Category Filter (if enabled) -->
+  <GenericFilter
+    v-if="enableCategoryFilter && categoryConfig"
+    filter-name="category"
+    label="Category"
+    placeholder="Select category"
+    :options="categoryConfig.options"
+    :model-value="currentCategory"
+    @filter-change="handleCategoryChange"
+  />
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/vue-ui';
-
-interface FilterOption {
-  value: string;
-  label: string;
-}
+import { ref, computed, watch } from 'vue';
+import GenericFilter from './base/GenericFilter.vue';
+import { useServicesFiltering, useServicesDeliveryModeFiltering } from '../composables/filtering/useServicesFiltering';
 
 interface ServicesFilterProps {
-  filterOptions?: FilterOption[];
-  onFilterChange?: (filter: string) => void;
+  enableCategoryFilter?: boolean;
+  enableDeliveryModeFilter?: boolean;
+  onFilterChange?: (filters: { delivery_mode?: string; category?: string }) => void;
+}
+
+interface ServicesFilterEmits {
+  (e: 'filtered-services', services: any[]): void;
+  (e: 'filter-change', filters: { delivery_mode?: string; category?: string }): void;
 }
 
 const props = withDefaults(defineProps<ServicesFilterProps>(), {
-  filterOptions: () => [{ value: 'all', label: 'Show All' }],
+  enableCategoryFilter: false,
+  enableDeliveryModeFilter: true,
 });
 
-const activeFilter = ref<string>('all');
+const emit = defineEmits<ServicesFilterEmits>();
 
-const handleFilterChange = (filter: string) => {
-  activeFilter.value = filter;
+// Use the services filtering composable
+const {
+  filteredServices,
+  deliveryModeFilterConfig,
+  categoryFilterConfig,
+  filters,
+  setDeliveryModeFilter,
+  setCategoryFilter,
+} = useServicesFiltering({}, {
+  enableCategoryFilter: props.enableCategoryFilter,
+  enableDeliveryModeFilter: props.enableDeliveryModeFilter,
+  includeCounts: true,
+});
 
-  // Apply the same filtering logic as the original buttons
-  const serviceCards = document.querySelectorAll('.service-card');
-  const filterButtons = document.querySelectorAll('.filter-btn');
+// Current filter values
+const currentDeliveryMode = computed(() => {
+  const value = filters.value.delivery_mode;
+  return Array.isArray(value) ? value[0] || '' : value || '';
+});
 
-  // Update button active states (for desktop)
-  filterButtons.forEach(btn => btn.classList.remove('active'));
-  const targetButton = document.querySelector(`[data-filter="${filter}"]`);
-  if (targetButton) {
-    targetButton.classList.add('active');
-  }
+const currentCategory = computed(() => {
+  const value = filters.value.category;
+  return Array.isArray(value) ? value[0] || '' : value || '';
+});
 
-  serviceCards.forEach(card => {
-    let show = false;
+// Filter configurations for UI
+const deliveryModeConfig = computed(() => deliveryModeFilterConfig.value);
+const categoryConfig = computed(() => categoryFilterConfig.value);
 
-    if (filter === 'all') {
-      show = true;
-    } else {
-      // Check if the card has the data attribute for this delivery mode
-      show = card.getAttribute(`data-${filter}`) === 'true';
-    }
+// Handle filter changes
+const handleDeliveryModeChange = (filterName: string, value: string | string[]) => {
+  const filterValue = Array.isArray(value) ? value[0] || '' : value || '';
+  setDeliveryModeFilter(filterValue);
+  emitFilterChange();
+};
 
-    if (show) {
-      card.classList.remove('hidden');
-    } else {
-      card.classList.add('hidden');
+const handleCategoryChange = (filterName: string, value: string | string[]) => {
+  const filterValue = Array.isArray(value) ? value[0] || '' : value || '';
+  setCategoryFilter(filterValue);
+  emitFilterChange();
+};
+
+// Emit filter changes
+const emitFilterChange = () => {
+  const filterValues = {
+    delivery_mode: currentDeliveryMode.value || undefined,
+    category: currentCategory.value || undefined,
+  };
+  
+  // Remove empty values
+  Object.keys(filterValues).forEach(key => {
+    if (!filterValues[key as keyof typeof filterValues]) {
+      delete filterValues[key as keyof typeof filterValues];
     }
   });
 
-  // Check if any categories are empty and hide them
-  document.querySelectorAll('.service-category').forEach(category => {
-    const visibleCards = category.querySelectorAll('.service-card:not(.hidden)');
-    if (visibleCards.length === 0) {
-      (category as HTMLElement).style.display = 'none';
-    } else {
-      (category as HTMLElement).style.display = 'block';
-    }
-  });
-
+  emit('filter-change', filterValues);
+  
   if (props.onFilterChange) {
-    props.onFilterChange(filter);
+    props.onFilterChange(filterValues);
   }
 };
 
-const handleButtonClick = (event: Event) => {
-  const button = event.target as HTMLButtonElement;
-  const filter = button.getAttribute('data-filter');
-  if (filter) {
-    activeFilter.value = filter;
-  }
-};
-
-onMounted(() => {
-  const filterButtons = document.querySelectorAll('.filter-btn');
-
-  filterButtons.forEach(button => {
-    button.addEventListener('click', handleButtonClick);
-  });
-
-  // Initialize the default filter (Show All) on component mount
-  handleFilterChange('all');
-});
-
-onUnmounted(() => {
-  const filterButtons = document.querySelectorAll('.filter-btn');
-  filterButtons.forEach(button => {
-    button.removeEventListener('click', handleButtonClick);
-  });
-});
+// Watch filtered services and emit them
+watch(filteredServices, (services) => {
+  emit('filtered-services', services);
+}, { immediate: true });
 </script>

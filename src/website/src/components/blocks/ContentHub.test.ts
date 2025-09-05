@@ -4,9 +4,14 @@ import { ref, nextTick } from 'vue';
 import ContentHub from './ContentHub.vue';
 
 // Mock composables
-vi.mock('@/lib/clients/composables/useNews');
-vi.mock('@/composables/useResearch');
-vi.mock('@/composables/useEvents');
+vi.mock('@/composables/', () => ({
+  useNews: vi.fn(),
+  useFeaturedNews: vi.fn(),
+  useResearchArticles: vi.fn(),
+  useFeaturedResearch: vi.fn(),
+  useEvents: vi.fn(),
+  useFeaturedEvents: vi.fn()
+}));
 
 // Mock child components
 vi.mock('../UnifiedContentCTA.vue', () => ({

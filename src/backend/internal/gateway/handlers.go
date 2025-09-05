@@ -13,18 +13,28 @@ import (
 
 // GatewayHandler handles HTTP requests for the gateway
 type GatewayHandler struct {
-	config       *GatewayConfiguration
-	serviceProxy *ServiceProxy
-	middleware   *Middleware
+	config            *GatewayConfiguration
+	serviceProxy      *ServiceProxy
+	middleware        *Middleware
+	subscriberHandler *SubscriberHandler
 }
 
 // NewGatewayHandler creates a new gateway handler
 func NewGatewayHandler(config *GatewayConfiguration, serviceProxy *ServiceProxy, middleware *Middleware) *GatewayHandler {
-	return &GatewayHandler{
+	handler := &GatewayHandler{
 		config:       config,
 		serviceProxy: serviceProxy,
 		middleware:   middleware,
 	}
+	
+	// Initialize subscriber handler for admin gateways
+	if config.IsAdmin() {
+		// Note: In a full implementation, database connection would be injected
+		// For now, we create a placeholder that will be initialized when needed
+		handler.subscriberHandler = nil // Will be set in gateway service initialization
+	}
+	
+	return handler
 }
 
 // RegisterRoutes registers gateway routes with the router
@@ -63,6 +73,14 @@ func (h *GatewayHandler) RegisterRoutes(router *mux.Router) {
 	
 	// Gateway information endpoint
 	router.HandleFunc("/gateway/info", h.GatewayInfo).Methods("GET")
+	
+	// Admin-specific routes (subscriber management)
+	if h.config.IsAdmin() && h.subscriberHandler != nil {
+		h.subscriberHandler.RegisterSubscriberRoutes(router)
+		
+		// Additional admin health check endpoint for subscriber management
+		router.HandleFunc("/admin/subscribers/health", h.subscriberHandler.SubscriberHealthCheck).Methods("GET")
+	}
 }
 
 // ProxyToContentAPI proxies requests to content API service
@@ -360,4 +378,14 @@ func (h *GatewayHandler) CreateRouter() *mux.Router {
 // GetConfiguration returns the gateway configuration
 func (h *GatewayHandler) GetConfiguration() *GatewayConfiguration {
 	return h.config
+}
+
+// SetSubscriberHandler sets the subscriber handler for admin gateways
+func (h *GatewayHandler) SetSubscriberHandler(subscriberHandler *SubscriberHandler) {
+	h.subscriberHandler = subscriberHandler
+}
+
+// GetSubscriberHandler returns the subscriber handler
+func (h *GatewayHandler) GetSubscriberHandler() *SubscriberHandler {
+	return h.subscriberHandler
 }

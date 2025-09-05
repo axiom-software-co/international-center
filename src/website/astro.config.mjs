@@ -6,12 +6,14 @@ import node from '@astrojs/node';
 
 // https://astro.build/config
 export default defineConfig({
-  output: 'hybrid', // Enable hybrid rendering for API endpoints
+  output: 'server', // Enable server-side rendering with dynamic routes
   adapter: node({
     mode: 'standalone'
   }),
   integrations: [
-    vue(),
+    vue({
+      appEntrypoint: '/src/plugins/vue-app.ts'
+    }),
     tailwind({
       applyBaseStyles: false, // We'll handle base styles ourselves for shadcn/ui
     }),
@@ -36,7 +38,7 @@ export default defineConfig({
         output: {
           // Enhanced chunking strategy for optimal CDN caching
           manualChunks: {
-            'vue-vendor': ['vue', '@vueuse/core'],
+            'vue-vendor': ['vue', '@vueuse/core', 'pinia'],
             'ui-vendor': ['lucide-vue-next', 'radix-vue'],
             utils: ['clsx', 'tailwind-merge'],
           },
@@ -73,7 +75,7 @@ export default defineConfig({
     },
     // Optimize dependencies for better CDN caching
     optimizeDeps: {
-      include: ['vue', '@vueuse/core', 'lucide-vue-next', 'radix-vue'],
+      include: ['vue', '@vueuse/core', 'pinia', 'lucide-vue-next', 'radix-vue'],
       exclude: [],
     },
   },

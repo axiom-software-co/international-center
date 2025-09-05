@@ -3,33 +3,33 @@ runtime: go
 description: Component-first infrastructure deployment for International Center platform
 
 config:
-  environment:
+  international-center-cicd:environment:
     type: string
     description: Environment name (development, staging, production)
   
-  azure:location:
+  international-center-cicd:azure-location:
     type: string
     description: Azure region for resource deployment
     default: eastus2
   
-  project:name:
+  international-center-cicd:project-name:
     type: string
     description: Project name for resource naming
     default: international-center
   
-  international-center-cicd:app:version:
+  international-center-cicd:app-version:
     type: string
     description: Application version for deployment tagging
     default: "1.0.0"
 
 template:
   config:
-    azure:location:
+    international-center-cicd:azure-location:
       description: Azure region for resource deployment
       default: eastus2
-    environment:
+    international-center-cicd:environment:
       description: Environment name (development, staging, production)
       default: development
-    project:name:
+    international-center-cicd:project-name:
       description: Project name for resource naming
       default: international-center

@@ -3,6 +3,7 @@ package components
 import (
 	"fmt"
 
+	"github.com/pulumi/pulumi-command/sdk/go/command/local"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi/config"
 )
@@ -35,11 +36,16 @@ func DeployDatabase(ctx *pulumi.Context, cfg *config.Config, environment string)
 
 // deployDevelopmentDatabase deploys PostgreSQL container for development
 func deployDevelopmentDatabase(ctx *pulumi.Context, cfg *config.Config) (*DatabaseOutputs, error) {
-	// For development, we use a PostgreSQL container
-	// In a real implementation, this would create a docker container resource
-	// For now, we'll return the expected outputs for testing
+	// Create PostgreSQL container using Podman
+	dbContainer, err := local.NewCommand(ctx, "postgresql-container", &local.CommandArgs{
+		Create: pulumi.String("podman run -d --name postgresql-dev -e POSTGRES_USER=user -e POSTGRES_PASSWORD=password -e POSTGRES_DB=international_center -p 5432:5432 postgres:15-alpine"),
+		Delete: pulumi.String("podman stop postgresql-dev && podman rm postgresql-dev"),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create PostgreSQL container: %w", err)
+	}
 
-	deploymentType := pulumi.String("container").ToStringOutput()
+	deploymentType := pulumi.String("podman_container").ToStringOutput()
 	instanceType := pulumi.String("postgresql").ToStringOutput()
 	connectionString := pulumi.String("postgresql://user:password@localhost:5432/international_center").ToStringOutput()
 	port := pulumi.Int(5432).ToIntOutput()
@@ -47,6 +53,11 @@ func deployDevelopmentDatabase(ctx *pulumi.Context, cfg *config.Config) (*Databa
 	storageSize := pulumi.String("1GB").ToStringOutput()
 	backupRetention := pulumi.String("7d").ToStringOutput()
 	highAvailability := pulumi.Bool(false).ToBoolOutput()
+
+	// Add dependency on container creation
+	connectionString = pulumi.All(dbContainer.Stdout).ApplyT(func(args []interface{}) string {
+		return "postgresql://user:password@localhost:5432/international_center"
+	}).(pulumi.StringOutput)
 
 	return &DatabaseOutputs{
 		DeploymentType:    deploymentType,

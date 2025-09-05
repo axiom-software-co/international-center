@@ -2,21 +2,41 @@
 // Tests validate useResearch composables with database schema-compliant reactive state
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { ref, nextTick } from 'vue';
-import { useResearchArticles, useResearchArticle, useFeaturedResearch, useSearchResearch } from './useResearch';
+import { ref, nextTick, defineComponent } from 'vue';
+import { mount } from '@vue/test-utils';
+import { useResearchArticles, useResearchArticle, useFeaturedResearch, useFeaturedResearchArticles, useSearchResearch } from './useResearch';
 import type { ResearchArticle, ResearchResponse, ResearchArticleResponse, GetResearchParams, SearchResearchParams } from '../lib/clients/research/types';
 
-// Mock the research client
+// Mock the researchClient singleton with hoisted functions
+const {
+  mockGetResearchArticles,
+  mockGetResearchArticleBySlug,
+  mockGetFeaturedResearch,
+  mockSearchResearch
+} = vi.hoisted(() => {
+  const mockGetResearchArticlesFunc = vi.fn();
+  const mockGetResearchArticleBySlugFunc = vi.fn();
+  const mockGetFeaturedResearchFunc = vi.fn();
+  const mockSearchResearchFunc = vi.fn();
+  
+  return {
+    mockGetResearchArticles: mockGetResearchArticlesFunc,
+    mockGetResearchArticleBySlug: mockGetResearchArticleBySlugFunc,
+    mockGetFeaturedResearch: mockGetFeaturedResearchFunc,
+    mockSearchResearch: mockSearchResearchFunc,
+  };
+});
+
 vi.mock('../lib/clients', () => ({
   researchClient: {
-    getResearchArticles: vi.fn(),
-    getResearchArticleBySlug: vi.fn(),
-    getFeaturedResearch: vi.fn(),
-    searchResearch: vi.fn(),
-  }
+    getResearchArticles: mockGetResearchArticles,
+    getResearchArticleBySlug: mockGetResearchArticleBySlug,
+    getFeaturedResearch: mockGetFeaturedResearch,
+    searchResearch: mockSearchResearch,
+  },
+  // Pass through any types that might be imported
+  ...vi.importActual('../lib/clients')
 }));
-
-import { researchClient } from '../lib/clients';
 
 // Database schema-compliant mock research article for testing
 const createMockDatabaseResearch = (overrides: Partial<any> = {}): any => ({
@@ -47,7 +67,10 @@ const createMockDatabaseResearch = (overrides: Partial<any> = {}): any => ({
 
 describe('useResearch Composables', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    mockGetResearchArticles.mockClear();
+    mockGetResearchArticleBySlug.mockClear();
+    mockGetFeaturedResearch.mockClear();
+    mockSearchResearch.mockClear();
   });
 
   afterEach(() => {
@@ -56,8 +79,7 @@ describe('useResearch Composables', () => {
 
   describe('useResearchArticles', () => {
     it('should initialize with proper default state', () => {
-      const mockResearchClient = vi.mocked(researchClient);
-      mockResearchClient.getResearchArticles.mockResolvedValue({
+      const mockResponse: ResearchResponse = {
         data: [],
         pagination: {
           page: 1,
@@ -66,7 +88,9 @@ describe('useResearch Composables', () => {
           totalPages: 0
         },
         success: true
-      });
+      };
+      
+      mockGetResearchArticles.mockResolvedValue(mockResponse);
 
       const { articles, loading, error, total, page, pageSize, totalPages } = useResearchArticles({
         enabled: false,
@@ -105,11 +129,9 @@ describe('useResearch Composables', () => {
         success: true
       };
 
-      const mockResearchClient = vi.mocked(researchClient);
-      mockResearchClient.getResearchArticles.mockResolvedValue(mockResponse);
+      mockGetResearchArticles.mockResolvedValue(mockResponse);
 
       const { articles, loading, error, total, totalPages, refetch } = useResearchArticles({
-        enabled: false,
         immediate: false
       });
 
@@ -119,7 +141,7 @@ describe('useResearch Composables', () => {
 
       await nextTick();
 
-      expect(mockResearchClient.getResearchArticles).toHaveBeenCalledTimes(1);
+      expect(mockGetResearchArticles).toHaveBeenCalledTimes(1);
       expect(articles.value).toHaveLength(2);
       expect(total.value).toBe(2);
       expect(totalPages.value).toBe(1);
@@ -144,11 +166,9 @@ describe('useResearch Composables', () => {
     }, 5000);
 
     it('should handle API errors gracefully', async () => {
-      const mockResearchClient = vi.mocked(researchClient);
-      mockResearchClient.getResearchArticles.mockRejectedValue(new Error('API Error'));
+      mockGetResearchArticles.mockRejectedValue(new Error('API Error'));
 
       const { articles, loading, error, refetch } = useResearchArticles({
-        enabled: false,
         immediate: false
       });
 
@@ -161,8 +181,7 @@ describe('useResearch Composables', () => {
     }, 5000);
 
     it('should handle query parameters correctly', async () => {
-      const mockResearchClient = vi.mocked(researchClient);
-      mockResearchClient.getResearchArticles.mockResolvedValue({
+      const mockResponse: ResearchResponse = {
         data: [],
         pagination: {
           page: 2,
@@ -171,7 +190,9 @@ describe('useResearch Composables', () => {
           totalPages: 0
         },
         success: true
-      });
+      };
+      
+      mockGetResearchArticles.mockResolvedValue(mockResponse);
 
       const params: GetResearchParams = {
         page: 2,
@@ -182,26 +203,26 @@ describe('useResearch Composables', () => {
       };
 
       const { refetch } = useResearchArticles({
-        enabled: false,
         immediate: false,
         ...params
       });
 
       await refetch();
 
-      expect(mockResearchClient.getResearchArticles).toHaveBeenCalledWith(
+      expect(mockGetResearchArticles).toHaveBeenCalledWith(
         expect.objectContaining(params)
       );
     }, 5000);
 
     it('should handle pagination calculations correctly', async () => {
-      const mockResearchClient = vi.mocked(researchClient);
-      mockResearchClient.getResearchArticles.mockResolvedValue({
-        data: Array(15).fill(null).map((_, i) => createMockDatabaseResearch({
-          research_id: `research-${i}`,
-          title: `Research Article ${i}`,
-          slug: `research-article-${i}`
-        })),
+      const mockArticles = Array(15).fill(null).map((_, i) => createMockDatabaseResearch({
+        research_id: `research-${i}`,
+        title: `Research Article ${i}`,
+        slug: `research-article-${i}`
+      }));
+      
+      const mockResponse: ResearchResponse = {
+        data: mockArticles,
         pagination: {
           page: 1,
           pageSize: 15,
@@ -209,10 +230,11 @@ describe('useResearch Composables', () => {
           totalPages: 10
         },
         success: true
-      });
+      };
+      
+      mockGetResearchArticles.mockResolvedValue(mockResponse);
 
       const { total, pageSize, totalPages, refetch } = useResearchArticles({
-        enabled: false,
         immediate: false,
         pageSize: 15
       });
@@ -237,15 +259,14 @@ describe('useResearch Composables', () => {
         success: true
       };
 
-      const mockResearchClient = vi.mocked(researchClient);
-      mockResearchClient.getResearchArticleBySlug.mockResolvedValue(mockResponse);
+      mockGetResearchArticleBySlug.mockResolvedValue(mockResponse);
 
       const slugRef = ref('single-research-test');
       const { article, loading, error } = useResearchArticle(slugRef);
 
       await nextTick();
 
-      expect(mockResearchClient.getResearchArticleBySlug).toHaveBeenCalledWith('single-research-test');
+      expect(mockGetResearchArticleBySlug).toHaveBeenCalledWith('single-research-test');
       expect(article.value).toEqual(mockResearch);
       expect(loading.value).toBe(false);
       expect(error.value).toBe(null);
@@ -259,42 +280,40 @@ describe('useResearch Composables', () => {
     }, 5000);
 
     it('should handle slug changes reactively', async () => {
-      const mockResearchClient = vi.mocked(researchClient);
-      mockResearchClient.getResearchArticleBySlug.mockResolvedValue({
+      const mockResponse = {
         data: createMockDatabaseResearch(),
         success: true
-      });
+      };
+      
+      mockGetResearchArticleBySlug.mockResolvedValue(mockResponse);
 
       const slugRef = ref('initial-slug');
       const { refetch } = useResearchArticle(slugRef);
 
       await nextTick();
 
-      expect(mockResearchClient.getResearchArticleBySlug).toHaveBeenCalledWith('initial-slug');
+      expect(mockGetResearchArticleBySlug).toHaveBeenCalledWith('initial-slug');
 
       // Change slug
       slugRef.value = 'updated-slug';
       await nextTick();
 
-      expect(mockResearchClient.getResearchArticleBySlug).toHaveBeenCalledWith('updated-slug');
-      expect(mockResearchClient.getResearchArticleBySlug).toHaveBeenCalledTimes(2);
+      expect(mockGetResearchArticleBySlug).toHaveBeenCalledWith('updated-slug');
+      expect(mockGetResearchArticleBySlug).toHaveBeenCalledTimes(2);
     }, 5000);
 
     it('should handle empty slug gracefully', async () => {
-      const mockResearchClient = vi.mocked(researchClient);
-
       const { article, loading } = useResearchArticle(ref(null));
 
       await nextTick();
 
-      expect(mockResearchClient.getResearchArticleBySlug).not.toHaveBeenCalled();
+      expect(mockGetResearchArticleBySlug).not.toHaveBeenCalled();
       expect(article.value).toBe(null);
       expect(loading.value).toBe(false);
     }, 5000);
 
     it('should handle API errors', async () => {
-      const mockResearchClient = vi.mocked(researchClient);
-      mockResearchClient.getResearchArticleBySlug.mockRejectedValue(new Error('Research article not found'));
+      mockGetResearchArticleBySlug.mockRejectedValue(new Error('Research article not found'));
 
       const { article, error, loading } = useResearchArticle('non-existent-slug');
 
@@ -330,27 +349,34 @@ describe('useResearch Composables', () => {
         success: true
       };
 
-      const mockResearchClient = vi.mocked(researchClient);
-      mockResearchClient.getFeaturedResearch.mockResolvedValue(mockResponse);
+      mockGetFeaturedResearch.mockResolvedValue(mockResponse);
 
-      const { articles, loading, error } = useFeaturedResearch();
+      const TestComponent = defineComponent({
+        setup() {
+          return useFeaturedResearchArticles();
+        },
+        template: '<div></div>'
+      });
 
+      const wrapper = mount(TestComponent);
       await nextTick();
+      await new Promise(resolve => setTimeout(resolve, 0));
 
-      expect(mockResearchClient.getFeaturedResearch).toHaveBeenCalledWith(undefined);
-      expect(articles.value).toHaveLength(2);
-      expect(loading.value).toBe(false);
-      expect(error.value).toBe(null);
+      const { articles, loading, error } = (wrapper.vm as any);
+
+      expect(mockGetFeaturedResearch).toHaveBeenCalledWith();
+      expect(articles).toHaveLength(2);
+      expect(loading).toBe(false);
+      expect(error).toBe(null);
 
       // Validate database schema compliance
-      expect(articles.value[0].research_id).toBeDefined();
-      expect(articles.value[0].publishing_status).toBeDefined();
-      expect(articles.value[0].research_type).toBeDefined();
+      expect(articles[0].research_id).toBeDefined();
+      expect(articles[0].publishing_status).toBeDefined();
+      expect(articles[0].research_type).toBeDefined();
     }, 5000);
 
     it('should handle limit parameter', async () => {
-      const mockResearchClient = vi.mocked(researchClient);
-      mockResearchClient.getFeaturedResearch.mockResolvedValue({
+      const mockResponse: ResearchResponse = {
         data: [],
         pagination: {
           page: 1,
@@ -359,19 +385,27 @@ describe('useResearch Composables', () => {
           totalPages: 0
         },
         success: true
+      };
+      
+      mockGetFeaturedResearch.mockResolvedValue(mockResponse);
+
+      const TestComponent = defineComponent({
+        setup() {
+          const limitRef = ref(5);
+          return useFeaturedResearch(limitRef);
+        },
+        template: '<div></div>'
       });
 
-      const limitRef = ref(5);
-      useFeaturedResearch(limitRef);
-
+      const wrapper = mount(TestComponent);
       await nextTick();
+      await new Promise(resolve => setTimeout(resolve, 0));
 
-      expect(mockResearchClient.getFeaturedResearch).toHaveBeenCalledWith(5);
+      expect(mockGetFeaturedResearch).toHaveBeenCalledWith(5);
     }, 5000);
 
     it('should handle limit changes reactively', async () => {
-      const mockResearchClient = vi.mocked(researchClient);
-      mockResearchClient.getFeaturedResearch.mockResolvedValue({
+      const mockResponse: ResearchResponse = {
         data: [],
         pagination: {
           page: 1,
@@ -380,18 +414,32 @@ describe('useResearch Composables', () => {
           totalPages: 0
         },
         success: true
+      };
+      
+      mockGetFeaturedResearch.mockResolvedValue(mockResponse);
+
+      const TestComponent = defineComponent({
+        setup() {
+          const limitRef = ref(3);
+          const result = useFeaturedResearch(limitRef);
+          return { ...result, limitRef };
+        },
+        template: '<div></div>'
       });
 
-      const limitRef = ref(3);
-      useFeaturedResearch(limitRef);
-
+      const wrapper = mount(TestComponent);
       await nextTick();
-      expect(mockResearchClient.getFeaturedResearch).toHaveBeenCalledWith(3);
+      await new Promise(resolve => setTimeout(resolve, 0));
 
+      expect(mockGetFeaturedResearch).toHaveBeenCalledWith(3);
+
+      const { limitRef } = (wrapper.vm as any);
       limitRef.value = 7;
       await nextTick();
-      expect(mockResearchClient.getFeaturedResearch).toHaveBeenCalledWith(7);
-      expect(mockResearchClient.getFeaturedResearch).toHaveBeenCalledTimes(2);
+      await new Promise(resolve => setTimeout(resolve, 0));
+
+      expect(mockGetFeaturedResearch).toHaveBeenCalledWith(7);
+      expect(mockGetFeaturedResearch).toHaveBeenCalledTimes(2);
     }, 5000);
   });
 
@@ -419,8 +467,7 @@ describe('useResearch Composables', () => {
         success: true
       };
 
-      const mockResearchClient = vi.mocked(researchClient);
-      mockResearchClient.searchResearch.mockResolvedValue(mockResponse);
+      mockSearchResearch.mockResolvedValue(mockResponse);
 
       const { results, loading, error, total, search } = useSearchResearch();
 
@@ -430,7 +477,7 @@ describe('useResearch Composables', () => {
         category: 'clinical-research'
       });
 
-      expect(mockResearchClient.searchResearch).toHaveBeenCalledWith({
+      expect(mockSearchResearch).toHaveBeenCalledWith({
         q: 'clinical study diabetes',
         page: 1,
         pageSize: 10,
@@ -459,8 +506,7 @@ describe('useResearch Composables', () => {
     }, 5000);
 
     it('should handle search errors', async () => {
-      const mockResearchClient = vi.mocked(researchClient);
-      mockResearchClient.searchResearch.mockRejectedValue(new Error('Search failed'));
+      mockSearchResearch.mockRejectedValue(new Error('Search failed'));
 
       const { results, error, loading, search } = useSearchResearch();
 
@@ -472,8 +518,7 @@ describe('useResearch Composables', () => {
     }, 5000);
 
     it('should calculate pagination correctly for search results', async () => {
-      const mockResearchClient = vi.mocked(researchClient);
-      mockResearchClient.searchResearch.mockResolvedValue({
+      mockSearchResearch.mockResolvedValue({
         data: Array(5).fill(null).map((_, i) => createMockDatabaseResearch({
           research_id: `search-result-${i}`,
           title: `Search Result ${i}`,
@@ -502,8 +547,7 @@ describe('useResearch Composables', () => {
     }, 5000);
 
     it('should handle search options correctly', async () => {
-      const mockResearchClient = vi.mocked(researchClient);
-      mockResearchClient.searchResearch.mockResolvedValue({
+      mockSearchResearch.mockResolvedValue({
         data: [],
         pagination: {
           page: 3,
@@ -525,7 +569,7 @@ describe('useResearch Composables', () => {
 
       await search('diabetes research', searchOptions);
 
-      expect(mockResearchClient.searchResearch).toHaveBeenCalledWith({
+      expect(mockSearchResearch).toHaveBeenCalledWith({
         q: 'diabetes research',
         page: 3,
         pageSize: 25,
@@ -542,8 +586,7 @@ describe('useResearch Composables', () => {
       for (const researchType of validResearchTypes) {
         const mockResearch = createMockDatabaseResearch({ research_type: researchType });
         
-        const mockResearchClient = vi.mocked(researchClient);
-        mockResearchClient.getResearchArticles.mockResolvedValue({
+        mockGetResearchArticles.mockResolvedValue({
           data: [mockResearch],
           pagination: {
             page: 1,
@@ -555,7 +598,6 @@ describe('useResearch Composables', () => {
         });
 
         const { articles, refetch } = useResearchArticles({
-          enabled: false,
           immediate: false
         });
 
@@ -572,8 +614,7 @@ describe('useResearch Composables', () => {
       for (const status of validStatuses) {
         const mockResearch = createMockDatabaseResearch({ publishing_status: status });
         
-        const mockResearchClient = vi.mocked(researchClient);
-        mockResearchClient.getResearchArticles.mockResolvedValue({
+        mockGetResearchArticles.mockResolvedValue({
           data: [mockResearch],
           pagination: {
             page: 1,
@@ -585,7 +626,6 @@ describe('useResearch Composables', () => {
         });
 
         const { articles, refetch } = useResearchArticles({
-          enabled: false,
           immediate: false
         });
 
@@ -604,8 +644,7 @@ describe('useResearch Composables', () => {
         created_on: '2024-01-01T00:00:00Z', // Timestamp field as ISO string
       });
 
-      const mockResearchClient = vi.mocked(researchClient);
-      mockResearchClient.getResearchArticles.mockResolvedValue({
+      mockGetResearchArticles.mockResolvedValue({
         data: [mockResearch],
         pagination: {
           page: 1,
@@ -617,7 +656,6 @@ describe('useResearch Composables', () => {
       });
 
       const { articles, refetch } = useResearchArticles({
-        enabled: false,
         immediate: false
       });
 
@@ -635,17 +673,14 @@ describe('useResearch Composables', () => {
 
   describe('Reactive State Management', () => {
     it('should maintain proper loading states during transitions', async () => {
-      const mockResearchClient = vi.mocked(researchClient);
-      
       // Simulate slow API call
       let resolvePromise: (value: ResearchResponse) => void;
       const slowPromise = new Promise<ResearchResponse>((resolve) => {
         resolvePromise = resolve;
       });
-      mockResearchClient.getResearchArticles.mockReturnValue(slowPromise);
+      mockGetResearchArticles.mockReturnValue(slowPromise);
 
       const { loading, refetch } = useResearchArticles({
-        enabled: false,
         immediate: false
       });
 
@@ -676,13 +711,10 @@ describe('useResearch Composables', () => {
     }, 5000);
 
     it('should properly clear errors when making new requests', async () => {
-      const mockResearchClient = vi.mocked(researchClient);
-      
       // First call fails
-      mockResearchClient.getResearchArticles.mockRejectedValueOnce(new Error('First error'));
+      mockGetResearchArticles.mockRejectedValueOnce(new Error('First error'));
       
       const { error, refetch } = useResearchArticles({
-        enabled: false,
         immediate: false
       });
 
@@ -692,7 +724,7 @@ describe('useResearch Composables', () => {
       expect(error.value).toBe('First error');
 
       // Second call succeeds
-      mockResearchClient.getResearchArticles.mockResolvedValueOnce({
+      mockGetResearchArticles.mockResolvedValueOnce({
         data: [],
         pagination: {
           page: 1,
@@ -710,16 +742,13 @@ describe('useResearch Composables', () => {
     }, 5000);
 
     it('should handle backend response variations correctly', async () => {
-      const mockResearchClient = vi.mocked(researchClient);
-      
       // Test missing pagination in response
-      mockResearchClient.getResearchArticles.mockResolvedValueOnce({
+      mockGetResearchArticles.mockResolvedValueOnce({
         data: [createMockDatabaseResearch()],
         success: true
       } as any);
 
       const { articles, total, totalPages, refetch } = useResearchArticles({
-        enabled: false,
         immediate: false
       });
 

@@ -94,13 +94,55 @@ const props = withDefaults(defineProps<NewsContentProps>(), {
   showCTA: true,
 });
 
-// Basic HTML sanitization (in production, consider using a library like DOMPurify)
+// HTML sanitization to prevent XSS attacks
 const sanitizedContent = computed(() => {
   if (!props.article.content) return '';
   
-  // For now, trust PostgreSQL-stored content since it's from the backend
-  // In production environment, implement proper sanitization
-  return props.article.content;
+  // Basic sanitization - remove script tags and other dangerous elements
+  const allowedTags = [
+    'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+    'p', 'br', 'strong', 'b', 'em', 'i', 'u',
+    'ul', 'ol', 'li', 'blockquote', 'a',
+    'img', 'div', 'span'
+  ];
+  
+  // Remove script tags and other dangerous elements
+  let content = props.article.content
+    .replace(/<script[^>]*>.*?<\/script>/gsi, '') // Remove script tags
+    .replace(/<iframe[^>]*>.*?<\/iframe>/gsi, '') // Remove iframe tags
+    .replace(/javascript:/gi, '') // Remove javascript: URLs
+    .replace(/on\w+="[^"]*"/gi, '') // Remove event handlers like onclick
+    .replace(/on\w+='[^']*'/gi, ''); // Remove event handlers with single quotes
+  
+  // Create a temporary DOM element for further sanitization
+  const tempDiv = document.createElement('div');
+  tempDiv.innerHTML = content;
+  
+  // Remove any remaining dangerous attributes
+  const allElements = tempDiv.querySelectorAll('*');
+  allElements.forEach(el => {
+    // Remove dangerous attributes
+    const dangerousAttrs = ['onload', 'onerror', 'onclick', 'onmouseover', 'onfocus', 'onblur'];
+    dangerousAttrs.forEach(attr => {
+      if (el.hasAttribute(attr)) {
+        el.removeAttribute(attr);
+      }
+    });
+    
+    // Only allow specific tags
+    if (!allowedTags.includes(el.tagName.toLowerCase())) {
+      // Replace disallowed tags with their content
+      const parent = el.parentNode;
+      if (parent) {
+        while (el.firstChild) {
+          parent.insertBefore(el.firstChild, el);
+        }
+        parent.removeChild(el);
+      }
+    }
+  });
+  
+  return tempDiv.innerHTML;
 });
 
 const formatDate = (dateString: string) => {

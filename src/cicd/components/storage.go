@@ -3,6 +3,7 @@ package components
 import (
 	"fmt"
 
+	"github.com/pulumi/pulumi-command/sdk/go/command/local"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi/config"
 )
@@ -34,17 +35,27 @@ func DeployStorage(ctx *pulumi.Context, cfg *config.Config, environment string) 
 
 // deployDevelopmentStorage deploys Azurite emulator for development
 func deployDevelopmentStorage(ctx *pulumi.Context, cfg *config.Config) (*StorageOutputs, error) {
-	// For development, we use Azurite emulator container
-	// In a real implementation, this would create a docker container resource
-	// For now, we'll return the expected outputs for testing
+	// Create Azurite container using Podman
+	storageContainer, err := local.NewCommand(ctx, "azurite-container", &local.CommandArgs{
+		Create: pulumi.String("podman run -d --name azurite-dev -p 10000:10000 -p 10001:10001 -p 10002:10002 mcr.microsoft.com/azure-storage/azurite azurite --blobHost 0.0.0.0 --queueHost 0.0.0.0 --tableHost 0.0.0.0"),
+		Delete: pulumi.String("podman stop azurite-dev && podman rm azurite-dev"),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Azurite container: %w", err)
+	}
 
-	storageType := pulumi.String("azurite").ToStringOutput()
+	storageType := pulumi.String("azurite_podman").ToStringOutput()
 	connectionString := pulumi.String("AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;DefaultEndpointsProtocol=http;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;").ToStringOutput()
 	accountName := pulumi.String("devstoreaccount1").ToStringOutput()
 	containerName := pulumi.String("international-center-dev").ToStringOutput()
 	replicationType := pulumi.String("local").ToStringOutput()
 	accessTier := pulumi.String("hot").ToStringOutput()
 	backupEnabled := pulumi.Bool(false).ToBoolOutput()
+
+	// Add dependency on container creation
+	connectionString = pulumi.All(storageContainer.Stdout).ApplyT(func(args []interface{}) string {
+		return "AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;DefaultEndpointsProtocol=http;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;"
+	}).(pulumi.StringOutput)
 
 	return &StorageOutputs{
 		StorageType:      storageType,

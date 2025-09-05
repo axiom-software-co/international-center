@@ -64,7 +64,7 @@ type GrafanaConfig struct {
 
 // LoadEnvironmentConfig loads configuration for the specified environment
 func LoadEnvironmentConfig(ctx *pulumi.Context, environment string) (*EnvironmentConfig, error) {
-	cfg := config.New(ctx, "")
+	cfg := config.New(ctx, "international-center-cicd")
 
 	envConfig := &EnvironmentConfig{
 		Environment: environment,

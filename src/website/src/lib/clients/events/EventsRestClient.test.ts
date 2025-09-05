@@ -4,6 +4,37 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { EventsRestClient } from './EventsRestClient';
 import type { Event, EventsResponse, EventResponse, GetEventsParams, SearchEventsParams } from './types';
+import { mockFetch } from '../../../test/setup';
+
+// Simple mock response helper for this test file
+const createMockResponse = (data: any, status = 200, ok = true) => {
+  const statusText = status === 200 ? 'OK' :
+                     status === 400 ? 'Bad Request' :
+                     status === 404 ? 'Not Found' :
+                     status === 429 ? 'Too Many Requests' :
+                     status === 500 ? 'Internal Server Error' : 'Unknown';
+  
+  return {
+    ok,
+    status,
+    statusText,
+    headers: { get: () => 'application/json' },
+    json: () => Promise.resolve(data)
+  };
+};
+
+// Mock the environment config to prevent HTTP client initialization issues
+vi.mock('../../environments', () => ({
+  config: {
+    domains: {
+      events: {
+        baseUrl: 'http://localhost:7220',
+        timeout: 5000,
+        retryAttempts: 2,
+      }
+    }
+  }
+}));
 
 // Database schema validation - Event interface must match TABLES-EVENTS.md exactly
 interface DatabaseSchemaEvent {
@@ -56,16 +87,19 @@ interface DatabaseSchemaEvent {
 
 describe('EventsRestClient', () => {
   let client: EventsRestClient;
-  let mockFetch: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
-    mockFetch = vi.fn();
-    global.fetch = mockFetch;
+    // Use the imported mockFetch from setup.ts
     client = new EventsRestClient();
+    
+    // Ensure completely clean mock state for each test
+    mockFetch.mockReset();
+    mockFetch.mockClear();
   });
 
   afterEach(() => {
     vi.clearAllMocks();
+    vi.resetAllMocks();
   });
 
   describe('Database Schema Compliance', () => {
@@ -175,10 +209,7 @@ describe('EventsRestClient', () => {
         correlation_id: 'test-correlation-id'
       };
 
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => mockResponse,
-      });
+      mockFetch.mockResolvedValueOnce(createMockResponse(mockResponse));
 
       const params: GetEventsParams = {
         page: 1,
@@ -206,10 +237,7 @@ describe('EventsRestClient', () => {
         correlation_id: 'test-correlation-id'
       };
 
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => mockResponse,
-      });
+      mockFetch.mockResolvedValueOnce(createMockResponse(mockResponse));
 
       const result = await client.getEvents();
 
@@ -260,10 +288,7 @@ describe('EventsRestClient', () => {
         correlation_id: 'schema-test-correlation-id'
       };
 
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => mockResponse,
-      });
+      mockFetch.mockResolvedValueOnce(createMockResponse(mockResponse));
 
       const result = await client.getEvents();
       
@@ -312,10 +337,7 @@ describe('EventsRestClient', () => {
         correlation_id: 'slug-correlation-id'
       };
 
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => mockResponse,
-      });
+      mockFetch.mockResolvedValueOnce(createMockResponse(mockResponse));
 
       const result = await client.getEventBySlug('slug-event');
 
@@ -340,10 +362,7 @@ describe('EventsRestClient', () => {
         correlation_id: 'encoded-correlation-id'
       };
 
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => mockResponse,
-      });
+      mockFetch.mockResolvedValueOnce(createMockResponse(mockResponse));
 
       await client.getEventBySlug('event with spaces & special chars');
 
@@ -361,10 +380,7 @@ describe('EventsRestClient', () => {
         correlation_id: 'id-correlation-id'
       };
 
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => mockResponse,
-      });
+      mockFetch.mockResolvedValueOnce(createMockResponse(mockResponse));
 
       await client.getEventById('event-uuid-123');
 
@@ -389,10 +405,7 @@ describe('EventsRestClient', () => {
         correlation_id: 'featured-correlation-id'
       };
 
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => mockResponse,
-      });
+      mockFetch.mockResolvedValueOnce(createMockResponse(mockResponse));
 
       await client.getFeaturedEvents();
 
@@ -411,10 +424,7 @@ describe('EventsRestClient', () => {
         correlation_id: 'featured-limit-correlation-id'
       };
 
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => mockResponse,
-      });
+      mockFetch.mockResolvedValueOnce(createMockResponse(mockResponse));
 
       await client.getFeaturedEvents(5);
 
@@ -435,10 +445,7 @@ describe('EventsRestClient', () => {
         correlation_id: 'search-correlation-id'
       };
 
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => mockResponse,
-      });
+      mockFetch.mockResolvedValueOnce(createMockResponse(mockResponse));
 
       const params: SearchEventsParams = {
         q: 'healthcare workshop',
@@ -464,10 +471,7 @@ describe('EventsRestClient', () => {
         correlation_id: 'search-encoded-correlation-id'
       };
 
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => mockResponse,
-      });
+      mockFetch.mockResolvedValueOnce(createMockResponse(mockResponse));
 
       await client.searchEvents({ q: 'event with special & chars' });
 
@@ -486,10 +490,7 @@ describe('EventsRestClient', () => {
         correlation_id: 'recent-correlation-id'
       };
 
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => mockResponse,
-      });
+      mockFetch.mockResolvedValueOnce(createMockResponse(mockResponse));
 
       await client.getRecentEvents();
 
@@ -508,10 +509,7 @@ describe('EventsRestClient', () => {
         correlation_id: 'recent-custom-correlation-id'
       };
 
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => mockResponse,
-      });
+      mockFetch.mockResolvedValueOnce(createMockResponse(mockResponse));
 
       await client.getRecentEvents(10);
 
@@ -532,10 +530,7 @@ describe('EventsRestClient', () => {
         correlation_id: 'category-correlation-id'
       };
 
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => mockResponse,
-      });
+      mockFetch.mockResolvedValueOnce(createMockResponse(mockResponse));
 
       await client.getEventsByCategory('healthcare');
 
@@ -558,10 +553,7 @@ describe('EventsRestClient', () => {
         correlation_id: 'category-encoded-correlation-id'
       };
 
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => mockResponse,
-      });
+      mockFetch.mockResolvedValueOnce(createMockResponse(mockResponse));
 
       await client.getEventsByCategory('medical research');
 
@@ -574,28 +566,35 @@ describe('EventsRestClient', () => {
 
   describe('Error Handling', () => {
     it('should handle network errors', async () => {
-      mockFetch.mockRejectedValueOnce(new Error('Network error'));
+      const networkError = new Error('Network error');
+      networkError.name = 'NetworkError';
+      mockFetch.mockRejectedValue(networkError);
 
       await expect(client.getEvents()).rejects.toThrow('Network error');
     }, 5000);
 
     it('should handle HTTP error responses', async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: false,
-        status: 404,
-        statusText: 'Not Found'
-      });
+      const errorData = {
+        error: {
+          code: 'NOT_FOUND',
+          message: 'Events not found',
+          correlation_id: 'error-404-events'
+        }
+      };
+      
+      mockFetch.mockResolvedValueOnce(createMockResponse(errorData, 404, false));
 
       await expect(client.getEvents()).rejects.toThrow();
     }, 5000);
 
     it('should handle malformed JSON responses', async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => { throw new Error('Invalid JSON'); }
-      });
+      const malformedResponse = createMockResponse(null, 200, true);
+      // Override the json method to simulate parsing error
+      malformedResponse.json = vi.fn().mockRejectedValue(new Error('Invalid JSON'));
+      
+      mockFetch.mockResolvedValueOnce(malformedResponse);
 
-      await expect(client.getEvents()).rejects.toThrow();
+      await expect(client.getEvents()).rejects.toThrow('Invalid JSON');
     }, 5000);
   });
 });

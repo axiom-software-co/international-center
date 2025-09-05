@@ -1,6 +1,7 @@
 package components
 
 import (
+	"sync"
 	"testing"
 
 	"github.com/pulumi/pulumi/sdk/v3/go/common/resource"
@@ -11,6 +12,8 @@ import (
 
 // TestWebsiteComponent_DevelopmentEnvironment tests website component for development environment
 func TestWebsiteComponent_DevelopmentEnvironment(t *testing.T) {
+	var wg sync.WaitGroup
+	
 	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
 		cfg := config.New(ctx, "")
 
@@ -19,31 +22,40 @@ func TestWebsiteComponent_DevelopmentEnvironment(t *testing.T) {
 			return err
 		}
 
-		// Verify development environment generates local server configuration
-		pulumi.All(outputs.DeploymentType, outputs.ServerURL, outputs.BuildCommand).ApplyT(func(args []interface{}) error {
+		// Verify development environment deploys Podman container
+		wg.Add(1)
+		pulumi.All(outputs.DeploymentType, outputs.ContainerID, outputs.ContainerStatus, outputs.ServerURL).ApplyT(func(args []interface{}) error {
+			defer wg.Done()
 			deploymentType := args[0].(string)
-			serverURL := args[1].(string)
-			buildCommand := args[2].(string)
+			containerID := args[1].(string)
+			containerStatus := args[2].(string)
+			serverURL := args[3].(string)
 
-			assert.Equal(t, "local_server", deploymentType, "Development should use local server")
+			assert.Equal(t, "podman_container", deploymentType, "Development should use Podman container")
+			assert.NotEmpty(t, containerID, "Should have container ID")
+			assert.Equal(t, "running", containerStatus, "Website container should be running")
 			assert.Contains(t, serverURL, "http://localhost:3000", "Should use local development server")
-			assert.Equal(t, "npm run dev", buildCommand, "Should use development build command")
 			return nil
 		})
 
-		// Verify development CDN and API integration
-		pulumi.All(outputs.CDNEnabled, outputs.APIGatewayURL).ApplyT(func(args []interface{}) error {
-			cdnEnabled := args[0].(bool)
+		// Verify development container configuration and API integration
+		wg.Add(1)
+		pulumi.All(outputs.NodeVersion, outputs.APIGatewayURL, outputs.CDNEnabled).ApplyT(func(args []interface{}) error {
+			defer wg.Done()
+			nodeVersion := args[0].(string)
 			apiGatewayURL := args[1].(string)
+			cdnEnabled := args[2].(bool)
 
-			assert.False(t, cdnEnabled, "Should not enable CDN for development")
+			assert.Contains(t, nodeVersion, "20", "Should use Node.js 20+")
 			assert.Contains(t, apiGatewayURL, "localhost:9001", "Should use local public gateway")
+			assert.False(t, cdnEnabled, "Should not enable CDN for development")
 			return nil
 		})
 
 		return nil
 	}, pulumi.WithMocks("test", "stack", &WebsiteMocks{}))
 
+	wg.Wait()
 	assert.NoError(t, err)
 }
 

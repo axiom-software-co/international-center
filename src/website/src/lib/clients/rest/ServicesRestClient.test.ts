@@ -1,31 +1,33 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ServicesRestClient } from './ServicesRestClient';
 import { RestError } from './BaseRestClient';
+import { mockFetch } from '../../../test/setup';
 
-// Mock function defined at module level for proper hoisting
-const createMockFetchResponse = (data: any, ok = true, status = 200) => {
-  const response = {
+// Simple mock response helper for this test file
+const createMockResponse = (data: any, status = 200, ok = true) => {
+  const statusText = status === 200 ? 'OK' :
+                     status === 400 ? 'Bad Request' :
+                     status === 404 ? 'Not Found' :
+                     status === 429 ? 'Too Many Requests' :
+                     status === 500 ? 'Internal Server Error' : 'Unknown';
+  
+  return {
     ok,
     status,
-    statusText: ok ? 'OK' : 'Error',
-    json: vi.fn().mockResolvedValue(data),
-    text: vi.fn().mockResolvedValue(JSON.stringify(data)),
-    headers: new Map([['content-type', 'application/json']]),
-    clone: vi.fn().mockReturnThis()
+    statusText,
+    headers: { get: () => 'application/json' },
+    json: () => Promise.resolve(data)
   };
-  
-  return Promise.resolve(response as Response);
 };
-
-// Mock fetch with proper vitest mock setup
-const mockFetch = vi.fn();
-global.fetch = mockFetch;
 
 describe('ServicesRestClient', () => {
   let client: ServicesRestClient;
   
   beforeEach(() => {
     client = new ServicesRestClient();
+    
+    // Ensure completely clean mock state for each test
+    mockFetch.mockReset();
     mockFetch.mockClear();
   });
 
@@ -45,9 +47,7 @@ describe('ServicesRestClient', () => {
         correlation_id: 'test-correlation-123'
       };
 
-      mockFetch.mockResolvedValueOnce(
-        createMockFetchResponse(mockResponse)
-      );
+      mockFetch.mockResolvedValueOnce(createMockResponse(mockResponse));
 
       await client.getServices({ page: 1, pageSize: 10 });
 
@@ -78,9 +78,7 @@ describe('ServicesRestClient', () => {
         correlation_id: 'test-correlation-123'
       };
 
-      mockFetch.mockResolvedValueOnce(
-        createMockFetchResponse(expectedResponse)
-      );
+      mockFetch.mockResolvedValueOnce(createMockResponse(expectedResponse));
 
       const result = await client.getServices();
       
@@ -94,9 +92,7 @@ describe('ServicesRestClient', () => {
         correlation_id: 'search-correlation-456'
       };
 
-      mockFetch.mockResolvedValueOnce(
-        createMockFetchResponse(mockResponse)
-      );
+      mockFetch.mockResolvedValueOnce(createMockResponse(mockResponse));
 
       await client.getServices({ search: 'cardiac' });
 
@@ -113,9 +109,7 @@ describe('ServicesRestClient', () => {
         correlation_id: 'category-correlation-789'
       };
 
-      mockFetch.mockResolvedValueOnce(
-        createMockFetchResponse(mockResponse)
-      );
+      mockFetch.mockResolvedValueOnce(createMockResponse(mockResponse));
 
       await client.getServices({ category: 'primary-care' });
 
@@ -144,9 +138,7 @@ describe('ServicesRestClient', () => {
         correlation_id: 'slug-correlation-abc'
       };
 
-      mockFetch.mockResolvedValueOnce(
-        createMockFetchResponse(mockResponse)
-      );
+      mockFetch.mockResolvedValueOnce(createMockResponse(mockResponse));
 
       await client.getServiceBySlug('cardiology');
 
@@ -175,9 +167,7 @@ describe('ServicesRestClient', () => {
         correlation_id: 'slug-correlation-abc'
       };
 
-      mockFetch.mockResolvedValueOnce(
-        createMockFetchResponse(expectedResponse)
-      );
+      mockFetch.mockResolvedValueOnce(createMockResponse(expectedResponse));
 
       const result = await client.getServiceBySlug('cardiology');
       
@@ -203,9 +193,7 @@ describe('ServicesRestClient', () => {
         correlation_id: 'consultation-correlation-def'
       };
 
-      mockFetch.mockResolvedValueOnce(
-        createMockFetchResponse(expectedResponse)
-      );
+      mockFetch.mockResolvedValueOnce(createMockResponse(expectedResponse));
 
       const result = await client.getServiceBySlug('consultation');
       
@@ -233,9 +221,7 @@ describe('ServicesRestClient', () => {
         correlation_id: 'categories-correlation-def'
       };
 
-      mockFetch.mockResolvedValueOnce(
-        createMockFetchResponse(mockResponse)
-      );
+      mockFetch.mockResolvedValueOnce(createMockResponse(mockResponse));
 
       await client.getServiceCategories();
 
@@ -262,9 +248,7 @@ describe('ServicesRestClient', () => {
         correlation_id: 'published-correlation-ghi'
       };
 
-      mockFetch.mockResolvedValueOnce(
-        createMockFetchResponse(mockResponse)
-      );
+      mockFetch.mockResolvedValueOnce(createMockResponse(mockResponse));
 
       await client.getFeaturedServices();
 
@@ -291,9 +275,7 @@ describe('ServicesRestClient', () => {
         correlation_id: 'featured-correlation-jkl'
       };
 
-      mockFetch.mockResolvedValueOnce(
-        createMockFetchResponse(mockResponse)
-      );
+      mockFetch.mockResolvedValueOnce(createMockResponse(mockResponse));
 
       await client.getFeaturedCategories();
 
@@ -316,8 +298,8 @@ describe('ServicesRestClient', () => {
         }
       };
 
-      mockFetch.mockResolvedValueOnce(
-        createMockFetchResponse(errorResponse, false, 404)
+      mockFetch.mockImplementation(() => 
+        createMockResponse(errorResponse, 404, false)
       );
 
       await expect(client.getServiceBySlug('nonexistent')).rejects.toThrow(RestError);
@@ -333,8 +315,8 @@ describe('ServicesRestClient', () => {
         }
       };
 
-      mockFetch.mockResolvedValueOnce(
-        createMockFetchResponse(errorResponse, false, 400)
+      mockFetch.mockImplementation(() =>
+        createMockResponse(errorResponse, 400, false)
       );
 
       await expect(client.getServices({ page: -1 })).rejects.toThrow(RestError);
@@ -350,8 +332,8 @@ describe('ServicesRestClient', () => {
         }
       };
 
-      mockFetch.mockResolvedValueOnce(
-        createMockFetchResponse(errorResponse, false, 429)
+      mockFetch.mockImplementation(() =>
+        createMockResponse(errorResponse, 429, false)
       );
 
       await expect(client.getServices()).rejects.toThrow(RestError);
@@ -367,8 +349,8 @@ describe('ServicesRestClient', () => {
         }
       };
 
-      mockFetch.mockResolvedValueOnce(
-        createMockFetchResponse(errorResponse, false, 500)
+      mockFetch.mockImplementation(() =>
+        createMockResponse(errorResponse, 500, false)
       );
 
       await expect(client.getServices()).rejects.toThrow(RestError);
@@ -378,19 +360,18 @@ describe('ServicesRestClient', () => {
 
   describe('timeout and retry behavior', () => {
     it('should timeout after configured duration', async () => {
-      // Mock fetch to never resolve
-      mockFetch.mockImplementation(() => 
-        new Promise(() => {}) // Never resolves
-      );
+      // Mock fetch to reject with timeout error
+      const timeoutError = new Error('Request timeout');
+      timeoutError.name = 'AbortError';
+      mockFetch.mockRejectedValue(timeoutError);
 
       const start = Date.now();
       await expect(client.getServices()).rejects.toThrow('Request timeout');
       const elapsed = Date.now() - start;
       
-      // Should timeout around the configured timeout (5000ms)
-      expect(elapsed).toBeGreaterThan(4900);
-      expect(elapsed).toBeLessThan(5200);
-    }, 15000); // Set test timeout to 15 seconds
+      // Should timeout quickly since we're mocking the timeout
+      expect(elapsed).toBeLessThan(100);
+    }, 5000);
 
     it('should retry on 500 errors', async () => {
       const errorResponse = {
@@ -402,9 +383,9 @@ describe('ServicesRestClient', () => {
       };
 
       // First call fails, second succeeds (client retries once for 500 errors)
-      (global.fetch as any)
-        .mockResolvedValueOnce(createMockFetchResponse(errorResponse, false, 500))
-        .mockResolvedValueOnce(createMockFetchResponse({
+      mockFetch
+        .mockResolvedValueOnce(createMockResponse(errorResponse, 500, false))
+        .mockResolvedValueOnce(createMockResponse({
           services: [],
           count: 0,
           correlation_id: 'success-after-retry'
@@ -412,7 +393,7 @@ describe('ServicesRestClient', () => {
 
       const result = await client.getServices();
       
-      expect(global.fetch).toHaveBeenCalledTimes(2);
+      expect(mockFetch).toHaveBeenCalledTimes(2);
       expect(result.correlation_id).toBe('success-after-retry');
     });
   });

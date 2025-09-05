@@ -106,7 +106,7 @@ export interface GetEventsParams extends PaginationParams, FilterParams {
 
 export interface SearchEventsParams extends PaginationParams {
   q: string; // Search query
-  category_id?: string;
+  category?: string;
   event_type?: EventType;
   publishing_status?: PublishingStatus;
   event_date_from?: string;
