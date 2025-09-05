@@ -12,6 +12,611 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// Domain Validation Method Tests (TDD RED Phase)
+
+func TestNewsType_IsValid(t *testing.T) {
+	tests := []struct {
+		name     string
+		newsType NewsType
+		want     bool
+	}{
+		{"valid announcement", NewsTypeAnnouncement, true},
+		{"valid press release", NewsTypePressRelease, true},
+		{"valid event", NewsTypeEvent, true},
+		{"valid update", NewsTypeUpdate, true},
+		{"valid alert", NewsTypeAlert, true},
+		{"valid feature", NewsTypeFeature, true},
+		{"invalid news type", NewsType("invalid"), false},
+		{"empty news type", NewsType(""), false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.newsType.IsValid()
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestPriorityLevel_IsValid(t *testing.T) {
+	tests := []struct {
+		name     string
+		priority PriorityLevel
+		want     bool
+	}{
+		{"valid low priority", PriorityLevelLow, true},
+		{"valid normal priority", PriorityLevelNormal, true},
+		{"valid high priority", PriorityLevelHigh, true},
+		{"valid urgent priority", PriorityLevelUrgent, true},
+		{"invalid priority", PriorityLevel("invalid"), false},
+		{"empty priority", PriorityLevel(""), false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.priority.IsValid()
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestPublishingStatus_IsValid(t *testing.T) {
+	tests := []struct {
+		name   string
+		status PublishingStatus
+		want   bool
+	}{
+		{"valid draft status", PublishingStatusDraft, true},
+		{"valid published status", PublishingStatusPublished, true},
+		{"valid archived status", PublishingStatusArchived, true},
+		{"invalid status", PublishingStatus("invalid"), false},
+		{"empty status", PublishingStatus(""), false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.status.IsValid()
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestNewNews(t *testing.T) {
+	tests := []struct {
+		name      string
+		title     string
+		summary   string
+		newsType  NewsType
+		categoryID string
+		userID    string
+		wantErr   bool
+		checkFunc func(*testing.T, *News)
+	}{
+		{
+			name:      "successfully create news with valid data",
+			title:     "Breaking News: Medical Center Opens",
+			summary:   "Our new medical center is now open to serve the community with advanced healthcare services.",
+			newsType:  NewsTypeAnnouncement,
+			categoryID: "category-123",
+			userID:    "admin-user",
+			wantErr:   false,
+			checkFunc: func(t *testing.T, news *News) {
+				assert.NotEmpty(t, news.NewsID)
+				assert.Equal(t, "Breaking News: Medical Center Opens", news.Title)
+				assert.Equal(t, NewsTypeAnnouncement, news.NewsType)
+				assert.Equal(t, PublishingStatusDraft, news.PublishingStatus)
+				assert.Equal(t, PriorityLevelNormal, news.PriorityLevel)
+				assert.False(t, news.IsDeleted)
+			},
+		},
+		{
+			name:      "return validation error for empty title",
+			title:     "",
+			summary:   "Valid summary content",
+			newsType:  NewsTypeAnnouncement,
+			categoryID: "category-123",
+			userID:    "admin-user",
+			wantErr:   true,
+		},
+		{
+			name:      "return validation error for empty summary",
+			title:     "Valid Title",
+			summary:   "",
+			newsType:  NewsTypeAnnouncement,
+			categoryID: "category-123",
+			userID:    "admin-user",
+			wantErr:   true,
+		},
+		{
+			name:      "return validation error for invalid news type",
+			title:     "Valid Title",
+			summary:   "Valid summary content",
+			newsType:  NewsType("invalid"),
+			categoryID: "category-123",
+			userID:    "admin-user",
+			wantErr:   true,
+		},
+		{
+			name:      "return validation error for empty category ID",
+			title:     "Valid Title",
+			summary:   "Valid summary content",
+			newsType:  NewsTypeAnnouncement,
+			categoryID: "",
+			userID:    "admin-user",
+			wantErr:   true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := NewNews(tt.title, tt.summary, tt.newsType, tt.categoryID, tt.userID)
+			
+			if tt.wantErr {
+				assert.Error(t, err)
+				assert.Nil(t, result)
+			} else {
+				assert.NoError(t, err)
+				require.NotNil(t, result)
+				if tt.checkFunc != nil {
+					tt.checkFunc(t, result)
+				}
+			}
+		})
+	}
+}
+
+func TestNewNewsCategory(t *testing.T) {
+	tests := []struct {
+		name    string
+		name_param string
+		slug    string
+		isDefaultUnassigned bool
+		userID  string
+		wantErr bool
+		checkFunc func(*testing.T, *NewsCategory)
+	}{
+		{
+			name: "successfully create news category with valid data",
+			name_param: "Health Updates",
+			slug: "health-updates",
+			isDefaultUnassigned: false,
+			userID: "admin-user",
+			wantErr: false,
+			checkFunc: func(t *testing.T, category *NewsCategory) {
+				assert.NotEmpty(t, category.CategoryID)
+				assert.Equal(t, "Health Updates", category.Name)
+				assert.Equal(t, "health-updates", category.Slug)
+				assert.False(t, category.IsDefaultUnassigned)
+				assert.False(t, category.IsDeleted)
+			},
+		},
+		{
+			name: "return validation error for empty name",
+			name_param: "",
+			slug: "valid-slug",
+			isDefaultUnassigned: false,
+			userID: "admin-user",
+			wantErr: true,
+		},
+		{
+			name: "return validation error for empty slug",
+			name_param: "Valid Name",
+			slug: "",
+			isDefaultUnassigned: false,
+			userID: "admin-user",
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := NewNewsCategory(tt.name_param, tt.slug, tt.isDefaultUnassigned, tt.userID)
+			
+			if tt.wantErr {
+				assert.Error(t, err)
+				assert.Nil(t, result)
+			} else {
+				assert.NoError(t, err)
+				require.NotNil(t, result)
+				if tt.checkFunc != nil {
+					tt.checkFunc(t, result)
+				}
+			}
+		})
+	}
+}
+
+func TestNewFeaturedNews(t *testing.T) {
+	tests := []struct {
+		name    string
+		newsID  string
+		userID  string
+		wantErr bool
+		checkFunc func(*testing.T, *FeaturedNews)
+	}{
+		{
+			name: "successfully create featured news with valid data",
+			newsID: "news-123",
+			userID: "admin-user",
+			wantErr: false,
+			checkFunc: func(t *testing.T, featured *FeaturedNews) {
+				assert.NotEmpty(t, featured.FeaturedNewsID)
+				assert.Equal(t, "news-123", featured.NewsID)
+			},
+		},
+		{
+			name: "return validation error for empty news ID",
+			newsID: "",
+			userID: "admin-user",
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := NewFeaturedNews(tt.newsID, tt.userID)
+			
+			if tt.wantErr {
+				assert.Error(t, err)
+				assert.Nil(t, result)
+			} else {
+				assert.NoError(t, err)
+				require.NotNil(t, result)
+				if tt.checkFunc != nil {
+					tt.checkFunc(t, result)
+				}
+			}
+		})
+	}
+}
+
+func TestNews_Publish(t *testing.T) {
+	tests := []struct {
+		name        string
+		initialStatus PublishingStatus
+		userID      string
+		wantErr     bool
+	}{
+		{
+			name: "successfully publish news from draft status",
+			initialStatus: PublishingStatusDraft,
+			userID: "admin-user",
+			wantErr: false,
+		},
+		{
+			name: "return error when trying to publish already published news",
+			initialStatus: PublishingStatusPublished,
+			userID: "admin-user",
+			wantErr: true,
+		},
+		{
+			name: "return error when trying to publish archived news",
+			initialStatus: PublishingStatusArchived,
+			userID: "admin-user",
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			news := &News{
+				NewsID: "news-123",
+				Title: "Test News",
+				Summary: "Test summary",
+				PublishingStatus: tt.initialStatus,
+			}
+
+			err := news.Publish(tt.userID)
+			
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, PublishingStatusPublished, news.PublishingStatus)
+				assert.NotNil(t, news.ModifiedOn)
+				assert.Equal(t, tt.userID, news.ModifiedBy)
+			}
+		})
+	}
+}
+
+func TestNews_Archive(t *testing.T) {
+	tests := []struct {
+		name        string
+		initialStatus PublishingStatus
+		userID      string
+		wantErr     bool
+	}{
+		{
+			name: "successfully archive published news",
+			initialStatus: PublishingStatusPublished,
+			userID: "admin-user",
+			wantErr: false,
+		},
+		{
+			name: "return error when trying to archive draft news",
+			initialStatus: PublishingStatusDraft,
+			userID: "admin-user",
+			wantErr: true,
+		},
+		{
+			name: "return error when trying to archive already archived news",
+			initialStatus: PublishingStatusArchived,
+			userID: "admin-user",
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			news := &News{
+				NewsID: "news-123",
+				Title: "Test News",
+				Summary: "Test summary",
+				PublishingStatus: tt.initialStatus,
+			}
+
+			err := news.Archive(tt.userID)
+			
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, PublishingStatusArchived, news.PublishingStatus)
+				assert.NotNil(t, news.ModifiedOn)
+				assert.Equal(t, tt.userID, news.ModifiedBy)
+			}
+		})
+	}
+}
+
+func TestNews_UnArchive(t *testing.T) {
+	tests := []struct {
+		name        string
+		initialStatus PublishingStatus
+		userID      string
+		wantErr     bool
+	}{
+		{
+			name: "successfully unarchive archived news",
+			initialStatus: PublishingStatusArchived,
+			userID: "admin-user",
+			wantErr: false,
+		},
+		{
+			name: "return error when trying to unarchive draft news",
+			initialStatus: PublishingStatusDraft,
+			userID: "admin-user",
+			wantErr: true,
+		},
+		{
+			name: "return error when trying to unarchive published news",
+			initialStatus: PublishingStatusPublished,
+			userID: "admin-user",
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			news := &News{
+				NewsID: "news-123",
+				Title: "Test News",
+				Summary: "Test summary",
+				PublishingStatus: tt.initialStatus,
+			}
+
+			err := news.UnArchive(tt.userID)
+			
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, PublishingStatusDraft, news.PublishingStatus)
+				assert.NotNil(t, news.ModifiedOn)
+				assert.Equal(t, tt.userID, news.ModifiedBy)
+			}
+		})
+	}
+}
+
+func TestNews_UpdateDetails(t *testing.T) {
+	tests := []struct {
+		name    string
+		title   string
+		summary string
+		userID  string
+		wantErr bool
+	}{
+		{
+			name: "successfully update news details",
+			title: "Updated News Title",
+			summary: "Updated news summary content",
+			userID: "admin-user",
+			wantErr: false,
+		},
+		{
+			name: "return validation error for empty title",
+			title: "",
+			summary: "Valid summary",
+			userID: "admin-user",
+			wantErr: true,
+		},
+		{
+			name: "return validation error for empty summary",
+			title: "Valid Title",
+			summary: "",
+			userID: "admin-user",
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			news := &News{
+				NewsID: "news-123",
+				Title: "Original Title",
+				Summary: "Original summary",
+				PublishingStatus: PublishingStatusDraft,
+			}
+
+			err := news.UpdateDetails(tt.title, tt.summary, tt.userID)
+			
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tt.title, news.Title)
+				assert.Equal(t, tt.summary, news.Summary)
+				assert.NotNil(t, news.ModifiedOn)
+				assert.Equal(t, tt.userID, news.ModifiedBy)
+			}
+		})
+	}
+}
+
+func TestNews_ValidateComprehensive(t *testing.T) {
+	tests := []struct {
+		name        string
+		news        *News
+		wantErr     bool
+		wantMsgContains string
+	}{
+		{
+			name: "valid news entity",
+			news: &News{
+				NewsID:              "550e8400-e29b-41d4-a716-446655440001",
+				Title:               "Valid News Title",
+				Summary:             "Valid news summary content",
+				Slug:                "valid-news-title",
+				CategoryID:          "550e8400-e29b-41d4-a716-446655440002",
+				NewsType:            NewsTypeAnnouncement,
+				PriorityLevel:       PriorityLevelNormal,
+				PublishingStatus:    PublishingStatusDraft,
+				PublicationTimestamp: time.Now(),
+				CreatedOn:           time.Now(),
+				CreatedBy:           "system",
+			},
+			wantErr: false,
+		},
+		{
+			name: "invalid news with empty title",
+			news: &News{
+				NewsID:              "550e8400-e29b-41d4-a716-446655440001",
+				Title:               "",
+				Summary:             "Valid summary",
+				NewsType:            NewsTypeAnnouncement,
+			},
+			wantErr:             true,
+			wantMsgContains:     "title",
+		},
+		{
+			name: "invalid news with invalid news type",
+			news: &News{
+				NewsID:              "550e8400-e29b-41d4-a716-446655440001",
+				Title:               "Valid Title",
+				Summary:             "Valid news summary content",
+				Slug:                "valid-title",
+				CategoryID:          "550e8400-e29b-41d4-a716-446655440002",
+				NewsType:            NewsType("invalid"),
+				PriorityLevel:       PriorityLevelNormal,
+				PublishingStatus:    PublishingStatusDraft,
+				CreatedBy:           "system",
+			},
+			wantErr:             true,
+			wantMsgContains:     "news type",
+		},
+		{
+			name: "invalid news with invalid publishing status",
+			news: &News{
+				NewsID:              "550e8400-e29b-41d4-a716-446655440001",
+				Title:               "Valid Title",
+				Summary:             "Valid news summary content",
+				Slug:                "valid-title",
+				CategoryID:          "550e8400-e29b-41d4-a716-446655440002",
+				NewsType:            NewsTypeAnnouncement,
+				PriorityLevel:       PriorityLevelNormal,
+				PublishingStatus:    PublishingStatus("invalid"),
+				CreatedBy:           "system",
+			},
+			wantErr:             true,
+			wantMsgContains:     "publishing status",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.news.ValidateComprehensive()
+			
+			if tt.wantErr {
+				assert.Error(t, err)
+				if tt.wantMsgContains != "" {
+					assert.Contains(t, strings.ToLower(err.Error()), strings.ToLower(tt.wantMsgContains))
+				}
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestNews_CanTransitionTo(t *testing.T) {
+	tests := []struct {
+		name          string
+		currentStatus PublishingStatus
+		targetStatus  PublishingStatus
+		wantErr       bool
+	}{
+		{
+			name: "can transition from draft to published",
+			currentStatus: PublishingStatusDraft,
+			targetStatus: PublishingStatusPublished,
+			wantErr: false,
+		},
+		{
+			name: "can transition from published to archived",
+			currentStatus: PublishingStatusPublished,
+			targetStatus: PublishingStatusArchived,
+			wantErr: false,
+		},
+		{
+			name: "can transition from archived to draft",
+			currentStatus: PublishingStatusArchived,
+			targetStatus: PublishingStatusDraft,
+			wantErr: false,
+		},
+		{
+			name: "cannot transition from draft to archived",
+			currentStatus: PublishingStatusDraft,
+			targetStatus: PublishingStatusArchived,
+			wantErr: true,
+		},
+		{
+			name: "cannot transition from published to draft",
+			currentStatus: PublishingStatusPublished,
+			targetStatus: PublishingStatusDraft,
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			news := &News{
+				NewsID: "news-123",
+				PublishingStatus: tt.currentStatus,
+			}
+			
+			err := news.CanTransitionTo(tt.targetStatus)
+			
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
 // MockNewsRepository provides mock implementation for unit tests
 type MockNewsRepository struct {
 	news               map[string]*News
