@@ -18,6 +18,11 @@ export type DonationFrequency = 'one-time' | 'monthly' | 'quarterly' | 'annually
 export type MediaType = 'print' | 'digital' | 'television' | 'radio' | 'podcast' | 'medical-journal' | 'other';
 export type MediaUrgency = 'low' | 'medium' | 'high';
 
+// Volunteer application specific enums
+export type VolunteerInterest = 'patient-support' | 'community-outreach' | 'research-support' | 'administrative-support' | 'multiple' | 'other';
+export type VolunteerAvailability = '2-4-hours' | '4-8-hours' | '8-16-hours' | '16-hours-plus' | 'flexible';
+export type VolunteerStatus = 'new' | 'under-review' | 'interview-scheduled' | 'background-check' | 'approved' | 'declined' | 'withdrawn';
+
 // Base inquiry interface - shared fields across all inquiry types
 export interface BaseInquiry {
   // Primary key
@@ -85,6 +90,43 @@ export interface MediaInquiry extends BaseInquiry {
   deadline?: string; // ISO date format
 }
 
+// Volunteer applications interface - uses application_id instead of inquiry_id and different status enum
+export interface VolunteerApplication {
+  // Primary key
+  application_id: string;
+  
+  // Personal information
+  first_name: string;
+  last_name: string;
+  email: string;
+  phone: string; // Required for volunteers
+  age: number; // Must be 18-100
+  
+  // Volunteer details
+  volunteer_interest: VolunteerInterest;
+  availability: VolunteerAvailability;
+  experience?: string; // Optional, max 1000 characters
+  motivation: string; // Required, 20-1500 characters
+  schedule_preferences?: string; // Optional, max 500 characters
+  
+  // Status management (different from other inquiries)
+  status: VolunteerStatus;
+  priority: InquiryPriority;
+  
+  // Metadata
+  source?: string;
+  ip_address?: string;
+  user_agent?: string;
+  
+  // Audit fields
+  created_at: string;
+  updated_at: string;
+  created_by: string;
+  updated_by: string;
+  is_deleted: boolean;
+  deleted_at?: string;
+}
+
 // Submission interfaces - data sent from forms (before database processing)
 export interface BaseInquirySubmission {
   contact_name: string;
@@ -119,12 +161,29 @@ export interface MediaInquirySubmission extends BaseInquirySubmission {
   deadline?: string;
 }
 
+export interface VolunteerApplicationSubmission {
+  // Personal information
+  first_name: string;
+  last_name: string;
+  email: string;
+  phone: string;
+  age: number;
+  
+  // Volunteer details
+  volunteer_interest: VolunteerInterest;
+  availability: VolunteerAvailability;
+  experience?: string;
+  motivation: string;
+  schedule_preferences?: string;
+}
+
 // API Response interfaces
 export interface InquirySubmissionResponse {
   // Domain-specific inquiry data (one will be populated)
   business_inquiry?: BusinessInquiry;
   donations_inquiry?: DonationsInquiry;
   media_inquiry?: MediaInquiry;
+  volunteer_application?: VolunteerApplication;
   
   // Response metadata
   correlation_id: string;
@@ -142,6 +201,7 @@ export interface InquiryGetResponse {
   business_inquiry?: BusinessInquiry;
   donations_inquiry?: DonationsInquiry;
   media_inquiry?: MediaInquiry;
+  volunteer_application?: VolunteerApplication;
   
   // Response metadata
   correlation_id: string;
@@ -150,8 +210,8 @@ export interface InquiryGetResponse {
 }
 
 // Union types for working with any inquiry type
-export type AnyInquiry = BusinessInquiry | DonationsInquiry | MediaInquiry;
-export type AnyInquirySubmission = BusinessInquirySubmission | DonationsInquirySubmission | MediaInquirySubmission;
+export type AnyInquiry = BusinessInquiry | DonationsInquiry | MediaInquiry | VolunteerApplication;
+export type AnyInquirySubmission = BusinessInquirySubmission | DonationsInquirySubmission | MediaInquirySubmission | VolunteerApplicationSubmission;
 
 // Type guards for inquiry type detection
 export function isBusinessInquiry(inquiry: AnyInquiry): inquiry is BusinessInquiry {
@@ -166,6 +226,10 @@ export function isMediaInquiry(inquiry: AnyInquiry): inquiry is MediaInquiry {
   return 'outlet' in inquiry && 'urgency' in inquiry;
 }
 
+export function isVolunteerApplication(inquiry: AnyInquiry): inquiry is VolunteerApplication {
+  return 'application_id' in inquiry && 'volunteer_interest' in inquiry && 'availability' in inquiry;
+}
+
 export function isBusinessInquirySubmission(submission: AnyInquirySubmission): submission is BusinessInquirySubmission {
   return 'organization_name' in submission && 'inquiry_type' in submission;
 }
@@ -176,4 +240,8 @@ export function isDonationsInquirySubmission(submission: AnyInquirySubmission): 
 
 export function isMediaInquirySubmission(submission: AnyInquirySubmission): submission is MediaInquirySubmission {
   return 'outlet' in submission && 'urgency' in submission;
+}
+
+export function isVolunteerApplicationSubmission(submission: AnyInquirySubmission): submission is VolunteerApplicationSubmission {
+  return 'first_name' in submission && 'last_name' in submission && 'volunteer_interest' in submission && 'availability' in submission;
 }

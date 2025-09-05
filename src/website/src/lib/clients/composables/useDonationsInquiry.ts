@@ -50,6 +50,12 @@ export function useDonationsInquirySubmission(): UseDonationsInquirySubmissionRe
       const result = await donationsInquiryClient.submitDonationsInquiry(submission);
       response.value = result;
 
+      // Handle malformed or null responses
+      if (!result) {
+        error.value = 'Invalid response from server';
+        return;
+      }
+
       // Handle backend validation errors
       if (!result.success && result.error) {
         error.value = result.error;
@@ -58,11 +64,6 @@ export function useDonationsInquirySubmission(): UseDonationsInquirySubmissionRe
       const errorMessage = err instanceof Error ? err.message : 'Failed to submit donations inquiry';
       error.value = errorMessage;
       console.error('Error submitting donations inquiry:', err);
-
-      // Check if response is malformed
-      if (!response.value) {
-        error.value = 'Invalid response from server';
-      }
     } finally {
       isSubmitting.value = false;
     }

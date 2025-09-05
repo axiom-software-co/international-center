@@ -2,10 +2,14 @@
 import { defineConfig } from 'astro/config';
 import vue from '@astrojs/vue';
 import tailwind from '@astrojs/tailwind';
+import node from '@astrojs/node';
 
 // https://astro.build/config
 export default defineConfig({
-  output: 'static',
+  output: 'hybrid', // Enable hybrid rendering for API endpoints
+  adapter: node({
+    mode: 'standalone'
+  }),
   integrations: [
     vue(),
     tailwind({
@@ -65,6 +69,7 @@ export default defineConfig({
     },
     server: {
       host: '0.0.0.0', // Expose to local network for mobile device testing
+      port: 3000, // Match test expectations
     },
     // Optimize dependencies for better CDN caching
     optimizeDeps: {

@@ -334,7 +334,7 @@ func (h *BusinessHandler) SetPriority(w http.ResponseWriter, r *http.Request) {
 	}
 
 	priority := InquiryPriority(request.Priority)
-	if !IsValidInquiryPriority(priority) {
+	if !priority.IsValid() {
 		h.handleError(w, r, domain.NewValidationError("invalid priority value"))
 		return
 	}

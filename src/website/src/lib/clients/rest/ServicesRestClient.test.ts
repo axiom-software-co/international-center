@@ -1,14 +1,32 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ServicesRestClient } from './ServicesRestClient';
 import { RestError } from './BaseRestClient';
-import { createMockFetchResponse } from '../../../test/setup';
+
+// Mock function defined at module level for proper hoisting
+const createMockFetchResponse = (data: any, ok = true, status = 200) => {
+  const response = {
+    ok,
+    status,
+    statusText: ok ? 'OK' : 'Error',
+    json: vi.fn().mockResolvedValue(data),
+    text: vi.fn().mockResolvedValue(JSON.stringify(data)),
+    headers: new Map([['content-type', 'application/json']]),
+    clone: vi.fn().mockReturnThis()
+  };
+  
+  return Promise.resolve(response as Response);
+};
+
+// Mock fetch with proper vitest mock setup
+const mockFetch = vi.fn();
+global.fetch = mockFetch;
 
 describe('ServicesRestClient', () => {
   let client: ServicesRestClient;
   
   beforeEach(() => {
     client = new ServicesRestClient();
-    vi.clearAllMocks();
+    mockFetch.mockClear();
   });
 
   describe('getServices', () => {
@@ -27,13 +45,13 @@ describe('ServicesRestClient', () => {
         correlation_id: 'test-correlation-123'
       };
 
-      (global.fetch as any).mockResolvedValueOnce(
+      mockFetch.mockResolvedValueOnce(
         createMockFetchResponse(mockResponse)
       );
 
       await client.getServices({ page: 1, pageSize: 10 });
 
-      expect(global.fetch).toHaveBeenCalledWith(
+      expect(mockFetch).toHaveBeenCalledWith(
         'http://localhost:7220/api/v1/services?page=1&pageSize=10',
         expect.objectContaining({
           method: 'GET',
@@ -60,7 +78,7 @@ describe('ServicesRestClient', () => {
         correlation_id: 'test-correlation-123'
       };
 
-      (global.fetch as any).mockResolvedValueOnce(
+      mockFetch.mockResolvedValueOnce(
         createMockFetchResponse(expectedResponse)
       );
 
@@ -76,13 +94,13 @@ describe('ServicesRestClient', () => {
         correlation_id: 'search-correlation-456'
       };
 
-      (global.fetch as any).mockResolvedValueOnce(
+      mockFetch.mockResolvedValueOnce(
         createMockFetchResponse(mockResponse)
       );
 
       await client.getServices({ search: 'cardiac' });
 
-      expect(global.fetch).toHaveBeenCalledWith(
+      expect(mockFetch).toHaveBeenCalledWith(
         'http://localhost:7220/api/v1/services?search=cardiac',
         expect.any(Object)
       );
@@ -95,13 +113,13 @@ describe('ServicesRestClient', () => {
         correlation_id: 'category-correlation-789'
       };
 
-      (global.fetch as any).mockResolvedValueOnce(
+      mockFetch.mockResolvedValueOnce(
         createMockFetchResponse(mockResponse)
       );
 
       await client.getServices({ category: 'primary-care' });
 
-      expect(global.fetch).toHaveBeenCalledWith(
+      expect(mockFetch).toHaveBeenCalledWith(
         'http://localhost:7220/api/v1/services/categories/primary-care/services',
         expect.any(Object)
       );
@@ -126,13 +144,13 @@ describe('ServicesRestClient', () => {
         correlation_id: 'slug-correlation-abc'
       };
 
-      (global.fetch as any).mockResolvedValueOnce(
+      mockFetch.mockResolvedValueOnce(
         createMockFetchResponse(mockResponse)
       );
 
       await client.getServiceBySlug('cardiology');
 
-      expect(global.fetch).toHaveBeenCalledWith(
+      expect(mockFetch).toHaveBeenCalledWith(
         'http://localhost:7220/api/v1/services/slug/cardiology',
         expect.objectContaining({
           method: 'GET'
@@ -157,7 +175,7 @@ describe('ServicesRestClient', () => {
         correlation_id: 'slug-correlation-abc'
       };
 
-      (global.fetch as any).mockResolvedValueOnce(
+      mockFetch.mockResolvedValueOnce(
         createMockFetchResponse(expectedResponse)
       );
 
@@ -185,7 +203,7 @@ describe('ServicesRestClient', () => {
         correlation_id: 'consultation-correlation-def'
       };
 
-      (global.fetch as any).mockResolvedValueOnce(
+      mockFetch.mockResolvedValueOnce(
         createMockFetchResponse(expectedResponse)
       );
 
@@ -215,13 +233,13 @@ describe('ServicesRestClient', () => {
         correlation_id: 'categories-correlation-def'
       };
 
-      (global.fetch as any).mockResolvedValueOnce(
+      mockFetch.mockResolvedValueOnce(
         createMockFetchResponse(mockResponse)
       );
 
       await client.getServiceCategories();
 
-      expect(global.fetch).toHaveBeenCalledWith(
+      expect(mockFetch).toHaveBeenCalledWith(
         'http://localhost:7220/api/v1/services/categories',
         expect.objectContaining({
           method: 'GET'
@@ -244,13 +262,13 @@ describe('ServicesRestClient', () => {
         correlation_id: 'published-correlation-ghi'
       };
 
-      (global.fetch as any).mockResolvedValueOnce(
+      mockFetch.mockResolvedValueOnce(
         createMockFetchResponse(mockResponse)
       );
 
       await client.getFeaturedServices();
 
-      expect(global.fetch).toHaveBeenCalledWith(
+      expect(mockFetch).toHaveBeenCalledWith(
         'http://localhost:7220/api/v1/services/published',
         expect.objectContaining({
           method: 'GET'
@@ -273,13 +291,13 @@ describe('ServicesRestClient', () => {
         correlation_id: 'featured-correlation-jkl'
       };
 
-      (global.fetch as any).mockResolvedValueOnce(
+      mockFetch.mockResolvedValueOnce(
         createMockFetchResponse(mockResponse)
       );
 
       await client.getFeaturedCategories();
 
-      expect(global.fetch).toHaveBeenCalledWith(
+      expect(mockFetch).toHaveBeenCalledWith(
         'http://localhost:7220/api/v1/services/featured',
         expect.objectContaining({
           method: 'GET'
@@ -298,7 +316,7 @@ describe('ServicesRestClient', () => {
         }
       };
 
-      (global.fetch as any).mockResolvedValueOnce(
+      mockFetch.mockResolvedValueOnce(
         createMockFetchResponse(errorResponse, false, 404)
       );
 
@@ -315,7 +333,7 @@ describe('ServicesRestClient', () => {
         }
       };
 
-      (global.fetch as any).mockResolvedValueOnce(
+      mockFetch.mockResolvedValueOnce(
         createMockFetchResponse(errorResponse, false, 400)
       );
 
@@ -332,7 +350,7 @@ describe('ServicesRestClient', () => {
         }
       };
 
-      (global.fetch as any).mockResolvedValueOnce(
+      mockFetch.mockResolvedValueOnce(
         createMockFetchResponse(errorResponse, false, 429)
       );
 
@@ -349,7 +367,7 @@ describe('ServicesRestClient', () => {
         }
       };
 
-      (global.fetch as any).mockResolvedValueOnce(
+      mockFetch.mockResolvedValueOnce(
         createMockFetchResponse(errorResponse, false, 500)
       );
 
@@ -361,7 +379,7 @@ describe('ServicesRestClient', () => {
   describe('timeout and retry behavior', () => {
     it('should timeout after configured duration', async () => {
       // Mock fetch to never resolve
-      (global.fetch as any).mockImplementation(() => 
+      mockFetch.mockImplementation(() => 
         new Promise(() => {}) // Never resolves
       );
 

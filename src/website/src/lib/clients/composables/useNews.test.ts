@@ -1,17 +1,39 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { ref, nextTick } from 'vue';
+import { ref, nextTick, defineComponent } from 'vue';
+import { mount } from '@vue/test-utils';
 import { useNews, useNewsArticle, useFeaturedNews, useNewsCategories } from './useNews';
 import { NewsRestClient } from '../rest/NewsRestClient';
 import { RestError } from '../rest/BaseRestClient';
 
-// Mock the NewsRestClient
+// Mock the NewsRestClient with hoisted functions
+const {
+  mockGetNews,
+  mockGetNewsBySlug,
+  mockGetFeaturedNews,
+  mockGetNewsCategories,
+  MockedNewsRestClient
+} = vi.hoisted(() => {
+  const mockGetNewsFunc = vi.fn();
+  const mockGetNewsBySlugFunc = vi.fn();
+  const mockGetFeaturedNewsFunc = vi.fn();
+  const mockGetNewsCategoriesFunc = vi.fn();
+  
+  return {
+    mockGetNews: mockGetNewsFunc,
+    mockGetNewsBySlug: mockGetNewsBySlugFunc,
+    mockGetFeaturedNews: mockGetFeaturedNewsFunc,
+    mockGetNewsCategories: mockGetNewsCategoriesFunc,
+    MockedNewsRestClient: vi.fn().mockImplementation(() => ({
+      getNews: mockGetNewsFunc,
+      getNewsBySlug: mockGetNewsBySlugFunc,
+      getFeaturedNews: mockGetFeaturedNewsFunc,
+      getNewsCategories: mockGetNewsCategoriesFunc,
+    }))
+  };
+});
+
 vi.mock('../rest/NewsRestClient', () => ({
-  NewsRestClient: vi.fn().mockImplementation(() => ({
-    getNews: vi.fn(),
-    getNewsBySlug: vi.fn(),
-    getFeaturedNews: vi.fn(),
-    getNewsCategories: vi.fn(),
-  }))
+  NewsRestClient: MockedNewsRestClient
 }));
 
 describe('useNews composables', () => {
@@ -53,8 +75,7 @@ describe('useNews composables', () => {
         correlation_id: 'news-correlation-123'
       };
 
-      const mockClient = new NewsRestClient();
-      (mockClient.getNews as any).mockResolvedValueOnce(mockBackendResponse);
+        mockGetNews.mockResolvedValueOnce(mockBackendResponse);
 
       const { articles, loading, error, total, refetch } = useNews({ 
         page: 1, 
@@ -71,7 +92,7 @@ describe('useNews composables', () => {
       expect(total.value).toBe(1);
       expect(loading.value).toBe(false);
       expect(error.value).toBe(null);
-      expect(mockClient.getNews).toHaveBeenCalledWith({
+      expect(mockGetNews).toHaveBeenCalledWith({
         page: 1,
         pageSize: 10
       });
@@ -94,8 +115,7 @@ describe('useNews composables', () => {
         correlation_id: 'search-correlation-789'
       };
 
-      const mockClient = new NewsRestClient();
-      (mockClient.getNews as any).mockResolvedValueOnce(mockSearchResponse);
+        mockGetNews.mockResolvedValueOnce(mockSearchResponse);
 
       const { articles, refetch } = useNews({ 
         search: 'medical',
@@ -105,7 +125,7 @@ describe('useNews composables', () => {
       await refetch();
       await nextTick();
 
-      expect(mockClient.getNews).toHaveBeenCalledWith({
+      expect(mockGetNews).toHaveBeenCalledWith({
         search: 'medical'
       });
       expect(articles.value).toEqual(mockSearchResponse.news);
@@ -125,8 +145,7 @@ describe('useNews composables', () => {
         correlation_id: 'category-correlation-456'
       };
 
-      const mockClient = new NewsRestClient();
-      (mockClient.getNews as any).mockResolvedValueOnce(mockCategoryResponse);
+        mockGetNews.mockResolvedValueOnce(mockCategoryResponse);
 
       const { articles, refetch } = useNews({ 
         category: 'health-alerts',
@@ -136,7 +155,7 @@ describe('useNews composables', () => {
       await refetch();
       await nextTick();
 
-      expect(mockClient.getNews).toHaveBeenCalledWith({
+      expect(mockGetNews).toHaveBeenCalledWith({
         category: 'health-alerts'
       });
     });
@@ -154,8 +173,7 @@ describe('useNews composables', () => {
         correlation_id: 'featured-correlation-101'
       };
 
-      const mockClient = new NewsRestClient();
-      (mockClient.getNews as any).mockResolvedValueOnce(mockFeaturedResponse);
+        mockGetNews.mockResolvedValueOnce(mockFeaturedResponse);
 
       const { articles, refetch } = useNews({ 
         featured: true,
@@ -165,7 +183,7 @@ describe('useNews composables', () => {
       await refetch();
       await nextTick();
 
-      expect(mockClient.getNews).toHaveBeenCalledWith({
+      expect(mockGetNews).toHaveBeenCalledWith({
         featured: true
       });
     });
@@ -178,8 +196,7 @@ describe('useNews composables', () => {
         'error-correlation-404'
       );
 
-      const mockClient = new NewsRestClient();
-      (mockClient.getNews as any).mockRejectedValueOnce(mockError);
+        mockGetNews.mockRejectedValueOnce(mockError);
 
       const { articles, loading, error, refetch } = useNews({ immediate: false });
 
@@ -199,8 +216,7 @@ describe('useNews composables', () => {
         'rate-limit-correlation-429'
       );
 
-      const mockClient = new NewsRestClient();
-      (mockClient.getNews as any).mockRejectedValueOnce(mockRateLimitError);
+        mockGetNews.mockRejectedValueOnce(mockRateLimitError);
 
       const { error, refetch } = useNews({ immediate: false });
 
@@ -227,8 +243,7 @@ describe('useNews composables', () => {
         correlation_id: 'article-correlation-123'
       };
 
-      const mockClient = new NewsRestClient();
-      (mockClient.getNewsBySlug as any).mockResolvedValueOnce(mockArticleResponse);
+        mockGetNewsBySlug.mockResolvedValueOnce(mockArticleResponse);
 
       const { article, loading, error, refetch } = useNewsArticle(ref('healthcare-policy-update'));
 
@@ -239,7 +254,7 @@ describe('useNews composables', () => {
       expect(article.value).toEqual(mockArticleResponse.news);
       expect(loading.value).toBe(false);
       expect(error.value).toBe(null);
-      expect(mockClient.getNewsBySlug).toHaveBeenCalledWith('healthcare-policy-update');
+      expect(mockGetNewsBySlug).toHaveBeenCalledWith('healthcare-policy-update');
     });
 
     it('should handle null slug gracefully', async () => {
@@ -250,8 +265,7 @@ describe('useNews composables', () => {
       expect(article.value).toBe(null);
       expect(loading.value).toBe(false);
       
-      const mockClient = new NewsRestClient();
-      expect(mockClient.getNewsBySlug).not.toHaveBeenCalled();
+        expect(mockGetNewsBySlug).not.toHaveBeenCalled();
     });
 
     it('should react to slug changes', async () => {
@@ -264,8 +278,7 @@ describe('useNews composables', () => {
         correlation_id: 'correlation-2'
       };
 
-      const mockClient = new NewsRestClient();
-      (mockClient.getNewsBySlug as any)
+        mockGetNewsBySlug
         .mockResolvedValueOnce(mockArticle1)
         .mockResolvedValueOnce(mockArticle2);
 
@@ -283,7 +296,7 @@ describe('useNews composables', () => {
       await new Promise(resolve => setTimeout(resolve, 0));
 
       expect(article.value).toEqual(mockArticle2.news);
-      expect(mockClient.getNewsBySlug).toHaveBeenCalledTimes(2);
+      expect(mockGetNewsBySlug).toHaveBeenCalledTimes(2);
     });
   });
 
@@ -308,19 +321,25 @@ describe('useNews composables', () => {
         correlation_id: 'featured-correlation-789'
       };
 
-      const mockClient = new NewsRestClient();
-      (mockClient.getFeaturedNews as any).mockResolvedValueOnce(mockFeaturedResponse);
+      mockGetFeaturedNews.mockResolvedValueOnce(mockFeaturedResponse);
 
-      const { articles, loading, error } = useFeaturedNews();
+      const TestComponent = defineComponent({
+        setup() {
+          return useFeaturedNews();
+        },
+        template: '<div></div>'
+      });
 
-      // Wait for mount and fetch
+      const wrapper = mount(TestComponent);
       await nextTick();
       await new Promise(resolve => setTimeout(resolve, 0));
 
-      expect(articles.value).toEqual(mockFeaturedResponse.news);
-      expect(loading.value).toBe(false);
-      expect(error.value).toBe(null);
-      expect(mockClient.getFeaturedNews).toHaveBeenCalledWith(undefined);
+      const { articles, loading, error } = (wrapper.vm as any);
+
+      expect(articles).toEqual(mockFeaturedResponse.news);
+      expect(loading).toBe(false);
+      expect(error).toBe(null);
+      expect(mockGetFeaturedNews).toHaveBeenCalledWith(undefined);
     });
 
     it('should handle limit parameter', async () => {
@@ -332,15 +351,14 @@ describe('useNews composables', () => {
         correlation_id: 'limited-correlation-123'
       };
 
-      const mockClient = new NewsRestClient();
-      (mockClient.getFeaturedNews as any).mockResolvedValueOnce(mockLimitedResponse);
+        mockGetFeaturedNews.mockResolvedValueOnce(mockLimitedResponse);
 
       const { articles } = useFeaturedNews(5);
 
       await nextTick();
       await new Promise(resolve => setTimeout(resolve, 0));
 
-      expect(mockClient.getFeaturedNews).toHaveBeenCalledWith(5);
+      expect(mockGetFeaturedNews).toHaveBeenCalledWith(5);
     });
   });
 
@@ -369,19 +387,25 @@ describe('useNews composables', () => {
         correlation_id: 'categories-correlation-456'
       };
 
-      const mockClient = new NewsRestClient();
-      (mockClient.getNewsCategories as any).mockResolvedValueOnce(mockCategoriesResponse);
+        mockGetNewsCategories.mockResolvedValueOnce(mockCategoriesResponse);
 
-      const { categories, loading, error } = useNewsCategories();
+      const TestComponent = defineComponent({
+        setup() {
+          return useNewsCategories();
+        },
+        template: '<div></div>'
+      });
 
-      // Wait for mount and fetch
+      const wrapper = mount(TestComponent);
       await nextTick();
       await new Promise(resolve => setTimeout(resolve, 0));
 
-      expect(categories.value).toEqual(mockCategoriesResponse.categories);
-      expect(loading.value).toBe(false);
-      expect(error.value).toBe(null);
-      expect(mockClient.getNewsCategories).toHaveBeenCalled();
+      const { categories, loading, error } = (wrapper.vm as any);
+
+      expect(categories).toEqual(mockCategoriesResponse.categories);
+      expect(loading).toBe(false);
+      expect(error).toBe(null);
+      expect(mockGetNewsCategories).toHaveBeenCalled();
     });
 
     it('should handle empty categories response', async () => {
@@ -391,15 +415,22 @@ describe('useNews composables', () => {
         correlation_id: 'empty-categories-correlation'
       };
 
-      const mockClient = new NewsRestClient();
-      (mockClient.getNewsCategories as any).mockResolvedValueOnce(mockEmptyResponse);
+        mockGetNewsCategories.mockResolvedValueOnce(mockEmptyResponse);
 
-      const { categories } = useNewsCategories();
+      const TestComponent = defineComponent({
+        setup() {
+          return useNewsCategories();
+        },
+        template: '<div></div>'
+      });
 
+      const wrapper = mount(TestComponent);
       await nextTick();
       await new Promise(resolve => setTimeout(resolve, 0));
 
-      expect(categories.value).toEqual([]);
+      const { categories } = (wrapper.vm as any);
+
+      expect(categories).toEqual([]);
     });
   });
 
@@ -407,8 +438,7 @@ describe('useNews composables', () => {
     it('should handle network errors consistently', async () => {
       const networkError = new Error('Network connection failed');
       
-      const mockClient = new NewsRestClient();
-      (mockClient.getNews as any).mockRejectedValueOnce(networkError);
+        mockGetNews.mockRejectedValueOnce(networkError);
 
       const { error, refetch } = useNews({ immediate: false });
 
@@ -421,8 +451,7 @@ describe('useNews composables', () => {
     it('should handle timeout errors', async () => {
       const timeoutError = new RestError('Request timeout after 5000ms', 408);
       
-      const mockClient = new NewsRestClient();
-      (mockClient.getNewsBySlug as any).mockRejectedValueOnce(timeoutError);
+        mockGetNewsBySlug.mockRejectedValueOnce(timeoutError);
 
       const { error } = useNewsArticle(ref('test-article'));
 
@@ -440,8 +469,7 @@ describe('useNews composables', () => {
         correlation_id: 'success-correlation'
       };
 
-      const mockClient = new NewsRestClient();
-      (mockClient.getNews as any)
+        mockGetNews
         .mockRejectedValueOnce(mockError)
         .mockResolvedValueOnce(mockSuccessResponse);
 

@@ -28,5 +28,4 @@ export type {
 // Research composables (ON HOLD - React hooks preserved but unused)
 // export { useResearch, useResearchArticle, useFeaturedResearch, useRecentResearch } from './useResearch';
 
-// Contacts composables (ON HOLD - React hooks preserved but unused)  
-// export { useContactSubmission, useContacts, useContact, useContactSearch, useRecentContacts } from './useContacts';
+// Contacts composables (REMOVED - React hooks eliminated in favor of Vue inquiry composables)

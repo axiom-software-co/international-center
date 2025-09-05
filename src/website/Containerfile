@@ -102,15 +102,22 @@ COPY --from=builder --chown=nodejs:nodejs /app ./
 # Set runtime environment variables
 ENV NODE_ENV=development
 ENV HOST=0.0.0.0
-ENV PORT=4321
+ENV PORT=3000
 ENV ASTRO_TELEMETRY_DISABLED=1
 ENV NODE_OPTIONS="--max-old-space-size=2048"
+
+# Add environment variables for backend service connectivity
+ENV API_BASE_URL=http://localhost:8080
+ENV SERVICES_API_URL=http://localhost:8081
+ENV DAPR_HTTP_PORT=3500
+ENV DAPR_APP_ID=website
+ENV NETWORK_NAME=development-network
 
 # Switch to non-root user for security
 USER nodejs
 
 # Expose port
-EXPOSE 4321
+EXPOSE 3000
 
 # Health check handled by podman-compose for better cross-platform compatibility
 

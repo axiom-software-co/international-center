@@ -169,7 +169,7 @@
 
 <script setup lang="ts">
 import { ref, reactive } from 'vue';
-import { contactsClient } from '../lib/clients';
+import { useDonationsInquirySubmission } from '../lib/clients/composables/useDonationsInquiry';
 
 // Preset amounts
 const presetAmounts = [25, 50, 100, 250, 500, 1000];
@@ -197,8 +197,18 @@ const errors = reactive({
   email: null as string | null,
 });
 
+// Initialize donations inquiry composable
+const { 
+  isSubmitting, 
+  error: submissionError, 
+  response: submissionResponse, 
+  isSuccess, 
+  isError, 
+  submitInquiry,
+  reset: resetSubmission 
+} = useDonationsInquirySubmission();
+
 // Submission state
-const isSubmitting = ref(false);
 const submitStatus = ref<'idle' | 'success' | 'error'>('idle');
 const submitMessage = ref('');
 
@@ -309,52 +319,72 @@ const handleSubmit = async (event: Event) => {
     return;
   }
 
-  isSubmitting.value = true;
   submitStatus.value = 'idle';
 
-  try {
-    const donationData = {
-      type: 'quick-donation',
-      amount: parseFloat(form.amount),
-      firstName: form.firstName.trim(),
-      lastName: form.lastName.trim(),
-      email: form.email.trim(),
-      anonymous: form.anonymous,
-      submittedAt: new Date().toISOString(),
-    };
+  // Determine amount range for donations inquiry
+  const amount = parseFloat(form.amount);
+  let preferredAmountRange: string;
+  if (amount < 1000) {
+    preferredAmountRange = 'under-1000';
+  } else if (amount < 5000) {
+    preferredAmountRange = '1000-5000';
+  } else if (amount < 25000) {
+    preferredAmountRange = '5000-25000';
+  } else if (amount < 100000) {
+    preferredAmountRange = '25000-100000';
+  } else {
+    preferredAmountRange = 'over-100000';
+  }
 
-    const response = await contactsClient.submitContact(donationData as any);
+  // Prepare data for donations inquiry submission using proper schema
+  const submissionData = {
+    contact_name: `${form.firstName.trim()} ${form.lastName.trim()}`,
+    email: form.email.trim(),
+    donor_type: 'individual' as const,
+    message: `Quick donation request for $${form.amount}${form.anonymous ? ' (Anonymous donation)' : ''}`,
+    preferred_amount_range: preferredAmountRange as any,
+    donation_frequency: 'one-time' as const,
+    interest_area: 'general-support' as const
+  };
+
+  // Submit using donations inquiry composable
+  await submitInquiry(submissionData);
+
+  // Handle response using composable state
+  if (isSuccess.value && submissionResponse.value?.donations_inquiry) {
+    console.log('✅ Donation inquiry submitted successfully:', submissionResponse.value);
+
+    submitStatus.value = 'success';
+    const referenceMsg = submissionResponse.value.donations_inquiry.inquiry_id 
+      ? ` Your inquiry ID is: ${submissionResponse.value.donations_inquiry.inquiry_id}` 
+      : '';
+    submitMessage.value = `Thank you for your donation inquiry! We have received your request and will contact you within 1-2 business days to coordinate the donation process.${referenceMsg}`;
     
-    if (response.success) {
-      submitStatus.value = 'success';
-      submitMessage.value = 'Thank you for your donation! You will be redirected to complete payment shortly.';
-      
-      // Reset form
-      Object.keys(form).forEach(key => {
-        if (typeof form[key as keyof typeof form] === 'string') {
-          (form as any)[key] = '';
-        } else if (typeof form[key as keyof typeof form] === 'boolean') {
-          (form as any)[key] = false;
-        }
-      });
-      
-      Object.keys(touched).forEach(key => {
-        touched[key as keyof typeof touched] = false;
-      });
-      
-      Object.keys(errors).forEach(key => {
-        errors[key as keyof typeof errors] = null;
-      });
-    } else {
-      submitStatus.value = 'error';
-      submitMessage.value = response.message || 'Failed to submit donation. Please try again.';
-    }
-  } catch (error) {
-    console.error('Quick donation submission error:', error);
+    // Reset form
+    Object.keys(form).forEach(key => {
+      if (typeof form[key as keyof typeof form] === 'string') {
+        (form as any)[key] = '';
+      } else if (typeof form[key as keyof typeof form] === 'boolean') {
+        (form as any)[key] = false;
+      }
+    });
+    
+    Object.keys(touched).forEach(key => {
+      touched[key as keyof typeof touched] = false;
+    });
+    
+    Object.keys(errors).forEach(key => {
+      errors[key as keyof typeof errors] = null;
+    });
+    
+    // Reset composable state
+    resetSubmission();
+  } else if (isError.value) {
+    // Handle error state using composable error
     submitStatus.value = 'error';
-    submitMessage.value = 'Network error occurred. Please try again later.';
-  } finally {
-    isSubmitting.value = false;
+    submitMessage.value = submissionError.value || 
+      submissionResponse.value?.message ||
+      'Unable to process your donation request. Please try again.';
   }
 };
 </script>

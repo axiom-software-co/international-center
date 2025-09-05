@@ -1,10 +1,14 @@
 package business
 
 import (
+	"fmt"
 	"net"
+	"net/mail"
+	"strings"
 	"time"
 
 	"github.com/axiom-software-co/international-center/src/backend/internal/shared/domain"
+	"github.com/google/uuid"
 )
 
 // InquiryStatus represents the status of a business inquiry
@@ -141,6 +145,10 @@ func (bi *BusinessInquiry) Validate() error {
 		return domain.NewValidationError("email must not exceed 254 characters")
 	}
 
+	if err := validateBusinessEmail(bi.Email); err != nil {
+		return err
+	}
+
 	if bi.Title == "" {
 		return domain.NewValidationError("title is required")
 	}
@@ -157,15 +165,15 @@ func (bi *BusinessInquiry) Validate() error {
 		return domain.NewValidationError("message must be between 20 and 1500 characters")
 	}
 
-	if !IsValidInquiryType(bi.InquiryType) {
+	if !bi.InquiryType.IsValid() {
 		return domain.NewValidationError("invalid inquiry type")
 	}
 
-	if !IsValidInquiryStatus(bi.Status) {
+	if !bi.Status.IsValid() {
 		return domain.NewValidationError("invalid inquiry status")
 	}
 
-	if !IsValidInquiryPriority(bi.Priority) {
+	if !bi.Priority.IsValid() {
 		return domain.NewValidationError("invalid inquiry priority")
 	}
 
@@ -202,12 +210,232 @@ func IsValidInquiryStatus(status InquiryStatus) bool {
 
 // IsValidInquiryPriority checks if the inquiry priority is valid
 func IsValidInquiryPriority(priority InquiryPriority) bool {
-	switch priority {
+	return priority.IsValid()
+}
+
+// IsValid checks if the inquiry priority is valid
+func (p InquiryPriority) IsValid() bool {
+	switch p {
 	case InquiryPriorityLow, InquiryPriorityMedium, InquiryPriorityHigh, InquiryPriorityUrgent:
 		return true
 	default:
 		return false
 	}
+}
+
+// IsValid checks if the inquiry status is valid
+func (s InquiryStatus) IsValid() bool {
+	switch s {
+	case InquiryStatusNew, InquiryStatusAcknowledged, InquiryStatusInProgress, InquiryStatusResolved, InquiryStatusClosed:
+		return true
+	default:
+		return false
+	}
+}
+
+// IsValid checks if the inquiry type is valid
+func (t InquiryType) IsValid() bool {
+	switch t {
+	case InquiryTypePartnership, InquiryTypeLicensing, InquiryTypeResearch, InquiryTypeTechnology, InquiryTypeRegulatory, InquiryTypeOther:
+		return true
+	default:
+		return false
+	}
+}
+
+// Factory Functions
+
+// NewBusinessInquiry creates a new business inquiry with validation
+func NewBusinessInquiry(request AdminCreateInquiryRequest, userID string) (*BusinessInquiry, error) {
+	// Validate required fields
+	if request.OrganizationName == "" {
+		return nil, domain.NewValidationError("organization name is required")
+	}
+	if len(request.OrganizationName) < 2 || len(request.OrganizationName) > 100 {
+		return nil, domain.NewValidationError("organization name must be between 2 and 100 characters")
+	}
+
+	if request.ContactName == "" {
+		return nil, domain.NewValidationError("contact name is required")
+	}
+	if len(request.ContactName) < 2 || len(request.ContactName) > 50 {
+		return nil, domain.NewValidationError("contact name must be between 2 and 50 characters")
+	}
+
+	if request.Email == "" {
+		return nil, domain.NewValidationError("email is required")
+	}
+	if _, err := mail.ParseAddress(request.Email); err != nil {
+		return nil, domain.NewValidationError("invalid email format")
+	}
+
+	if request.Title == "" {
+		return nil, domain.NewValidationError("title is required")
+	}
+	if len(request.Title) > 50 {
+		return nil, domain.NewValidationError("title must not exceed 50 characters")
+	}
+
+	if request.Message == "" {
+		return nil, domain.NewValidationError("message is required")
+	}
+	if len(request.Message) < 20 || len(request.Message) > 1500 {
+		return nil, domain.NewValidationError("message must be between 20 and 1500 characters")
+	}
+
+	inquiryType := InquiryType(request.InquiryType)
+	if !inquiryType.IsValid() {
+		return nil, domain.NewValidationError("invalid inquiry type")
+	}
+
+	if request.Phone != nil && len(*request.Phone) != 10 {
+		return nil, domain.NewValidationError("phone number must be exactly 10 digits")
+	}
+
+	if request.Industry != nil && len(*request.Industry) > 50 {
+		return nil, domain.NewValidationError("industry must not exceed 50 characters")
+	}
+
+	// Parse IP address if provided
+	var ipAddress *net.IP
+	if request.IPAddress != nil {
+		if ip := net.ParseIP(*request.IPAddress); ip != nil {
+			ipAddress = &ip
+		}
+	}
+
+	// Create the inquiry
+	now := time.Now()
+	inquiry := &BusinessInquiry{
+		InquiryID:        uuid.New().String(),
+		Status:           InquiryStatusNew,
+		Priority:         InquiryPriorityMedium,
+		OrganizationName: request.OrganizationName,
+		ContactName:      request.ContactName,
+		Title:            request.Title,
+		Email:            request.Email,
+		Phone:            request.Phone,
+		Industry:         request.Industry,
+		InquiryType:      inquiryType,
+		Message:          request.Message,
+		Source:           getSourceOrDefault(request.Source),
+		IPAddress:        ipAddress,
+		UserAgent:        request.UserAgent,
+		CreatedAt:        now,
+		UpdatedAt:        now,
+		CreatedBy:        userID,
+		UpdatedBy:        userID,
+		IsDeleted:        false,
+	}
+
+	return inquiry, nil
+}
+
+// Business Logic Methods
+
+// SetPriority updates the priority of the inquiry
+func (bi *BusinessInquiry) SetPriority(priority InquiryPriority, userID string) error {
+	if !priority.IsValid() {
+		return domain.NewValidationError("invalid priority value")
+	}
+
+	bi.Priority = priority
+	bi.UpdatedBy = userID
+	bi.UpdatedAt = time.Now()
+
+	return nil
+}
+
+// Acknowledge transitions the inquiry from new to acknowledged status
+func (bi *BusinessInquiry) Acknowledge(userID string) error {
+	if bi.Status != InquiryStatusNew {
+		return domain.NewValidationError(fmt.Sprintf("cannot acknowledge inquiry with status %s", bi.Status))
+	}
+
+	if bi.IsDeleted {
+		return domain.NewValidationError("cannot acknowledge deleted inquiry")
+	}
+
+	bi.Status = InquiryStatusAcknowledged
+	bi.UpdatedBy = userID
+	bi.UpdatedAt = time.Now()
+
+	return nil
+}
+
+// Resolve transitions the inquiry to resolved status
+func (bi *BusinessInquiry) Resolve(userID string) error {
+	if bi.Status != InquiryStatusAcknowledged && bi.Status != InquiryStatusInProgress {
+		return domain.NewValidationError(fmt.Sprintf("cannot resolve inquiry with status %s", bi.Status))
+	}
+
+	if bi.IsDeleted {
+		return domain.NewValidationError("cannot resolve deleted inquiry")
+	}
+
+	bi.Status = InquiryStatusResolved
+	bi.UpdatedBy = userID
+	bi.UpdatedAt = time.Now()
+
+	return nil
+}
+
+// Close transitions the inquiry to closed status (can be done from any status)
+func (bi *BusinessInquiry) Close(userID string) error {
+	if bi.Status == InquiryStatusClosed {
+		return domain.NewValidationError("inquiry is already closed")
+	}
+
+	if bi.IsDeleted {
+		return domain.NewValidationError("cannot close deleted inquiry")
+	}
+
+	bi.Status = InquiryStatusClosed
+	bi.UpdatedBy = userID
+	bi.UpdatedAt = time.Now()
+
+	return nil
+}
+
+// Helper functions
+
+// getSourceOrDefault returns the source or defaults to "website"
+func getSourceOrDefault(source string) string {
+	if source == "" {
+		return "website"
+	}
+	return source
+}
+
+// validateBusinessEmail validates email format with stricter business requirements
+func validateBusinessEmail(email string) error {
+	if email == "" {
+		return domain.NewValidationError("email is required")
+	}
+
+	// Must contain @ symbol
+	if !strings.Contains(email, "@") {
+		return domain.NewValidationError("invalid email format")
+	}
+
+	// Use Go's built-in email parser
+	addr, err := mail.ParseAddress(email)
+	if err != nil {
+		return domain.NewValidationError("invalid email format")
+	}
+
+	// Additional check: must have domain part
+	parts := strings.Split(addr.Address, "@")
+	if len(parts) != 2 || len(parts[0]) == 0 || len(parts[1]) == 0 {
+		return domain.NewValidationError("invalid email format")
+	}
+
+	// Domain must contain a dot
+	if !strings.Contains(parts[1], ".") {
+		return domain.NewValidationError("invalid email format")
+	}
+
+	return nil
 }
 
 // CanTransitionTo checks if the inquiry can transition to the target status

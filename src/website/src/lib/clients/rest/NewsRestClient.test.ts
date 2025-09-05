@@ -1,14 +1,32 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NewsRestClient } from './NewsRestClient';
 import { RestError } from './BaseRestClient';
-import { createMockFetchResponse } from '../../../test/setup';
+
+// Mock function defined at module level for proper hoisting
+const createMockFetchResponse = (data: any, ok = true, status = 200) => {
+  const response = {
+    ok,
+    status,
+    statusText: ok ? 'OK' : 'Error',
+    json: vi.fn().mockResolvedValue(data),
+    text: vi.fn().mockResolvedValue(JSON.stringify(data)),
+    headers: new Map([['content-type', 'application/json']]),
+    clone: vi.fn().mockReturnThis()
+  };
+  
+  return Promise.resolve(response as Response);
+};
+
+// Mock fetch with proper vitest mock setup
+const mockFetch = vi.fn();
+global.fetch = mockFetch;
 
 describe('NewsRestClient', () => {
   let client: NewsRestClient;
   
   beforeEach(() => {
     client = new NewsRestClient();
-    vi.clearAllMocks();
+    mockFetch.mockClear();
   });
 
   describe('getNews', () => {
@@ -31,13 +49,13 @@ describe('NewsRestClient', () => {
         correlation_id: 'test-correlation-123'
       };
 
-      (global.fetch as any).mockResolvedValueOnce(
+      mockFetch.mockResolvedValueOnce(
         createMockFetchResponse(mockResponse)
       );
 
       await client.getNews({ page: 1, pageSize: 10 });
 
-      expect(global.fetch).toHaveBeenCalledWith(
+      expect(mockFetch).toHaveBeenCalledWith(
         'http://localhost:7220/api/v1/news?page=1&pageSize=10',
         expect.objectContaining({
           method: 'GET',
@@ -70,7 +88,7 @@ describe('NewsRestClient', () => {
         correlation_id: 'test-correlation-123'
       };
 
-      (global.fetch as any).mockResolvedValueOnce(
+      mockFetch.mockResolvedValueOnce(
         createMockFetchResponse(expectedResponse)
       );
 
@@ -86,13 +104,13 @@ describe('NewsRestClient', () => {
         correlation_id: 'search-correlation-456'
       };
 
-      (global.fetch as any).mockResolvedValueOnce(
+      mockFetch.mockResolvedValueOnce(
         createMockFetchResponse(mockResponse)
       );
 
       await client.getNews({ search: 'healthcare' });
 
-      expect(global.fetch).toHaveBeenCalledWith(
+      expect(mockFetch).toHaveBeenCalledWith(
         'http://localhost:7220/api/v1/news?search=healthcare',
         expect.any(Object)
       );
@@ -105,13 +123,13 @@ describe('NewsRestClient', () => {
         correlation_id: 'category-correlation-789'
       };
 
-      (global.fetch as any).mockResolvedValueOnce(
+      mockFetch.mockResolvedValueOnce(
         createMockFetchResponse(mockResponse)
       );
 
       await client.getNews({ category: 'health-updates' });
 
-      expect(global.fetch).toHaveBeenCalledWith(
+      expect(mockFetch).toHaveBeenCalledWith(
         'http://localhost:7220/api/v1/news/categories/health-updates/news',
         expect.any(Object)
       );
@@ -124,13 +142,13 @@ describe('NewsRestClient', () => {
         correlation_id: 'featured-correlation-abc'
       };
 
-      (global.fetch as any).mockResolvedValueOnce(
+      mockFetch.mockResolvedValueOnce(
         createMockFetchResponse(mockResponse)
       );
 
       await client.getNews({ featured: true });
 
-      expect(global.fetch).toHaveBeenCalledWith(
+      expect(mockFetch).toHaveBeenCalledWith(
         'http://localhost:7220/api/v1/news?featured=true',
         expect.any(Object)
       );
@@ -156,13 +174,13 @@ describe('NewsRestClient', () => {
         correlation_id: 'slug-correlation-def'
       };
 
-      (global.fetch as any).mockResolvedValueOnce(
+      mockFetch.mockResolvedValueOnce(
         createMockFetchResponse(mockResponse)
       );
 
       await client.getNewsBySlug('health-news-update');
 
-      expect(global.fetch).toHaveBeenCalledWith(
+      expect(mockFetch).toHaveBeenCalledWith(
         'http://localhost:7220/api/v1/news/slug/health-news-update',
         expect.objectContaining({
           method: 'GET'
@@ -188,7 +206,7 @@ describe('NewsRestClient', () => {
         correlation_id: 'slug-correlation-def'
       };
 
-      (global.fetch as any).mockResolvedValueOnce(
+      mockFetch.mockResolvedValueOnce(
         createMockFetchResponse(expectedResponse)
       );
 
@@ -217,7 +235,7 @@ describe('NewsRestClient', () => {
         correlation_id: 'brief-correlation-ghi'
       };
 
-      (global.fetch as any).mockResolvedValueOnce(
+      mockFetch.mockResolvedValueOnce(
         createMockFetchResponse(expectedResponse)
       );
 
@@ -249,13 +267,13 @@ describe('NewsRestClient', () => {
         correlation_id: 'categories-correlation-jkl'
       };
 
-      (global.fetch as any).mockResolvedValueOnce(
+      mockFetch.mockResolvedValueOnce(
         createMockFetchResponse(mockResponse)
       );
 
       await client.getNewsCategories();
 
-      expect(global.fetch).toHaveBeenCalledWith(
+      expect(mockFetch).toHaveBeenCalledWith(
         'http://localhost:7220/api/v1/news/categories',
         expect.objectContaining({
           method: 'GET'
@@ -279,13 +297,13 @@ describe('NewsRestClient', () => {
         correlation_id: 'featured-correlation-mno'
       };
 
-      (global.fetch as any).mockResolvedValueOnce(
+      mockFetch.mockResolvedValueOnce(
         createMockFetchResponse(mockResponse)
       );
 
       await client.getFeaturedNews();
 
-      expect(global.fetch).toHaveBeenCalledWith(
+      expect(mockFetch).toHaveBeenCalledWith(
         'http://localhost:7220/api/v1/news/featured',
         expect.objectContaining({
           method: 'GET'
@@ -300,13 +318,13 @@ describe('NewsRestClient', () => {
         correlation_id: 'limited-correlation-pqr'
       };
 
-      (global.fetch as any).mockResolvedValueOnce(
+      mockFetch.mockResolvedValueOnce(
         createMockFetchResponse(mockResponse)
       );
 
       await client.getFeaturedNews(3);
 
-      expect(global.fetch).toHaveBeenCalledWith(
+      expect(mockFetch).toHaveBeenCalledWith(
         'http://localhost:7220/api/v1/news/featured?limit=3',
         expect.any(Object)
       );
@@ -321,13 +339,13 @@ describe('NewsRestClient', () => {
         correlation_id: 'search-correlation-stu'
       };
 
-      (global.fetch as any).mockResolvedValueOnce(
+      mockFetch.mockResolvedValueOnce(
         createMockFetchResponse(mockResponse)
       );
 
       await client.searchNews({ q: 'medical research', page: 1, pageSize: 5 });
 
-      expect(global.fetch).toHaveBeenCalledWith(
+      expect(mockFetch).toHaveBeenCalledWith(
         'http://localhost:7220/api/v1/news/search?q=medical+research&page=1&pageSize=5',
         expect.any(Object)
       );
@@ -344,7 +362,7 @@ describe('NewsRestClient', () => {
         }
       };
 
-      (global.fetch as any).mockResolvedValueOnce(
+      mockFetch.mockResolvedValueOnce(
         createMockFetchResponse(errorResponse, false, 404)
       );
 
@@ -361,7 +379,7 @@ describe('NewsRestClient', () => {
         }
       };
 
-      (global.fetch as any).mockResolvedValueOnce(
+      mockFetch.mockResolvedValueOnce(
         createMockFetchResponse(errorResponse, false, 400)
       );
 
@@ -378,7 +396,7 @@ describe('NewsRestClient', () => {
         }
       };
 
-      (global.fetch as any).mockResolvedValueOnce(
+      mockFetch.mockResolvedValueOnce(
         createMockFetchResponse(errorResponse, false, 429)
       );
 
@@ -395,7 +413,7 @@ describe('NewsRestClient', () => {
         }
       };
 
-      (global.fetch as any).mockResolvedValueOnce(
+      mockFetch.mockResolvedValueOnce(
         createMockFetchResponse(errorResponse, false, 500)
       );
 
@@ -407,7 +425,7 @@ describe('NewsRestClient', () => {
   describe('timeout and retry behavior', () => {
     it('should timeout after configured duration', async () => {
       // Never resolves
-      (global.fetch as any).mockImplementation(() => 
+      mockFetch.mockImplementation(() => 
         new Promise(() => {})
       );
 

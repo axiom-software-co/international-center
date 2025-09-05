@@ -5,12 +5,27 @@ import { BusinessInquiryRestClient } from '../rest/BusinessInquiryRestClient';
 import { RestError } from '../rest/BaseRestClient';
 import type { BusinessInquirySubmission, InquirySubmissionResponse } from '../inquiries/types';
 
-// Mock the BusinessInquiryRestClient
+// Mock the BusinessInquiryRestClient with hoisted functions
+const {
+  mockSubmitBusinessInquiry,
+  mockGetBusinessInquiry,
+  MockedBusinessInquiryRestClient
+} = vi.hoisted(() => {
+  const mockSubmit = vi.fn();
+  const mockGet = vi.fn();
+  
+  return {
+    mockSubmitBusinessInquiry: mockSubmit,
+    mockGetBusinessInquiry: mockGet,
+    MockedBusinessInquiryRestClient: vi.fn().mockImplementation(() => ({
+      submitBusinessInquiry: mockSubmit,
+      getBusinessInquiry: mockGet,
+    }))
+  };
+});
+
 vi.mock('../rest/BusinessInquiryRestClient', () => ({
-  BusinessInquiryRestClient: vi.fn().mockImplementation(() => ({
-    submitBusinessInquiry: vi.fn(),
-    getBusinessInquiry: vi.fn(),
-  }))
+  BusinessInquiryRestClient: MockedBusinessInquiryRestClient
 }));
 
 describe('useBusinessInquiry composables', () => {
@@ -66,8 +81,7 @@ describe('useBusinessInquiry composables', () => {
     });
 
     it('should submit business inquiry successfully', async () => {
-      const mockClient = new BusinessInquiryRestClient();
-      (mockClient.submitBusinessInquiry as any).mockResolvedValueOnce(mockSuccessResponse);
+      mockSubmitBusinessInquiry.mockResolvedValueOnce(mockSuccessResponse);
 
       const { submitInquiry, isSubmitting, response, isSuccess, error } = useBusinessInquirySubmission();
 
@@ -87,7 +101,7 @@ describe('useBusinessInquiry composables', () => {
       expect(error.value).toBe(null);
       expect(response.value).toEqual(mockSuccessResponse);
       expect(response.value?.business_inquiry?.inquiry_type).toBe('partnership');
-      expect(mockClient.submitBusinessInquiry).toHaveBeenCalledWith(mockSubmissionData);
+      expect(mockSubmitBusinessInquiry).toHaveBeenCalledWith(mockSubmissionData);
     });
 
     it('should handle different inquiry types correctly', async () => {
@@ -106,8 +120,7 @@ describe('useBusinessInquiry composables', () => {
         }
       };
 
-      const mockClient = new BusinessInquiryRestClient();
-      (mockClient.submitBusinessInquiry as any).mockResolvedValueOnce(researchResponse);
+      mockSubmitBusinessInquiry.mockResolvedValueOnce(researchResponse);
 
       const { submitInquiry, response, isSuccess } = useBusinessInquirySubmission();
 
@@ -135,8 +148,7 @@ describe('useBusinessInquiry composables', () => {
         }
       };
 
-      const mockClient = new BusinessInquiryRestClient();
-      (mockClient.submitBusinessInquiry as any).mockResolvedValueOnce(licensingResponse);
+      mockSubmitBusinessInquiry.mockResolvedValueOnce(licensingResponse);
 
       const { submitInquiry, response, isSuccess } = useBusinessInquirySubmission();
 
@@ -150,8 +162,7 @@ describe('useBusinessInquiry composables', () => {
 
     it('should handle submission errors', async () => {
       const errorMessage = 'Network connection failed';
-      const mockClient = new BusinessInquiryRestClient();
-      (mockClient.submitBusinessInquiry as any).mockRejectedValueOnce(new Error(errorMessage));
+      mockSubmitBusinessInquiry.mockRejectedValueOnce(new Error(errorMessage));
 
       const { submitInquiry, isSubmitting, error, isError, isSuccess } = useBusinessInquirySubmission();
 
@@ -180,8 +191,7 @@ describe('useBusinessInquiry composables', () => {
         message: 'Please correct the following errors'
       };
 
-      const mockClient = new BusinessInquiryRestClient();
-      (mockClient.submitBusinessInquiry as any).mockResolvedValueOnce(validationErrorResponse);
+      mockSubmitBusinessInquiry.mockResolvedValueOnce(validationErrorResponse);
 
       const { submitInquiry, error, isError, response, isSuccess } = useBusinessInquirySubmission();
 
@@ -203,8 +213,7 @@ describe('useBusinessInquiry composables', () => {
         retry_after: 60
       };
 
-      const mockClient = new BusinessInquiryRestClient();
-      (mockClient.submitBusinessInquiry as any).mockResolvedValueOnce(rateLimitResponse);
+      mockSubmitBusinessInquiry.mockResolvedValueOnce(rateLimitResponse);
 
       const { submitInquiry, error, isError, response } = useBusinessInquirySubmission();
 
@@ -217,8 +226,7 @@ describe('useBusinessInquiry composables', () => {
     });
 
     it('should reset state when submitting new inquiry', async () => {
-      const mockClient = new BusinessInquiryRestClient();
-      (mockClient.submitBusinessInquiry as any).mockResolvedValueOnce(mockSuccessResponse);
+      mockSubmitBusinessInquiry.mockResolvedValueOnce(mockSuccessResponse);
 
       const { submitInquiry, error, response, reset } = useBusinessInquirySubmission();
 
@@ -260,8 +268,7 @@ describe('useBusinessInquiry composables', () => {
         }
       };
 
-      const mockClient = new BusinessInquiryRestClient();
-      (mockClient.submitBusinessInquiry as any).mockResolvedValueOnce(responseWithOptionals);
+      mockSubmitBusinessInquiry.mockResolvedValueOnce(responseWithOptionals);
 
       const { submitInquiry, response, isSuccess } = useBusinessInquirySubmission();
 
@@ -307,8 +314,7 @@ describe('useBusinessInquiry composables', () => {
         correlation_id: 'corr-get-123'
       };
 
-      const mockClient = new BusinessInquiryRestClient();
-      (mockClient.getBusinessInquiry as any).mockResolvedValueOnce(mockResponse);
+      mockGetBusinessInquiry.mockResolvedValueOnce(mockResponse);
 
       const inquiryId = ref('123e4567-e89b-12d3-a456-426614174000');
       const { inquiry, loading, error } = useBusinessInquiry(inquiryId);
@@ -318,7 +324,7 @@ describe('useBusinessInquiry composables', () => {
       expect(inquiry.value).toEqual(mockBusinessInquiry);
       expect(loading.value).toBe(false);
       expect(error.value).toBe(null);
-      expect(mockClient.getBusinessInquiry).toHaveBeenCalledWith('123e4567-e89b-12d3-a456-426614174000');
+      expect(mockGetBusinessInquiry).toHaveBeenCalledWith('123e4567-e89b-12d3-a456-426614174000');
     });
 
     it('should handle inquiry not found', async () => {
@@ -328,8 +334,7 @@ describe('useBusinessInquiry composables', () => {
         success: false
       };
 
-      const mockClient = new BusinessInquiryRestClient();
-      (mockClient.getBusinessInquiry as any).mockResolvedValueOnce(notFoundResponse);
+      mockGetBusinessInquiry.mockResolvedValueOnce(notFoundResponse);
 
       const inquiryId = ref('non-existent-id');
       const { inquiry, loading, error } = useBusinessInquiry(inquiryId);
@@ -343,8 +348,7 @@ describe('useBusinessInquiry composables', () => {
 
     it('should handle fetch errors', async () => {
       const errorMessage = 'Failed to fetch business inquiry';
-      const mockClient = new BusinessInquiryRestClient();
-      (mockClient.getBusinessInquiry as any).mockRejectedValueOnce(new Error(errorMessage));
+      mockGetBusinessInquiry.mockRejectedValueOnce(new Error(errorMessage));
 
       const inquiryId = ref('123e4567-e89b-12d3-a456-426614174000');
       const { inquiry, error } = useBusinessInquiry(inquiryId);
@@ -366,8 +370,7 @@ describe('useBusinessInquiry composables', () => {
         correlation_id: 'corr-2'
       };
 
-      const mockClient = new BusinessInquiryRestClient();
-      (mockClient.getBusinessInquiry as any).mockResolvedValueOnce(mockResponse1);
+      mockGetBusinessInquiry.mockResolvedValueOnce(mockResponse1);
 
       const inquiryId = ref('id-1');
       const { inquiry } = useBusinessInquiry(inquiryId);
@@ -376,13 +379,13 @@ describe('useBusinessInquiry composables', () => {
       expect(inquiry.value?.inquiry_id).toBe('id-1');
 
       // Change ID and mock second response
-      (mockClient.getBusinessInquiry as any).mockResolvedValueOnce(mockResponse2);
+      mockGetBusinessInquiry.mockResolvedValueOnce(mockResponse2);
       inquiryId.value = 'id-2';
 
       await nextTick();
       expect(inquiry.value?.inquiry_id).toBe('id-2');
       expect(inquiry.value?.organization_name).toBe('New Company');
-      expect(mockClient.getBusinessInquiry).toHaveBeenCalledTimes(2);
+      expect(mockGetBusinessInquiry).toHaveBeenCalledTimes(2);
     });
 
     it('should handle loading states correctly', async () => {
@@ -391,12 +394,11 @@ describe('useBusinessInquiry composables', () => {
         correlation_id: 'corr-loading-test'
       };
 
-      const mockClient = new BusinessInquiryRestClient();
       let resolvePromise: (value: any) => void;
       const pendingPromise = new Promise(resolve => {
         resolvePromise = resolve;
       });
-      (mockClient.getBusinessInquiry as any).mockReturnValueOnce(pendingPromise);
+      mockGetBusinessInquiry.mockReturnValueOnce(pendingPromise);
 
       const inquiryId = ref('123e4567-e89b-12d3-a456-426614174000');
       const { inquiry, loading, error } = useBusinessInquiry(inquiryId);
@@ -422,8 +424,7 @@ describe('useBusinessInquiry composables', () => {
   describe('error handling edge cases', () => {
     it('should handle network timeouts', async () => {
       const timeoutError = new Error('Request timeout');
-      const mockClient = new BusinessInquiryRestClient();
-      (mockClient.submitBusinessInquiry as any).mockRejectedValueOnce(timeoutError);
+      mockSubmitBusinessInquiry.mockRejectedValueOnce(timeoutError);
 
       const { submitInquiry, error, isError } = useBusinessInquirySubmission();
 
@@ -444,8 +445,7 @@ describe('useBusinessInquiry composables', () => {
     });
 
     it('should handle malformed responses gracefully', async () => {
-      const mockClient = new BusinessInquiryRestClient();
-      (mockClient.submitBusinessInquiry as any).mockResolvedValueOnce(null);
+      mockSubmitBusinessInquiry.mockResolvedValueOnce(null);
 
       const { submitInquiry, error, isError } = useBusinessInquirySubmission();
 

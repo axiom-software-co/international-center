@@ -482,7 +482,7 @@ import SelectTrigger from '@/components/vue-ui/SelectTrigger.vue';
 import SelectValue from '@/components/vue-ui/SelectValue.vue';
 import Label from '@/components/vue-ui/Label.vue';
 import { cn } from '@/lib/utils';
-import { contactsClient } from '../lib/clients';
+import { useDonationsInquirySubmission } from '../lib/clients/composables/useDonationsInquiry';
 
 interface DonationsFormProps {
   className?: string;
@@ -541,8 +541,18 @@ const donationErrors = reactive({
   dedication: null as string | null,
 });
 
+// Initialize donations inquiry composable
+const { 
+  isSubmitting, 
+  error: submissionError, 
+  response: submissionResponse, 
+  isSuccess, 
+  isError, 
+  submitInquiry,
+  reset: resetSubmission 
+} = useDonationsInquirySubmission();
+
 // Submission state
-const isSubmitting = ref(false);
 const submitStatus = ref<'idle' | 'success' | 'error'>('idle');
 const submitMessage = ref('');
 
@@ -766,62 +776,88 @@ const handleDonationSubmit = async (event: Event) => {
     return;
   }
 
-  isSubmitting.value = true;
   submitStatus.value = 'idle';
 
-  try {
-    // Format donation data for submission
-    const donationData = {
-      type: 'donation',
-      amount: parseFloat(donationForm.amount),
-      frequency: donationForm.frequency,
-      firstName: donationForm.firstName.trim(),
-      lastName: donationForm.lastName.trim(),
-      email: donationForm.email.trim(),
-      phone: donationForm.phone.trim() || null,
-      address: donationForm.address.trim(),
-      city: donationForm.city.trim(),
-      state: donationForm.state.trim().toUpperCase(),
-      zipCode: donationForm.zipCode.trim(),
-      dedication: donationForm.dedication.trim() || null,
-      anonymousDonation: donationForm.anonymousDonation,
-      receiveUpdates: donationForm.receiveUpdates,
-      submittedAt: new Date().toISOString(),
-    };
+  // Determine donor type based on form input
+  let donorType: string = 'individual'; // Default to individual
+  
+  // Determine amount range for donations inquiry
+  const amount = parseFloat(donationForm.amount);
+  let preferredAmountRange: string;
+  if (amount < 1000) {
+    preferredAmountRange = 'under-1000';
+  } else if (amount < 5000) {
+    preferredAmountRange = '1000-5000';
+  } else if (amount < 25000) {
+    preferredAmountRange = '5000-25000';
+  } else if (amount < 100000) {
+    preferredAmountRange = '25000-100000';
+  } else {
+    preferredAmountRange = 'over-100000';
+  }
 
-    // Submit using the contacts client (extend for donations)
-    const response = await contactsClient.submitContact(donationData as any);
+  // Determine interest area from the form context
+  let interestArea: string = 'general-support'; // Default for donation forms
+  if (donationForm.dedication && donationForm.dedication.toLowerCase().includes('research')) {
+    interestArea = 'research-funding';
+  } else if (donationForm.dedication && donationForm.dedication.toLowerCase().includes('patient')) {
+    interestArea = 'patient-care';
+  } else if (donationForm.dedication && donationForm.dedication.toLowerCase().includes('equipment')) {
+    interestArea = 'equipment';
+  } else if (donationForm.dedication && donationForm.dedication.toLowerCase().includes('clinic')) {
+    interestArea = 'clinic-development';
+  }
+
+  // Prepare data for donations inquiry submission using proper schema
+  const submissionData = {
+    contact_name: `${donationForm.firstName.trim()} ${donationForm.lastName.trim()}`,
+    email: donationForm.email.trim(),
+    phone: donationForm.phone.trim() || undefined,
+    donor_type: donorType as any,
+    message: `Donation inquiry for $${donationForm.amount} (${donationForm.frequency})${donationForm.dedication ? `\n\nDedication: ${donationForm.dedication}` : ''}${donationForm.anonymousDonation ? '\n\nAnonymous donation requested' : ''}${!donationForm.receiveUpdates ? '\n\nRequested no future updates' : ''}`,
+    preferred_amount_range: preferredAmountRange as any,
+    donation_frequency: donationForm.frequency as any,
+    interest_area: interestArea as any
+  };
+
+  // Submit using donations inquiry composable
+  await submitInquiry(submissionData);
+
+  // Handle response using composable state
+  if (isSuccess.value && submissionResponse.value?.donations_inquiry) {
+    console.log('✅ Donation inquiry submitted successfully:', submissionResponse.value);
+
+    submitStatus.value = 'success';
+    const referenceMsg = submissionResponse.value.donations_inquiry.inquiry_id 
+      ? ` Your inquiry ID is: ${submissionResponse.value.donations_inquiry.inquiry_id}` 
+      : '';
+    submitMessage.value = `Thank you for your generous donation inquiry! We have received your donation request and will contact you within 1-2 business days with payment processing instructions and receipt information.${referenceMsg}`;
     
-    if (response.success) {
-      submitStatus.value = 'success';
-      submitMessage.value = 'Thank you for your generous donation! We will contact you soon with payment processing instructions and receipt information.';
-      
-      // Reset form
-      Object.keys(donationForm).forEach(key => {
-        if (typeof donationForm[key as keyof typeof donationForm] === 'string') {
-          (donationForm as any)[key] = '';
-        } else if (typeof donationForm[key as keyof typeof donationForm] === 'boolean') {
-          (donationForm as any)[key] = key === 'receiveUpdates';
-        }
-      });
-      
-      Object.keys(donationTouched).forEach(key => {
-        donationTouched[key as keyof typeof donationTouched] = false;
-      });
-      
-      Object.keys(donationErrors).forEach(key => {
-        donationErrors[key as keyof typeof donationErrors] = null;
-      });
-    } else {
-      submitStatus.value = 'error';
-      submitMessage.value = response.message || 'Failed to submit donation information. Please try again.';
-    }
-  } catch (error) {
-    console.error('Donation submission error:', error);
+    // Reset form
+    Object.keys(donationForm).forEach(key => {
+      if (typeof donationForm[key as keyof typeof donationForm] === 'string') {
+        (donationForm as any)[key] = '';
+      } else if (typeof donationForm[key as keyof typeof donationForm] === 'boolean') {
+        (donationForm as any)[key] = key === 'receiveUpdates';
+      }
+    });
+    
+    Object.keys(donationTouched).forEach(key => {
+      donationTouched[key as keyof typeof donationTouched] = false;
+    });
+    
+    Object.keys(donationErrors).forEach(key => {
+      donationErrors[key as keyof typeof donationErrors] = null;
+    });
+    
+    // Reset composable state
+    resetSubmission();
+  } else if (isError.value) {
+    // Handle error state using composable error
     submitStatus.value = 'error';
-    submitMessage.value = 'Network error occurred. Please try again later.';
-  } finally {
-    isSubmitting.value = false;
+    submitMessage.value = submissionError.value || 
+      submissionResponse.value?.message ||
+      'Failed to submit donation information. Please try again.';
   }
 };
 </script>

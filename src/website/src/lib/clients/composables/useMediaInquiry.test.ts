@@ -5,67 +5,83 @@ import { MediaInquiryRestClient } from '../rest/MediaInquiryRestClient';
 import { RestError } from '../rest/BaseRestClient';
 import type { MediaInquirySubmission, InquirySubmissionResponse } from '../inquiries/types';
 
-// Mock the MediaInquiryRestClient
+// Mock the MediaInquiryRestClient with hoisted functions
+const {
+  mockSubmitMediaInquiry,
+  mockGetMediaInquiry,
+  MockedMediaInquiryRestClient
+} = vi.hoisted(() => {
+  const mockSubmit = vi.fn();
+  const mockGet = vi.fn();
+  
+  return {
+    mockSubmitMediaInquiry: mockSubmit,
+    mockGetMediaInquiry: mockGet,
+    MockedMediaInquiryRestClient: vi.fn().mockImplementation(() => ({
+      submitMediaInquiry: mockSubmit,
+      getMediaInquiry: mockGet,
+    }))
+  };
+});
+
 vi.mock('../rest/MediaInquiryRestClient', () => ({
-  MediaInquiryRestClient: vi.fn().mockImplementation(() => ({
-    submitMediaInquiry: vi.fn(),
-    getMediaInquiry: vi.fn(),
-  }))
+  MediaInquiryRestClient: MockedMediaInquiryRestClient
 }));
 
 describe('useMediaInquiry composables', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
+  const mockStandardSubmission: MediaInquirySubmission = {
+    contact_name: 'Sarah Reporter',
+    email: 'sarah.reporter@newsnetwork.com',
+    outlet: 'Medical News Network',
+    title: 'Senior Medical Reporter',
+    phone: '+1-555-987-6543',
+    media_type: 'digital',
+    subject: 'Request for interview regarding new treatment protocol and FDA approval process',
+    urgency: 'medium'
+  };
 
-  describe('useMediaInquirySubmission', () => {
-    const mockStandardSubmission: MediaInquirySubmission = {
+  const mockUrgentSubmission: MediaInquirySubmission = {
+    contact_name: 'Tom Journalist',
+    email: 'tom.journalist@tv.com',
+    outlet: 'Health TV',
+    title: 'Health Correspondent',
+    phone: '+1-555-111-2222',
+    media_type: 'television',
+    deadline: '2024-03-16',
+    urgency: 'high',
+    subject: 'Breaking: New FDA approval for innovative treatment - urgent interview needed'
+  };
+
+  const mockSuccessResponse: InquirySubmissionResponse = {
+    media_inquiry: {
+      inquiry_id: '789e0123-e89b-12d3-a456-426614174002',
       contact_name: 'Sarah Reporter',
       email: 'sarah.reporter@newsnetwork.com',
       outlet: 'Medical News Network',
       title: 'Senior Medical Reporter',
       phone: '+1-555-987-6543',
       media_type: 'digital',
-      subject: 'Request for interview regarding new treatment protocol and FDA approval process',
-      urgency: 'medium'
-    };
+      subject: mockStandardSubmission.subject,
+      urgency: 'medium',
+      status: 'new',
+      priority: 'medium',
+      source: 'website',
+      created_at: '2024-03-15T10:00:00Z',
+      updated_at: '2024-03-15T10:00:00Z',
+      created_by: 'system',
+      updated_by: 'system',
+      is_deleted: false
+    },
+    correlation_id: 'corr-789-012-345',
+    success: true,
+    message: 'Media inquiry submitted successfully'
+  };
 
-    const mockUrgentSubmission: MediaInquirySubmission = {
-      contact_name: 'Tom Journalist',
-      email: 'tom.journalist@tv.com',
-      outlet: 'Health TV',
-      title: 'Health Correspondent',
-      phone: '+1-555-111-2222',
-      media_type: 'television',
-      deadline: '2024-03-16',
-      urgency: 'high',
-      subject: 'Breaking: New FDA approval for innovative treatment - urgent interview needed'
-    };
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
 
-    const mockSuccessResponse: InquirySubmissionResponse = {
-      media_inquiry: {
-        inquiry_id: '789e0123-e89b-12d3-a456-426614174002',
-        contact_name: 'Sarah Reporter',
-        email: 'sarah.reporter@newsnetwork.com',
-        outlet: 'Medical News Network',
-        title: 'Senior Medical Reporter',
-        phone: '+1-555-987-6543',
-        media_type: 'digital',
-        subject: mockStandardSubmission.subject,
-        urgency: 'medium',
-        status: 'new',
-        priority: 'medium',
-        source: 'website',
-        created_at: '2024-03-15T10:00:00Z',
-        updated_at: '2024-03-15T10:00:00Z',
-        created_by: 'system',
-        updated_by: 'system',
-        is_deleted: false
-      },
-      correlation_id: 'corr-789-012-345',
-      success: true,
-      message: 'Media inquiry submitted successfully'
-    };
+  describe('useMediaInquirySubmission', () => {
 
     it('should initialize with correct default values', () => {
       const { isSubmitting, error, response, isSuccess, isError } = useMediaInquirySubmission();
@@ -78,8 +94,7 @@ describe('useMediaInquiry composables', () => {
     });
 
     it('should submit media inquiry successfully', async () => {
-      const mockClient = new MediaInquiryRestClient();
-      (mockClient.submitMediaInquiry as any).mockResolvedValueOnce(mockSuccessResponse);
+      mockSubmitMediaInquiry.mockResolvedValueOnce(mockSuccessResponse);
 
       const { submitInquiry, isSubmitting, response, isSuccess, error } = useMediaInquirySubmission();
 
@@ -99,7 +114,7 @@ describe('useMediaInquiry composables', () => {
       expect(error.value).toBe(null);
       expect(response.value).toEqual(mockSuccessResponse);
       expect(response.value?.media_inquiry?.outlet).toBe('Medical News Network');
-      expect(mockClient.submitMediaInquiry).toHaveBeenCalledWith(mockStandardSubmission);
+      expect(mockSubmitMediaInquiry).toHaveBeenCalledWith(mockStandardSubmission);
     });
 
     it('should handle urgent media inquiry with deadline correctly', async () => {
@@ -119,8 +134,7 @@ describe('useMediaInquiry composables', () => {
         }
       };
 
-      const mockClient = new MediaInquiryRestClient();
-      (mockClient.submitMediaInquiry as any).mockResolvedValueOnce(urgentResponse);
+      mockSubmitMediaInquiry.mockResolvedValueOnce(urgentResponse);
 
       const { submitInquiry, response, isSuccess } = useMediaInquirySubmission();
 
@@ -151,8 +165,7 @@ describe('useMediaInquiry composables', () => {
         }
       };
 
-      const mockClient = new MediaInquiryRestClient();
-      (mockClient.submitMediaInquiry as any).mockResolvedValueOnce(printResponse);
+      mockSubmitMediaInquiry.mockResolvedValueOnce(printResponse);
 
       const { submitInquiry, response, isSuccess } = useMediaInquirySubmission();
 
@@ -182,8 +195,7 @@ describe('useMediaInquiry composables', () => {
         }
       };
 
-      const mockClient = new MediaInquiryRestClient();
-      (mockClient.submitMediaInquiry as any).mockResolvedValueOnce(podcastResponse);
+      mockSubmitMediaInquiry.mockResolvedValueOnce(podcastResponse);
 
       const { submitInquiry, response, isSuccess } = useMediaInquirySubmission();
 
@@ -213,8 +225,7 @@ describe('useMediaInquiry composables', () => {
         }
       };
 
-      const mockClient = new MediaInquiryRestClient();
-      (mockClient.submitMediaInquiry as any).mockResolvedValueOnce(radioResponse);
+      mockSubmitMediaInquiry.mockResolvedValueOnce(radioResponse);
 
       const { submitInquiry, response, isSuccess } = useMediaInquirySubmission();
 
@@ -241,8 +252,7 @@ describe('useMediaInquiry composables', () => {
         }
       };
 
-      const mockClient = new MediaInquiryRestClient();
-      (mockClient.submitMediaInquiry as any).mockResolvedValueOnce(lowUrgencyResponse);
+      mockSubmitMediaInquiry.mockResolvedValueOnce(lowUrgencyResponse);
 
       const { submitInquiry, response, isSuccess } = useMediaInquirySubmission();
 
@@ -255,8 +265,7 @@ describe('useMediaInquiry composables', () => {
 
     it('should handle submission errors', async () => {
       const errorMessage = 'Network connection failed';
-      const mockClient = new MediaInquiryRestClient();
-      (mockClient.submitMediaInquiry as any).mockRejectedValueOnce(new Error(errorMessage));
+      mockSubmitMediaInquiry.mockRejectedValueOnce(new Error(errorMessage));
 
       const { submitInquiry, isSubmitting, error, isError, isSuccess } = useMediaInquirySubmission();
 
@@ -286,8 +295,7 @@ describe('useMediaInquiry composables', () => {
         message: 'Please correct the following errors'
       };
 
-      const mockClient = new MediaInquiryRestClient();
-      (mockClient.submitMediaInquiry as any).mockResolvedValueOnce(validationErrorResponse);
+      mockSubmitMediaInquiry.mockResolvedValueOnce(validationErrorResponse);
 
       const { submitInquiry, error, isError, response, isSuccess } = useMediaInquirySubmission();
 
@@ -309,8 +317,7 @@ describe('useMediaInquiry composables', () => {
         retry_after: 180
       };
 
-      const mockClient = new MediaInquiryRestClient();
-      (mockClient.submitMediaInquiry as any).mockResolvedValueOnce(rateLimitResponse);
+      mockSubmitMediaInquiry.mockResolvedValueOnce(rateLimitResponse);
 
       const { submitInquiry, error, isError, response } = useMediaInquirySubmission();
 
@@ -323,8 +330,7 @@ describe('useMediaInquiry composables', () => {
     });
 
     it('should reset state correctly', async () => {
-      const mockClient = new MediaInquiryRestClient();
-      (mockClient.submitMediaInquiry as any).mockResolvedValueOnce(mockSuccessResponse);
+      mockSubmitMediaInquiry.mockResolvedValueOnce(mockSuccessResponse);
 
       const { submitInquiry, error, response, reset } = useMediaInquirySubmission();
 
@@ -367,8 +373,7 @@ describe('useMediaInquiry composables', () => {
         }
       };
 
-      const mockClient = new MediaInquiryRestClient();
-      (mockClient.submitMediaInquiry as any).mockResolvedValueOnce(minimalResponse);
+      mockSubmitMediaInquiry.mockResolvedValueOnce(minimalResponse);
 
       const { submitInquiry, response, isSuccess } = useMediaInquirySubmission();
 
@@ -397,8 +402,7 @@ describe('useMediaInquiry composables', () => {
         }
       };
 
-      const mockClient = new MediaInquiryRestClient();
-      (mockClient.submitMediaInquiry as any).mockResolvedValueOnce(journalResponse);
+      mockSubmitMediaInquiry.mockResolvedValueOnce(journalResponse);
 
       const { submitInquiry, response, isSuccess } = useMediaInquirySubmission();
 
@@ -446,8 +450,7 @@ describe('useMediaInquiry composables', () => {
         correlation_id: 'corr-get-789'
       };
 
-      const mockClient = new MediaInquiryRestClient();
-      (mockClient.getMediaInquiry as any).mockResolvedValueOnce(mockResponse);
+      mockGetMediaInquiry.mockResolvedValueOnce(mockResponse);
 
       const inquiryId = ref('789e0123-e89b-12d3-a456-426614174002');
       const { inquiry, loading, error } = useMediaInquiry(inquiryId);
@@ -457,7 +460,7 @@ describe('useMediaInquiry composables', () => {
       expect(inquiry.value).toEqual(mockMediaInquiry);
       expect(loading.value).toBe(false);
       expect(error.value).toBe(null);
-      expect(mockClient.getMediaInquiry).toHaveBeenCalledWith('789e0123-e89b-12d3-a456-426614174002');
+      expect(mockGetMediaInquiry).toHaveBeenCalledWith('789e0123-e89b-12d3-a456-426614174002');
     });
 
     it('should handle inquiry not found', async () => {
@@ -467,8 +470,7 @@ describe('useMediaInquiry composables', () => {
         success: false
       };
 
-      const mockClient = new MediaInquiryRestClient();
-      (mockClient.getMediaInquiry as any).mockResolvedValueOnce(notFoundResponse);
+      mockGetMediaInquiry.mockResolvedValueOnce(notFoundResponse);
 
       const inquiryId = ref('non-existent-id');
       const { inquiry, loading, error } = useMediaInquiry(inquiryId);
@@ -482,8 +484,7 @@ describe('useMediaInquiry composables', () => {
 
     it('should handle fetch errors', async () => {
       const errorMessage = 'Failed to fetch media inquiry';
-      const mockClient = new MediaInquiryRestClient();
-      (mockClient.getMediaInquiry as any).mockRejectedValueOnce(new Error(errorMessage));
+      mockGetMediaInquiry.mockRejectedValueOnce(new Error(errorMessage));
 
       const inquiryId = ref('789e0123-e89b-12d3-a456-426614174002');
       const { inquiry, error } = useMediaInquiry(inquiryId);
@@ -505,8 +506,7 @@ describe('useMediaInquiry composables', () => {
         correlation_id: 'corr-2'
       };
 
-      const mockClient = new MediaInquiryRestClient();
-      (mockClient.getMediaInquiry as any).mockResolvedValueOnce(mockResponse1);
+      mockGetMediaInquiry.mockResolvedValueOnce(mockResponse1);
 
       const inquiryId = ref('id-1');
       const { inquiry } = useMediaInquiry(inquiryId);
@@ -515,13 +515,13 @@ describe('useMediaInquiry composables', () => {
       expect(inquiry.value?.inquiry_id).toBe('id-1');
 
       // Change ID and mock second response
-      (mockClient.getMediaInquiry as any).mockResolvedValueOnce(mockResponse2);
+      mockGetMediaInquiry.mockResolvedValueOnce(mockResponse2);
       inquiryId.value = 'id-2';
 
       await nextTick();
       expect(inquiry.value?.inquiry_id).toBe('id-2');
       expect(inquiry.value?.outlet).toBe('New Outlet');
-      expect(mockClient.getMediaInquiry).toHaveBeenCalledTimes(2);
+      expect(mockGetMediaInquiry).toHaveBeenCalledTimes(2);
     });
 
     it('should handle loading states correctly', async () => {
@@ -530,12 +530,11 @@ describe('useMediaInquiry composables', () => {
         correlation_id: 'corr-loading-test'
       };
 
-      const mockClient = new MediaInquiryRestClient();
       let resolvePromise: (value: any) => void;
       const pendingPromise = new Promise(resolve => {
         resolvePromise = resolve;
       });
-      (mockClient.getMediaInquiry as any).mockReturnValueOnce(pendingPromise);
+      mockGetMediaInquiry.mockReturnValueOnce(pendingPromise);
 
       const inquiryId = ref('789e0123-e89b-12d3-a456-426614174002');
       const { inquiry, loading, error } = useMediaInquiry(inquiryId);
@@ -561,8 +560,7 @@ describe('useMediaInquiry composables', () => {
   describe('error handling edge cases', () => {
     it('should handle network timeouts', async () => {
       const timeoutError = new Error('Request timeout');
-      const mockClient = new MediaInquiryRestClient();
-      (mockClient.submitMediaInquiry as any).mockRejectedValueOnce(timeoutError);
+      mockSubmitMediaInquiry.mockRejectedValueOnce(timeoutError);
 
       const { submitInquiry, error, isError } = useMediaInquirySubmission();
 
@@ -584,8 +582,7 @@ describe('useMediaInquiry composables', () => {
     });
 
     it('should handle malformed responses gracefully', async () => {
-      const mockClient = new MediaInquiryRestClient();
-      (mockClient.submitMediaInquiry as any).mockResolvedValueOnce(null);
+      mockSubmitMediaInquiry.mockResolvedValueOnce(null);
 
       const { submitInquiry, error, isError } = useMediaInquirySubmission();
 
@@ -627,8 +624,7 @@ describe('useMediaInquiry composables', () => {
         }
       };
 
-      const mockClient = new MediaInquiryRestClient();
-      (mockClient.submitMediaInquiry as any).mockResolvedValueOnce(sameDayResponse);
+      mockSubmitMediaInquiry.mockResolvedValueOnce(sameDayResponse);
 
       const { submitInquiry, response, isSuccess } = useMediaInquirySubmission();
 
@@ -659,8 +655,7 @@ describe('useMediaInquiry composables', () => {
         }
       };
 
-      const mockClient = new MediaInquiryRestClient();
-      (mockClient.submitMediaInquiry as any).mockResolvedValueOnce(futureDeadlineResponse);
+      mockSubmitMediaInquiry.mockResolvedValueOnce(futureDeadlineResponse);
 
       const { submitInquiry, response, isSuccess } = useMediaInquirySubmission();
 
@@ -690,8 +685,7 @@ describe('useMediaInquiry composables', () => {
         }
       };
 
-      const mockClient = new MediaInquiryRestClient();
-      (mockClient.submitMediaInquiry as any).mockResolvedValueOnce(tvResponse);
+      mockSubmitMediaInquiry.mockResolvedValueOnce(tvResponse);
 
       const { submitInquiry, response, isSuccess } = useMediaInquirySubmission();
 

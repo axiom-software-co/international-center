@@ -1,8 +1,0 @@
-name: international-center-dev
-runtime: go
-description: International Center Development Infrastructure
-template:
-  config:
-    environment:
-      description: The deployment environment
-      default: development

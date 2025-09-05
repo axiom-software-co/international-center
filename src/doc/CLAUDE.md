@@ -123,6 +123,8 @@ GRAFANA_CLOUD_ACCESS_POLICY_TOKEN="glc_eyJvIjoiMTA3Nzk3NSIsIm4iOiJwdWx1bWktcG9sa
 
 ## testing
 
+- use bun instead of npx to run tests
+
 - arrange , act , assert
 - testing should be results reprodusable ( temporary fixes need to followed up with reprodusable implmentation )
 - contract-first testing ( testing interfaces/contracts rather than implementation details ) ( focused on preconditions/dependencies and postconditions/state-change )
@@ -140,6 +142,7 @@ GRAFANA_CLOUD_ACCESS_POLICY_TOKEN="glc_eyJvIjoiMTA3Nzk3NSIsIm4iOiJwdWx1bWktcG9sa
 
 - trunk based development for version control
 
+- commit message template ( will implement this some other time ) 
 
 # stack
 

@@ -3,9 +3,9 @@
   "type": "module",
   "version": "0.0.1",
   "scripts": {
-    "dev": "astro dev --host 0.0.0.0 --port 4321",
-    "dev:windows": "astro dev --host 0.0.0.0 --port 4321",
-    "dev:astro-only": "astro dev --host 0.0.0.0 --port 4321",
+    "dev": "astro dev --host 0.0.0.0 --port 3000",
+    "dev:windows": "astro dev --host 0.0.0.0 --port 3000",
+    "dev:astro-only": "astro dev --host 0.0.0.0 --port 3000",
     "dev:check": "node --version && echo 'Node version check complete'",
     "build": "astro build",
     "preview": "astro preview",

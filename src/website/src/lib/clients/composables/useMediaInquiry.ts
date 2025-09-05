@@ -50,6 +50,12 @@ export function useMediaInquirySubmission(): UseMediaInquirySubmissionResult {
       const result = await mediaInquiryClient.submitMediaInquiry(submission);
       response.value = result;
 
+      // Handle malformed or null responses
+      if (!result) {
+        error.value = 'Invalid response from server';
+        return;
+      }
+
       // Handle backend validation errors
       if (!result.success && result.error) {
         error.value = result.error;
@@ -58,11 +64,6 @@ export function useMediaInquirySubmission(): UseMediaInquirySubmissionResult {
       const errorMessage = err instanceof Error ? err.message : 'Failed to submit media inquiry';
       error.value = errorMessage;
       console.error('Error submitting media inquiry:', err);
-
-      // Check if response is malformed
-      if (!response.value) {
-        error.value = 'Invalid response from server';
-      }
     } finally {
       isSubmitting.value = false;
     }

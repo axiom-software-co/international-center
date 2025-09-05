@@ -323,7 +323,7 @@ import SelectTrigger from '@/components/vue-ui/SelectTrigger.vue';
 import SelectValue from '@/components/vue-ui/SelectValue.vue';
 import Label from '@/components/vue-ui/Label.vue';
 import { cn } from '@/lib/utils';
-import { contactsClient, type ContactSubmission } from '../lib/clients';
+import { useVolunteerInquirySubmission } from '../lib/clients/composables/useVolunteerInquiry';
 
 interface VolunteerFormProps {
   className?: string;
@@ -442,7 +442,17 @@ const volunteerForm = reactive({
 
 const volunteerErrors = reactive<Record<string, string | null>>({});
 const volunteerTouched = reactive<Record<string, boolean>>({});
-const isSubmitting = ref(false);
+
+// Initialize volunteer inquiry composable
+const { 
+  isSubmitting, 
+  error: submissionError, 
+  response: submissionResponse, 
+  isSuccess, 
+  isError, 
+  submitInquiry,
+  reset: resetSubmission 
+} = useVolunteerInquirySubmission();
 
 // Success and error states
 const submitStatus = ref<'idle' | 'success' | 'error'>('idle');
@@ -537,7 +547,6 @@ watch(
 
 const handleVolunteerSubmit = async (e: Event) => {
   e.preventDefault();
-  isSubmitting.value = true;
   submitStatus.value = 'idle';
   submitMessage.value = '';
 
@@ -548,73 +557,61 @@ const handleVolunteerSubmit = async (e: Event) => {
   });
 
   if (!validateVolunteerForm()) {
-    isSubmitting.value = false;
     return;
   }
 
-  // Prepare data for standardized Contact API submission
-  const submissionData: ContactSubmission = {
-    name: `${volunteerForm.firstName} ${volunteerForm.lastName}`,
+  // Prepare data for volunteer application submission using proper schema
+  const submissionData = {
+    first_name: volunteerForm.firstName,
+    last_name: volunteerForm.lastName,
     email: volunteerForm.email,
     phone: volunteerForm.phone,
-    subject: `Volunteer Application - ${volunteerForm.volunteerInterest}`,
-    message: `Volunteer Application Details:
-
-Name: ${volunteerForm.firstName} ${volunteerForm.lastName}
-Age: ${volunteerForm.age}
-Areas of Interest: ${volunteerForm.volunteerInterest}
-Weekly Availability: ${volunteerForm.availability}
-
-Relevant Experience:
-${volunteerForm.experience || 'None specified'}
-
-Motivation:
-${volunteerForm.motivation}
-
-Preferred Schedule:
-${volunteerForm.schedule || 'None specified'}`,
+    age: parseInt(volunteerForm.age),
+    volunteer_interest: volunteerForm.volunteerInterest as any,
+    availability: volunteerForm.availability as any,
+    motivation: volunteerForm.motivation,
+    experience: volunteerForm.experience || undefined,
+    schedule_preferences: volunteerForm.schedule || undefined,
   };
 
-  try {
-    // Submit using contacts client
-    const response = await contactsClient.submitContact(submissionData);
+  // Submit using volunteer inquiry composable
+  await submitInquiry(submissionData);
 
-    if (response.success) {
-      console.log('✅ Volunteer application submitted successfully:', response);
+  // Handle response using composable state
+  if (isSuccess.value && submissionResponse.value?.volunteer_application) {
+    console.log('✅ Volunteer application submitted successfully:', submissionResponse.value);
 
-      // Set success state
-      submitStatus.value = 'success';
-      const referenceMsg = response.id ? ` Your reference ID is: ${response.id}` : '';
-      submitMessage.value = `Thank you for your interest in volunteering with us! Your application has been submitted successfully. We will review your application and contact you within 3-5 business days to discuss next steps.${referenceMsg}`;
+    // Set success state
+    submitStatus.value = 'success';
+    const referenceMsg = submissionResponse.value.volunteer_application.application_id 
+      ? ` Your application ID is: ${submissionResponse.value.volunteer_application.application_id}` 
+      : '';
+    submitMessage.value = `Thank you for your interest in volunteering with us! Your application has been submitted successfully. We will review your application and contact you within 3-5 business days to discuss next steps.${referenceMsg}`;
 
-      // Reset form on success
-      Object.assign(volunteerForm, {
-        firstName: '',
-        lastName: '',
-        email: '',
-        phone: '',
-        age: '',
-        volunteerInterest: '',
-        availability: '',
-        experience: '',
-        motivation: '',
-        schedule: '',
-      });
-      Object.keys(volunteerErrors).forEach(key => (volunteerErrors[key] = null));
-      Object.keys(volunteerTouched).forEach(key => (volunteerTouched[key] = false));
-    } else {
-      // Handle error state
-      submitStatus.value = 'error';
-      submitMessage.value =
-        response.message ||
-        'Unable to submit your volunteer application at this time. Please try again later or contact us directly.';
-    }
-  } catch (err) {
-    console.error('Volunteer application submission error:', err);
+    // Reset form on success
+    Object.assign(volunteerForm, {
+      firstName: '',
+      lastName: '',
+      email: '',
+      phone: '',
+      age: '',
+      volunteerInterest: '',
+      availability: '',
+      experience: '',
+      motivation: '',
+      schedule: '',
+    });
+    Object.keys(volunteerErrors).forEach(key => (volunteerErrors[key] = null));
+    Object.keys(volunteerTouched).forEach(key => (volunteerTouched[key] = false));
+    
+    // Reset composable state
+    resetSubmission();
+  } else if (isError.value) {
+    // Handle error state using composable error
     submitStatus.value = 'error';
-    submitMessage.value = 'Network error occurred. Please try again later or contact us directly.';
-  } finally {
-    isSubmitting.value = false;
+    submitMessage.value = submissionError.value || 
+      submissionResponse.value?.message ||
+      'Unable to submit your volunteer application at this time. Please try again later or contact us directly.';
   }
 };
 </script>

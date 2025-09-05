@@ -5,21 +5,55 @@ import { DonationsInquiryRestClient } from '../rest/DonationsInquiryRestClient';
 import { RestError } from '../rest/BaseRestClient';
 import type { DonationsInquirySubmission, InquirySubmissionResponse } from '../inquiries/types';
 
-// Mock the DonationsInquiryRestClient
+// Mock the DonationsInquiryRestClient with hoisted functions
+const {
+  mockSubmitDonationsInquiry,
+  mockGetDonationsInquiry,
+  MockedDonationsInquiryRestClient
+} = vi.hoisted(() => {
+  const mockSubmit = vi.fn();
+  const mockGet = vi.fn();
+  
+  return {
+    mockSubmitDonationsInquiry: mockSubmit,
+    mockGetDonationsInquiry: mockGet,
+    MockedDonationsInquiryRestClient: vi.fn().mockImplementation(() => ({
+      submitDonationsInquiry: mockSubmit,
+      getDonationsInquiry: mockGet,
+    }))
+  };
+});
+
 vi.mock('../rest/DonationsInquiryRestClient', () => ({
-  DonationsInquiryRestClient: vi.fn().mockImplementation(() => ({
-    submitDonationsInquiry: vi.fn(),
-    getDonationsInquiry: vi.fn(),
-  }))
+  DonationsInquiryRestClient: MockedDonationsInquiryRestClient
 }));
 
 describe('useDonationsInquiry composables', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
+  const mockIndividualSubmission: DonationsInquirySubmission = {
+    contact_name: 'Mary Johnson',
+    email: 'mary.johnson@email.com',
+    phone: '+1-555-987-6543',
+    donor_type: 'individual',
+    interest_area: 'research-funding',
+    preferred_amount_range: '1000-5000',
+    donation_frequency: 'monthly',
+    message: 'I would like to make a donation to support your research initiatives and patient care programs.'
+  };
 
-  describe('useDonationsInquirySubmission', () => {
-    const mockIndividualSubmission: DonationsInquirySubmission = {
+  const mockCorporateSubmission: DonationsInquirySubmission = {
+    contact_name: 'Robert Wilson',
+    email: 'robert.wilson@foundation.org',
+    organization: 'Wilson Foundation',
+    donor_type: 'foundation',
+    interest_area: 'clinic-development',
+    preferred_amount_range: '25000-100000',
+    donation_frequency: 'annually',
+    message: 'Our foundation is interested in funding medical research projects and clinic development initiatives to improve patient care and advance medical science.'
+  };
+
+  const mockSuccessResponse: InquirySubmissionResponse = {
+    donations_inquiry: {
+      inquiry_id: '456e7890-e89b-12d3-a456-426614174001',
       contact_name: 'Mary Johnson',
       email: 'mary.johnson@email.com',
       phone: '+1-555-987-6543',
@@ -27,44 +61,26 @@ describe('useDonationsInquiry composables', () => {
       interest_area: 'research-funding',
       preferred_amount_range: '1000-5000',
       donation_frequency: 'monthly',
-      message: 'I would like to make a donation to support your research initiatives and patient care programs.'
-    };
+      message: mockIndividualSubmission.message,
+      status: 'new',
+      priority: 'medium',
+      source: 'website',
+      created_at: '2024-03-15T10:00:00Z',
+      updated_at: '2024-03-15T10:00:00Z',
+      created_by: 'system',
+      updated_by: 'system',
+      is_deleted: false
+    },
+    correlation_id: 'corr-456-789-012',
+    success: true,
+    message: 'Donations inquiry submitted successfully'
+  };
 
-    const mockCorporateSubmission: DonationsInquirySubmission = {
-      contact_name: 'Robert Wilson',
-      email: 'robert.wilson@foundation.org',
-      organization: 'Wilson Foundation',
-      donor_type: 'foundation',
-      interest_area: 'clinic-development',
-      preferred_amount_range: '25000-100000',
-      donation_frequency: 'annually',
-      message: 'Our foundation is interested in funding medical research projects and clinic development initiatives to improve patient care and advance medical science.'
-    };
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
 
-    const mockSuccessResponse: InquirySubmissionResponse = {
-      donations_inquiry: {
-        inquiry_id: '456e7890-e89b-12d3-a456-426614174001',
-        contact_name: 'Mary Johnson',
-        email: 'mary.johnson@email.com',
-        phone: '+1-555-987-6543',
-        donor_type: 'individual',
-        interest_area: 'research-funding',
-        preferred_amount_range: '1000-5000',
-        donation_frequency: 'monthly',
-        message: mockIndividualSubmission.message,
-        status: 'new',
-        priority: 'medium',
-        source: 'website',
-        created_at: '2024-03-15T10:00:00Z',
-        updated_at: '2024-03-15T10:00:00Z',
-        created_by: 'system',
-        updated_by: 'system',
-        is_deleted: false
-      },
-      correlation_id: 'corr-456-789-012',
-      success: true,
-      message: 'Donations inquiry submitted successfully'
-    };
+  describe('useDonationsInquirySubmission', () => {
 
     it('should initialize with correct default values', () => {
       const { isSubmitting, error, response, isSuccess, isError } = useDonationsInquirySubmission();
@@ -77,8 +93,7 @@ describe('useDonationsInquiry composables', () => {
     });
 
     it('should submit individual donations inquiry successfully', async () => {
-      const mockClient = new DonationsInquiryRestClient();
-      (mockClient.submitDonationsInquiry as any).mockResolvedValueOnce(mockSuccessResponse);
+      mockSubmitDonationsInquiry.mockResolvedValueOnce(mockSuccessResponse);
 
       const { submitInquiry, isSubmitting, response, isSuccess, error } = useDonationsInquirySubmission();
 
@@ -98,7 +113,7 @@ describe('useDonationsInquiry composables', () => {
       expect(error.value).toBe(null);
       expect(response.value).toEqual(mockSuccessResponse);
       expect(response.value?.donations_inquiry?.donor_type).toBe('individual');
-      expect(mockClient.submitDonationsInquiry).toHaveBeenCalledWith(mockIndividualSubmission);
+      expect(mockSubmitDonationsInquiry).toHaveBeenCalledWith(mockIndividualSubmission);
     });
 
     it('should handle corporate donations inquiry correctly', async () => {
@@ -117,8 +132,7 @@ describe('useDonationsInquiry composables', () => {
         }
       };
 
-      const mockClient = new DonationsInquiryRestClient();
-      (mockClient.submitDonationsInquiry as any).mockResolvedValueOnce(corporateResponse);
+      mockSubmitDonationsInquiry.mockResolvedValueOnce(corporateResponse);
 
       const { submitInquiry, response, isSuccess } = useDonationsInquirySubmission();
 
@@ -147,8 +161,7 @@ describe('useDonationsInquiry composables', () => {
         }
       };
 
-      const mockClient = new DonationsInquiryRestClient();
-      (mockClient.submitDonationsInquiry as any).mockResolvedValueOnce(estateResponse);
+      mockSubmitDonationsInquiry.mockResolvedValueOnce(estateResponse);
 
       const { submitInquiry, response, isSuccess } = useDonationsInquirySubmission();
 
@@ -176,8 +189,7 @@ describe('useDonationsInquiry composables', () => {
         }
       };
 
-      const mockClient = new DonationsInquiryRestClient();
-      (mockClient.submitDonationsInquiry as any).mockResolvedValueOnce(patientCareResponse);
+      mockSubmitDonationsInquiry.mockResolvedValueOnce(patientCareResponse);
 
       const { submitInquiry, response, isSuccess } = useDonationsInquirySubmission();
 
@@ -203,8 +215,7 @@ describe('useDonationsInquiry composables', () => {
         }
       };
 
-      const mockClient = new DonationsInquiryRestClient();
-      (mockClient.submitDonationsInquiry as any).mockResolvedValueOnce(largeAmountResponse);
+      mockSubmitDonationsInquiry.mockResolvedValueOnce(largeAmountResponse);
 
       const { submitInquiry, response, isSuccess } = useDonationsInquirySubmission();
 
@@ -230,8 +241,7 @@ describe('useDonationsInquiry composables', () => {
         }
       };
 
-      const mockClient = new DonationsInquiryRestClient();
-      (mockClient.submitDonationsInquiry as any).mockResolvedValueOnce(quarterlyResponse);
+      mockSubmitDonationsInquiry.mockResolvedValueOnce(quarterlyResponse);
 
       const { submitInquiry, response, isSuccess } = useDonationsInquirySubmission();
 
@@ -244,8 +254,7 @@ describe('useDonationsInquiry composables', () => {
 
     it('should handle submission errors', async () => {
       const errorMessage = 'Network connection failed';
-      const mockClient = new DonationsInquiryRestClient();
-      (mockClient.submitDonationsInquiry as any).mockRejectedValueOnce(new Error(errorMessage));
+      mockSubmitDonationsInquiry.mockRejectedValueOnce(new Error(errorMessage));
 
       const { submitInquiry, isSubmitting, error, isError, isSuccess } = useDonationsInquirySubmission();
 
@@ -274,8 +283,7 @@ describe('useDonationsInquiry composables', () => {
         message: 'Please correct the following errors'
       };
 
-      const mockClient = new DonationsInquiryRestClient();
-      (mockClient.submitDonationsInquiry as any).mockResolvedValueOnce(validationErrorResponse);
+      mockSubmitDonationsInquiry.mockResolvedValueOnce(validationErrorResponse);
 
       const { submitInquiry, error, isError, response, isSuccess } = useDonationsInquirySubmission();
 
@@ -297,8 +305,7 @@ describe('useDonationsInquiry composables', () => {
         retry_after: 120
       };
 
-      const mockClient = new DonationsInquiryRestClient();
-      (mockClient.submitDonationsInquiry as any).mockResolvedValueOnce(rateLimitResponse);
+      mockSubmitDonationsInquiry.mockResolvedValueOnce(rateLimitResponse);
 
       const { submitInquiry, error, isError, response } = useDonationsInquirySubmission();
 
@@ -311,8 +318,7 @@ describe('useDonationsInquiry composables', () => {
     });
 
     it('should reset state correctly', async () => {
-      const mockClient = new DonationsInquiryRestClient();
-      (mockClient.submitDonationsInquiry as any).mockResolvedValueOnce(mockSuccessResponse);
+      mockSubmitDonationsInquiry.mockResolvedValueOnce(mockSuccessResponse);
 
       const { submitInquiry, error, response, reset } = useDonationsInquirySubmission();
 
@@ -352,8 +358,7 @@ describe('useDonationsInquiry composables', () => {
         }
       };
 
-      const mockClient = new DonationsInquiryRestClient();
-      (mockClient.submitDonationsInquiry as any).mockResolvedValueOnce(minimalResponse);
+      mockSubmitDonationsInquiry.mockResolvedValueOnce(minimalResponse);
 
       const { submitInquiry, response, isSuccess } = useDonationsInquirySubmission();
 
@@ -379,8 +384,7 @@ describe('useDonationsInquiry composables', () => {
         }
       };
 
-      const mockClient = new DonationsInquiryRestClient();
-      (mockClient.submitDonationsInquiry as any).mockResolvedValueOnce(undisclosedResponse);
+      mockSubmitDonationsInquiry.mockResolvedValueOnce(undisclosedResponse);
 
       const { submitInquiry, response, isSuccess } = useDonationsInquirySubmission();
 
@@ -426,8 +430,7 @@ describe('useDonationsInquiry composables', () => {
         correlation_id: 'corr-get-456'
       };
 
-      const mockClient = new DonationsInquiryRestClient();
-      (mockClient.getDonationsInquiry as any).mockResolvedValueOnce(mockResponse);
+      mockGetDonationsInquiry.mockResolvedValueOnce(mockResponse);
 
       const inquiryId = ref('456e7890-e89b-12d3-a456-426614174001');
       const { inquiry, loading, error } = useDonationsInquiry(inquiryId);
@@ -437,7 +440,7 @@ describe('useDonationsInquiry composables', () => {
       expect(inquiry.value).toEqual(mockDonationsInquiry);
       expect(loading.value).toBe(false);
       expect(error.value).toBe(null);
-      expect(mockClient.getDonationsInquiry).toHaveBeenCalledWith('456e7890-e89b-12d3-a456-426614174001');
+      expect(mockGetDonationsInquiry).toHaveBeenCalledWith('456e7890-e89b-12d3-a456-426614174001');
     });
 
     it('should handle inquiry not found', async () => {
@@ -447,8 +450,7 @@ describe('useDonationsInquiry composables', () => {
         success: false
       };
 
-      const mockClient = new DonationsInquiryRestClient();
-      (mockClient.getDonationsInquiry as any).mockResolvedValueOnce(notFoundResponse);
+      mockGetDonationsInquiry.mockResolvedValueOnce(notFoundResponse);
 
       const inquiryId = ref('non-existent-id');
       const { inquiry, loading, error } = useDonationsInquiry(inquiryId);
@@ -462,8 +464,7 @@ describe('useDonationsInquiry composables', () => {
 
     it('should handle fetch errors', async () => {
       const errorMessage = 'Failed to fetch donations inquiry';
-      const mockClient = new DonationsInquiryRestClient();
-      (mockClient.getDonationsInquiry as any).mockRejectedValueOnce(new Error(errorMessage));
+      mockGetDonationsInquiry.mockRejectedValueOnce(new Error(errorMessage));
 
       const inquiryId = ref('456e7890-e89b-12d3-a456-426614174001');
       const { inquiry, error } = useDonationsInquiry(inquiryId);
@@ -485,8 +486,7 @@ describe('useDonationsInquiry composables', () => {
         correlation_id: 'corr-2'
       };
 
-      const mockClient = new DonationsInquiryRestClient();
-      (mockClient.getDonationsInquiry as any).mockResolvedValueOnce(mockResponse1);
+      mockGetDonationsInquiry.mockResolvedValueOnce(mockResponse1);
 
       const inquiryId = ref('id-1');
       const { inquiry } = useDonationsInquiry(inquiryId);
@@ -495,13 +495,13 @@ describe('useDonationsInquiry composables', () => {
       expect(inquiry.value?.inquiry_id).toBe('id-1');
 
       // Change ID and mock second response
-      (mockClient.getDonationsInquiry as any).mockResolvedValueOnce(mockResponse2);
+      mockGetDonationsInquiry.mockResolvedValueOnce(mockResponse2);
       inquiryId.value = 'id-2';
 
       await nextTick();
       expect(inquiry.value?.inquiry_id).toBe('id-2');
       expect(inquiry.value?.donor_type).toBe('foundation');
-      expect(mockClient.getDonationsInquiry).toHaveBeenCalledTimes(2);
+      expect(mockGetDonationsInquiry).toHaveBeenCalledTimes(2);
     });
 
     it('should handle loading states correctly', async () => {
@@ -510,12 +510,11 @@ describe('useDonationsInquiry composables', () => {
         correlation_id: 'corr-loading-test'
       };
 
-      const mockClient = new DonationsInquiryRestClient();
       let resolvePromise: (value: any) => void;
       const pendingPromise = new Promise(resolve => {
         resolvePromise = resolve;
       });
-      (mockClient.getDonationsInquiry as any).mockReturnValueOnce(pendingPromise);
+      mockGetDonationsInquiry.mockReturnValueOnce(pendingPromise);
 
       const inquiryId = ref('456e7890-e89b-12d3-a456-426614174001');
       const { inquiry, loading, error } = useDonationsInquiry(inquiryId);
@@ -541,8 +540,7 @@ describe('useDonationsInquiry composables', () => {
   describe('error handling edge cases', () => {
     it('should handle network timeouts', async () => {
       const timeoutError = new Error('Request timeout');
-      const mockClient = new DonationsInquiryRestClient();
-      (mockClient.submitDonationsInquiry as any).mockRejectedValueOnce(timeoutError);
+      mockSubmitDonationsInquiry.mockRejectedValueOnce(timeoutError);
 
       const { submitInquiry, error, isError } = useDonationsInquirySubmission();
 
@@ -561,8 +559,7 @@ describe('useDonationsInquiry composables', () => {
     });
 
     it('should handle malformed responses gracefully', async () => {
-      const mockClient = new DonationsInquiryRestClient();
-      (mockClient.submitDonationsInquiry as any).mockResolvedValueOnce(null);
+      mockSubmitDonationsInquiry.mockResolvedValueOnce(null);
 
       const { submitInquiry, error, isError } = useDonationsInquirySubmission();
 
@@ -597,8 +594,7 @@ describe('useDonationsInquiry composables', () => {
         }
       };
 
-      const mockClient = new DonationsInquiryRestClient();
-      (mockClient.submitDonationsInquiry as any).mockResolvedValueOnce(equipmentResponse);
+      mockSubmitDonationsInquiry.mockResolvedValueOnce(equipmentResponse);
 
       const { submitInquiry, response, isSuccess } = useDonationsInquirySubmission();
 
@@ -624,8 +620,7 @@ describe('useDonationsInquiry composables', () => {
         }
       };
 
-      const mockClient = new DonationsInquiryRestClient();
-      (mockClient.submitDonationsInquiry as any).mockResolvedValueOnce(generalSupportResponse);
+      mockSubmitDonationsInquiry.mockResolvedValueOnce(generalSupportResponse);
 
       const { submitInquiry, response, isSuccess } = useDonationsInquirySubmission();
 

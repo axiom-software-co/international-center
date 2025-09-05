@@ -2,21 +2,27 @@
 // Tests validate useEvents composables with database schema-compliant reactive state
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { ref, nextTick } from 'vue';
+import { ref, nextTick, defineComponent } from 'vue';
+import { mount } from '@vue/test-utils';
 import { useEvents, useEvent, useFeaturedEvents, useSearchEvents } from './useEvents';
 import type { Event, EventsResponse, EventResponse, GetEventsParams, SearchEventsParams } from '../lib/clients/events/types';
 
-// Mock the events client
-vi.mock('../lib/clients', () => ({
-  eventsClient: {
-    getEvents: vi.fn(),
-    getEventBySlug: vi.fn(),
-    getFeaturedEvents: vi.fn(),
-    searchEvents: vi.fn(),
-  }
+// Mock the EventsRestClient with hoisted functions
+const mockGetEvents = vi.fn();
+const mockGetEventBySlug = vi.fn();
+const mockGetFeaturedEvents = vi.fn();
+const mockSearchEvents = vi.fn();
+
+const MockedEventsRestClient = vi.fn().mockImplementation(() => ({
+  getEvents: mockGetEvents,
+  getEventBySlug: mockGetEventBySlug,
+  getFeaturedEvents: mockGetFeaturedEvents,
+  searchEvents: mockSearchEvents,
 }));
 
-import { eventsClient } from '../lib/clients';
+vi.mock('../lib/clients/events/EventsRestClient', () => ({
+  EventsRestClient: MockedEventsRestClient
+}));
 
 // Database schema-compliant mock event for testing
 const createMockDatabaseEvent = (overrides: Partial<any> = {}): any => ({
@@ -62,8 +68,7 @@ describe('useEvents Composables', () => {
 
   describe('useEvents', () => {
     it('should initialize with proper default state', () => {
-      const mockEventsClient = vi.mocked(eventsClient);
-      mockEventsClient.getEvents.mockResolvedValue({
+      mockGetEvents.mockResolvedValue({
         events: [],
         count: 0,
         correlation_id: 'test-correlation-id'
@@ -101,8 +106,7 @@ describe('useEvents Composables', () => {
         correlation_id: 'events-correlation-id'
       };
 
-      const mockEventsClient = vi.mocked(eventsClient);
-      mockEventsClient.getEvents.mockResolvedValue(mockResponse);
+      mockGetEvents.mockResolvedValue(mockResponse);
 
       const { events, loading, error, total, totalPages, refetch } = useEvents({
         enabled: false,
@@ -115,7 +119,7 @@ describe('useEvents Composables', () => {
 
       await nextTick();
 
-      expect(mockEventsClient.getEvents).toHaveBeenCalledTimes(1);
+      expect(mockGetEvents).toHaveBeenCalledTimes(1);
       expect(events.value).toHaveLength(2);
       expect(total.value).toBe(2);
       expect(totalPages.value).toBe(1);
@@ -136,8 +140,7 @@ describe('useEvents Composables', () => {
     }, 5000);
 
     it('should handle API errors gracefully', async () => {
-      const mockEventsClient = vi.mocked(eventsClient);
-      mockEventsClient.getEvents.mockRejectedValue(new Error('API Error'));
+      mockGetEvents.mockRejectedValue(new Error('API Error'));
 
       const { events, loading, error, refetch } = useEvents({
         enabled: false,
@@ -153,8 +156,7 @@ describe('useEvents Composables', () => {
     }, 5000);
 
     it('should handle query parameters correctly', async () => {
-      const mockEventsClient = vi.mocked(eventsClient);
-      mockEventsClient.getEvents.mockResolvedValue({
+      mockGetEvents.mockResolvedValue({
         events: [],
         count: 0,
         correlation_id: 'params-correlation-id'
@@ -176,14 +178,13 @@ describe('useEvents Composables', () => {
 
       await refetch();
 
-      expect(mockEventsClient.getEvents).toHaveBeenCalledWith(
+      expect(mockGetEvents).toHaveBeenCalledWith(
         expect.objectContaining(params)
       );
     }, 5000);
 
     it('should handle pagination calculations correctly', async () => {
-      const mockEventsClient = vi.mocked(eventsClient);
-      mockEventsClient.getEvents.mockResolvedValue({
+      mockGetEvents.mockResolvedValue({
         events: Array(15).fill(null).map((_, i) => createMockDatabaseEvent({
           event_id: `event-${i}`,
           title: `Event ${i}`,
@@ -219,15 +220,14 @@ describe('useEvents Composables', () => {
         correlation_id: 'single-event-correlation-id'
       };
 
-      const mockEventsClient = vi.mocked(eventsClient);
-      mockEventsClient.getEventBySlug.mockResolvedValue(mockResponse);
+      mockGetEventBySlug.mockResolvedValue(mockResponse);
 
       const slugRef = ref('single-event-test');
       const { event, loading, error } = useEvent(slugRef);
 
       await nextTick();
 
-      expect(mockEventsClient.getEventBySlug).toHaveBeenCalledWith('single-event-test');
+      expect(mockGetEventBySlug).toHaveBeenCalledWith('single-event-test');
       expect(event.value).toEqual(mockEvent);
       expect(loading.value).toBe(false);
       expect(error.value).toBe(null);
@@ -239,8 +239,7 @@ describe('useEvents Composables', () => {
     }, 5000);
 
     it('should handle slug changes reactively', async () => {
-      const mockEventsClient = vi.mocked(eventsClient);
-      mockEventsClient.getEventBySlug.mockResolvedValue({
+      mockGetEventBySlug.mockResolvedValue({
         event: createMockDatabaseEvent(),
         correlation_id: 'reactive-correlation-id'
       });
@@ -250,31 +249,29 @@ describe('useEvents Composables', () => {
 
       await nextTick();
 
-      expect(mockEventsClient.getEventBySlug).toHaveBeenCalledWith('initial-slug');
+      expect(mockGetEventBySlug).toHaveBeenCalledWith('initial-slug');
 
       // Change slug
       slugRef.value = 'updated-slug';
       await nextTick();
 
-      expect(mockEventsClient.getEventBySlug).toHaveBeenCalledWith('updated-slug');
-      expect(mockEventsClient.getEventBySlug).toHaveBeenCalledTimes(2);
+      expect(mockGetEventBySlug).toHaveBeenCalledWith('updated-slug');
+      expect(mockGetEventBySlug).toHaveBeenCalledTimes(2);
     }, 5000);
 
     it('should handle empty slug gracefully', async () => {
-      const mockEventsClient = vi.mocked(eventsClient);
 
       const { event, loading } = useEvent(ref(null));
 
       await nextTick();
 
-      expect(mockEventsClient.getEventBySlug).not.toHaveBeenCalled();
+      expect(mockGetEventBySlug).not.toHaveBeenCalled();
       expect(event.value).toBe(null);
       expect(loading.value).toBe(false);
     }, 5000);
 
     it('should handle API errors', async () => {
-      const mockEventsClient = vi.mocked(eventsClient);
-      mockEventsClient.getEventBySlug.mockRejectedValue(new Error('Event not found'));
+      mockGetEventBySlug.mockRejectedValue(new Error('Event not found'));
 
       const { event, error, loading } = useEvent('non-existent-slug');
 
@@ -304,14 +301,13 @@ describe('useEvents Composables', () => {
         correlation_id: 'featured-correlation-id'
       };
 
-      const mockEventsClient = vi.mocked(eventsClient);
-      mockEventsClient.getFeaturedEvents.mockResolvedValue(mockResponse);
+      mockGetFeaturedEvents.mockResolvedValue(mockResponse);
 
       const { events, loading, error } = useFeaturedEvents();
 
       await nextTick();
 
-      expect(mockEventsClient.getFeaturedEvents).toHaveBeenCalledWith(undefined);
+      expect(mockGetFeaturedEvents).toHaveBeenCalledWith(undefined);
       expect(events.value).toHaveLength(2);
       expect(loading.value).toBe(false);
       expect(error.value).toBe(null);
@@ -322,8 +318,7 @@ describe('useEvents Composables', () => {
     }, 5000);
 
     it('should handle limit parameter', async () => {
-      const mockEventsClient = vi.mocked(eventsClient);
-      mockEventsClient.getFeaturedEvents.mockResolvedValue({
+      mockGetFeaturedEvents.mockResolvedValue({
         events: [],
         count: 0,
         correlation_id: 'featured-limit-correlation-id'
@@ -334,12 +329,11 @@ describe('useEvents Composables', () => {
 
       await nextTick();
 
-      expect(mockEventsClient.getFeaturedEvents).toHaveBeenCalledWith(5);
+      expect(mockGetFeaturedEvents).toHaveBeenCalledWith(5);
     }, 5000);
 
     it('should handle limit changes reactively', async () => {
-      const mockEventsClient = vi.mocked(eventsClient);
-      mockEventsClient.getFeaturedEvents.mockResolvedValue({
+      mockGetFeaturedEvents.mockResolvedValue({
         events: [],
         count: 0,
         correlation_id: 'featured-reactive-correlation-id'
@@ -349,12 +343,12 @@ describe('useEvents Composables', () => {
       useFeaturedEvents(limitRef);
 
       await nextTick();
-      expect(mockEventsClient.getFeaturedEvents).toHaveBeenCalledWith(3);
+      expect(mockGetFeaturedEvents).toHaveBeenCalledWith(3);
 
       limitRef.value = 7;
       await nextTick();
-      expect(mockEventsClient.getFeaturedEvents).toHaveBeenCalledWith(7);
-      expect(mockEventsClient.getFeaturedEvents).toHaveBeenCalledTimes(2);
+      expect(mockGetFeaturedEvents).toHaveBeenCalledWith(7);
+      expect(mockGetFeaturedEvents).toHaveBeenCalledTimes(2);
     }, 5000);
   });
 
@@ -376,8 +370,7 @@ describe('useEvents Composables', () => {
         correlation_id: 'search-correlation-id'
       };
 
-      const mockEventsClient = vi.mocked(eventsClient);
-      mockEventsClient.searchEvents.mockResolvedValue(mockResponse);
+      mockSearchEvents.mockResolvedValue(mockResponse);
 
       const { results, loading, error, total, search } = useSearchEvents();
 
@@ -387,7 +380,7 @@ describe('useEvents Composables', () => {
         category: 'medical'
       });
 
-      expect(mockEventsClient.searchEvents).toHaveBeenCalledWith({
+      expect(mockSearchEvents).toHaveBeenCalledWith({
         q: 'healthcare workshop',
         page: 1,
         pageSize: 10,
@@ -414,8 +407,7 @@ describe('useEvents Composables', () => {
     }, 5000);
 
     it('should handle search errors', async () => {
-      const mockEventsClient = vi.mocked(eventsClient);
-      mockEventsClient.searchEvents.mockRejectedValue(new Error('Search failed'));
+      mockSearchEvents.mockRejectedValue(new Error('Search failed'));
 
       const { results, error, loading, search } = useSearchEvents();
 
@@ -427,8 +419,7 @@ describe('useEvents Composables', () => {
     }, 5000);
 
     it('should calculate pagination correctly for search results', async () => {
-      const mockEventsClient = vi.mocked(eventsClient);
-      mockEventsClient.searchEvents.mockResolvedValue({
+      mockSearchEvents.mockResolvedValue({
         events: Array(5).fill(null).map((_, i) => createMockDatabaseEvent({
           event_id: `search-result-${i}`,
           title: `Search Result ${i}`,
@@ -452,8 +443,7 @@ describe('useEvents Composables', () => {
     }, 5000);
 
     it('should handle search options correctly', async () => {
-      const mockEventsClient = vi.mocked(eventsClient);
-      mockEventsClient.searchEvents.mockResolvedValue({
+      mockSearchEvents.mockResolvedValue({
         events: [],
         count: 0,
         correlation_id: 'search-options-correlation-id'
@@ -470,7 +460,7 @@ describe('useEvents Composables', () => {
 
       await search('medical conference', searchOptions);
 
-      expect(mockEventsClient.searchEvents).toHaveBeenCalledWith({
+      expect(mockSearchEvents).toHaveBeenCalledWith({
         q: 'medical conference',
         page: 3,
         pageSize: 25,
@@ -482,14 +472,13 @@ describe('useEvents Composables', () => {
 
   describe('Reactive State Management', () => {
     it('should maintain proper loading states during transitions', async () => {
-      const mockEventsClient = vi.mocked(eventsClient);
       
       // Simulate slow API call
       let resolvePromise: (value: EventsResponse) => void;
       const slowPromise = new Promise<EventsResponse>((resolve) => {
         resolvePromise = resolve;
       });
-      mockEventsClient.getEvents.mockReturnValue(slowPromise);
+      mockGetEvents.mockReturnValue(slowPromise);
 
       const { loading, refetch } = useEvents({
         enabled: false,
@@ -518,10 +507,9 @@ describe('useEvents Composables', () => {
     }, 5000);
 
     it('should properly clear errors when making new requests', async () => {
-      const mockEventsClient = vi.mocked(eventsClient);
       
       // First call fails
-      mockEventsClient.getEvents.mockRejectedValueOnce(new Error('First error'));
+      mockGetEvents.mockRejectedValueOnce(new Error('First error'));
       
       const { error, refetch } = useEvents({
         enabled: false,
@@ -534,7 +522,7 @@ describe('useEvents Composables', () => {
       expect(error.value).toBe('First error');
 
       // Second call succeeds
-      mockEventsClient.getEvents.mockResolvedValueOnce({
+      mockGetEvents.mockResolvedValueOnce({
         events: [],
         count: 0,
         correlation_id: 'error-clear-correlation-id'

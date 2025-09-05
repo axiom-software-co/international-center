@@ -79,6 +79,21 @@ export type {
 const researchClientInstance = new ResearchRestClient();
 export { researchClientInstance as researchClient };
 
+// Volunteer Inquiry domain (REST-enabled through Public Gateway)
+export { VolunteerInquiryRestClient } from './rest/VolunteerInquiryRestClient';
+export { useVolunteerInquirySubmission, useVolunteerInquiry } from './composables/useVolunteerInquiry';
+export type {
+  UseVolunteerInquirySubmissionResult,
+  UseVolunteerInquiryResult,
+} from './composables/useVolunteerInquiry';
+export type {
+  VolunteerApplication,
+  VolunteerApplicationSubmission,
+  VolunteerInterest,
+  VolunteerAvailability,
+  VolunteerStatus,
+} from './inquiries/types';
+
 // ====================================================================================
 // APIS ON HOLD - These will be migrated to REST architecture when development resumes
 // ====================================================================================
