@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/axiom-software-co/international-center/src/backend/internal/shared/domain"
 	"github.com/google/uuid"
 )
 
@@ -25,6 +26,26 @@ const (
 	PublishingStatusPublished PublishingStatus = "published"
 	PublishingStatusArchived  PublishingStatus = "archived"
 )
+
+// IsValid checks if the delivery mode is valid
+func (d DeliveryMode) IsValid() bool {
+	switch d {
+	case DeliveryModeMobile, DeliveryModeOutpatient, DeliveryModeInpatient:
+		return true
+	default:
+		return false
+	}
+}
+
+// IsValid checks if the publishing status is valid
+func (p PublishingStatus) IsValid() bool {
+	switch p {
+	case PublishingStatusDraft, PublishingStatusPublished, PublishingStatusArchived:
+		return true
+	default:
+		return false
+	}
+}
 
 // Service represents the main services entity matching TABLES-SERVICES.md
 type Service struct {
@@ -276,8 +297,8 @@ func (s *Service) ChangeCategory(categoryID string, userID string) error {
 }
 
 func (s *Service) SetDeliveryMode(deliveryMode DeliveryMode, userID string) error {
-	if !isValidDeliveryMode(deliveryMode) {
-		return errors.New("invalid delivery mode")
+	if !deliveryMode.IsValid() {
+		return domain.NewValidationError("invalid delivery mode")
 	}
 
 	s.DeliveryMode = deliveryMode
@@ -364,29 +385,60 @@ func (fc *FeaturedCategory) SetFeaturePosition(featurePosition int, userID strin
 
 // Domain validation functions
 
-func validateNewServiceParams(title, description, slug string, categoryID string, deliveryMode DeliveryMode) error {
+// Validation helper functions matching Volunteers/News domain patterns
+
+func validateServiceTitle(title string) error {
 	if strings.TrimSpace(title) == "" {
-		return errors.New("title cannot be empty")
+		return domain.NewValidationError("title is required")
 	}
+	if len(title) < 2 || len(title) > 255 {
+		return domain.NewValidationError("title must be between 2 and 255 characters")
+	}
+	return nil
+}
 
+func validateServiceDescription(description string) error {
 	if strings.TrimSpace(description) == "" {
-		return errors.New("description cannot be empty")
+		return domain.NewValidationError("description is required")
 	}
+	if len(description) < 10 || len(description) > 2000 {
+		return domain.NewValidationError("description must be between 10 and 2000 characters")
+	}
+	return nil
+}
 
+func validateServiceSlug(slug string) error {
 	if strings.TrimSpace(slug) == "" {
-		return errors.New("slug cannot be empty")
+		return domain.NewValidationError("slug is required")
+	}
+	if len(slug) < 2 || len(slug) > 255 {
+		return domain.NewValidationError("slug must be between 2 and 255 characters")
+	}
+	if !slugRegex.MatchString(slug) {
+		return domain.NewValidationError("slug must contain only lowercase letters, numbers, and hyphens")
+	}
+	return nil
+}
+
+func validateNewServiceParams(title, description, slug string, categoryID string, deliveryMode DeliveryMode) error {
+	if err := validateServiceTitle(title); err != nil {
+		return err
 	}
 
-	if !isValidSlug(slug) {
-		return errors.New("slug must contain only lowercase letters, numbers, and hyphens")
+	if err := validateServiceDescription(description); err != nil {
+		return err
+	}
+
+	if err := validateServiceSlug(slug); err != nil {
+		return err
 	}
 
 	if strings.TrimSpace(categoryID) == "" {
-		return errors.New("category ID cannot be empty")
+		return domain.NewValidationError("category ID cannot be empty")
 	}
 
-	if !isValidDeliveryMode(deliveryMode) {
-		return errors.New("invalid delivery mode")
+	if !deliveryMode.IsValid() {
+		return domain.NewValidationError("invalid delivery mode")
 	}
 
 	return nil
@@ -394,15 +446,11 @@ func validateNewServiceParams(title, description, slug string, categoryID string
 
 func validateNewServiceCategoryParams(name, slug string) error {
 	if strings.TrimSpace(name) == "" {
-		return errors.New("category name cannot be empty")
+		return domain.NewValidationError("category name cannot be empty")
 	}
 
-	if strings.TrimSpace(slug) == "" {
-		return errors.New("slug cannot be empty")
-	}
-
-	if !isValidSlug(slug) {
-		return errors.New("slug must contain only lowercase letters, numbers, and hyphens")
+	if err := validateServiceSlug(slug); err != nil {
+		return err
 	}
 
 	return nil
@@ -410,37 +458,20 @@ func validateNewServiceCategoryParams(name, slug string) error {
 
 func validateNewFeaturedCategoryParams(categoryID string, featurePosition int) error {
 	if strings.TrimSpace(categoryID) == "" {
-		return errors.New("category ID cannot be empty")
+		return domain.NewValidationError("category ID cannot be empty")
 	}
 
 	if featurePosition != 1 && featurePosition != 2 {
-		return errors.New("feature position must be 1 or 2")
+		return domain.NewValidationError("feature position must be 1 or 2")
 	}
 
 	return nil
 }
 
-func isValidSlug(slug string) bool {
-	return slugRegex.MatchString(slug)
-}
-
-func isValidDeliveryMode(mode DeliveryMode) bool {
-	switch mode {
-	case DeliveryModeMobile, DeliveryModeOutpatient, DeliveryModeInpatient:
-		return true
-	default:
-		return false
-	}
-}
-
-func isValidPublishingStatus(status PublishingStatus) bool {
-	switch status {
-	case PublishingStatusDraft, PublishingStatusPublished, PublishingStatusArchived:
-		return true
-	default:
-		return false
-	}
-}
+// Removed redundant validation functions:
+// - isValidSlug: replaced by comprehensive validateServiceSlug helper
+// - isValidDeliveryMode: replaced by DeliveryMode.IsValid() method  
+// - isValidPublishingStatus: replaced by PublishingStatus.IsValid() method
 
 func generateContentBlobPath(environment, serviceID, contentHash string) string {
 	return fmt.Sprintf("blob-storage://%s/services/content/%s/%s.html", environment, serviceID, contentHash)

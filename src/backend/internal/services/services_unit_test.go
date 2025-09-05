@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -565,7 +566,7 @@ func TestServicesService_CreateService(t *testing.T) {
 			deliveryMode:  DeliveryModeMobile,
 			userID:        "user-1",
 			setupMock:     func(repo *MockServicesRepository) {},
-			expectedError: "title cannot be empty",
+			expectedError: "title is required",
 		},
 		{
 			name:          "fail with empty description",
@@ -576,7 +577,7 @@ func TestServicesService_CreateService(t *testing.T) {
 			deliveryMode:  DeliveryModeMobile,
 			userID:        "user-1",
 			setupMock:     func(repo *MockServicesRepository) {},
-			expectedError: "description cannot be empty",
+			expectedError: "description is required",
 		},
 		{
 			name:          "fail with invalid slug",
@@ -870,6 +871,204 @@ func TestServicesService_Timeout(t *testing.T) {
 	require.True(t, hasDeadline)
 	assert.True(t, time.Until(deadline) <= 5*time.Second)
 	assert.True(t, time.Until(deadline) > 4*time.Second) // Allow some margin
+}
+
+// Domain validation helper tests (will fail until comprehensive validation helpers are implemented)
+
+func TestValidateServiceTitle(t *testing.T) {
+	tests := []struct {
+		name        string
+		title       string
+		wantError   bool
+		errorMsg    string
+	}{
+		{
+			name:      "valid service title",
+			title:     "Cardiology Services",
+			wantError: false,
+		},
+		{
+			name:      "valid title with maximum length",
+			title:     strings.Repeat("a", 255),
+			wantError: false,
+		},
+		{
+			name:      "valid title with minimum length",
+			title:     "ab",
+			wantError: false,
+		},
+		{
+			name:      "invalid empty title",
+			title:     "",
+			wantError: true,
+			errorMsg:  "title is required",
+		},
+		{
+			name:      "invalid whitespace-only title",
+			title:     "   ",
+			wantError: true,
+			errorMsg:  "title is required",
+		},
+		{
+			name:      "invalid title too short",
+			title:     "a",
+			wantError: true,
+			errorMsg:  "title must be between 2 and 255 characters",
+		},
+		{
+			name:      "invalid title too long",
+			title:     strings.Repeat("a", 256),
+			wantError: true,
+			errorMsg:  "title must be between 2 and 255 characters",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// This will fail until we implement validateServiceTitle helper function
+			err := validateServiceTitle(tt.title)
+			
+			if tt.wantError {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errorMsg)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestValidateServiceDescription(t *testing.T) {
+	tests := []struct {
+		name        string
+		description string
+		wantError   bool
+		errorMsg    string
+	}{
+		{
+			name:        "valid service description",
+			description: "Comprehensive cardiac care services including diagnostics and treatment",
+			wantError:   false,
+		},
+		{
+			name:        "valid description with minimum length",
+			description: "abcdefghij", // 10 characters
+			wantError:   false,
+		},
+		{
+			name:        "invalid empty description",
+			description: "",
+			wantError:   true,
+			errorMsg:    "description is required",
+		},
+		{
+			name:        "invalid whitespace-only description",
+			description: "   ",
+			wantError:   true,
+			errorMsg:    "description is required",
+		},
+		{
+			name:        "invalid description too short",
+			description: "short",
+			wantError:   true,
+			errorMsg:    "description must be between 10 and 2000 characters",
+		},
+		{
+			name:        "invalid description too long",
+			description: strings.Repeat("a", 2001),
+			wantError:   true,
+			errorMsg:    "description must be between 10 and 2000 characters",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// This will fail until we implement validateServiceDescription helper function
+			err := validateServiceDescription(tt.description)
+			
+			if tt.wantError {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errorMsg)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestValidateServiceSlug(t *testing.T) {
+	tests := []struct {
+		name      string
+		slug      string
+		wantError bool
+		errorMsg  string
+	}{
+		{
+			name:      "valid service slug",
+			slug:      "cardiology-services",
+			wantError: false,
+		},
+		{
+			name:      "valid slug with numbers",
+			slug:      "service-123",
+			wantError: false,
+		},
+		{
+			name:      "valid slug minimum length",
+			slug:      "ab",
+			wantError: false,
+		},
+		{
+			name:      "invalid empty slug",
+			slug:      "",
+			wantError: true,
+			errorMsg:  "slug is required",
+		},
+		{
+			name:      "invalid slug with spaces",
+			slug:      "service slug",
+			wantError: true,
+			errorMsg:  "slug must contain only lowercase letters, numbers, and hyphens",
+		},
+		{
+			name:      "invalid slug with uppercase",
+			slug:      "Service-Slug",
+			wantError: true,
+			errorMsg:  "slug must contain only lowercase letters, numbers, and hyphens",
+		},
+		{
+			name:      "invalid slug with special characters",
+			slug:      "service_slug!",
+			wantError: true,
+			errorMsg:  "slug must contain only lowercase letters, numbers, and hyphens",
+		},
+		{
+			name:      "invalid slug too short",
+			slug:      "a",
+			wantError: true,
+			errorMsg:  "slug must be between 2 and 255 characters",
+		},
+		{
+			name:      "invalid slug too long",
+			slug:      strings.Repeat("a", 256),
+			wantError: true,
+			errorMsg:  "slug must be between 2 and 255 characters",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// This will fail until we implement validateServiceSlug helper function
+			err := validateServiceSlug(tt.slug)
+			
+			if tt.wantError {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errorMsg)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
 }
 
 // Admin Audit Endpoint Unit Tests - RED PHASE (Failing Tests)
@@ -1642,6 +1841,102 @@ func TestServicesService_AdminSetFeaturedCategories(t *testing.T) {
 				// Should have audit events for setting featured categories
 				assert.True(t, len(repo.auditEvents) >= 1)
 			}
+		})
+	}
+}
+
+// RED PHASE - Domain enum validation tests (will fail until IsValid methods are implemented)
+
+func TestDeliveryMode_IsValid(t *testing.T) {
+	tests := []struct {
+		name         string
+		deliveryMode DeliveryMode
+		want         bool
+	}{
+		{
+			name:         "valid mobile service",
+			deliveryMode: DeliveryModeMobile,
+			want:         true,
+		},
+		{
+			name:         "valid outpatient service",
+			deliveryMode: DeliveryModeOutpatient,
+			want:         true,
+		},
+		{
+			name:         "valid inpatient service",
+			deliveryMode: DeliveryModeInpatient,
+			want:         true,
+		},
+		{
+			name:         "invalid empty delivery mode",
+			deliveryMode: DeliveryMode(""),
+			want:         false,
+		},
+		{
+			name:         "invalid unknown delivery mode",
+			deliveryMode: DeliveryMode("unknown_mode"),
+			want:         false,
+		},
+		{
+			name:         "invalid mixed case delivery mode",
+			deliveryMode: DeliveryMode("Mobile_Service"),
+			want:         false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// This will fail until we implement DeliveryMode.IsValid() method
+			got := tt.deliveryMode.IsValid()
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestPublishingStatus_IsValid(t *testing.T) {
+	tests := []struct {
+		name   string
+		status PublishingStatus
+		want   bool
+	}{
+		{
+			name:   "valid draft status",
+			status: PublishingStatusDraft,
+			want:   true,
+		},
+		{
+			name:   "valid published status",
+			status: PublishingStatusPublished,
+			want:   true,
+		},
+		{
+			name:   "valid archived status",
+			status: PublishingStatusArchived,
+			want:   true,
+		},
+		{
+			name:   "invalid empty status",
+			status: PublishingStatus(""),
+			want:   false,
+		},
+		{
+			name:   "invalid unknown status",
+			status: PublishingStatus("unknown_status"),
+			want:   false,
+		},
+		{
+			name:   "invalid mixed case status",
+			status: PublishingStatus("DRAFT"),
+			want:   false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// This will fail until we implement PublishingStatus.IsValid() method
+			got := tt.status.IsValid()
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }

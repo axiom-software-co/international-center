@@ -488,27 +488,23 @@ func (s *ServicesService) UploadServiceContent(ctx context.Context, serviceID st
 
 // validateCreateServiceParams validates service creation parameters
 func (s *ServicesService) validateCreateServiceParams(title, description, slug string, categoryID string, deliveryMode DeliveryMode, userID string) error {
-	if strings.TrimSpace(title) == "" {
-		return domain.NewValidationError("title cannot be empty")
+	if err := validateServiceTitle(title); err != nil {
+		return err
 	}
 
-	if strings.TrimSpace(description) == "" {
-		return domain.NewValidationError("description cannot be empty")
+	if err := validateServiceDescription(description); err != nil {
+		return err
 	}
 
-	if strings.TrimSpace(slug) == "" {
-		return domain.NewValidationError("slug cannot be empty")
-	}
-
-	if !isValidSlug(slug) {
-		return domain.NewValidationError("slug must contain only lowercase letters, numbers, and hyphens")
+	if err := validateServiceSlug(slug); err != nil {
+		return err
 	}
 
 	if strings.TrimSpace(categoryID) == "" {
 		return domain.NewValidationError("category ID cannot be empty")
 	}
 
-	if !isValidDeliveryMode(deliveryMode) {
+	if !deliveryMode.IsValid() {
 		return domain.NewValidationError("invalid delivery mode")
 	}
 
