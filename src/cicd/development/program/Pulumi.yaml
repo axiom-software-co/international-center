@@ -1,0 +1,9 @@
+name: international-center-development-infrastructure
+runtime: go
+description: Development environment infrastructure for International Center
+template:
+  description: Development environment infrastructure deployment
+  config:
+    development:environment:
+      description: The environment name (development)
+      default: development
