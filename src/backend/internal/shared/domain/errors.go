@@ -5,7 +5,9 @@ import (
 	"fmt"
 )
 
-// ErrorType represents the type of domain error
+// ErrorType represents the classification of domain errors for consistent error handling
+// across all backend services. Each type corresponds to specific HTTP status codes
+// and error handling strategies.
 type ErrorType string
 
 const (
@@ -20,14 +22,19 @@ const (
 	ErrorTypeDependency    ErrorType = "dependency"
 )
 
-// DomainError represents a structured domain error
+// DomainError represents a structured domain error with comprehensive context
+// for debugging, logging, and API responses. It implements the error interface
+// and provides structured error information for consistent error handling.
+//
+// The error includes type classification, structured codes, human-readable messages,
+// field-specific validation context, and error chaining support.
 type DomainError struct {
-	Type    ErrorType `json:"type"`
-	Code    string    `json:"code"`
-	Message string    `json:"message"`
-	Field   string    `json:"field,omitempty"`
-	Value   string    `json:"value,omitempty"`
-	Cause   error     `json:"-"`
+	Type    ErrorType `json:"type"`              // Error classification for handling strategy
+	Code    string    `json:"code"`              // Structured error code for programmatic handling
+	Message string    `json:"message"`           // Human-readable error message
+	Field   string    `json:"field,omitempty"`   // Field name for validation errors
+	Value   string    `json:"value,omitempty"`   // Field value that caused the error
+	Cause   error     `json:"-"`                 // Underlying cause for error chaining
 }
 
 // Error implements the error interface
@@ -154,16 +161,19 @@ func NewDependencyError(dependency string, cause error) *DomainError {
 	}
 }
 
-// Predefined common errors
+// Predefined common validation errors for consistency
 var (
-	ErrInvalidUUID          = NewValidationError("invalid UUID format")
-	ErrInvalidSlug          = NewValidationError("invalid slug format")
-	ErrEmptyTitle           = NewValidationError("title cannot be empty")
-	ErrEmptyDescription     = NewValidationError("description cannot be empty")
-	ErrInvalidEmail         = NewValidationError("invalid email format")
-	ErrInvalidURL           = NewValidationError("invalid URL format")
-	ErrInvalidDate          = NewValidationError("invalid date format")
-	ErrInvalidEnum          = NewValidationError("invalid enum value")
+	// Format validation errors
+	ErrInvalidUUID  = NewValidationError("invalid UUID format")
+	ErrInvalidSlug  = NewValidationError("invalid slug format")
+	ErrInvalidEmail = NewValidationError("invalid email format")
+	ErrInvalidURL   = NewValidationError("invalid URL format")
+	ErrInvalidDate  = NewValidationError("invalid date format")
+	ErrInvalidEnum  = NewValidationError("invalid enum value")
+	
+	// Required field validation errors
+	ErrEmptyTitle           = NewValidationError("title is required")
+	ErrEmptyDescription     = NewValidationError("description is required")
 	ErrMissingCorrelationID = NewValidationError("correlation ID is required")
 	ErrMissingUserID        = NewValidationError("user ID is required")
 )

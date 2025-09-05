@@ -6,7 +6,9 @@ import (
 	"github.com/google/uuid"
 )
 
-// AuditEventType represents the type of audit event
+// AuditEventType represents the type of operation being audited for compliance tracking.
+// Each type corresponds to a specific database operation that requires audit trail documentation
+// for regulatory compliance and security monitoring.
 type AuditEventType string
 
 const (
@@ -22,44 +24,59 @@ const (
 type EntityType string
 
 const (
+	// Services Domain
 	EntityTypeService  EntityType = "service"
 	EntityTypeServiceCategory EntityType = "service_category"
-	EntityTypeCategory EntityType = "category" 
-	EntityTypeFeatured EntityType = "featured_category"
-	EntityTypeContent  EntityType = "content"
-	EntityTypeUser     EntityType = "user"
-	EntityTypeMigration EntityType = "migration"
+	EntityTypeFeaturedCategory EntityType = "featured_category"
+	
+	// News Domain  
 	EntityTypeNews     EntityType = "news"
 	EntityTypeNewsCategory EntityType = "news_category"
 	EntityTypeFeaturedNews EntityType = "featured_news"
+	
+	// Research Domain
 	EntityTypeResearch EntityType = "research"
 	EntityTypeResearchCategory EntityType = "research_category"
 	EntityTypeFeaturedResearch EntityType = "featured_research"
+	
+	// Events Domain
 	EntityTypeEvent EntityType = "event"
 	EntityTypeEventCategory EntityType = "event_category"
 	EntityTypeFeaturedEvent EntityType = "featured_event"
-	EntityTypeBusiness EntityType = "business"
-	EntityTypeDonations EntityType = "donations"
-	EntityTypeMedia EntityType = "media"
+	EntityTypeEventRegistration EntityType = "event_registration"
+	
+	// Inquiry Domains
+	EntityTypeBusinessInquiry EntityType = "business_inquiry"
+	EntityTypeDonationsInquiry EntityType = "donations_inquiry"
+	EntityTypeMediaInquiry EntityType = "media_inquiry"
 	EntityTypeVolunteerApplication EntityType = "volunteer_application"
+	
+	// System Entities
+	EntityTypeUser     EntityType = "user"
+	EntityTypeMigration EntityType = "migration"
 )
 
-// AuditEvent represents a complete audit event for compliance
+// AuditEvent represents a complete audit event for regulatory compliance and security monitoring.
+// This structure captures all necessary information for immutable audit trails that support
+// compliance requirements including HIPAA, SOC 2, and other regulatory frameworks.
+//
+// The audit event includes complete context about the operation, user, environment, and
+// data changes to ensure comprehensive audit trail documentation.
 type AuditEvent struct {
-	AuditID       string                 `json:"audit_id"`
-	EntityType    EntityType             `json:"entity_type"`
-	EntityID      string                 `json:"entity_id"`
-	OperationType AuditEventType         `json:"operation_type"`
-	AuditTime     time.Time              `json:"audit_timestamp"`
-	UserID        string                 `json:"user_id"`
-	CorrelationID string                 `json:"correlation_id"`
-	TraceID       string                 `json:"trace_id"`
-	DataSnapshot  *AuditDataSnapshot     `json:"data_snapshot"`
-	Environment   string                 `json:"environment"`
-	AppVersion    string                 `json:"app_version"`
-	RequestURL    string                 `json:"request_url,omitempty"`
-	IPAddress     string                 `json:"ip_address,omitempty"`
-	UserAgent     string                 `json:"user_agent,omitempty"`
+	AuditID       string                 `json:"audit_id"`         // Unique identifier for the audit event
+	EntityType    EntityType             `json:"entity_type"`      // Type of entity being audited
+	EntityID      string                 `json:"entity_id"`        // Unique identifier of the audited entity
+	OperationType AuditEventType         `json:"operation_type"`   // Type of operation (INSERT, UPDATE, DELETE, etc.)
+	AuditTime     time.Time              `json:"audit_timestamp"`  // Timestamp when the audit event occurred
+	UserID        string                 `json:"user_id"`          // Identifier of the user performing the operation
+	CorrelationID string                 `json:"correlation_id"`   // Request correlation identifier for distributed tracing
+	TraceID       string                 `json:"trace_id"`         // Trace identifier for request tracking
+	DataSnapshot  *AuditDataSnapshot     `json:"data_snapshot"`    // Before and after data snapshots
+	Environment   string                 `json:"environment"`      // Environment where the operation occurred
+	AppVersion    string                 `json:"app_version"`      // Application version performing the operation
+	RequestURL    string                 `json:"request_url,omitempty"`  // HTTP request URL (if applicable)
+	IPAddress     string                 `json:"ip_address,omitempty"`   // Client IP address (if applicable)
+	UserAgent     string                 `json:"user_agent,omitempty"`   // Client user agent (if applicable)
 }
 
 // AuditDataSnapshot contains before and after data for the audited entity
@@ -157,7 +174,12 @@ func (a *AuditEvent) Validate() error {
 // IsValidEntityType checks if the entity type is valid
 func IsValidEntityType(entityType EntityType) bool {
 	switch entityType {
-	case EntityTypeService, EntityTypeServiceCategory, EntityTypeCategory, EntityTypeFeatured, EntityTypeContent, EntityTypeUser, EntityTypeMigration, EntityTypeNews, EntityTypeNewsCategory, EntityTypeFeaturedNews, EntityTypeResearch, EntityTypeResearchCategory, EntityTypeFeaturedResearch, EntityTypeEvent, EntityTypeEventCategory, EntityTypeFeaturedEvent, EntityTypeBusiness, EntityTypeDonations, EntityTypeMedia, EntityTypeVolunteerApplication:
+	case EntityTypeService, EntityTypeServiceCategory, EntityTypeFeaturedCategory,
+		 EntityTypeNews, EntityTypeNewsCategory, EntityTypeFeaturedNews,
+		 EntityTypeResearch, EntityTypeResearchCategory, EntityTypeFeaturedResearch,
+		 EntityTypeEvent, EntityTypeEventCategory, EntityTypeFeaturedEvent, EntityTypeEventRegistration,
+		 EntityTypeBusinessInquiry, EntityTypeDonationsInquiry, EntityTypeMediaInquiry, EntityTypeVolunteerApplication,
+		 EntityTypeUser, EntityTypeMigration:
 		return true
 	default:
 		return false

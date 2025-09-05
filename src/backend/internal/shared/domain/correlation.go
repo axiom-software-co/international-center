@@ -2,7 +2,7 @@ package domain
 
 import (
 	"context"
-	"fmt"
+	"encoding/hex"
 	"time"
 
 	"github.com/google/uuid"
@@ -19,14 +19,19 @@ const (
 	ContextKeyAppVersion    ContextKey = "app_version"
 )
 
-// CorrelationContext contains correlation information for distributed tracing
+// CorrelationContext contains correlation information for distributed tracing and request tracking.
+// This context flows through all backend services to provide comprehensive request correlation,
+// performance monitoring, and debugging capabilities across service boundaries.
+//
+// The context includes unique identifiers for correlation, tracing, and request tracking,
+// along with user context and timing information for complete request lifecycle tracking.
 type CorrelationContext struct {
-	CorrelationID string
-	TraceID       string
-	UserID        string
-	RequestID     string
-	AppVersion    string
-	StartTime     time.Time
+	CorrelationID string    // Unique identifier that spans the entire user request across all services
+	TraceID       string    // Distributed tracing identifier for monitoring and debugging
+	UserID        string    // User identifier for security and audit context
+	RequestID     string    // Unique identifier for this specific service request
+	AppVersion    string    // Application version for compatibility tracking
+	StartTime     time.Time // Request start time for performance monitoring
 }
 
 // NewCorrelationContext creates a new correlation context with generated IDs
@@ -208,8 +213,12 @@ func (c *CorrelationContext) ToLogFields() map[string]interface{} {
 }
 
 // generateTraceID generates a trace ID compatible with distributed tracing
+// Returns a 32-character hex string optimized for performance
 func generateTraceID() string {
 	// Generate a 32-character hex string for trace ID
-	uuid := uuid.New()
-	return fmt.Sprintf("%x%x", uuid[:8], uuid[8:])
+	// Optimized to avoid string formatting overhead
+	id := uuid.New()
+	var buf [32]byte
+	hex.Encode(buf[:], id[:])
+	return string(buf[:])
 }
