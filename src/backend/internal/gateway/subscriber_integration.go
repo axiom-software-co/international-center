@@ -5,8 +5,9 @@ import (
 	"database/sql"
 	"fmt"
 	"os"
+	"time"
 
-	"github.com/axiom-software-co/international-center/src/backend/internal/shared/database"
+	"github.com/axiom-software-co/international-center/src/backend/internal/notifications"
 	_ "github.com/lib/pq" // PostgreSQL driver
 )
 
@@ -130,7 +131,7 @@ func (smi *SubscriberManagementIntegration) initializeDatabase() error {
 	// Configure connection pool
 	db.SetMaxOpenConns(dbConfig.MaxOpenConns)
 	db.SetMaxIdleConns(dbConfig.MaxIdleConns)
-	db.SetConnMaxLifetime(dbConfig.ConnMaxLifetime)
+	db.SetConnMaxLifetime(time.Duration(dbConfig.ConnMaxLifetime) * time.Minute)
 
 	// Verify database connectivity
 	if err := db.Ping(); err != nil {
@@ -325,24 +326,24 @@ func (smi *SubscriberManagementIntegration) SeedDatabaseWithDefaultSubscribers(c
 	}
 
 	// Create default admin subscriber
-	defaultSubscriber := &NotificationSubscriber{
+	defaultSubscriber := &notifications.NotificationSubscriber{
 		SubscriberID: "00000000-0000-0000-0000-000000000001", // Fixed UUID for system admin
-		Status:       SubscriberStatusActive,
+		Status:       notifications.SubscriberStatusActive,
 		SubscriberName: "System Administrator",
 		Email:        getEnvString("ADMIN_EMAIL", "admin@international-center.org"),
 		Phone:        stringPtr(getEnvString("ADMIN_PHONE", "+1234567890")),
-		EventTypes: []EventType{
-			EventTypeSystemError,
-			EventTypeCapacityAlert,
-			EventTypeAdminActionRequired,
-			EventTypeComplianceAlert,
+		EventTypes: []notifications.EventType{
+			notifications.EventTypeSystemError,
+			notifications.EventTypeCapacityAlert,
+			notifications.EventTypeAdminActionRequired,
+			notifications.EventTypeComplianceAlert,
 		},
-		NotificationMethods:  []NotificationMethod{NotificationMethodBoth},
-		NotificationSchedule: NotificationScheduleImmediate,
-		PriorityThreshold:    PriorityThresholdLow, // Receive all priority levels
+		NotificationMethods:  []notifications.NotificationMethod{notifications.NotificationMethodBoth},
+		NotificationSchedule: notifications.ScheduleImmediate,
+		PriorityThreshold:    notifications.PriorityLow, // Receive all priority levels
 		Notes:                stringPtr("Default system administrator subscriber"),
-		CreatedAt:            database.GetCurrentTime(),
-		UpdatedAt:            database.GetCurrentTime(),
+		CreatedAt:            time.Now(),
+		UpdatedAt:            time.Now(),
 		CreatedBy:            "system",
 		UpdatedBy:            "system",
 		IsDeleted:            false,

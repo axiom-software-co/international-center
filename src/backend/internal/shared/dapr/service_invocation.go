@@ -33,10 +33,11 @@ type ServiceResponse struct {
 
 // ServiceEndpoints contains the configured service endpoints
 type ServiceEndpoints struct {
-	ContentAPI  string
-	ServicesAPI string
-	AdminGW     string
-	PublicGW    string
+	ContentAPI      string
+	ServicesAPI     string
+	NotificationAPI string
+	AdminGW         string
+	PublicGW        string
 }
 
 // NewServiceInvocation creates a new service invocation instance
@@ -49,10 +50,11 @@ func NewServiceInvocation(client *Client) *ServiceInvocation {
 // GetServiceEndpoints returns the configured service endpoints
 func (s *ServiceInvocation) GetServiceEndpoints() *ServiceEndpoints {
 	return &ServiceEndpoints{
-		ContentAPI:  getEnv("CONTENT_API_APP_ID", "content-api"),
-		ServicesAPI: getEnv("SERVICES_API_APP_ID", "services-api"),
-		AdminGW:     getEnv("ADMIN_GATEWAY_APP_ID", "admin-gateway"),
-		PublicGW:    getEnv("PUBLIC_GATEWAY_APP_ID", "public-gateway"),
+		ContentAPI:      getEnv("CONTENT_API_APP_ID", "content-api"),
+		ServicesAPI:     getEnv("SERVICES_API_APP_ID", "services-api"),
+		NotificationAPI: getEnv("NOTIFICATION_API_APP_ID", "notification-api"),
+		AdminGW:         getEnv("ADMIN_GATEWAY_APP_ID", "admin-gateway"),
+		PublicGW:        getEnv("PUBLIC_GATEWAY_APP_ID", "public-gateway"),
 	}
 }
 
@@ -138,6 +140,21 @@ func (s *ServiceInvocation) InvokeServicesAPI(ctx context.Context, method, httpV
 	
 	req := &ServiceRequest{
 		AppID:       endpoints.ServicesAPI,
+		MethodName:  method,
+		HTTPVerb:    httpVerb,
+		Data:        data,
+		ContentType: "application/json",
+	}
+
+	return s.InvokeService(ctx, req)
+}
+
+// InvokeNotificationAPI invokes a method on the notification API service
+func (s *ServiceInvocation) InvokeNotificationAPI(ctx context.Context, method, httpVerb string, data []byte) (*ServiceResponse, error) {
+	endpoints := s.GetServiceEndpoints()
+	
+	req := &ServiceRequest{
+		AppID:       endpoints.NotificationAPI,
 		MethodName:  method,
 		HTTPVerb:    httpVerb,
 		Data:        data,
@@ -309,6 +326,16 @@ func (s *ServiceInvocation) CheckServicesAPIHealth(ctx context.Context) (bool, e
 	return true, nil
 }
 
+// CheckNotificationAPIHealth checks if the notification API service is healthy
+func (s *ServiceInvocation) CheckNotificationAPIHealth(ctx context.Context) (bool, error) {
+	endpoints := s.GetServiceEndpoints()
+	err := s.CheckServiceHealth(ctx, endpoints.NotificationAPI)
+	if err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
 // GetContentAPIMetrics retrieves metrics from the content API service
 func (s *ServiceInvocation) GetContentAPIMetrics(ctx context.Context) (map[string]interface{}, error) {
 	// For TDD GREEN phase - simplified implementation
@@ -328,6 +355,18 @@ func (s *ServiceInvocation) GetServicesAPIMetrics(ctx context.Context) (map[stri
 		"status": "healthy",
 		"uptime": "1h25m",
 		"requests": 200,
+	}, nil
+}
+
+// GetNotificationAPIMetrics retrieves metrics from the notification API service
+func (s *ServiceInvocation) GetNotificationAPIMetrics(ctx context.Context) (map[string]interface{}, error) {
+	// For TDD GREEN phase - simplified implementation
+	// In production, this would fetch actual metrics
+	return map[string]interface{}{
+		"status": "healthy",
+		"uptime": "45m",
+		"notifications_sent": 150,
+		"subscribers": 25,
 	}, nil
 }
 

@@ -17,10 +17,13 @@ import (
 type ServiceInvocationInterface interface {
 	InvokeContentAPI(ctx context.Context, method, httpVerb string, data []byte) (*dapr.ServiceResponse, error)
 	InvokeServicesAPI(ctx context.Context, method, httpVerb string, data []byte) (*dapr.ServiceResponse, error)
+	InvokeNotificationAPI(ctx context.Context, method, httpVerb string, data []byte) (*dapr.ServiceResponse, error)
 	CheckContentAPIHealth(ctx context.Context) (bool, error)
 	CheckServicesAPIHealth(ctx context.Context) (bool, error)
+	CheckNotificationAPIHealth(ctx context.Context) (bool, error)
 	GetContentAPIMetrics(ctx context.Context) (map[string]interface{}, error)
 	GetServicesAPIMetrics(ctx context.Context) (map[string]interface{}, error)
+	GetNotificationAPIMetrics(ctx context.Context) (map[string]interface{}, error)
 }
 
 // ServiceProxy handles proxying requests to backend services via Dapr service invocation
@@ -90,6 +93,8 @@ func (p *ServiceProxy) ProxyRequest(ctx context.Context, w http.ResponseWriter, 
 		response, err = p.invokeContentAPI(requestCtx, httpMethod, targetPath, requestData, headers)
 	case "services-api":
 		response, err = p.invokeServicesAPI(requestCtx, httpMethod, targetPath, requestData, headers)
+	case "notification-api":
+		response, err = p.invokeNotificationAPI(requestCtx, httpMethod, targetPath, requestData, headers)
 	default:
 		return domain.NewValidationError(fmt.Sprintf("unknown target service: %s", serviceName))
 	}
@@ -124,6 +129,8 @@ func (p *ServiceProxy) parseTargetService(path, targetService string) (string, s
 		serviceName = "content-api"
 	case "services":
 		serviceName = "services-api"
+	case "notifications":
+		serviceName = "notification-api"
 	default:
 		return "", "", "", fmt.Errorf("unknown service: %s", service)
 	}
@@ -194,6 +201,36 @@ func (p *ServiceProxy) invokeServicesAPI(ctx context.Context, method, path strin
 	}
 }
 
+// invokeNotificationAPI invokes notification API service
+func (p *ServiceProxy) invokeNotificationAPI(ctx context.Context, method, path string, data interface{}, headers map[string]string) (interface{}, error) {
+	switch {
+	case strings.HasPrefix(path, "/api/v1/notifications"):
+		// Convert data to []byte if needed
+		var requestData []byte
+		if data != nil {
+			var err error
+			requestData, err = json.Marshal(data)
+			if err != nil {
+				return nil, domain.NewValidationError("failed to marshal request data")
+			}
+		}
+		response, err := p.serviceInvocation.InvokeNotificationAPI(ctx, path, method, requestData)
+		if err != nil {
+			return nil, err
+		}
+		// Parse response data back to interface{}
+		var result interface{}
+		if len(response.Data) > 0 {
+			if err := json.Unmarshal(response.Data, &result); err != nil {
+				return nil, domain.NewInternalError("failed to unmarshal response", err)
+			}
+		}
+		return result, nil
+	default:
+		return nil, domain.NewNotFoundError("notification API endpoint", path)
+	}
+}
+
 // extractForwardableHeaders extracts headers that should be forwarded to backend services
 func (p *ServiceProxy) extractForwardableHeaders(r *http.Request) map[string]string {
 	headers := make(map[string]string)
@@ -257,6 +294,12 @@ func (p *ServiceProxy) HealthCheck(ctx context.Context) error {
 		return fmt.Errorf("services API health check failed: %v", err)
 	}
 	
+	// Check notification API health
+	notificationHealthy, err := p.serviceInvocation.CheckNotificationAPIHealth(ctx)
+	if err != nil || !notificationHealthy {
+		return fmt.Errorf("notification API health check failed: %v", err)
+	}
+	
 	return nil
 }
 
@@ -274,6 +317,12 @@ func (p *ServiceProxy) GetServiceMetrics(ctx context.Context) (map[string]interf
 	servicesMetrics, err := p.serviceInvocation.GetServicesAPIMetrics(ctx)
 	if err == nil {
 		metrics["services_api"] = servicesMetrics
+	}
+	
+	// Get notification API metrics
+	notificationMetrics, err := p.serviceInvocation.GetNotificationAPIMetrics(ctx)
+	if err == nil {
+		metrics["notification_api"] = notificationMetrics
 	}
 	
 	// Add gateway metrics

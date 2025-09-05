@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/axiom-software-co/international-center/src/backend/internal/notifications"
 	"github.com/axiom-software-co/international-center/src/backend/internal/shared/domain"
 	"github.com/gorilla/mux"
 )
@@ -203,10 +204,10 @@ func (h *SubscriberHandler) ListSubscribers(w http.ResponseWriter, r *http.Reque
 	}
 	
 	// Parse status filter
-	var status *SubscriberStatus
+	var status *notifications.SubscriberStatus
 	if statusStr := queryParams.Get("status"); statusStr != "" {
-		s := SubscriberStatus(statusStr)
-		if s != SubscriberStatusActive && s != SubscriberStatusInactive && s != SubscriberStatusSuspended {
+		s := notifications.SubscriberStatus(statusStr)
+		if s != notifications.SubscriberStatusActive && s != notifications.SubscriberStatusInactive && s != notifications.SubscriberStatusSuspended {
 			h.writeErrorResponse(w, r, http.StatusBadRequest, "INVALID_PARAMETER", "invalid status parameter", nil)
 			return
 		}
@@ -263,12 +264,12 @@ func (h *SubscriberHandler) SearchSubscribers(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	var subscribers []*NotificationSubscriber
+	var subscribers []*notifications.NotificationSubscriber
 	var err error
 
 	// Search by email (exact match)
 	if email != "" {
-		subscriber, err := h.subscriberService.GetSubscribersByEvent(ctx, EventType(eventType), PriorityThresholdLow)
+		subscriber, err := h.subscriberService.GetSubscribersByEvent(ctx, notifications.EventType(eventType), notifications.PriorityLow)
 		if err != nil && !domain.IsNotFoundError(err) {
 			h.handleServiceError(w, r, err)
 			return
@@ -276,7 +277,7 @@ func (h *SubscriberHandler) SearchSubscribers(w http.ResponseWriter, r *http.Req
 		subscribers = subscriber
 	} else if eventType != "" {
 		// Search by event type
-		subscribers, err = h.subscriberService.GetSubscribersByEvent(ctx, EventType(eventType), PriorityThresholdLow)
+		subscribers, err = h.subscriberService.GetSubscribersByEvent(ctx, notifications.EventType(eventType), notifications.PriorityLow)
 		if err != nil {
 			h.handleServiceError(w, r, err)
 			return
@@ -284,7 +285,7 @@ func (h *SubscriberHandler) SearchSubscribers(w http.ResponseWriter, r *http.Req
 	} else {
 		// For name search, we'd need to implement a search method in the service
 		// For now, return empty results
-		subscribers = []*NotificationSubscriber{}
+		subscribers = []*notifications.NotificationSubscriber{}
 	}
 
 	// Write response
@@ -312,12 +313,12 @@ func (h *SubscriberHandler) GetSubscribersByEvent(w http.ResponseWriter, r *http
 		return
 	}
 
-	eventType := EventType(eventTypeStr)
+	eventType := notifications.EventType(eventTypeStr)
 
 	// Get priority from query parameter (default: low)
-	priority := PriorityThresholdLow
+	priority := notifications.PriorityLow
 	if priorityStr := r.URL.Query().Get("priority"); priorityStr != "" {
-		priority = PriorityThreshold(priorityStr)
+		priority = notifications.PriorityThreshold(priorityStr)
 	}
 
 	// Get subscribers by event
@@ -450,8 +451,6 @@ func (h *SubscriberHandler) writeJSONResponse(w http.ResponseWriter, r *http.Req
 
 // Health check endpoint for subscriber management
 func (h *SubscriberHandler) SubscriberHealthCheck(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	
 	health := map[string]interface{}{
 		"status":         "ok",
 		"service":        "subscriber-management",
@@ -471,11 +470,11 @@ func (h *SubscriberHandler) SubscriberHealthCheck(w http.ResponseWriter, r *http
 // validateSubscriberID validates subscriber ID from URL parameter
 func (h *SubscriberHandler) validateSubscriberID(subscriberID string) error {
 	if subscriberID == "" {
-		return domain.NewValidationError("subscriber ID cannot be empty", nil)
+		return domain.NewValidationError("subscriber ID cannot be empty")
 	}
 	
 	if strings.TrimSpace(subscriberID) == "" {
-		return domain.NewValidationError("subscriber ID cannot be empty", nil)
+		return domain.NewValidationError("subscriber ID cannot be empty")
 	}
 	
 	// Additional validation can be added here

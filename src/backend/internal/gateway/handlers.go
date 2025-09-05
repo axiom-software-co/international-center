@@ -71,6 +71,11 @@ func (h *GatewayHandler) RegisterRoutes(router *mux.Router) {
 		router.PathPrefix("/api/v1/news").HandlerFunc(h.ProxyToNewsAPI).Methods("GET", "POST", "PUT", "DELETE")
 	}
 	
+	if h.config.ServiceRouting.NotificationAPIEnabled {
+		// Notification API routes (admin-only)
+		router.PathPrefix("/api/v1/notifications").HandlerFunc(h.ProxyToNotificationAPI).Methods("GET", "POST", "PUT", "DELETE")
+	}
+	
 	// Gateway information endpoint
 	router.HandleFunc("/gateway/info", h.GatewayInfo).Methods("GET")
 	
@@ -125,6 +130,22 @@ func (h *GatewayHandler) ProxyToNewsAPI(w http.ResponseWriter, r *http.Request) 
 	
 	// Proxy request to news API
 	err := h.serviceProxy.ProxyRequest(ctx, w, r, "news-api")
+	if err != nil {
+		h.handleError(w, r, err)
+		return
+	}
+}
+
+// ProxyToNotificationAPI proxies requests to notification API service
+func (h *GatewayHandler) ProxyToNotificationAPI(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	
+	// Add request timeout
+	ctx, cancel := context.WithTimeout(ctx, h.config.Timeouts.RequestTimeout)
+	defer cancel()
+	
+	// Proxy request to notification API
+	err := h.serviceProxy.ProxyRequest(ctx, w, r, "notification-api")
 	if err != nil {
 		h.handleError(w, r, err)
 		return
@@ -214,11 +235,12 @@ func (h *GatewayHandler) MetricsEndpoint(w http.ResponseWriter, r *http.Request)
 			"environment": h.config.Environment,
 			"uptime":      time.Now().UTC(),
 			"configuration": map[string]interface{}{
-				"rate_limit_enabled":     h.config.RateLimit.Enabled,
-				"cors_enabled":           h.config.CORS.Enabled,
-				"auth_required":          h.config.ShouldRequireAuth(),
-				"content_api_enabled":    h.config.ServiceRouting.ContentAPIEnabled,
-				"services_api_enabled":   h.config.ServiceRouting.ServicesAPIEnabled,
+				"rate_limit_enabled":       h.config.RateLimit.Enabled,
+				"cors_enabled":             h.config.CORS.Enabled,
+				"auth_required":            h.config.ShouldRequireAuth(),
+				"content_api_enabled":      h.config.ServiceRouting.ContentAPIEnabled,
+				"services_api_enabled":     h.config.ServiceRouting.ServicesAPIEnabled,
+				"notification_api_enabled": h.config.ServiceRouting.NotificationAPIEnabled,
 			},
 		},
 		"services": serviceMetrics,
@@ -235,11 +257,12 @@ func (h *GatewayHandler) GatewayInfo(w http.ResponseWriter, r *http.Request) {
 		"version":     h.config.Version,
 		"environment": h.config.Environment,
 		"capabilities": map[string]interface{}{
-			"content_api":   h.config.ServiceRouting.ContentAPIEnabled,
-			"services_api":  h.config.ServiceRouting.ServicesAPIEnabled,
-			"rate_limiting": h.config.RateLimit.Enabled,
-			"cors":          h.config.CORS.Enabled,
-			"authentication": h.config.ShouldRequireAuth(),
+			"content_api":       h.config.ServiceRouting.ContentAPIEnabled,
+			"services_api":      h.config.ServiceRouting.ServicesAPIEnabled,
+			"notification_api":  h.config.ServiceRouting.NotificationAPIEnabled,
+			"rate_limiting":     h.config.RateLimit.Enabled,
+			"cors":              h.config.CORS.Enabled,
+			"authentication":    h.config.ShouldRequireAuth(),
 		},
 		"endpoints": map[string]interface{}{
 			"health":    h.config.Observability.HealthCheckPath,

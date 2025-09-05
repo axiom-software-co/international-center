@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/axiom-software-co/international-center/src/backend/internal/shared/database"
+	"github.com/axiom-software-co/international-center/src/backend/internal/notifications"
 	"github.com/axiom-software-co/international-center/src/backend/internal/shared/domain"
 	"github.com/google/uuid"
 	"github.com/lib/pq"
@@ -17,6 +17,14 @@ type PostgreSQLSubscriberRepository struct {
 	db *sql.DB
 }
 
+// isDuplicateKeyError checks if the error is a PostgreSQL duplicate key error
+func isDuplicateKeyError(err error) bool {
+	if pqErr, ok := err.(*pq.Error); ok {
+		return pqErr.Code == "23505" // unique_violation
+	}
+	return false
+}
+
 // NewPostgreSQLSubscriberRepository creates a new PostgreSQL subscriber repository
 func NewPostgreSQLSubscriberRepository(db *sql.DB) *PostgreSQLSubscriberRepository {
 	return &PostgreSQLSubscriberRepository{
@@ -25,14 +33,14 @@ func NewPostgreSQLSubscriberRepository(db *sql.DB) *PostgreSQLSubscriberReposito
 }
 
 // CreateSubscriber creates a new notification subscriber
-func (r *PostgreSQLSubscriberRepository) CreateSubscriber(ctx context.Context, subscriber *NotificationSubscriber) error {
+func (r *PostgreSQLSubscriberRepository) CreateSubscriber(ctx context.Context, subscriber *notifications.NotificationSubscriber) error {
 	if subscriber == nil {
-		return domain.NewValidationError("subscriber cannot be nil", nil)
+		return domain.NewValidationError("subscriber cannot be nil")
 	}
 
 	// Validate subscriber ID format
 	if _, err := uuid.Parse(subscriber.SubscriberID); err != nil {
-		return domain.NewValidationError("invalid subscriber ID format", err)
+		return domain.NewValidationError("invalid subscriber ID format")
 	}
 
 	// Check for duplicate email
@@ -41,7 +49,7 @@ func (r *PostgreSQLSubscriberRepository) CreateSubscriber(ctx context.Context, s
 		return fmt.Errorf("failed to check email existence: %w", err)
 	}
 	if exists {
-		return domain.NewConflictError("duplicate email address", nil)
+		return domain.NewConflictError("duplicate email address")
 	}
 
 	query := `
@@ -75,8 +83,8 @@ func (r *PostgreSQLSubscriberRepository) CreateSubscriber(ctx context.Context, s
 	)
 
 	if err != nil {
-		if database.IsDuplicateKeyError(err) {
-			return domain.NewConflictError("duplicate email address", err)
+		if isDuplicateKeyError(err) {
+			return domain.NewConflictError("duplicate email address")
 		}
 		return fmt.Errorf("failed to create subscriber: %w", err)
 	}
@@ -85,14 +93,14 @@ func (r *PostgreSQLSubscriberRepository) CreateSubscriber(ctx context.Context, s
 }
 
 // GetSubscriber retrieves a subscriber by ID
-func (r *PostgreSQLSubscriberRepository) GetSubscriber(ctx context.Context, subscriberID string) (*NotificationSubscriber, error) {
+func (r *PostgreSQLSubscriberRepository) GetSubscriber(ctx context.Context, subscriberID string) (*notifications.NotificationSubscriber, error) {
 	if subscriberID == "" {
-		return nil, domain.NewValidationError("subscriber ID cannot be empty", nil)
+		return nil, domain.NewValidationError("subscriber ID cannot be empty")
 	}
 
 	// Validate subscriber ID format
 	if _, err := uuid.Parse(subscriberID); err != nil {
-		return nil, domain.NewValidationError("invalid subscriber ID format", err)
+		return nil, domain.NewValidationError("invalid subscriber ID format")
 	}
 
 	query := `
@@ -105,7 +113,7 @@ func (r *PostgreSQLSubscriberRepository) GetSubscriber(ctx context.Context, subs
 
 	row := r.db.QueryRowContext(ctx, query, subscriberID)
 
-	subscriber := &NotificationSubscriber{}
+	subscriber := &notifications.NotificationSubscriber{}
 	var eventTypes pq.StringArray
 	var notificationMethods pq.StringArray
 
@@ -130,29 +138,29 @@ func (r *PostgreSQLSubscriberRepository) GetSubscriber(ctx context.Context, subs
 
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return nil, domain.NewNotFoundError("subscriber not found", nil)
+			return nil, domain.NewNotFoundError("subscriber", subscriberID)
 		}
 		return nil, fmt.Errorf("failed to get subscriber: %w", err)
 	}
 
 	// Convert arrays to slices
-	subscriber.EventTypes = make([]EventType, len(eventTypes))
+	subscriber.EventTypes = make([]notifications.EventType, len(eventTypes))
 	for i, et := range eventTypes {
-		subscriber.EventTypes[i] = EventType(et)
+		subscriber.EventTypes[i] = notifications.EventType(et)
 	}
 
-	subscriber.NotificationMethods = make([]NotificationMethod, len(notificationMethods))
+	subscriber.NotificationMethods = make([]notifications.NotificationMethod, len(notificationMethods))
 	for i, nm := range notificationMethods {
-		subscriber.NotificationMethods[i] = NotificationMethod(nm)
+		subscriber.NotificationMethods[i] = notifications.NotificationMethod(nm)
 	}
 
 	return subscriber, nil
 }
 
 // GetSubscriberByEmail retrieves a subscriber by email address
-func (r *PostgreSQLSubscriberRepository) GetSubscriberByEmail(ctx context.Context, email string) (*NotificationSubscriber, error) {
+func (r *PostgreSQLSubscriberRepository) GetSubscriberByEmail(ctx context.Context, email string) (*notifications.NotificationSubscriber, error) {
 	if email == "" {
-		return nil, domain.NewValidationError("email cannot be empty", nil)
+		return nil, domain.NewValidationError("email cannot be empty")
 	}
 
 	query := `
@@ -165,7 +173,7 @@ func (r *PostgreSQLSubscriberRepository) GetSubscriberByEmail(ctx context.Contex
 
 	row := r.db.QueryRowContext(ctx, query, email)
 
-	subscriber := &NotificationSubscriber{}
+	subscriber := &notifications.NotificationSubscriber{}
 	var eventTypes pq.StringArray
 	var notificationMethods pq.StringArray
 
@@ -190,34 +198,34 @@ func (r *PostgreSQLSubscriberRepository) GetSubscriberByEmail(ctx context.Contex
 
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return nil, domain.NewNotFoundError("subscriber not found", nil)
+			return nil, domain.NewNotFoundError("subscriber", email)
 		}
 		return nil, fmt.Errorf("failed to get subscriber by email: %w", err)
 	}
 
 	// Convert arrays to slices
-	subscriber.EventTypes = make([]EventType, len(eventTypes))
+	subscriber.EventTypes = make([]notifications.EventType, len(eventTypes))
 	for i, et := range eventTypes {
-		subscriber.EventTypes[i] = EventType(et)
+		subscriber.EventTypes[i] = notifications.EventType(et)
 	}
 
-	subscriber.NotificationMethods = make([]NotificationMethod, len(notificationMethods))
+	subscriber.NotificationMethods = make([]notifications.NotificationMethod, len(notificationMethods))
 	for i, nm := range notificationMethods {
-		subscriber.NotificationMethods[i] = NotificationMethod(nm)
+		subscriber.NotificationMethods[i] = notifications.NotificationMethod(nm)
 	}
 
 	return subscriber, nil
 }
 
 // UpdateSubscriber updates an existing subscriber
-func (r *PostgreSQLSubscriberRepository) UpdateSubscriber(ctx context.Context, subscriber *NotificationSubscriber) error {
+func (r *PostgreSQLSubscriberRepository) UpdateSubscriber(ctx context.Context, subscriber *notifications.NotificationSubscriber) error {
 	if subscriber == nil {
-		return domain.NewValidationError("subscriber cannot be nil", nil)
+		return domain.NewValidationError("subscriber cannot be nil")
 	}
 
 	// Validate subscriber ID format
 	if _, err := uuid.Parse(subscriber.SubscriberID); err != nil {
-		return domain.NewValidationError("invalid subscriber ID format", err)
+		return domain.NewValidationError("invalid subscriber ID format")
 	}
 
 	// Check for duplicate email (excluding this subscriber)
@@ -226,7 +234,7 @@ func (r *PostgreSQLSubscriberRepository) UpdateSubscriber(ctx context.Context, s
 		return fmt.Errorf("failed to check email existence: %w", err)
 	}
 	if exists {
-		return domain.NewConflictError("duplicate email address", nil)
+		return domain.NewConflictError("duplicate email address")
 	}
 
 	query := `
@@ -255,8 +263,8 @@ func (r *PostgreSQLSubscriberRepository) UpdateSubscriber(ctx context.Context, s
 	)
 
 	if err != nil {
-		if database.IsDuplicateKeyError(err) {
-			return domain.NewConflictError("duplicate email address", err)
+		if isDuplicateKeyError(err) {
+			return domain.NewConflictError("duplicate email address")
 		}
 		return fmt.Errorf("failed to update subscriber: %w", err)
 	}
@@ -267,7 +275,7 @@ func (r *PostgreSQLSubscriberRepository) UpdateSubscriber(ctx context.Context, s
 	}
 
 	if rowsAffected == 0 {
-		return domain.NewNotFoundError("subscriber not found", nil)
+		return domain.NewNotFoundError("subscriber", subscriber.SubscriberID)
 	}
 
 	return nil
@@ -276,16 +284,16 @@ func (r *PostgreSQLSubscriberRepository) UpdateSubscriber(ctx context.Context, s
 // DeleteSubscriber soft deletes a subscriber
 func (r *PostgreSQLSubscriberRepository) DeleteSubscriber(ctx context.Context, subscriberID string, deletedBy string) error {
 	if subscriberID == "" {
-		return domain.NewValidationError("subscriber ID cannot be empty", nil)
+		return domain.NewValidationError("subscriber ID cannot be empty")
 	}
 
 	if deletedBy == "" {
-		return domain.NewValidationError("deleted by cannot be empty", nil)
+		return domain.NewValidationError("deleted by cannot be empty")
 	}
 
 	// Validate subscriber ID format
 	if _, err := uuid.Parse(subscriberID); err != nil {
-		return domain.NewValidationError("invalid subscriber ID format", err)
+		return domain.NewValidationError("invalid subscriber ID format")
 	}
 
 	query := `
@@ -305,20 +313,20 @@ func (r *PostgreSQLSubscriberRepository) DeleteSubscriber(ctx context.Context, s
 	}
 
 	if rowsAffected == 0 {
-		return domain.NewNotFoundError("subscriber not found", nil)
+		return domain.NewNotFoundError("subscriber", subscriberID)
 	}
 
 	return nil
 }
 
 // ListSubscribers retrieves subscribers with pagination and filtering
-func (r *PostgreSQLSubscriberRepository) ListSubscribers(ctx context.Context, status *SubscriberStatus, limit, offset int) ([]*NotificationSubscriber, int, error) {
+func (r *PostgreSQLSubscriberRepository) ListSubscribers(ctx context.Context, status *notifications.SubscriberStatus, limit, offset int) ([]*notifications.NotificationSubscriber, int, error) {
 	if limit < 0 {
-		return nil, 0, domain.NewValidationError("invalid limit parameter", nil)
+		return nil, 0, domain.NewValidationError("invalid limit parameter")
 	}
 
 	if offset < 0 {
-		return nil, 0, domain.NewValidationError("invalid offset parameter", nil)
+		return nil, 0, domain.NewValidationError("invalid offset parameter")
 	}
 
 	// Build query with optional status filter
@@ -367,10 +375,10 @@ func (r *PostgreSQLSubscriberRepository) ListSubscribers(ctx context.Context, st
 	}
 	defer rows.Close()
 
-	var subscribers []*NotificationSubscriber
+	var subscribers []*notifications.NotificationSubscriber
 
 	for rows.Next() {
-		subscriber := &NotificationSubscriber{}
+		subscriber := &notifications.NotificationSubscriber{}
 		var eventTypes pq.StringArray
 		var notificationMethods pq.StringArray
 
@@ -398,14 +406,14 @@ func (r *PostgreSQLSubscriberRepository) ListSubscribers(ctx context.Context, st
 		}
 
 		// Convert arrays to slices
-		subscriber.EventTypes = make([]EventType, len(eventTypes))
+		subscriber.EventTypes = make([]notifications.EventType, len(eventTypes))
 		for i, et := range eventTypes {
-			subscriber.EventTypes[i] = EventType(et)
+			subscriber.EventTypes[i] = notifications.EventType(et)
 		}
 
-		subscriber.NotificationMethods = make([]NotificationMethod, len(notificationMethods))
+		subscriber.NotificationMethods = make([]notifications.NotificationMethod, len(notificationMethods))
 		for i, nm := range notificationMethods {
-			subscriber.NotificationMethods[i] = NotificationMethod(nm)
+			subscriber.NotificationMethods[i] = notifications.NotificationMethod(nm)
 		}
 
 		subscribers = append(subscribers, subscriber)
@@ -419,7 +427,7 @@ func (r *PostgreSQLSubscriberRepository) ListSubscribers(ctx context.Context, st
 }
 
 // GetSubscribersByEventType retrieves subscribers for a specific event type
-func (r *PostgreSQLSubscriberRepository) GetSubscribersByEventType(ctx context.Context, eventType EventType) ([]*NotificationSubscriber, error) {
+func (r *PostgreSQLSubscriberRepository) GetSubscribersByEventType(ctx context.Context, eventType notifications.EventType) ([]*notifications.NotificationSubscriber, error) {
 	query := `
 		SELECT subscriber_id, status, subscriber_name, email, phone, event_types, 
 			   notification_methods, notification_schedule, priority_threshold, 
@@ -437,10 +445,10 @@ func (r *PostgreSQLSubscriberRepository) GetSubscribersByEventType(ctx context.C
 	}
 	defer rows.Close()
 
-	var subscribers []*NotificationSubscriber
+	var subscribers []*notifications.NotificationSubscriber
 
 	for rows.Next() {
-		subscriber := &NotificationSubscriber{}
+		subscriber := &notifications.NotificationSubscriber{}
 		var eventTypes pq.StringArray
 		var notificationMethods pq.StringArray
 
@@ -468,14 +476,14 @@ func (r *PostgreSQLSubscriberRepository) GetSubscribersByEventType(ctx context.C
 		}
 
 		// Convert arrays to slices
-		subscriber.EventTypes = make([]EventType, len(eventTypes))
+		subscriber.EventTypes = make([]notifications.EventType, len(eventTypes))
 		for i, et := range eventTypes {
-			subscriber.EventTypes[i] = EventType(et)
+			subscriber.EventTypes[i] = notifications.EventType(et)
 		}
 
-		subscriber.NotificationMethods = make([]NotificationMethod, len(notificationMethods))
+		subscriber.NotificationMethods = make([]notifications.NotificationMethod, len(notificationMethods))
 		for i, nm := range notificationMethods {
-			subscriber.NotificationMethods[i] = NotificationMethod(nm)
+			subscriber.NotificationMethods[i] = notifications.NotificationMethod(nm)
 		}
 
 		subscribers = append(subscribers, subscriber)
@@ -489,7 +497,7 @@ func (r *PostgreSQLSubscriberRepository) GetSubscribersByEventType(ctx context.C
 }
 
 // GetActiveSubscribersByPriority retrieves active subscribers for a priority level
-func (r *PostgreSQLSubscriberRepository) GetActiveSubscribersByPriority(ctx context.Context, priority PriorityThreshold) ([]*NotificationSubscriber, error) {
+func (r *PostgreSQLSubscriberRepository) GetActiveSubscribersByPriority(ctx context.Context, priority notifications.PriorityThreshold) ([]*notifications.NotificationSubscriber, error) {
 	query := `
 		SELECT subscriber_id, status, subscriber_name, email, phone, event_types, 
 			   notification_methods, notification_schedule, priority_threshold, 
@@ -512,10 +520,10 @@ func (r *PostgreSQLSubscriberRepository) GetActiveSubscribersByPriority(ctx cont
 	}
 	defer rows.Close()
 
-	var subscribers []*NotificationSubscriber
+	var subscribers []*notifications.NotificationSubscriber
 
 	for rows.Next() {
-		subscriber := &NotificationSubscriber{}
+		subscriber := &notifications.NotificationSubscriber{}
 		var eventTypes pq.StringArray
 		var notificationMethods pq.StringArray
 
@@ -543,14 +551,14 @@ func (r *PostgreSQLSubscriberRepository) GetActiveSubscribersByPriority(ctx cont
 		}
 
 		// Convert arrays to slices
-		subscriber.EventTypes = make([]EventType, len(eventTypes))
+		subscriber.EventTypes = make([]notifications.EventType, len(eventTypes))
 		for i, et := range eventTypes {
-			subscriber.EventTypes[i] = EventType(et)
+			subscriber.EventTypes[i] = notifications.EventType(et)
 		}
 
-		subscriber.NotificationMethods = make([]NotificationMethod, len(notificationMethods))
+		subscriber.NotificationMethods = make([]notifications.NotificationMethod, len(notificationMethods))
 		for i, nm := range notificationMethods {
-			subscriber.NotificationMethods[i] = NotificationMethod(nm)
+			subscriber.NotificationMethods[i] = notifications.NotificationMethod(nm)
 		}
 
 		subscribers = append(subscribers, subscriber)
@@ -566,7 +574,7 @@ func (r *PostgreSQLSubscriberRepository) GetActiveSubscribersByPriority(ctx cont
 // CheckEmailExists checks if an email address already exists
 func (r *PostgreSQLSubscriberRepository) CheckEmailExists(ctx context.Context, email string, excludeID *string) (bool, error) {
 	if email == "" {
-		return false, domain.NewValidationError("email cannot be empty", nil)
+		return false, domain.NewValidationError("email cannot be empty")
 	}
 
 	query := `

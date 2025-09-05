@@ -94,11 +94,12 @@ type CacheControlConfig struct {
 
 // ServiceRoutingConfig defines service routing configuration
 type ServiceRoutingConfig struct {
-	ContentAPIEnabled  bool   `json:"content_api_enabled"`
-	ServicesAPIEnabled bool   `json:"services_api_enabled"`
-	NewsAPIEnabled     bool   `json:"news_api_enabled"`
-	HealthCheckPath    string `json:"health_check_path"`
-	MetricsPath        string `json:"metrics_path"`
+	ContentAPIEnabled      bool   `json:"content_api_enabled"`
+	ServicesAPIEnabled     bool   `json:"services_api_enabled"`
+	NotificationAPIEnabled bool   `json:"notification_api_enabled"`
+	NewsAPIEnabled         bool   `json:"news_api_enabled"`
+	HealthCheckPath        string `json:"health_check_path"`
+	MetricsPath            string `json:"metrics_path"`
 }
 
 // TimeoutConfig defines timeout configuration
@@ -188,11 +189,12 @@ func NewPublicGatewayConfiguration() *GatewayConfiguration {
 		},
 		
 		ServiceRouting: ServiceRoutingConfig{
-			ContentAPIEnabled:  true,
-			ServicesAPIEnabled: true,
-			NewsAPIEnabled:     true,
-			HealthCheckPath:    "/health",
-			MetricsPath:        "/metrics",
+			ContentAPIEnabled:      true,
+			ServicesAPIEnabled:     true,
+			NotificationAPIEnabled: false, // Public gateway does not handle notifications
+			NewsAPIEnabled:         true,
+			HealthCheckPath:        "/health",
+			MetricsPath:            "/metrics",
 		},
 		
 		Timeouts: TimeoutConfig{
@@ -282,11 +284,12 @@ func NewAdminGatewayConfiguration() *GatewayConfiguration {
 		},
 		
 		ServiceRouting: ServiceRoutingConfig{
-			ContentAPIEnabled:  true,
-			ServicesAPIEnabled: true,
-			NewsAPIEnabled:     true,
-			HealthCheckPath:    "/health",
-			MetricsPath:        "/metrics",
+			ContentAPIEnabled:      true,
+			ServicesAPIEnabled:     true,
+			NotificationAPIEnabled: true, // Admin gateway handles notification management
+			NewsAPIEnabled:         true,
+			HealthCheckPath:        "/health",
+			MetricsPath:            "/metrics",
 		},
 		
 		Timeouts: TimeoutConfig{

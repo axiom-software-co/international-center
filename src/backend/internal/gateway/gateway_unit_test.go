@@ -41,10 +41,11 @@ func NewMockServiceInvocation() *MockServiceInvocation {
 		healthChecks: make(map[string]bool),
 		invocations:  make([]MockInvocation, 0),
 		endpoints: &dapr.ServiceEndpoints{
-			ContentAPI:  "content-api",
-			ServicesAPI: "services-api",
-			AdminGW:     "admin-gateway",
-			PublicGW:    "public-gateway",
+			ContentAPI:       "content-api",
+			ServicesAPI:      "services-api",
+			NotificationAPI:  "notification-api",
+			AdminGW:          "admin-gateway",
+			PublicGW:         "public-gateway",
 		},
 	}
 }
@@ -148,6 +149,23 @@ func (m *MockServiceInvocation) InvokeServicesAPI(ctx context.Context, method, h
 	return m.InvokeService(ctx, req)
 }
 
+// InvokeNotificationAPI mocks notification API invocation
+func (m *MockServiceInvocation) InvokeNotificationAPI(ctx context.Context, method, httpVerb string, data []byte) (*dapr.ServiceResponse, error) {
+	if err, exists := m.failures["InvokeNotificationAPI"]; exists {
+		return nil, err
+	}
+	
+	req := &dapr.ServiceRequest{
+		AppID:       m.endpoints.NotificationAPI,
+		MethodName:  method,
+		HTTPVerb:    httpVerb,
+		Data:        data,
+		ContentType: "application/json",
+	}
+	
+	return m.InvokeService(ctx, req)
+}
+
 // CheckServiceHealth mocks health check
 func (m *MockServiceInvocation) CheckServiceHealth(ctx context.Context, appID string) error {
 	if err, exists := m.failures["CheckServiceHealth"]; exists {
@@ -179,7 +197,7 @@ func (m *MockServiceInvocation) CheckAllServicesHealth(ctx context.Context) erro
 	}
 	
 	endpoints := m.GetServiceEndpoints()
-	services := []string{endpoints.ContentAPI, endpoints.ServicesAPI}
+	services := []string{endpoints.ContentAPI, endpoints.ServicesAPI, endpoints.NotificationAPI}
 	
 	for _, service := range services {
 		if err := m.CheckServiceHealth(ctx, service); err != nil {
@@ -247,6 +265,34 @@ func (m *MockServiceInvocation) GetServicesAPIMetrics(ctx context.Context) (map[
 	}, nil
 }
 
+// CheckNotificationAPIHealth checks if the notification API service is healthy
+func (m *MockServiceInvocation) CheckNotificationAPIHealth(ctx context.Context) (bool, error) {
+	if err, exists := m.failures["CheckNotificationAPIHealth"]; exists {
+		return false, err
+	}
+	
+	if healthy, exists := m.healthChecks[m.endpoints.NotificationAPI]; exists {
+		return healthy, nil
+	}
+	
+	return true, nil // default to healthy
+}
+
+// GetNotificationAPIMetrics retrieves metrics from the notification API service
+func (m *MockServiceInvocation) GetNotificationAPIMetrics(ctx context.Context) (map[string]interface{}, error) {
+	if err, exists := m.failures["GetNotificationAPIMetrics"]; exists {
+		return nil, err
+	}
+	
+	return map[string]interface{}{
+		"status": "healthy",
+		"uptime": "1h20m",
+		"requests": 75,
+		"notifications_sent": 150,
+		"active_subscribers": 45,
+	}, nil
+}
+
 // Test helper functions
 func createTestGatewayConfiguration() *GatewayConfiguration {
 	return &GatewayConfiguration{
@@ -287,10 +333,12 @@ func createTestGatewayConfiguration() *GatewayConfiguration {
 		},
 		
 		ServiceRouting: ServiceRoutingConfig{
-			ContentAPIEnabled:  true,
-			ServicesAPIEnabled: true,
-			HealthCheckPath:    "/health",
-			MetricsPath:        "/metrics",
+			ContentAPIEnabled:      true,
+			ServicesAPIEnabled:     true,
+			NotificationAPIEnabled: true,
+			NewsAPIEnabled:         false,
+			HealthCheckPath:        "/health",
+			MetricsPath:            "/metrics",
 		},
 		
 		Timeouts: TimeoutConfig{
@@ -864,6 +912,354 @@ func TestGatewayHandler_MiddlewareIntegration(t *testing.T) {
 			if tt.validateHeaders != nil {
 				tt.validateHeaders(t, recorder)
 			}
+		})
+	}
+}
+
+// Notification Service Proxy Integration Tests
+
+func TestGatewayHandler_ProxyToNotificationAPI(t *testing.T) {
+	tests := []struct {
+		name             string
+		path             string
+		method           string
+		setupMock        func(*MockServiceInvocation)
+		expectedStatus   int
+		expectedError    string
+		validateResponse func(*testing.T, *httptest.ResponseRecorder, *MockServiceInvocation)
+	}{
+		{
+			name:   "successfully proxy GET request to notification API",
+			path:   "/api/v1/notifications",
+			method: "GET",
+			setupMock: func(mock *MockServiceInvocation) {
+				mock.SetMockResponse("notification-api", "/api/v1/notifications", map[string]interface{}{
+					"notifications": []map[string]interface{}{
+						{
+							"id":       "notif-1",
+							"type":     "email",
+							"status":   "sent",
+							"subject":  "Test Notification",
+						},
+					},
+				})
+			},
+			expectedStatus: http.StatusOK,
+			validateResponse: func(t *testing.T, recorder *httptest.ResponseRecorder, mock *MockServiceInvocation) {
+				// Verify service was invoked
+				invocations := mock.GetInvocations()
+				assert.Len(t, invocations, 1)
+				assert.Equal(t, "notification-api", invocations[0].AppID)
+				assert.Equal(t, "GET", invocations[0].HTTPVerb)
+				
+				// Verify response headers
+				assert.Equal(t, "application/json", recorder.Header().Get("Content-Type"))
+				assert.NotEmpty(t, recorder.Header().Get("X-Correlation-ID"))
+			},
+		},
+		{
+			name:   "successfully proxy subscriber management endpoints",
+			path:   "/api/v1/notifications/subscribers",
+			method: "GET",
+			setupMock: func(mock *MockServiceInvocation) {
+				mock.SetMockResponse("notification-api", "/api/v1/notifications/subscribers", map[string]interface{}{
+					"subscribers": []map[string]interface{}{
+						{
+							"id":     "sub-1",
+							"email":  "user@example.com",
+							"status": "active",
+						},
+					},
+				})
+			},
+			expectedStatus: http.StatusOK,
+			validateResponse: func(t *testing.T, recorder *httptest.ResponseRecorder, mock *MockServiceInvocation) {
+				invocations := mock.GetInvocations()
+				assert.Len(t, invocations, 1)
+				assert.Equal(t, "notification-api", invocations[0].AppID)
+			},
+		},
+		{
+			name:   "successfully proxy notification templates endpoints",
+			path:   "/api/v1/notifications/templates",
+			method: "GET",
+			setupMock: func(mock *MockServiceInvocation) {
+				mock.SetMockResponse("notification-api", "/api/v1/notifications/templates", map[string]interface{}{
+					"templates": []map[string]interface{}{
+						{
+							"id":      "template-1",
+							"name":    "Welcome Email",
+							"type":    "email",
+							"subject": "Welcome to our service",
+						},
+					},
+				})
+			},
+			expectedStatus: http.StatusOK,
+		},
+		{
+			name:   "handle notification service invocation failure",
+			path:   "/api/v1/notifications",
+			method: "GET",
+			setupMock: func(mock *MockServiceInvocation) {
+				mock.SetFailure("InvokeService", domain.NewDependencyError("notification API unavailable", nil))
+			},
+			expectedStatus: http.StatusBadGateway,
+			expectedError:  "notification API unavailable",
+		},
+		{
+			name:   "handle notification API specific failure",
+			path:   "/api/v1/notifications/subscribers",
+			method: "GET",
+			setupMock: func(mock *MockServiceInvocation) {
+				mock.SetFailure("InvokeNotificationAPI", domain.NewDependencyError("notification service timeout", nil))
+			},
+			expectedStatus: http.StatusBadGateway,
+			expectedError:  "notification service timeout",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Arrange
+			ctx, cancel := sharedtesting.CreateUnitTestContext()
+			defer cancel()
+			
+			mockInvocation := NewMockServiceInvocation()
+			tt.setupMock(mockInvocation)
+			
+			serviceProxy := createTestServiceProxy(mockInvocation)
+			middleware := createTestMiddleware()
+			config := createTestGatewayConfiguration()
+			handler := NewGatewayHandler(config, serviceProxy, middleware)
+			
+			// Create request
+			req := httptest.NewRequest(tt.method, tt.path, nil)
+			req = req.WithContext(ctx)
+			recorder := httptest.NewRecorder()
+			
+			// Act
+			handler.ProxyToNotificationAPI(recorder, req)
+			
+			// Assert
+			assert.Equal(t, tt.expectedStatus, recorder.Code)
+			
+			if tt.expectedError != "" {
+				assert.Contains(t, recorder.Body.String(), tt.expectedError)
+			} else {
+				if tt.validateResponse != nil {
+					tt.validateResponse(t, recorder, mockInvocation)
+				}
+			}
+		})
+	}
+}
+
+func TestServiceProxy_NotificationAPIIntegration(t *testing.T) {
+	tests := []struct {
+		name           string
+		path           string
+		targetService  string
+		setupMock      func(*MockServiceInvocation)
+		expectedError  string
+		validateResult func(*testing.T, *MockServiceInvocation)
+	}{
+		{
+			name:          "successfully proxy notification API request",
+			path:          "/api/v1/notifications",
+			targetService: "notification-api",
+			setupMock:     func(mock *MockServiceInvocation) {},
+			validateResult: func(t *testing.T, mock *MockServiceInvocation) {
+				invocations := mock.GetInvocations()
+				assert.Len(t, invocations, 1)
+				assert.Equal(t, "notification-api", invocations[0].AppID)
+			},
+		},
+		{
+			name:          "successfully proxy subscriber management request",
+			path:          "/api/v1/notifications/subscribers/123",
+			targetService: "notification-api",
+			setupMock:     func(mock *MockServiceInvocation) {},
+			validateResult: func(t *testing.T, mock *MockServiceInvocation) {
+				invocations := mock.GetInvocations()
+				assert.Len(t, invocations, 1)
+				assert.Equal(t, "notification-api", invocations[0].AppID)
+				assert.Equal(t, "/api/v1/notifications/subscribers/123", invocations[0].Method)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Arrange
+			ctx, cancel := sharedtesting.CreateUnitTestContext()
+			defer cancel()
+			
+			mockInvocation := NewMockServiceInvocation()
+			tt.setupMock(mockInvocation)
+			
+			serviceProxy := createTestServiceProxy(mockInvocation)
+			
+			// Create request
+			req := httptest.NewRequest("GET", tt.path, nil)
+			req = req.WithContext(ctx)
+			recorder := httptest.NewRecorder()
+			
+			// Act
+			err := serviceProxy.ProxyRequest(ctx, recorder, req, tt.targetService)
+			
+			// Assert
+			if tt.expectedError != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedError)
+			} else {
+				require.NoError(t, err)
+				if tt.validateResult != nil {
+					tt.validateResult(t, mockInvocation)
+				}
+			}
+		})
+	}
+}
+
+func TestGatewayHandler_NotificationServiceHealthCheck(t *testing.T) {
+	tests := []struct {
+		name             string
+		setupMock        func(*MockServiceInvocation)
+		expectedStatus   int
+		expectedHealth   string
+		validateResponse func(*testing.T, *httptest.ResponseRecorder)
+	}{
+		{
+			name: "return healthy when notification service is healthy",
+			setupMock: func(mock *MockServiceInvocation) {
+				mock.SetHealthCheck("content-api", true)
+				mock.SetHealthCheck("services-api", true)
+				mock.SetHealthCheck("notification-api", true)
+			},
+			expectedStatus: http.StatusOK,
+			expectedHealth: "healthy",
+			validateResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
+				assert.Contains(t, recorder.Body.String(), "healthy")
+				assert.Equal(t, "application/json", recorder.Header().Get("Content-Type"))
+			},
+		},
+		{
+			name: "return unhealthy when notification service is down",
+			setupMock: func(mock *MockServiceInvocation) {
+				mock.SetHealthCheck("content-api", true)
+				mock.SetHealthCheck("services-api", true)
+				mock.SetHealthCheck("notification-api", false)
+			},
+			expectedStatus: http.StatusServiceUnavailable,
+			expectedHealth: "unhealthy",
+		},
+		{
+			name: "return unhealthy when notification health check fails",
+			setupMock: func(mock *MockServiceInvocation) {
+				mock.SetHealthCheck("content-api", true)
+				mock.SetHealthCheck("services-api", true)
+				mock.SetFailure("CheckNotificationAPIHealth", domain.NewDependencyError("notification health check failed", nil))
+			},
+			expectedStatus: http.StatusServiceUnavailable,
+			expectedHealth: "unhealthy",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Arrange
+			ctx, cancel := sharedtesting.CreateUnitTestContext()
+			defer cancel()
+			
+			mockInvocation := NewMockServiceInvocation()
+			tt.setupMock(mockInvocation)
+			
+			serviceProxy := createTestServiceProxy(mockInvocation)
+			middleware := createTestMiddleware()
+			config := createTestGatewayConfiguration()
+			handler := NewGatewayHandler(config, serviceProxy, middleware)
+			
+			// Create request
+			req := httptest.NewRequest("GET", "/health", nil)
+			req = req.WithContext(ctx)
+			recorder := httptest.NewRecorder()
+			
+			// Act
+			handler.HealthCheck(recorder, req)
+			
+			// Assert
+			assert.Equal(t, tt.expectedStatus, recorder.Code)
+			assert.Contains(t, recorder.Body.String(), tt.expectedHealth)
+			
+			if tt.validateResponse != nil {
+				tt.validateResponse(t, recorder)
+			}
+		})
+	}
+}
+
+func TestGatewayHandler_NotificationAPIRouteRegistration(t *testing.T) {
+	tests := []struct {
+		name           string
+		modifyConfig   func(*GatewayConfiguration)
+		testPath       string
+		testMethod     string
+		expectedFound  bool
+	}{
+		{
+			name:          "register notification API proxy routes",
+			modifyConfig:  func(config *GatewayConfiguration) {},
+			testPath:      "/api/v1/notifications",
+			testMethod:    "GET",
+			expectedFound: true,
+		},
+		{
+			name:          "register subscriber management routes",
+			modifyConfig:  func(config *GatewayConfiguration) {},
+			testPath:      "/api/v1/notifications/subscribers",
+			testMethod:    "GET",
+			expectedFound: true,
+		},
+		{
+			name:          "register template management routes",
+			modifyConfig:  func(config *GatewayConfiguration) {},
+			testPath:      "/api/v1/notifications/templates",
+			testMethod:    "GET",
+			expectedFound: true,
+		},
+		{
+			name: "disable notification API routes",
+			modifyConfig: func(config *GatewayConfiguration) {
+				config.ServiceRouting.NotificationAPIEnabled = false
+			},
+			testPath:      "/api/v1/notifications",
+			testMethod:    "GET",
+			expectedFound: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Arrange
+			mockInvocation := NewMockServiceInvocation()
+			serviceProxy := createTestServiceProxy(mockInvocation)
+			middleware := createTestMiddleware()
+			config := createTestGatewayConfiguration()
+			tt.modifyConfig(config)
+			
+			handler := NewGatewayHandler(config, serviceProxy, middleware)
+			router := mux.NewRouter()
+			
+			// Act
+			handler.RegisterRoutes(router)
+			
+			// Assert
+			req := httptest.NewRequest(tt.testMethod, tt.testPath, nil)
+			match := &mux.RouteMatch{}
+			found := router.Match(req, match)
+			
+			assert.Equal(t, tt.expectedFound, found, "Route %s should be %s", tt.testPath, map[bool]string{true: "found", false: "not found"}[tt.expectedFound])
 		})
 	}
 }

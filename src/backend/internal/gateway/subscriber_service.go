@@ -7,9 +7,58 @@ import (
 	"strings"
 	"time"
 
+	"github.com/axiom-software-co/international-center/src/backend/internal/notifications"
 	"github.com/axiom-software-co/international-center/src/backend/internal/shared/domain"
 	"github.com/google/uuid"
 )
+
+// Gateway-specific request/response types using notification domain models
+type CreateSubscriberRequest struct {
+	SubscriberName       string                              `json:"subscriber_name"`
+	Email                string                              `json:"email"`
+	Phone                *string                             `json:"phone,omitempty"`
+	EventTypes           []notifications.EventType           `json:"event_types"`
+	NotificationMethods  []notifications.NotificationMethod  `json:"notification_methods"`
+	NotificationSchedule notifications.NotificationSchedule  `json:"notification_schedule"`
+	PriorityThreshold    notifications.PriorityThreshold     `json:"priority_threshold"`
+	Notes                *string                             `json:"notes,omitempty"`
+	CreatedBy            string                              `json:"created_by"`
+}
+
+type UpdateSubscriberRequest struct {
+	Status               *notifications.SubscriberStatus      `json:"status,omitempty"`
+	SubscriberName       *string                             `json:"subscriber_name,omitempty"`
+	Email                *string                             `json:"email,omitempty"`
+	Phone                *string                             `json:"phone,omitempty"`
+	EventTypes           []notifications.EventType           `json:"event_types,omitempty"`
+	NotificationMethods  []notifications.NotificationMethod  `json:"notification_methods,omitempty"`
+	NotificationSchedule *notifications.NotificationSchedule `json:"notification_schedule,omitempty"`
+	PriorityThreshold    *notifications.PriorityThreshold    `json:"priority_threshold,omitempty"`
+	Notes                *string                             `json:"notes,omitempty"`
+	UpdatedBy            string                              `json:"updated_by"`
+}
+
+// SubscriberService interface using notification domain types
+type SubscriberService interface {
+	CreateSubscriber(ctx context.Context, req *CreateSubscriberRequest) (*notifications.NotificationSubscriber, error)
+	GetSubscriber(ctx context.Context, subscriberID string) (*notifications.NotificationSubscriber, error)
+	UpdateSubscriber(ctx context.Context, subscriberID string, req *UpdateSubscriberRequest) (*notifications.NotificationSubscriber, error)
+	DeleteSubscriber(ctx context.Context, subscriberID string, deletedBy string) error
+	ListSubscribers(ctx context.Context, status *notifications.SubscriberStatus, page, pageSize int) ([]*notifications.NotificationSubscriber, int, error)
+	GetSubscribersByEvent(ctx context.Context, eventType notifications.EventType, priority notifications.PriorityThreshold) ([]*notifications.NotificationSubscriber, error)
+	ValidateSubscriber(ctx context.Context, subscriber *notifications.NotificationSubscriber) error
+}
+
+// SubscriberRepository interface using notification domain types
+type SubscriberRepository interface {
+	CreateSubscriber(ctx context.Context, subscriber *notifications.NotificationSubscriber) error
+	GetSubscriber(ctx context.Context, subscriberID string) (*notifications.NotificationSubscriber, error)
+	UpdateSubscriber(ctx context.Context, subscriber *notifications.NotificationSubscriber) error
+	DeleteSubscriber(ctx context.Context, subscriberID string, deletedBy string) error
+	ListSubscribers(ctx context.Context, status *notifications.SubscriberStatus, limit, offset int) ([]*notifications.NotificationSubscriber, int, error)
+	GetSubscribersByEventType(ctx context.Context, eventType notifications.EventType) ([]*notifications.NotificationSubscriber, error)
+	CheckEmailExists(ctx context.Context, email string, excludeSubscriberID *string) (bool, error)
+}
 
 // DefaultSubscriberService implements SubscriberService
 type DefaultSubscriberService struct {
@@ -24,9 +73,9 @@ func NewDefaultSubscriberService(repository SubscriberRepository) *DefaultSubscr
 }
 
 // CreateSubscriber creates a new notification subscriber
-func (s *DefaultSubscriberService) CreateSubscriber(ctx context.Context, req *CreateSubscriberRequest) (*NotificationSubscriber, error) {
+func (s *DefaultSubscriberService) CreateSubscriber(ctx context.Context, req *CreateSubscriberRequest) (*notifications.NotificationSubscriber, error) {
 	if req == nil {
-		return nil, domain.NewValidationError("create request cannot be nil", nil)
+		return nil, domain.NewValidationError("create request cannot be nil")
 	}
 
 	// Validate request
@@ -39,9 +88,9 @@ func (s *DefaultSubscriberService) CreateSubscriber(ctx context.Context, req *Cr
 
 	// Create subscriber domain model
 	now := time.Now().UTC()
-	subscriber := &NotificationSubscriber{
+	subscriber := &notifications.NotificationSubscriber{
 		SubscriberID:         subscriberID,
-		Status:               SubscriberStatusActive, // Default status
+		Status:               notifications.SubscriberStatusActive, // Default status
 		SubscriberName:       req.SubscriberName,
 		Email:                strings.ToLower(strings.TrimSpace(req.Email)),
 		Phone:                req.Phone,
@@ -71,14 +120,14 @@ func (s *DefaultSubscriberService) CreateSubscriber(ctx context.Context, req *Cr
 }
 
 // GetSubscriber retrieves a subscriber by ID
-func (s *DefaultSubscriberService) GetSubscriber(ctx context.Context, subscriberID string) (*NotificationSubscriber, error) {
+func (s *DefaultSubscriberService) GetSubscriber(ctx context.Context, subscriberID string) (*notifications.NotificationSubscriber, error) {
 	if subscriberID == "" {
-		return nil, domain.NewValidationError("subscriber ID cannot be empty", nil)
+		return nil, domain.NewValidationError("subscriber ID cannot be empty")
 	}
 
 	// Validate UUID format
 	if _, err := uuid.Parse(subscriberID); err != nil {
-		return nil, domain.NewValidationError("invalid subscriber ID format", err)
+		return nil, domain.NewValidationError("invalid subscriber ID format")
 	}
 
 	subscriber, err := s.repository.GetSubscriber(ctx, subscriberID)
@@ -90,13 +139,13 @@ func (s *DefaultSubscriberService) GetSubscriber(ctx context.Context, subscriber
 }
 
 // UpdateSubscriber updates an existing subscriber
-func (s *DefaultSubscriberService) UpdateSubscriber(ctx context.Context, subscriberID string, req *UpdateSubscriberRequest) (*NotificationSubscriber, error) {
+func (s *DefaultSubscriberService) UpdateSubscriber(ctx context.Context, subscriberID string, req *UpdateSubscriberRequest) (*notifications.NotificationSubscriber, error) {
 	if subscriberID == "" {
-		return nil, domain.NewValidationError("subscriber ID cannot be empty", nil)
+		return nil, domain.NewValidationError("subscriber ID cannot be empty")
 	}
 
 	if req == nil {
-		return nil, domain.NewValidationError("update request cannot be nil", nil)
+		return nil, domain.NewValidationError("update request cannot be nil")
 	}
 
 	// Validate request
@@ -129,16 +178,16 @@ func (s *DefaultSubscriberService) UpdateSubscriber(ctx context.Context, subscri
 // DeleteSubscriber soft deletes a subscriber
 func (s *DefaultSubscriberService) DeleteSubscriber(ctx context.Context, subscriberID string, deletedBy string) error {
 	if subscriberID == "" {
-		return domain.NewValidationError("subscriber ID cannot be empty", nil)
+		return domain.NewValidationError("subscriber ID cannot be empty")
 	}
 
 	if deletedBy == "" {
-		return domain.NewValidationError("deleted by cannot be empty", nil)
+		return domain.NewValidationError("deleted by cannot be empty")
 	}
 
 	// Validate UUID format
 	if _, err := uuid.Parse(subscriberID); err != nil {
-		return domain.NewValidationError("invalid subscriber ID format", err)
+		return domain.NewValidationError("invalid subscriber ID format")
 	}
 
 	// Check if subscriber exists
@@ -156,14 +205,14 @@ func (s *DefaultSubscriberService) DeleteSubscriber(ctx context.Context, subscri
 }
 
 // ListSubscribers retrieves subscribers with pagination and filtering
-func (s *DefaultSubscriberService) ListSubscribers(ctx context.Context, status *SubscriberStatus, page, pageSize int) ([]*NotificationSubscriber, int, error) {
+func (s *DefaultSubscriberService) ListSubscribers(ctx context.Context, status *notifications.SubscriberStatus, page, pageSize int) ([]*notifications.NotificationSubscriber, int, error) {
 	// Validate pagination parameters
 	if page < 1 {
-		return nil, 0, domain.NewValidationError("page must be greater than 0", nil)
+		return nil, 0, domain.NewValidationError("page must be greater than 0")
 	}
 
 	if pageSize < 1 || pageSize > 100 {
-		return nil, 0, domain.NewValidationError("page size must be between 1 and 100", nil)
+		return nil, 0, domain.NewValidationError("page size must be between 1 and 100")
 	}
 
 	// Validate status filter
@@ -185,7 +234,7 @@ func (s *DefaultSubscriberService) ListSubscribers(ctx context.Context, status *
 }
 
 // GetSubscribersByEvent retrieves subscribers for a specific event and priority
-func (s *DefaultSubscriberService) GetSubscribersByEvent(ctx context.Context, eventType EventType, priority PriorityThreshold) ([]*NotificationSubscriber, error) {
+func (s *DefaultSubscriberService) GetSubscribersByEvent(ctx context.Context, eventType notifications.EventType, priority notifications.PriorityThreshold) ([]*notifications.NotificationSubscriber, error) {
 	// Validate event type
 	if err := s.validateEventType(eventType); err != nil {
 		return nil, err
@@ -203,7 +252,7 @@ func (s *DefaultSubscriberService) GetSubscribersByEvent(ctx context.Context, ev
 	}
 
 	// Filter by priority threshold
-	var filteredSubscribers []*NotificationSubscriber
+	var filteredSubscribers []*notifications.NotificationSubscriber
 	for _, subscriber := range eventSubscribers {
 		if s.meetsPriorityThreshold(subscriber.PriorityThreshold, priority) {
 			filteredSubscribers = append(filteredSubscribers, subscriber)
@@ -214,18 +263,18 @@ func (s *DefaultSubscriberService) GetSubscribersByEvent(ctx context.Context, ev
 }
 
 // ValidateSubscriber validates a subscriber model
-func (s *DefaultSubscriberService) ValidateSubscriber(ctx context.Context, subscriber *NotificationSubscriber) error {
+func (s *DefaultSubscriberService) ValidateSubscriber(ctx context.Context, subscriber *notifications.NotificationSubscriber) error {
 	if subscriber == nil {
-		return domain.NewValidationError("subscriber cannot be nil", nil)
+		return domain.NewValidationError("subscriber cannot be nil")
 	}
 
 	// Validate subscriber ID
 	if subscriber.SubscriberID == "" {
-		return domain.NewValidationError("subscriber ID is required", nil)
+		return domain.NewValidationError("subscriber ID is required")
 	}
 
 	if _, err := uuid.Parse(subscriber.SubscriberID); err != nil {
-		return domain.NewValidationError("invalid subscriber ID format", err)
+		return domain.NewValidationError("invalid subscriber ID format")
 	}
 
 	// Validate subscriber name
@@ -272,16 +321,16 @@ func (s *DefaultSubscriberService) ValidateSubscriber(ctx context.Context, subsc
 
 	// Validate notes length
 	if subscriber.Notes != nil && len(*subscriber.Notes) > 1000 {
-		return domain.NewValidationError("notes cannot exceed 1000 characters", nil)
+		return domain.NewValidationError("notes cannot exceed 1000 characters")
 	}
 
 	// Validate required fields
 	if subscriber.CreatedBy == "" {
-		return domain.NewValidationError("created by is required", nil)
+		return domain.NewValidationError("created by is required")
 	}
 
 	if subscriber.UpdatedBy == "" {
-		return domain.NewValidationError("updated by is required", nil)
+		return domain.NewValidationError("updated by is required")
 	}
 
 	// Validate business rules
@@ -293,19 +342,19 @@ func (s *DefaultSubscriberService) ValidateSubscriber(ctx context.Context, subsc
 // validateCreateRequest validates a create subscriber request
 func (s *DefaultSubscriberService) validateCreateRequest(req *CreateSubscriberRequest) error {
 	if req.SubscriberName == "" {
-		return domain.NewValidationError("subscriber name is required", nil)
+		return domain.NewValidationError("subscriber name is required")
 	}
 
 	if len(req.SubscriberName) < 2 {
-		return domain.NewValidationError("subscriber name must be at least 2 characters", nil)
+		return domain.NewValidationError("subscriber name must be at least 2 characters")
 	}
 
 	if len(req.SubscriberName) > 100 {
-		return domain.NewValidationError("subscriber name cannot exceed 100 characters", nil)
+		return domain.NewValidationError("subscriber name cannot exceed 100 characters")
 	}
 
 	if req.Email == "" {
-		return domain.NewValidationError("email is required", nil)
+		return domain.NewValidationError("email is required")
 	}
 
 	if err := s.validateEmail(req.Email); err != nil {
@@ -319,7 +368,7 @@ func (s *DefaultSubscriberService) validateCreateRequest(req *CreateSubscriberRe
 	}
 
 	if len(req.EventTypes) == 0 {
-		return domain.NewValidationError("at least one event type is required", nil)
+		return domain.NewValidationError("at least one event type is required")
 	}
 
 	if err := s.validateEventTypes(req.EventTypes); err != nil {
@@ -327,7 +376,7 @@ func (s *DefaultSubscriberService) validateCreateRequest(req *CreateSubscriberRe
 	}
 
 	if len(req.NotificationMethods) == 0 {
-		return domain.NewValidationError("at least one notification method is required", nil)
+		return domain.NewValidationError("at least one notification method is required")
 	}
 
 	if err := s.validateNotificationMethods(req.NotificationMethods); err != nil {
@@ -343,11 +392,11 @@ func (s *DefaultSubscriberService) validateCreateRequest(req *CreateSubscriberRe
 	}
 
 	if req.CreatedBy == "" {
-		return domain.NewValidationError("created by is required", nil)
+		return domain.NewValidationError("created by is required")
 	}
 
 	if req.Notes != nil && len(*req.Notes) > 1000 {
-		return domain.NewValidationError("notes cannot exceed 1000 characters", nil)
+		return domain.NewValidationError("notes cannot exceed 1000 characters")
 	}
 
 	return nil
@@ -356,7 +405,7 @@ func (s *DefaultSubscriberService) validateCreateRequest(req *CreateSubscriberRe
 // validateUpdateRequest validates an update subscriber request
 func (s *DefaultSubscriberService) validateUpdateRequest(req *UpdateSubscriberRequest) error {
 	if req.UpdatedBy == "" {
-		return domain.NewValidationError("updated by is required", nil)
+		return domain.NewValidationError("updated by is required")
 	}
 
 	if req.Status != nil {
@@ -367,10 +416,10 @@ func (s *DefaultSubscriberService) validateUpdateRequest(req *UpdateSubscriberRe
 
 	if req.SubscriberName != nil {
 		if len(*req.SubscriberName) < 2 {
-			return domain.NewValidationError("subscriber name must be at least 2 characters", nil)
+			return domain.NewValidationError("subscriber name must be at least 2 characters")
 		}
 		if len(*req.SubscriberName) > 100 {
-			return domain.NewValidationError("subscriber name cannot exceed 100 characters", nil)
+			return domain.NewValidationError("subscriber name cannot exceed 100 characters")
 		}
 	}
 
@@ -411,7 +460,7 @@ func (s *DefaultSubscriberService) validateUpdateRequest(req *UpdateSubscriberRe
 	}
 
 	if req.Notes != nil && len(*req.Notes) > 1000 {
-		return domain.NewValidationError("notes cannot exceed 1000 characters", nil)
+		return domain.NewValidationError("notes cannot exceed 1000 characters")
 	}
 
 	return nil
@@ -420,15 +469,15 @@ func (s *DefaultSubscriberService) validateUpdateRequest(req *UpdateSubscriberRe
 // validateSubscriberName validates subscriber name
 func (s *DefaultSubscriberService) validateSubscriberName(name string) error {
 	if name == "" {
-		return domain.NewValidationError("subscriber name is required", nil)
+		return domain.NewValidationError("subscriber name is required")
 	}
 
 	if len(name) < 2 {
-		return domain.NewValidationError("subscriber name must be at least 2 characters", nil)
+		return domain.NewValidationError("subscriber name must be at least 2 characters")
 	}
 
 	if len(name) > 100 {
-		return domain.NewValidationError("subscriber name cannot exceed 100 characters", nil)
+		return domain.NewValidationError("subscriber name cannot exceed 100 characters")
 	}
 
 	return nil
@@ -437,18 +486,18 @@ func (s *DefaultSubscriberService) validateSubscriberName(name string) error {
 // validateEmail validates email format
 func (s *DefaultSubscriberService) validateEmail(email string) error {
 	if email == "" {
-		return domain.NewValidationError("email is required", nil)
+		return domain.NewValidationError("email is required")
 	}
 
 	email = strings.TrimSpace(email)
 	if len(email) < 3 || len(email) > 255 {
-		return domain.NewValidationError("invalid email format", nil)
+		return domain.NewValidationError("invalid email format")
 	}
 
 	// Basic email validation
 	emailRegex := regexp.MustCompile(`^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`)
 	if !emailRegex.MatchString(email) {
-		return domain.NewValidationError("invalid email format", nil)
+		return domain.NewValidationError("invalid email format")
 	}
 
 	return nil
@@ -464,33 +513,33 @@ func (s *DefaultSubscriberService) validatePhone(phone string) error {
 	// E.164 format validation
 	e164Regex := regexp.MustCompile(`^\+[1-9]\d{1,14}$`)
 	if !e164Regex.MatchString(phone) {
-		return domain.NewValidationError("invalid phone number format", nil)
+		return domain.NewValidationError("invalid phone number format")
 	}
 
 	return nil
 }
 
 // validateEventTypes validates event types array
-func (s *DefaultSubscriberService) validateEventTypes(eventTypes []EventType) error {
+func (s *DefaultSubscriberService) validateEventTypes(eventTypes []notifications.EventType) error {
 	if len(eventTypes) == 0 {
-		return domain.NewValidationError("at least one event type is required", nil)
+		return domain.NewValidationError("at least one event type is required")
 	}
 
-	validEventTypes := map[EventType]bool{
-		EventTypeInquiryMedia:            true,
-		EventTypeInquiryBusiness:         true,
-		EventTypeInquiryDonations:        true,
-		EventTypeInquiryVolunteers:       true,
-		EventTypeEventRegistration:       true,
-		EventTypeSystemError:             true,
-		EventTypeCapacityAlert:           true,
-		EventTypeAdminActionRequired:     true,
-		EventTypeComplianceAlert:         true,
+	validEventTypes := map[notifications.EventType]bool{
+		notifications.EventTypeInquiryMedia:            true,
+		notifications.EventTypeInquiryBusiness:         true,
+		notifications.EventTypeInquiryDonations:        true,
+		notifications.EventTypeInquiryVolunteers:       true,
+		notifications.EventTypeEventRegistration:       true,
+		notifications.EventTypeSystemError:             true,
+		notifications.EventTypeCapacityAlert:           true,
+		notifications.EventTypeAdminActionRequired:     true,
+		notifications.EventTypeComplianceAlert:         true,
 	}
 
 	for _, eventType := range eventTypes {
 		if !validEventTypes[eventType] {
-			return domain.NewValidationError(fmt.Sprintf("invalid event type: %s", eventType), nil)
+			return domain.NewValidationError(fmt.Sprintf("invalid event type: %s", eventType))
 		}
 	}
 
@@ -498,25 +547,25 @@ func (s *DefaultSubscriberService) validateEventTypes(eventTypes []EventType) er
 }
 
 // validateEventType validates a single event type
-func (s *DefaultSubscriberService) validateEventType(eventType EventType) error {
-	return s.validateEventTypes([]EventType{eventType})
+func (s *DefaultSubscriberService) validateEventType(eventType notifications.EventType) error {
+	return s.validateEventTypes([]notifications.EventType{eventType})
 }
 
 // validateNotificationMethods validates notification methods array
-func (s *DefaultSubscriberService) validateNotificationMethods(methods []NotificationMethod) error {
+func (s *DefaultSubscriberService) validateNotificationMethods(methods []notifications.NotificationMethod) error {
 	if len(methods) == 0 {
-		return domain.NewValidationError("at least one notification method is required", nil)
+		return domain.NewValidationError("at least one notification method is required")
 	}
 
-	validMethods := map[NotificationMethod]bool{
-		NotificationMethodEmail: true,
-		NotificationMethodSMS:   true,
-		NotificationMethodBoth:  true,
+	validMethods := map[notifications.NotificationMethod]bool{
+		notifications.NotificationMethodEmail: true,
+		notifications.NotificationMethodSMS:   true,
+		notifications.NotificationMethodBoth:  true,
 	}
 
 	for _, method := range methods {
 		if !validMethods[method] {
-			return domain.NewValidationError(fmt.Sprintf("invalid notification method: %s", method), nil)
+			return domain.NewValidationError(fmt.Sprintf("invalid notification method: %s", method))
 		}
 	}
 
@@ -524,75 +573,75 @@ func (s *DefaultSubscriberService) validateNotificationMethods(methods []Notific
 }
 
 // validateNotificationSchedule validates notification schedule
-func (s *DefaultSubscriberService) validateNotificationSchedule(schedule NotificationSchedule) error {
-	validSchedules := map[NotificationSchedule]bool{
-		NotificationScheduleImmediate: true,
-		NotificationScheduleHourly:    true,
-		NotificationScheduleDaily:     true,
+func (s *DefaultSubscriberService) validateNotificationSchedule(schedule notifications.NotificationSchedule) error {
+	validSchedules := map[notifications.NotificationSchedule]bool{
+		notifications.ScheduleImmediate: true,
+		notifications.ScheduleHourly:    true,
+		notifications.ScheduleDaily:     true,
 	}
 
 	if !validSchedules[schedule] {
-		return domain.NewValidationError(fmt.Sprintf("invalid notification schedule: %s", schedule), nil)
+		return domain.NewValidationError(fmt.Sprintf("invalid notification schedule: %s", schedule))
 	}
 
 	return nil
 }
 
 // validatePriorityThreshold validates priority threshold
-func (s *DefaultSubscriberService) validatePriorityThreshold(priority PriorityThreshold) error {
-	validPriorities := map[PriorityThreshold]bool{
-		PriorityThresholdLow:    true,
-		PriorityThresholdMedium: true,
-		PriorityThresholdHigh:   true,
-		PriorityThresholdUrgent: true,
+func (s *DefaultSubscriberService) validatePriorityThreshold(priority notifications.PriorityThreshold) error {
+	validPriorities := map[notifications.PriorityThreshold]bool{
+		notifications.PriorityLow:    true,
+		notifications.PriorityMedium: true,
+		notifications.PriorityHigh:   true,
+		notifications.PriorityUrgent: true,
 	}
 
 	if !validPriorities[priority] {
-		return domain.NewValidationError(fmt.Sprintf("invalid priority threshold: %s", priority), nil)
+		return domain.NewValidationError(fmt.Sprintf("invalid priority threshold: %s", priority))
 	}
 
 	return nil
 }
 
 // validateSubscriberStatus validates subscriber status
-func (s *DefaultSubscriberService) validateSubscriberStatus(status SubscriberStatus) error {
-	validStatuses := map[SubscriberStatus]bool{
-		SubscriberStatusActive:    true,
-		SubscriberStatusInactive:  true,
-		SubscriberStatusSuspended: true,
+func (s *DefaultSubscriberService) validateSubscriberStatus(status notifications.SubscriberStatus) error {
+	validStatuses := map[notifications.SubscriberStatus]bool{
+		notifications.SubscriberStatusActive:    true,
+		notifications.SubscriberStatusInactive:  true,
+		notifications.SubscriberStatusSuspended: true,
 	}
 
 	if !validStatuses[status] {
-		return domain.NewValidationError(fmt.Sprintf("invalid subscriber status: %s", status), nil)
+		return domain.NewValidationError(fmt.Sprintf("invalid subscriber status: %s", status))
 	}
 
 	return nil
 }
 
 // validateBusinessRules validates business-specific rules
-func (s *DefaultSubscriberService) validateBusinessRules(ctx context.Context, subscriber *NotificationSubscriber) error {
+func (s *DefaultSubscriberService) validateBusinessRules(ctx context.Context, subscriber *notifications.NotificationSubscriber) error {
 	// Rule: SMS notification method requires phone number
 	for _, method := range subscriber.NotificationMethods {
-		if (method == NotificationMethodSMS || method == NotificationMethodBoth) && 
+		if (method == notifications.NotificationMethodSMS || method == notifications.NotificationMethodBoth) && 
 		   (subscriber.Phone == nil || *subscriber.Phone == "") {
-			return domain.NewValidationError("phone number is required for SMS notifications", nil)
+			return domain.NewValidationError("phone number is required for SMS notifications")
 		}
 	}
 
 	// Rule: Email notification method requires valid email (already validated above)
 
 	// Rule: High/Urgent priority events should have immediate notifications
-	if (subscriber.PriorityThreshold == PriorityThresholdHigh || 
-		subscriber.PriorityThreshold == PriorityThresholdUrgent) &&
-	   subscriber.NotificationSchedule != NotificationScheduleImmediate {
-		return domain.NewValidationError("high and urgent priority subscribers should use immediate notifications", nil)
+	if (subscriber.PriorityThreshold == notifications.PriorityHigh || 
+		subscriber.PriorityThreshold == notifications.PriorityUrgent) &&
+	   subscriber.NotificationSchedule != notifications.ScheduleImmediate {
+		return domain.NewValidationError("high and urgent priority subscribers should use immediate notifications")
 	}
 
 	return nil
 }
 
 // applyUpdates applies update request to existing subscriber
-func (s *DefaultSubscriberService) applyUpdates(existing *NotificationSubscriber, req *UpdateSubscriberRequest) *NotificationSubscriber {
+func (s *DefaultSubscriberService) applyUpdates(existing *notifications.NotificationSubscriber, req *UpdateSubscriberRequest) *notifications.NotificationSubscriber {
 	updated := *existing // Copy the existing subscriber
 
 	// Apply updates
@@ -640,12 +689,12 @@ func (s *DefaultSubscriberService) applyUpdates(existing *NotificationSubscriber
 }
 
 // meetsPriorityThreshold checks if a subscriber's priority threshold meets the given priority
-func (s *DefaultSubscriberService) meetsPriorityThreshold(subscriberThreshold, eventPriority PriorityThreshold) bool {
-	priorityLevels := map[PriorityThreshold]int{
-		PriorityThresholdLow:    1,
-		PriorityThresholdMedium: 2,
-		PriorityThresholdHigh:   3,
-		PriorityThresholdUrgent: 4,
+func (s *DefaultSubscriberService) meetsPriorityThreshold(subscriberThreshold, eventPriority notifications.PriorityThreshold) bool {
+	priorityLevels := map[notifications.PriorityThreshold]int{
+		notifications.PriorityLow:    1,
+		notifications.PriorityMedium: 2,
+		notifications.PriorityHigh:   3,
+		notifications.PriorityUrgent: 4,
 	}
 
 	subscriberLevel := priorityLevels[subscriberThreshold]

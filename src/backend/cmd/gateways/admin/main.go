@@ -155,6 +155,27 @@ func updateConfigurationFromEnvironment(config *gateway.GatewayConfiguration) {
 		// In production, this would configure the authentication provider
 		log.Printf("Using authentication provider: %s", authProvider)
 	}
+	
+	// Configure notification API settings from environment (admin-specific)
+	if enableNotifications := os.Getenv("ADMIN_NOTIFICATION_API_ENABLED"); enableNotifications == "false" {
+		// Allow disabling notification API for specific environments
+		config.ServiceRouting.NotificationAPIEnabled = false
+		log.Printf("WARNING: Admin notification API disabled via environment configuration")
+	} else if enableNotifications == "true" {
+		// Explicitly enable (though it's already enabled by default for admin)
+		config.ServiceRouting.NotificationAPIEnabled = true
+		log.Printf("Admin notification API explicitly enabled via environment configuration")
+	}
+	
+	// Log notification service configuration
+	if config.ServiceRouting.NotificationAPIEnabled {
+		log.Printf("Notification service configuration:")
+		log.Printf("  - Notification API integration: enabled")
+		log.Printf("  - DAPR service invocation target: notification-api")
+		log.Printf("  - Available endpoints: /api/v1/notifications/*")
+		log.Printf("  - Supported operations: GET, POST, PUT, DELETE")
+		log.Printf("  - Admin-only access with authentication required")
+	}
 }
 
 // logGatewayConfiguration logs gateway configuration details
@@ -188,6 +209,12 @@ func logGatewayConfiguration(config *gateway.GatewayConfiguration) {
 	log.Printf("  - Service Routing:")
 	log.Printf("    - Content API: %v", config.ServiceRouting.ContentAPIEnabled)
 	log.Printf("    - Services API: %v", config.ServiceRouting.ServicesAPIEnabled)
+	log.Printf("    - Notification API: %v", config.ServiceRouting.NotificationAPIEnabled)
+	if config.ServiceRouting.NotificationAPIEnabled {
+		log.Printf("      - Notification management endpoints enabled")
+		log.Printf("      - Subscriber management via DAPR service invocation")
+		log.Printf("      - Template management and notification sending")
+	}
 	log.Printf("  - Observability:")
 	log.Printf("    - Health Check: %s", config.Observability.HealthCheckPath)
 	log.Printf("    - Readiness: %s", config.Observability.ReadinessPath)
