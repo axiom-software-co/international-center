@@ -1,11 +1,14 @@
 package volunteers
 
 import (
-	"context"
+	"fmt"
 	"net"
+	"net/mail"
+	"strings"
 	"time"
 
 	"github.com/axiom-software-co/international-center/src/backend/internal/shared/domain"
+	"github.com/google/uuid"
 )
 
 // Domain types matching TABLES-VOLUNTEERS.md schema
@@ -48,6 +51,46 @@ const (
 	AvailabilityFlexible    Availability = "flexible"
 )
 
+// IsValid checks if the application status is valid
+func (s ApplicationStatus) IsValid() bool {
+	switch s {
+	case ApplicationStatusNew, ApplicationStatusUnderReview, ApplicationStatusInterviewScheduled, ApplicationStatusBackgroundCheck, ApplicationStatusApproved, ApplicationStatusDeclined, ApplicationStatusWithdrawn:
+		return true
+	default:
+		return false
+	}
+}
+
+// IsValid checks if the application priority is valid
+func (p ApplicationPriority) IsValid() bool {
+	switch p {
+	case ApplicationPriorityLow, ApplicationPriorityMedium, ApplicationPriorityHigh, ApplicationPriorityUrgent:
+		return true
+	default:
+		return false
+	}
+}
+
+// IsValid checks if the volunteer interest is valid
+func (v VolunteerInterest) IsValid() bool {
+	switch v {
+	case VolunteerInterestPatientSupport, VolunteerInterestCommunityOutreach, VolunteerInterestResearchSupport, VolunteerInterestAdministrativeSupport, VolunteerInterestMultiple, VolunteerInterestOther:
+		return true
+	default:
+		return false
+	}
+}
+
+// IsValid checks if the availability is valid
+func (a Availability) IsValid() bool {
+	switch a {
+	case Availability2To4Hours, Availability4To8Hours, Availability8To16Hours, Availability16HoursPlus, AvailabilityFlexible:
+		return true
+	default:
+		return false
+	}
+}
+
 // VolunteerApplication represents the main volunteer application entity matching TABLES-VOLUNTEERS.md
 type VolunteerApplication struct {
 	ApplicationID string              `json:"application_id"`
@@ -80,6 +123,233 @@ type VolunteerApplication struct {
 	UpdatedBy string     `json:"updated_by"`
 	IsDeleted bool       `json:"is_deleted"`
 	DeletedAt *time.Time `json:"deleted_at,omitempty"`
+}
+
+// Validation helper functions
+
+func validateName(name, fieldName string) error {
+	if strings.TrimSpace(name) == "" {
+		return domain.NewValidationError(fieldName + " is required")
+	}
+	if len(name) < 2 || len(name) > 50 {
+		return domain.NewValidationError(fieldName + " must be between 2 and 50 characters")
+	}
+	return nil
+}
+
+func validateEmail(email string) error {
+	if strings.TrimSpace(email) == "" {
+		return domain.NewValidationError("email is required")
+	}
+	if _, err := mail.ParseAddress(email); err != nil {
+		return domain.NewValidationError("invalid email format")
+	}
+	return nil
+}
+
+func validateAge(age int) error {
+	if age < 18 {
+		return domain.NewValidationError("applicant must be at least 18 years old")
+	}
+	if age > 100 {
+		return domain.NewValidationError("invalid age")
+	}
+	return nil
+}
+
+func validateMotivation(motivation string) error {
+	if len(strings.TrimSpace(motivation)) < 30 {
+		return domain.NewValidationError("motivation must be at least 30 characters")
+	}
+	if len(motivation) > 2000 {
+		return domain.NewValidationError("motivation cannot exceed 2000 characters")
+	}
+	return nil
+}
+
+func validatePhone(phone string, required bool) error {
+	if required && phone == "" {
+		return domain.NewValidationError("phone number is required")
+	}
+	if phone != "" && len(phone) != 10 {
+		return domain.NewValidationError("phone number must be exactly 10 digits")
+	}
+	return nil
+}
+
+func validateUserID(userID, fieldName string) error {
+	if strings.TrimSpace(userID) == "" {
+		return domain.NewValidationError(fieldName + " is required")
+	}
+	return nil
+}
+
+// NewVolunteerApplication creates a new volunteer application with validation
+func NewVolunteerApplication(firstName, lastName, email, phone string, age int, interest VolunteerInterest, availability Availability, motivation, userID string) (*VolunteerApplication, error) {
+	// Validate all input parameters using helper functions
+	if err := validateName(firstName, "first name"); err != nil {
+		return nil, err
+	}
+	if err := validateName(lastName, "last name"); err != nil {
+		return nil, err
+	}
+	if err := validateEmail(email); err != nil {
+		return nil, err
+	}
+	if err := validatePhone(phone, true); err != nil {
+		return nil, err
+	}
+	if err := validateAge(age); err != nil {
+		return nil, err
+	}
+	if err := validateMotivation(motivation); err != nil {
+		return nil, err
+	}
+
+	if !interest.IsValid() {
+		return nil, domain.NewValidationError("invalid volunteer interest")
+	}
+	if !availability.IsValid() {
+		return nil, domain.NewValidationError("invalid availability")
+	}
+
+	// Create the application
+	now := time.Now()
+	application := &VolunteerApplication{
+		ApplicationID:     uuid.New().String(),
+		Status:            ApplicationStatusNew,
+		Priority:          ApplicationPriorityMedium,
+		FirstName:         firstName,
+		LastName:          lastName,
+		Email:             email,
+		Phone:             phone,
+		Age:               age,
+		VolunteerInterest: interest,
+		Availability:      availability,
+		Motivation:        motivation,
+		Source:            "website",
+		CreatedAt:         now,
+		UpdatedAt:         now,
+		CreatedBy:         userID,
+		UpdatedBy:         userID,
+		IsDeleted:         false,
+	}
+
+	return application, nil
+}
+
+// Validate validates the volunteer application data
+func (v *VolunteerApplication) Validate() error {
+	if v.ApplicationID == "" {
+		return domain.NewValidationError("application ID is required")
+	}
+
+	// Use helper functions for common validation logic
+	if err := validateName(v.FirstName, "first name"); err != nil {
+		return err
+	}
+	if err := validateName(v.LastName, "last name"); err != nil {
+		return err
+	}
+	if err := validateEmail(v.Email); err != nil {
+		return err
+	}
+	if err := validateAge(v.Age); err != nil {
+		return err
+	}
+	if err := validateMotivation(v.Motivation); err != nil {
+		return err
+	}
+	if err := validatePhone(v.Phone, false); err != nil {
+		return err
+	}
+	if err := validateUserID(v.CreatedBy, "created by"); err != nil {
+		return err
+	}
+	if err := validateUserID(v.UpdatedBy, "updated by"); err != nil {
+		return err
+	}
+
+	// Validate enum fields
+	if !v.Status.IsValid() {
+		return domain.NewValidationError("invalid application status")
+	}
+	if !v.Priority.IsValid() {
+		return domain.NewValidationError("invalid application priority")
+	}
+	if !v.VolunteerInterest.IsValid() {
+		return domain.NewValidationError("invalid volunteer interest")
+	}
+	if !v.Availability.IsValid() {
+		return domain.NewValidationError("invalid availability")
+	}
+
+	return nil
+}
+
+// SetPriority updates the priority of the application
+func (v *VolunteerApplication) SetPriority(priority ApplicationPriority, userID string) error {
+	if !priority.IsValid() {
+		return domain.NewValidationError("invalid priority value")
+	}
+
+	v.Priority = priority
+	v.UpdatedBy = userID
+	v.UpdatedAt = time.Now()
+
+	return nil
+}
+
+// UpdateStatus updates the status of the application with validation
+func (v *VolunteerApplication) UpdateStatus(newStatus ApplicationStatus, userID string) error {
+	if !newStatus.IsValid() {
+		return domain.NewValidationError("invalid status value")
+	}
+
+	// Check if transition is allowed
+	if err := v.CanTransitionTo(newStatus); err != nil {
+		return err
+	}
+
+	v.Status = newStatus
+	v.UpdatedBy = userID
+	v.UpdatedAt = time.Now()
+
+	return nil
+}
+
+// CanTransitionTo checks if the application can transition to the target status
+func (v *VolunteerApplication) CanTransitionTo(targetStatus ApplicationStatus) error {
+	switch v.Status {
+	case ApplicationStatusNew:
+		if targetStatus == ApplicationStatusUnderReview || targetStatus == ApplicationStatusDeclined || targetStatus == ApplicationStatusWithdrawn {
+			return nil
+		}
+	case ApplicationStatusUnderReview:
+		if targetStatus == ApplicationStatusInterviewScheduled || targetStatus == ApplicationStatusDeclined || targetStatus == ApplicationStatusWithdrawn {
+			return nil
+		}
+	case ApplicationStatusInterviewScheduled:
+		if targetStatus == ApplicationStatusBackgroundCheck || targetStatus == ApplicationStatusDeclined || targetStatus == ApplicationStatusWithdrawn {
+			return nil
+		}
+	case ApplicationStatusBackgroundCheck:
+		if targetStatus == ApplicationStatusApproved || targetStatus == ApplicationStatusDeclined || targetStatus == ApplicationStatusWithdrawn {
+			return nil
+		}
+	case ApplicationStatusApproved:
+		if targetStatus == ApplicationStatusWithdrawn {
+			return nil
+		}
+	case ApplicationStatusDeclined:
+		// Cannot transition from declined
+		return domain.NewValidationError("cannot transition from declined status")
+	case ApplicationStatusWithdrawn:
+		// Cannot transition from withdrawn
+		return domain.NewValidationError("cannot transition from withdrawn status")
+	}
+
+	return domain.NewValidationError(fmt.Sprintf("cannot transition from %s to %s", v.Status, targetStatus))
 }
 
 
