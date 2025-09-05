@@ -2,6 +2,7 @@ package testing
 
 import (
 	"context"
+	"os"
 	"time"
 
 	"github.com/axiom-software-co/international-center/src/backend/internal/shared/domain"
@@ -10,6 +11,30 @@ import (
 // CreateUnitTestContext creates a context with timeout for unit tests
 func CreateUnitTestContext() (context.Context, context.CancelFunc) {
 	return context.WithTimeout(context.Background(), 5*time.Second)
+}
+
+// CreateDaprTestContext creates a context and sets up test environment for Dapr components
+func CreateDaprTestContext() (context.Context, context.CancelFunc) {
+	// Only set test mode globally to prevent real Dapr connections
+	// Individual tests should use t.Setenv() for ENVIRONMENT and DAPR_APP_ID
+	os.Setenv("DAPR_TEST_MODE", "true")
+	
+	return context.WithTimeout(context.Background(), 5*time.Second)
+}
+
+// ResetDaprTestEnvironment resets the test environment and clears singleton state
+func ResetDaprTestEnvironment() {
+	// Clear test mode to ensure clean state
+	os.Unsetenv("DAPR_TEST_MODE")
+	os.Unsetenv("ENVIRONMENT")
+	os.Unsetenv("DAPR_APP_ID")
+}
+
+// SetupDaprTest sets up the test environment and returns a context
+// This is a convenience function that combines context creation and environment setup
+func SetupDaprTest() (context.Context, context.CancelFunc) {
+	ResetDaprTestEnvironment()
+	return CreateDaprTestContext()
 }
 
 // MockDaprComponents provides mock implementations for unit testing

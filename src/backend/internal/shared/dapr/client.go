@@ -26,17 +26,32 @@ func NewClient() (*Client, error) {
 	once.Do(func() {
 		environment := getEnv("ENVIRONMENT", "development")
 		appID := getEnv("DAPR_APP_ID", "international-center")
-
-		daprSDKClient, clientErr := client.NewClient()
-		if clientErr != nil {
-			err = fmt.Errorf("failed to create Dapr client: %w", clientErr)
-			return
-		}
-
-		daprClient = &Client{
-			client:      daprSDKClient,
-			environment: environment,
-			appID:       appID,
+		
+		// Check if we're in test mode
+		testMode := getEnv("DAPR_TEST_MODE", "false") == "true"
+		
+		if testMode {
+			// In test mode, create a simplified client that doesn't require real Dapr connection
+			daprClient = &Client{
+				client:      nil, // We'll check for nil in methods that need real client
+				environment: environment,
+				appID:       appID,
+			}
+		} else {
+			// In production mode, create real Dapr client
+			var daprSDKClient client.Client
+			var clientErr error
+			daprSDKClient, clientErr = client.NewClient()
+			if clientErr != nil {
+				err = fmt.Errorf("failed to create Dapr client: %w", clientErr)
+				return
+			}
+			
+			daprClient = &Client{
+				client:      daprSDKClient,
+				environment: environment,
+				appID:       appID,
+			}
 		}
 	})
 
@@ -45,6 +60,12 @@ func NewClient() (*Client, error) {
 	}
 
 	return daprClient, nil
+}
+
+// ResetClientForTesting resets the singleton client for testing purposes
+func ResetClientForTesting() {
+	daprClient = nil
+	once = sync.Once{}
 }
 
 // GetClient returns the underlying Dapr client
@@ -72,6 +93,11 @@ func (c *Client) Close() error {
 
 // HealthCheck validates the Dapr client connection
 func (c *Client) HealthCheck(ctx context.Context) error {
+	// In test mode, always return success
+	if c.client == nil {
+		return nil
+	}
+	
 	// Test connectivity by attempting to get configuration
 	_, err := c.client.GetConfigurationItem(ctx, "healthcheck", "test")
 	if err != nil {
@@ -86,4 +112,5 @@ func (c *Client) IsHealthy(ctx context.Context) bool {
 	err := c.HealthCheck(ctx)
 	return err == nil
 }
+
 
