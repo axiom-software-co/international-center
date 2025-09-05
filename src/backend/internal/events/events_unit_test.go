@@ -2,6 +2,7 @@ package events
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -974,6 +975,432 @@ func TestEventsService_AdminGetEventRegistrations(t *testing.T) {
 				require.NoError(t, err)
 				require.NotNil(t, registrations)
 				assert.Len(t, registrations, tt.wantCount)
+			}
+		})
+	}
+}
+
+// RED PHASE - Domain enum validation tests (will fail until IsValid methods are implemented)
+
+func TestEventType_IsValid(t *testing.T) {
+	tests := []struct {
+		name      string
+		eventType EventType
+		want      bool
+	}{
+		{
+			name:      "valid workshop",
+			eventType: EventTypeWorkshop,
+			want:      true,
+		},
+		{
+			name:      "valid seminar",
+			eventType: EventTypeSeminar,
+			want:      true,
+		},
+		{
+			name:      "valid webinar",
+			eventType: EventTypeWebinar,
+			want:      true,
+		},
+		{
+			name:      "valid conference",
+			eventType: EventTypeConference,
+			want:      true,
+		},
+		{
+			name:      "valid fundraiser",
+			eventType: EventTypeFundraiser,
+			want:      true,
+		},
+		{
+			name:      "valid community",
+			eventType: EventTypeCommunity,
+			want:      true,
+		},
+		{
+			name:      "valid medical",
+			eventType: EventTypeMedical,
+			want:      true,
+		},
+		{
+			name:      "valid educational",
+			eventType: EventTypeEducational,
+			want:      true,
+		},
+		{
+			name:      "invalid empty event type",
+			eventType: EventType(""),
+			want:      false,
+		},
+		{
+			name:      "invalid unknown event type",
+			eventType: EventType("unknown_type"),
+			want:      false,
+		},
+		{
+			name:      "invalid mixed case event type",
+			eventType: EventType("Workshop"),
+			want:      false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// This will fail until we implement EventType.IsValid() method
+			got := tt.eventType.IsValid()
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestPublishingStatus_IsValid(t *testing.T) {
+	tests := []struct {
+		name   string
+		status PublishingStatus
+		want   bool
+	}{
+		{
+			name:   "valid draft status",
+			status: PublishingStatusDraft,
+			want:   true,
+		},
+		{
+			name:   "valid published status",
+			status: PublishingStatusPublished,
+			want:   true,
+		},
+		{
+			name:   "valid archived status",
+			status: PublishingStatusArchived,
+			want:   true,
+		},
+		{
+			name:   "invalid empty status",
+			status: PublishingStatus(""),
+			want:   false,
+		},
+		{
+			name:   "invalid unknown status",
+			status: PublishingStatus("unknown_status"),
+			want:   false,
+		},
+		{
+			name:   "invalid mixed case status",
+			status: PublishingStatus("DRAFT"),
+			want:   false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// This will fail until we implement PublishingStatus.IsValid() method
+			got := tt.status.IsValid()
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestRegistrationStatus_IsValid(t *testing.T) {
+	tests := []struct {
+		name   string
+		status RegistrationStatus
+		want   bool
+	}{
+		{
+			name:   "valid open status",
+			status: RegistrationStatusOpen,
+			want:   true,
+		},
+		{
+			name:   "valid registration_required status",
+			status: RegistrationStatusRegistrationRequired,
+			want:   true,
+		},
+		{
+			name:   "valid full status",
+			status: RegistrationStatusFull,
+			want:   true,
+		},
+		{
+			name:   "valid cancelled status",
+			status: RegistrationStatusCancelled,
+			want:   true,
+		},
+		{
+			name:   "valid registered status",
+			status: RegistrationStatusRegistered,
+			want:   true,
+		},
+		{
+			name:   "valid confirmed status",
+			status: RegistrationStatusConfirmed,
+			want:   true,
+		},
+		{
+			name:   "valid no_show status",
+			status: RegistrationStatusNoShow,
+			want:   true,
+		},
+		{
+			name:   "invalid empty status",
+			status: RegistrationStatus(""),
+			want:   false,
+		},
+		{
+			name:   "invalid unknown status",
+			status: RegistrationStatus("unknown_status"),
+			want:   false,
+		},
+		{
+			name:   "invalid mixed case status",
+			status: RegistrationStatus("OPEN"),
+			want:   false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// This will fail until we implement RegistrationStatus.IsValid() method
+			got := tt.status.IsValid()
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestPriorityLevel_IsValid(t *testing.T) {
+	tests := []struct {
+		name  string
+		level PriorityLevel
+		want  bool
+	}{
+		{
+			name:  "valid low priority",
+			level: PriorityLevelLow,
+			want:  true,
+		},
+		{
+			name:  "valid normal priority",
+			level: PriorityLevelNormal,
+			want:  true,
+		},
+		{
+			name:  "valid high priority",
+			level: PriorityLevelHigh,
+			want:  true,
+		},
+		{
+			name:  "valid urgent priority",
+			level: PriorityLevelUrgent,
+			want:  true,
+		},
+		{
+			name:  "invalid empty priority",
+			level: PriorityLevel(""),
+			want:  false,
+		},
+		{
+			name:  "invalid unknown priority",
+			level: PriorityLevel("unknown_priority"),
+			want:  false,
+		},
+		{
+			name:  "invalid mixed case priority",
+			level: PriorityLevel("LOW"),
+			want:  false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// This will fail until we implement PriorityLevel.IsValid() method
+			got := tt.level.IsValid()
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+// Domain validation helper tests (will fail until comprehensive validation helpers are implemented)
+
+func TestValidateEventTitle(t *testing.T) {
+	tests := []struct {
+		name        string
+		title       string
+		wantError   bool
+		errorMsg    string
+	}{
+		{
+			name:      "valid event title",
+			title:     "Healthcare Innovation Workshop",
+			wantError: false,
+		},
+		{
+			name:      "valid title with maximum length",
+			title:     strings.Repeat("a", 255),
+			wantError: false,
+		},
+		{
+			name:      "valid title with minimum length",
+			title:     "ab",
+			wantError: false,
+		},
+		{
+			name:      "invalid empty title",
+			title:     "",
+			wantError: true,
+			errorMsg:  "title is required",
+		},
+		{
+			name:      "invalid whitespace-only title",
+			title:     "   ",
+			wantError: true,
+			errorMsg:  "title is required",
+		},
+		{
+			name:      "invalid title too short",
+			title:     "a",
+			wantError: true,
+			errorMsg:  "title must be between 2 and 255 characters",
+		},
+		{
+			name:      "invalid title too long",
+			title:     strings.Repeat("a", 256),
+			wantError: true,
+			errorMsg:  "title must be between 2 and 255 characters",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// This will fail until we implement validateEventTitle helper function
+			err := validateEventTitle(tt.title)
+			
+			if tt.wantError {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errorMsg)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestValidateEventDescription(t *testing.T) {
+	tests := []struct {
+		name        string
+		description string
+		wantError   bool
+		errorMsg    string
+	}{
+		{
+			name:        "valid event description",
+			description: "Join us for an innovative healthcare workshop focusing on cutting-edge medical technologies and patient care strategies.",
+			wantError:   false,
+		},
+		{
+			name:        "valid description with minimum length",
+			description: "abcdefghij", // 10 characters
+			wantError:   false,
+		},
+		{
+			name:        "invalid empty description",
+			description: "",
+			wantError:   true,
+			errorMsg:    "description is required",
+		},
+		{
+			name:        "invalid whitespace-only description",
+			description: "   ",
+			wantError:   true,
+			errorMsg:    "description is required",
+		},
+		{
+			name:        "invalid description too short",
+			description: "short",
+			wantError:   true,
+			errorMsg:    "description must be between 10 and 2000 characters",
+		},
+		{
+			name:        "invalid description too long",
+			description: strings.Repeat("a", 2001),
+			wantError:   true,
+			errorMsg:    "description must be between 10 and 2000 characters",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// This will fail until we implement validateEventDescription helper function
+			err := validateEventDescription(tt.description)
+			
+			if tt.wantError {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errorMsg)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestValidateEventLocation(t *testing.T) {
+	tests := []struct {
+		name      string
+		location  string
+		wantError bool
+		errorMsg  string
+	}{
+		{
+			name:      "valid event location",
+			location:  "Main Conference Hall, Building A",
+			wantError: false,
+		},
+		{
+			name:      "valid virtual location",
+			location:  "Virtual Event",
+			wantError: false,
+		},
+		{
+			name:      "valid location minimum length",
+			location:  "ab",
+			wantError: false,
+		},
+		{
+			name:      "invalid empty location",
+			location:  "",
+			wantError: true,
+			errorMsg:  "location is required",
+		},
+		{
+			name:      "invalid whitespace-only location",
+			location:  "   ",
+			wantError: true,
+			errorMsg:  "location is required",
+		},
+		{
+			name:      "invalid location too short",
+			location:  "a",
+			wantError: true,
+			errorMsg:  "location must be between 2 and 255 characters",
+		},
+		{
+			name:      "invalid location too long",
+			location:  strings.Repeat("a", 256),
+			wantError: true,
+			errorMsg:  "location must be between 2 and 255 characters",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// This will fail until we implement validateEventLocation helper function
+			err := validateEventLocation(tt.location)
+			
+			if tt.wantError {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errorMsg)
+			} else {
+				assert.NoError(t, err)
 			}
 		})
 	}

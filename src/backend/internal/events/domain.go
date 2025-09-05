@@ -1,7 +1,6 @@
 package events
 
 import (
-	"context"
 	"fmt"
 	"net/url"
 	"regexp"
@@ -134,6 +133,17 @@ const (
 	EventTypeEducational EventType = "educational"
 )
 
+// IsValid checks if the event type is valid
+func (et EventType) IsValid() bool {
+	switch et {
+	case EventTypeWorkshop, EventTypeSeminar, EventTypeWebinar, EventTypeConference,
+		 EventTypeFundraiser, EventTypeCommunity, EventTypeMedical, EventTypeEducational:
+		return true
+	default:
+		return false
+	}
+}
+
 // PublishingStatus represents the publishing status of an event
 type PublishingStatus string
 
@@ -142,6 +152,16 @@ const (
 	PublishingStatusPublished PublishingStatus = "published"
 	PublishingStatusArchived  PublishingStatus = "archived"
 )
+
+// IsValid checks if the publishing status is valid
+func (ps PublishingStatus) IsValid() bool {
+	switch ps {
+	case PublishingStatusDraft, PublishingStatusPublished, PublishingStatusArchived:
+		return true
+	default:
+		return false
+	}
+}
 
 // RegistrationStatus represents the registration status for events
 type RegistrationStatus string
@@ -156,6 +176,17 @@ const (
 	RegistrationStatusNoShow             RegistrationStatus = "no_show"
 )
 
+// IsValid checks if the registration status is valid
+func (rs RegistrationStatus) IsValid() bool {
+	switch rs {
+	case RegistrationStatusOpen, RegistrationStatusRegistrationRequired, RegistrationStatusFull,
+		 RegistrationStatusCancelled, RegistrationStatusRegistered, RegistrationStatusConfirmed, RegistrationStatusNoShow:
+		return true
+	default:
+		return false
+	}
+}
+
 // PriorityLevel represents the priority level of an event
 type PriorityLevel string
 
@@ -165,6 +196,16 @@ const (
 	PriorityLevelHigh   PriorityLevel = "high"
 	PriorityLevelUrgent PriorityLevel = "urgent"
 )
+
+// IsValid checks if the priority level is valid
+func (pl PriorityLevel) IsValid() bool {
+	switch pl {
+	case PriorityLevelLow, PriorityLevelNormal, PriorityLevelHigh, PriorityLevelUrgent:
+		return true
+	default:
+		return false
+	}
+}
 
 // Request/Response DTOs for admin operations
 
@@ -528,11 +569,15 @@ func (e *Event) IsRegistrationOpen() bool {
 
 func validateEventTitle(title string) error {
 	if strings.TrimSpace(title) == "" {
-		return domain.NewValidationError("event title cannot be empty")
+		return domain.NewValidationError("title is required")
+	}
+	
+	if len(title) < 2 {
+		return domain.NewValidationError("title must be between 2 and 255 characters")
 	}
 	
 	if len(title) > 255 {
-		return domain.NewValidationError("event title cannot exceed 255 characters")
+		return domain.NewValidationError("title must be between 2 and 255 characters")
 	}
 	
 	return nil
@@ -540,11 +585,15 @@ func validateEventTitle(title string) error {
 
 func validateEventDescription(description string) error {
 	if strings.TrimSpace(description) == "" {
-		return domain.NewValidationError("event description cannot be empty")
+		return domain.NewValidationError("description is required")
+	}
+	
+	if len(description) < 10 {
+		return domain.NewValidationError("description must be between 10 and 2000 characters")
 	}
 	
 	if len(description) > 2000 {
-		return domain.NewValidationError("event description cannot exceed 2000 characters")
+		return domain.NewValidationError("description must be between 10 and 2000 characters")
 	}
 	
 	return nil
@@ -576,35 +625,26 @@ func validateEventID(eventID string) error {
 
 func validateEventLocation(location string) error {
 	if strings.TrimSpace(location) == "" {
-		return domain.NewValidationError("event location cannot be empty")
+		return domain.NewValidationError("location is required")
 	}
 	
-	if len(location) > 500 {
-		return domain.NewValidationError("event location cannot exceed 500 characters")
+	if len(location) < 2 {
+		return domain.NewValidationError("location must be between 2 and 255 characters")
+	}
+	
+	if len(location) > 255 {
+		return domain.NewValidationError("location must be between 2 and 255 characters")
 	}
 	
 	return nil
 }
 
 func validateEventType(eventType EventType) error {
-	validTypes := []EventType{
-		EventTypeWorkshop,
-		EventTypeSeminar,
-		EventTypeWebinar,
-		EventTypeConference,
-		EventTypeFundraiser,
-		EventTypeCommunity,
-		EventTypeMedical,
-		EventTypeEducational,
+	if !eventType.IsValid() {
+		return domain.NewValidationError(fmt.Sprintf("invalid event type: %s", eventType))
 	}
 	
-	for _, valid := range validTypes {
-		if eventType == valid {
-			return nil
-		}
-	}
-	
-	return domain.NewValidationError(fmt.Sprintf("invalid event type: %s", eventType))
+	return nil
 }
 
 func validateEventDate(eventDate time.Time) error {
@@ -614,20 +654,11 @@ func validateEventDate(eventDate time.Time) error {
 }
 
 func validatePriorityLevel(priorityLevel PriorityLevel) error {
-	validLevels := []PriorityLevel{
-		PriorityLevelLow,
-		PriorityLevelNormal,
-		PriorityLevelHigh,
-		PriorityLevelUrgent,
+	if !priorityLevel.IsValid() {
+		return domain.NewValidationError(fmt.Sprintf("invalid priority level: %s", priorityLevel))
 	}
 	
-	for _, valid := range validLevels {
-		if priorityLevel == valid {
-			return nil
-		}
-	}
-	
-	return domain.NewValidationError(fmt.Sprintf("invalid priority level: %s", priorityLevel))
+	return nil
 }
 
 func validateCategoryName(name string) error {
@@ -737,42 +768,22 @@ func generateCategorySlug(name string) string {
 
 // IsValidEventType checks if the given string is a valid event type
 func IsValidEventType(eventType string) bool {
-	validTypes := []string{
-		string(EventTypeWorkshop),
-		string(EventTypeSeminar),
-		string(EventTypeWebinar),
-		string(EventTypeConference),
-		string(EventTypeFundraiser),
-		string(EventTypeCommunity),
-		string(EventTypeMedical),
-		string(EventTypeEducational),
-	}
-	
-	for _, valid := range validTypes {
-		if eventType == valid {
-			return true
-		}
-	}
-	
-	return false
+	return EventType(eventType).IsValid()
 }
 
 // IsValidPriorityLevel checks if the given string is a valid priority level
 func IsValidPriorityLevel(priorityLevel string) bool {
-	validLevels := []string{
-		string(PriorityLevelLow),
-		string(PriorityLevelNormal),
-		string(PriorityLevelHigh),
-		string(PriorityLevelUrgent),
-	}
-	
-	for _, valid := range validLevels {
-		if priorityLevel == valid {
-			return true
-		}
-	}
-	
-	return false
+	return PriorityLevel(priorityLevel).IsValid()
+}
+
+// IsValidPublishingStatus checks if the given string is a valid publishing status
+func IsValidPublishingStatus(status string) bool {
+	return PublishingStatus(status).IsValid()
+}
+
+// IsValidRegistrationStatus checks if the given string is a valid registration status
+func IsValidRegistrationStatus(status string) bool {
+	return RegistrationStatus(status).IsValid()
 }
 
 // IsAdminUser checks if the user has admin privileges
