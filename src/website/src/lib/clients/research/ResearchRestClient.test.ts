@@ -71,6 +71,9 @@ describe('ResearchRestClient', () => {
     // Ensure completely clean mock state for each test
     mockFetch.mockReset();
     mockFetch.mockClear();
+    
+    // Clear cache for complete test isolation
+    client.clearCache();
   });
 
   afterEach(() => {
@@ -184,9 +187,13 @@ describe('ResearchRestClient', () => {
       const result = await client.getResearchArticles(params);
 
       expect(mockFetch).toHaveBeenCalledWith(
-        expect.stringContaining('/api/v1/research?page=1&pageSize=10&category=clinical-research&featured=true&industry=healthcare'),
+        expect.stringMatching(new RegExp('http://localhost:7220/api/v1/research\\?page=1&pageSize=10&category=clinical-research&featured=true&industry=healthcare')),
         expect.objectContaining({
-          method: 'GET'
+          method: 'GET',
+          headers: expect.objectContaining({
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+          })
         })
       );
       expect(result).toEqual(mockResponse);
@@ -204,9 +211,13 @@ describe('ResearchRestClient', () => {
       const result = await client.getResearchArticles();
 
       expect(mockFetch).toHaveBeenCalledWith(
-        expect.stringContaining('/api/v1/research'),
+        'http://localhost:7220/api/v1/research',
         expect.objectContaining({
-          method: 'GET'
+          method: 'GET',
+          headers: expect.objectContaining({
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+          })
         })
       );
       expect(result).toEqual(mockResponse);
@@ -293,9 +304,13 @@ describe('ResearchRestClient', () => {
       const result = await client.getResearchArticleBySlug('slug-research-article');
 
       expect(mockFetch).toHaveBeenCalledWith(
-        expect.stringContaining('/api/v1/research/slug/slug-research-article'),
+        'http://localhost:7220/api/v1/research/slug/slug-research-article',
         expect.objectContaining({
-          method: 'GET'
+          method: 'GET',
+          headers: expect.objectContaining({
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+          })
         })
       );
       expect(result.research.slug).toBe('slug-research-article');
@@ -319,8 +334,14 @@ describe('ResearchRestClient', () => {
       await client.getResearchArticleBySlug('research with spaces & special chars');
 
       expect(mockFetch).toHaveBeenCalledWith(
-        expect.stringContaining('/api/v1/research/slug/research%20with%20spaces%20%26%20special%20chars'),
-        expect.any(Object)
+        'http://localhost:7220/api/v1/research/slug/research%20with%20spaces%20%26%20special%20chars',
+        expect.objectContaining({
+          method: 'GET',
+          headers: expect.objectContaining({
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+          })
+        })
       );
     }, 5000);
   });
@@ -337,9 +358,13 @@ describe('ResearchRestClient', () => {
       await client.getResearchArticleById('research-uuid-123');
 
       expect(mockFetch).toHaveBeenCalledWith(
-        expect.stringContaining('/api/v1/research/research-uuid-123'),
+        'http://localhost:7220/api/v1/research/research-uuid-123',
         expect.objectContaining({
-          method: 'GET'
+          method: 'GET',
+          headers: expect.objectContaining({
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+          })
         })
       );
     }, 5000);
@@ -362,9 +387,13 @@ describe('ResearchRestClient', () => {
       await client.getFeaturedResearch();
 
       expect(mockFetch).toHaveBeenCalledWith(
-        expect.stringContaining('/api/v1/research/featured'),
+        'http://localhost:7220/api/v1/research/featured',
         expect.objectContaining({
-          method: 'GET'
+          method: 'GET',
+          headers: expect.objectContaining({
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+          })
         })
       );
     }, 5000);
@@ -386,9 +415,13 @@ describe('ResearchRestClient', () => {
       await client.getFeaturedResearch(5);
 
       expect(mockFetch).toHaveBeenCalledWith(
-        expect.stringContaining('/api/v1/research/featured?limit=5'),
+        'http://localhost:7220/api/v1/research/featured?limit=5',
         expect.objectContaining({
-          method: 'GET'
+          method: 'GET',
+          headers: expect.objectContaining({
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+          })
         })
       );
     }, 5000);
@@ -419,9 +452,13 @@ describe('ResearchRestClient', () => {
       await client.searchResearch(params);
 
       expect(mockFetch).toHaveBeenCalledWith(
-        expect.stringContaining('/api/v1/research/search?q=clinical%20study%20diabetes&page=1&pageSize=5&category=clinical-research'),
+        expect.stringMatching(new RegExp('http://localhost:7220/api/v1/research/search\\?q=clinical\+study\+diabetes&page=1&pageSize=5&category=clinical-research')),
         expect.objectContaining({
-          method: 'GET'
+          method: 'GET',
+          headers: expect.objectContaining({
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+          })
         })
       );
     }, 5000);
@@ -438,8 +475,14 @@ describe('ResearchRestClient', () => {
       await client.searchResearch({ q: 'research with special & chars' });
 
       expect(mockFetch).toHaveBeenCalledWith(
-        expect.stringContaining('q=research%20with%20special%20%26%20chars'),
-        expect.any(Object)
+        expect.stringMatching(new RegExp('http://localhost:7220/api/v1/research/search\\?q=research\+with\+special\+%26\+chars')),
+        expect.objectContaining({
+          method: 'GET',
+          headers: expect.objectContaining({
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+          })
+        })
       );
     }, 5000);
   });
@@ -462,9 +505,13 @@ describe('ResearchRestClient', () => {
       await client.getRecentResearch();
 
       expect(mockFetch).toHaveBeenCalledWith(
-        expect.stringContaining('/api/v1/research?limit=5&sortBy=date-desc'),
+        'http://localhost:7220/api/v1/research?limit=5&sortBy=date-desc',
         expect.objectContaining({
-          method: 'GET'
+          method: 'GET',
+          headers: expect.objectContaining({
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+          })
         })
       );
     }, 5000);
@@ -481,9 +528,13 @@ describe('ResearchRestClient', () => {
       await client.getRecentResearch(10);
 
       expect(mockFetch).toHaveBeenCalledWith(
-        expect.stringContaining('/api/v1/research?limit=10&sortBy=date-desc'),
+        'http://localhost:7220/api/v1/research?limit=10&sortBy=date-desc',
         expect.objectContaining({
-          method: 'GET'
+          method: 'GET',
+          headers: expect.objectContaining({
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+          })
         })
       );
     }, 5000);
@@ -502,9 +553,13 @@ describe('ResearchRestClient', () => {
       await client.getResearchByCategory('clinical-research');
 
       expect(mockFetch).toHaveBeenCalledWith(
-        expect.stringContaining('/api/v1/research/categories/clinical-research/articles'),
+        'http://localhost:7220/api/v1/research/categories/clinical-research/articles',
         expect.objectContaining({
-          method: 'GET'
+          method: 'GET',
+          headers: expect.objectContaining({
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+          })
         })
       );
     }, 5000);
@@ -525,8 +580,14 @@ describe('ResearchRestClient', () => {
       await client.getResearchByCategory('medical research studies');
 
       expect(mockFetch).toHaveBeenCalledWith(
-        expect.stringContaining('/api/v1/research/categories/medical%20research%20studies/articles'),
-        expect.any(Object)
+        'http://localhost:7220/api/v1/research/categories/medical%20research%20studies/articles',
+        expect.objectContaining({
+          method: 'GET',
+          headers: expect.objectContaining({
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+          })
+        })
       );
     }, 5000);
   });
@@ -544,9 +605,13 @@ describe('ResearchRestClient', () => {
       await client.getResearchByIndustry('healthcare');
 
       expect(mockFetch).toHaveBeenCalledWith(
-        expect.stringContaining('/api/v1/research?industry=healthcare'),
+        'http://localhost:7220/api/v1/research?industry=healthcare',
         expect.objectContaining({
-          method: 'GET'
+          method: 'GET',
+          headers: expect.objectContaining({
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+          })
         })
       );
     }, 5000);
@@ -576,9 +641,13 @@ describe('ResearchRestClient', () => {
       });
 
       expect(mockFetch).toHaveBeenCalledWith(
-        expect.stringContaining('/api/v1/research?industry=healthcare&page=2&pageSize=20&sortBy=date-desc'),
+        'http://localhost:7220/api/v1/research?industry=healthcare&page=2&pageSize=20&sortBy=date-desc',
         expect.objectContaining({
-          method: 'GET'
+          method: 'GET',
+          headers: expect.objectContaining({
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+          })
         })
       );
     }, 5000);

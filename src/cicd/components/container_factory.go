@@ -234,47 +234,17 @@ func DeployServiceContainer(ctx *pulumi.Context, config ContainerConfig) (pulumi
 		})
 	}
 	
-	// Create Podman container using Command provider
-	logger.LogProgress("Creating container", map[string]interface{}{
-		"container_name": config.ContainerName,
-		"dependencies":   len(dependencies),
+	// Create Dapr sidecar container first to establish network
+	logger.LogProgress("Creating Dapr sidecar first", map[string]interface{}{
+		"app_id":         config.AppID,
+		"dapr_grpc_port": config.DaprGrpcPort,
 	})
 	
-	containerCmd, err := local.NewCommand(ctx, fmt.Sprintf("%s-container", config.ServiceName), &local.CommandArgs{
-		Create: pulumi.Sprintf("podman run -d --name %s -p %d:%d -e DAPR_HTTP_PORT=3500 -e DAPR_GRPC_PORT=%d %s", 
-			config.ContainerName, config.HostPort, config.ContainerPort, config.DaprGrpcPort, config.ImageName),
-		Delete: pulumi.String(deleteCmd),
-	}, pulumi.DependsOn(dependencies))
-	if err != nil {
-		logger.LogError(err, map[string]interface{}{
-			"phase": "container_creation",
-			"container_name": config.ContainerName,
-			"dependencies_count": len(dependencies),
-		})
-		return nil, &ContainerFactoryError{
-			Type:        ErrorTypeContainerDeploy,
-			ServiceName: config.ServiceName,
-			Operation:   "container creation",
-			Context: map[string]interface{}{
-				"container_name": config.ContainerName,
-				"image_name":     config.ImageName,
-				"host_port":      config.HostPort,
-				"container_port": config.ContainerPort,
-			},
-			Err: err,
-		}
-	}
-	
-	logger.LogProgress("Container created, setting up Dapr sidecar", map[string]interface{}{
-		"container_name": config.ContainerName,
-	})
-	
-	// Create Dapr sidecar container
 	daprCmd, err := local.NewCommand(ctx, fmt.Sprintf("%s-dapr-sidecar", config.ServiceName), &local.CommandArgs{
-		Create: pulumi.Sprintf("podman run -d --name %s-dapr --network=container:%s daprio/daprd:latest /daprd --app-id %s --app-port %d --dapr-http-port 3500 --dapr-grpc-port %d --resources-path /tmp/components", 
-			config.ServiceName, config.ContainerName, config.AppID, config.ContainerPort, config.DaprGrpcPort),
+		Create: pulumi.Sprintf("podman run -d --name %s-dapr daprio/daprd:latest /daprd --app-id %s --app-port %d --dapr-http-port 3500 --dapr-grpc-port %d", 
+			config.ServiceName, config.AppID, config.ContainerPort, config.DaprGrpcPort),
 		Delete: pulumi.Sprintf("podman rm -f %s-dapr", config.ServiceName),
-	}, pulumi.DependsOn([]pulumi.Resource{containerCmd}))
+	}, pulumi.DependsOn(dependencies))
 	if err != nil {
 		logger.LogError(err, map[string]interface{}{
 			"phase": "dapr_sidecar_creation",
@@ -288,33 +258,160 @@ func DeployServiceContainer(ctx *pulumi.Context, config ContainerConfig) (pulumi
 			Context: map[string]interface{}{
 				"app_id":         config.AppID,
 				"dapr_grpc_port": config.DaprGrpcPort,
-				"container_name": config.ContainerName,
 			},
 			Err: err,
 		}
 	}
 	
-	logger.LogSuccess(map[string]interface{}{
-		"container_name":    config.ContainerName,
-		"dapr_sidecar":      fmt.Sprintf("%s-dapr", config.ServiceName),
-		"host_port":         config.HostPort,
-		"container_port":    config.ContainerPort,
-		"dapr_grpc_port":   config.DaprGrpcPort,
-		"app_id":           config.AppID,
-		"image_name":       config.ImageName,
-		"health_check":     config.HealthCheck,
-		"cleanup_images":   config.CleanupImages,
+	// Wait for Dapr sidecar to be ready
+	logger.LogProgress("Waiting for Dapr sidecar readiness", map[string]interface{}{
+		"dapr_grpc_port": config.DaprGrpcPort,
+		"app_id":         config.AppID,
 	})
 	
-	// Return service configuration map
-	return pulumi.Map{
+	daprHealthCheck, err := local.NewCommand(ctx, fmt.Sprintf("%s-dapr-health", config.ServiceName), &local.CommandArgs{
+		Create: pulumi.Sprintf(`
+			echo "Waiting for Dapr sidecar %s to be ready on port %d..." &&
+			for i in {1..30}; do 
+				if podman exec %s-dapr /bin/sh -c "netstat -ln | grep :%d" >/dev/null 2>&1; then 
+					echo "Dapr sidecar %s ready on port %d" && exit 0
+				fi
+				echo "Waiting for Dapr sidecar (attempt $i/30)..."
+				sleep 2
+			done &&
+			echo "ERROR: Dapr sidecar %s not ready after 60 seconds" && exit 1
+		`, config.ServiceName, config.DaprGrpcPort, config.ServiceName, config.DaprGrpcPort, config.ServiceName, config.DaprGrpcPort, config.ServiceName),
+	}, pulumi.DependsOn([]pulumi.Resource{daprCmd}))
+	if err != nil {
+		logger.LogError(err, map[string]interface{}{
+			"phase": "dapr_health_check",
+			"app_id": config.AppID,
+		})
+		return nil, &ContainerFactoryError{
+			Type:        ErrorTypeHealthCheck,
+			ServiceName: config.ServiceName,
+			Operation:   "dapr health check",
+			Context: map[string]interface{}{
+				"app_id":         config.AppID,
+				"dapr_grpc_port": config.DaprGrpcPort,
+			},
+			Err: err,
+		}
+	}
+	
+	// Create backend container with network sharing to Dapr sidecar
+	logger.LogProgress("Creating backend container with Dapr network sharing", map[string]interface{}{
+		"container_name": config.ContainerName,
+		"dapr_ready":     true,
+	})
+	
+	containerDeps := append(dependencies, daprCmd, daprHealthCheck)
+	containerCmd, err := local.NewCommand(ctx, fmt.Sprintf("%s-container", config.ServiceName), &local.CommandArgs{
+		Create: pulumi.Sprintf("podman run -d --name %s --network=container:%s-dapr -p %d:%d -e DAPR_HTTP_PORT=3500 -e DAPR_GRPC_PORT=%d %s", 
+			config.ContainerName, config.ServiceName, config.HostPort, config.ContainerPort, config.DaprGrpcPort, config.ImageName),
+		Delete: pulumi.String(deleteCmd),
+	}, pulumi.DependsOn(containerDeps))
+	if err != nil {
+		logger.LogError(err, map[string]interface{}{
+			"phase": "container_creation",
+			"container_name": config.ContainerName,
+			"dapr_network":   true,
+			"dependencies_count": len(containerDeps),
+		})
+		return nil, &ContainerFactoryError{
+			Type:        ErrorTypeContainerDeploy,
+			ServiceName: config.ServiceName,
+			Operation:   "container creation with dapr network",
+			Context: map[string]interface{}{
+				"container_name": config.ContainerName,
+				"image_name":     config.ImageName,
+				"host_port":      config.HostPort,
+				"container_port": config.ContainerPort,
+				"dapr_network":   fmt.Sprintf("%s-dapr", config.ServiceName),
+			},
+			Err: err,
+		}
+	}
+	
+	// Perform service readiness validation if health checks are enabled
+	var serviceHealthCmd *local.Command
+	if config.HealthCheck {
+		logger.LogProgress("Performing service readiness validation", map[string]interface{}{
+			"service_name":     config.ServiceName,
+			"health_endpoint":  fmt.Sprintf("http://localhost:%d/health", config.HostPort),
+			"container_ready":  true,
+		})
+		
+		serviceHealthCmd, err = local.NewCommand(ctx, fmt.Sprintf("%s-service-health", config.ServiceName), &local.CommandArgs{
+			Create: pulumi.Sprintf(`
+				echo "Waiting for service %s to be ready on port %d..." &&
+				for i in {1..30}; do 
+					if curl -f -s http://localhost:%d/health >/dev/null 2>&1; then 
+						echo "Service %s health endpoint ready on port %d" && exit 0
+					fi
+					echo "Waiting for service health endpoint (attempt $i/30)..."
+					sleep 3
+				done &&
+				echo "ERROR: Service %s health endpoint not ready after 90 seconds" && exit 1
+			`, config.ServiceName, config.HostPort, config.HostPort, config.ServiceName, config.HostPort, config.ServiceName),
+			Delete: pulumi.String("echo 'Service health check cleanup'"),
+		}, pulumi.DependsOn([]pulumi.Resource{containerCmd}))
+		if err != nil {
+			logger.LogError(err, map[string]interface{}{
+				"phase": "service_health_check",
+				"service_name": config.ServiceName,
+				"health_endpoint": fmt.Sprintf("http://localhost:%d/health", config.HostPort),
+			})
+			return nil, &ContainerFactoryError{
+				Type:        ErrorTypeHealthCheck,
+				ServiceName: config.ServiceName,
+				Operation:   "service readiness validation",
+				Context: map[string]interface{}{
+					"health_endpoint": fmt.Sprintf("http://localhost:%d/health", config.HostPort),
+					"host_port":       config.HostPort,
+				},
+				Err: err,
+			}
+		}
+		
+		logger.LogProgress("Service readiness validation configured", map[string]interface{}{
+			"service_name":     config.ServiceName,
+			"health_endpoint":  fmt.Sprintf("http://localhost:%d/health", config.HostPort),
+		})
+	}
+	
+	logger.LogSuccess(map[string]interface{}{
+		"container_name":     config.ContainerName,
+		"dapr_sidecar":       fmt.Sprintf("%s-dapr", config.ServiceName),
+		"host_port":          config.HostPort,
+		"container_port":     config.ContainerPort,
+		"dapr_grpc_port":     config.DaprGrpcPort,
+		"app_id":             config.AppID,
+		"image_name":         config.ImageName,
+		"health_check":       config.HealthCheck,
+		"service_validated":  serviceHealthCmd != nil,
+		"cleanup_images":     config.CleanupImages,
+	})
+	
+	// Return service configuration map with validation status
+	serviceMap := pulumi.Map{
 		"container_id":      containerCmd.Stdout,
 		"container_status":  pulumi.String("running"),
 		"host_port":         pulumi.Int(config.HostPort),
 		"health_endpoint":   pulumi.Sprintf("http://localhost:%d/health", config.HostPort),
 		"dapr_app_id":       pulumi.String(config.AppID),
 		"dapr_sidecar_id":   daprCmd.Stdout,
-	}, nil
+	}
+	
+	// Add service validation status to output
+	if serviceHealthCmd != nil {
+		serviceMap["service_validated"] = pulumi.Bool(true)
+		serviceMap["validation_output"] = serviceHealthCmd.Stdout
+	} else {
+		serviceMap["service_validated"] = pulumi.Bool(false)
+	}
+	
+	return serviceMap, nil
 }
 
 // validateContainerConfig validates the container configuration
@@ -1208,7 +1305,7 @@ func deployTestContainer(ctx *pulumi.Context, config TestContainerConfig, volume
 	// Create the test execution command
 	testCmd, err := local.NewCommand(ctx, fmt.Sprintf("%s-execution", config.ServiceName), &local.CommandArgs{
 		Create: pulumi.String(containerRunCmd),
-	}, pulumi.DependsOn([]pulumi.Resource{volumes}))
+	})
 	
 	if err != nil {
 		logger.LogError(err, map[string]interface{}{

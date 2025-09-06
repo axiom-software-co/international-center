@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { ref, nextTick, defineComponent } from 'vue';
-import { mount } from '@vue/test-utils';
+import { ref, computed, nextTick } from 'vue';
 import { useEvents, useEvent, useFeaturedEvents, useEventCategories } from './useEvents';
 import { useEventsStore } from '../stores/events';
 import { RestError } from '../lib/clients/rest/BaseRestClient';
@@ -25,10 +24,11 @@ describe('useEvents composables', () => {
       categories: ref([]),
       featuredEvents: ref([]),
       searchResults: ref([]),
+      event: ref(null),
       loading: ref(false),
       error: ref(null),
       total: ref(0),
-      totalPages: ref(0),
+      totalPages: computed(() => Math.ceil(mockStore.total.value / 10) || 0),
       searchTotal: ref(0),
       fetchEvents: vi.fn(),
       fetchEvent: vi.fn(),
@@ -79,35 +79,26 @@ describe('useEvents composables', () => {
         }
       ];
 
-      // Pre-populate mock store state before component mounts
+      // Simulate successful store action
       mockStore.events.value = mockEvents;
       mockStore.total.value = 1;
       mockStore.loading.value = false;
       mockStore.error.value = null;
 
-      // Mock store behavior to maintain state
-      mockStore.fetchEvents.mockImplementation(async () => {
-        // State is already set above
+      const { events, loading, error, total, refetch } = useEvents({ 
+        page: 1, 
+        pageSize: 10,
+        immediate: false 
       });
 
-      const TestComponent = defineComponent({
-        setup() {
-          return useEvents({ 
-            page: 1, 
-            pageSize: 10,
-            immediate: false 
-          });
-        },
-        template: '<div></div>'
-      });
-
-      const wrapper = mount(TestComponent);
-      const { events, loading, error, total, refetch } = (wrapper.vm as any);
-
-      expect(loading).toBe(false);
-      
       await refetch();
       await nextTick();
+
+      // Expect store action delegation
+      expect(mockStore.fetchEvents).toHaveBeenCalledWith({
+        page: 1,
+        pageSize: 10
+      });
 
       // Contract: composable should expose store state
       expect(events).toBeDefined();
@@ -284,8 +275,11 @@ describe('useEvents composables', () => {
       mockStore.loading.value = false;
       mockStore.error.value = null;
 
-      // Mock store behavior
-      mockStore.fetchEvent.mockResolvedValueOnce(mockEvent);
+      // Mock store behavior - simulate setting the event ref when fetchEvent is called
+      mockStore.fetchEvent.mockImplementation(async (slug: string) => {
+        mockStore.event.value = mockEvent;
+        return mockEvent;
+      });
 
       const TestComponent = defineComponent({
         setup() {

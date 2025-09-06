@@ -4,7 +4,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { EventsRestClient } from './EventsRestClient';
 import type { Event, EventsResponse, EventResponse, GetEventsParams, SearchEventsParams } from './types';
-import { mockFetch } from '../../../test/setup';
+import { mockFetch, expectUrlWithoutBase, expectQueryWithPlusEncoding } from '../../../test/setup';
 
 // Simple mock response helper for this test file
 const createMockResponse = (data: any, status = 200, ok = true) => {
@@ -95,6 +95,9 @@ describe('EventsRestClient', () => {
     // Ensure completely clean mock state for each test
     mockFetch.mockReset();
     mockFetch.mockClear();
+    
+    // Clear client cache to prevent cross-test contamination
+    client.clearCache();
   });
 
   afterEach(() => {
@@ -221,10 +224,15 @@ describe('EventsRestClient', () => {
 
       const result = await client.getEvents(params);
 
+      // Validate fetch call with cache-aware expectations
       expect(mockFetch).toHaveBeenCalledWith(
-        expect.stringContaining('/api/v1/events?page=1&pageSize=10&category=healthcare&featured=true&sortBy=date-desc'),
+        expect.stringMatching(new RegExp('http://localhost:7220/api/v1/events\\?page=1&pageSize=10&category=healthcare&featured=true&sortBy=date-desc')),
         expect.objectContaining({
-          method: 'GET'
+          method: 'GET',
+          headers: expect.objectContaining({
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+          })
         })
       );
       expect(result).toEqual(mockResponse);
@@ -241,10 +249,15 @@ describe('EventsRestClient', () => {
 
       const result = await client.getEvents();
 
+      // Validate fetch call with full URL pattern
       expect(mockFetch).toHaveBeenCalledWith(
-        expect.stringContaining('/api/v1/events'),
+        expect.stringMatching(new RegExp('http://localhost:7220/api/v1/events$')),
         expect.objectContaining({
-          method: 'GET'
+          method: 'GET',
+          headers: expect.objectContaining({
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+          })
         })
       );
       expect(result).toEqual(mockResponse);
@@ -456,10 +469,15 @@ describe('EventsRestClient', () => {
 
       await client.searchEvents(params);
 
+      // Validate search call with + encoding (URLSearchParams standard)
       expect(mockFetch).toHaveBeenCalledWith(
-        expect.stringContaining('/api/v1/events?search=healthcare%20workshop&page=1&pageSize=5&category=medical'),
+        expect.stringMatching(new RegExp('http://localhost:7220/api/v1/events\\?search=healthcare\\+workshop&page=1&pageSize=5&category=medical')),
         expect.objectContaining({
-          method: 'GET'
+          method: 'GET',
+          headers: expect.objectContaining({
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+          })
         })
       );
     }, 5000);
@@ -475,9 +493,16 @@ describe('EventsRestClient', () => {
 
       await client.searchEvents({ q: 'event with special & chars' });
 
+      // Validate special character encoding with + for spaces, %26 for &
       expect(mockFetch).toHaveBeenCalledWith(
-        expect.stringContaining('search=event%20with%20special%20%26%20chars'),
-        expect.any(Object)
+        expect.stringMatching(new RegExp('http://localhost:7220/api/v1/events\\?search=event\\+with\\+special\\+%26\\+chars')),
+        expect.objectContaining({
+          method: 'GET',
+          headers: expect.objectContaining({
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+          })
+        })
       );
     }, 5000);
   });

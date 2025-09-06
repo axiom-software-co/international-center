@@ -29,6 +29,9 @@ describe('ServicesRestClient', () => {
     // Ensure completely clean mock state for each test
     mockFetch.mockReset();
     mockFetch.mockClear();
+    
+    // Clear cache for complete test isolation
+    client.clearCache();
   });
 
   describe('getServices', () => {

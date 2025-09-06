@@ -17,19 +17,19 @@ export class MediaInquiryRestClient extends BaseRestClient {
 
   /**
    * Submit media inquiry
-   * Maps to POST /api/inquiries/media endpoint through Public Gateway
+   * Maps to POST /api/v1/inquiries/media endpoint through Public Gateway
    * Returns backend format with correlation_id for tracking
    */
   async submitMediaInquiry(submission: MediaInquirySubmission): Promise<InquirySubmissionResponse> {
-    return this.post<InquirySubmissionResponse>('/api/inquiries/media', submission);
+    return this.post<InquirySubmissionResponse>('/api/v1/inquiries/media', submission);
   }
 
   /**
    * Get media inquiry by ID
-   * Maps to GET /api/inquiries/media/{id} endpoint through Public Gateway
+   * Maps to GET /api/v1/inquiries/media/{id} endpoint through Public Gateway
    * Returns single media inquiry with metadata
    */
   async getMediaInquiry(inquiryId: string): Promise<InquiryGetResponse> {
-    return this.get<InquiryGetResponse>(`/api/inquiries/media/${inquiryId}`);
+    return this.get<InquiryGetResponse>(`/api/v1/inquiries/media/${inquiryId}`);
   }
 }

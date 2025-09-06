@@ -1,14 +1,26 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { BusinessInquiryRestClient } from './BusinessInquiryRestClient';
 import type { BusinessInquiry, BusinessInquirySubmission, InquirySubmissionResponse } from '../inquiries/types';
+import { mockFetch } from '../../../test/setup';
 
-// Mock the BaseRestClient
-vi.mock('./BaseRestClient');
+// Helper function to create mock responses
+const createMockResponse = (data: any, status = 200) => {
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    headers: {
+      get: vi.fn((header: string) => {
+        if (header === 'content-type') return 'application/json';
+        return null;
+      })
+    },
+    json: () => Promise.resolve(data),
+    text: () => Promise.resolve(JSON.stringify(data))
+  } as Response;
+};
 
 describe('BusinessInquiryRestClient', () => {
   let client: BusinessInquiryRestClient;
-  let mockPost: ReturnType<typeof vi.fn>;
-  let mockGet: ReturnType<typeof vi.fn>;
 
   const mockBusinessInquiry: BusinessInquiry = {
     inquiry_id: '123e4567-e89b-12d3-a456-426614174000',
@@ -47,13 +59,8 @@ describe('BusinessInquiryRestClient', () => {
   };
 
   beforeEach(() => {
-    mockPost = vi.fn();
-    mockGet = vi.fn();
-    
     client = new BusinessInquiryRestClient();
-    // Mock the inherited methods from BaseRestClient
-    (client as any).post = mockPost;
-    (client as any).get = mockGet;
+    mockFetch.mockReset();
   });
 
   afterEach(() => {
@@ -62,11 +69,20 @@ describe('BusinessInquiryRestClient', () => {
 
   describe('submitBusinessInquiry', () => {
     it('should submit business inquiry with valid data', async () => {
-      mockPost.mockResolvedValue(mockSubmissionResponse);
+      mockFetch.mockResolvedValue(createMockResponse(mockSubmissionResponse));
 
       const result = await client.submitBusinessInquiry(mockSubmissionData);
 
-      expect(mockPost).toHaveBeenCalledWith('/api/inquiries/business', mockSubmissionData);
+      expect(mockFetch).toHaveBeenCalledWith('http://localhost:7220/api/inquiries/business', expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'X-Retry-Attempt': '1'
+        }),
+        body: JSON.stringify(mockSubmissionData),
+        signal: expect.any(AbortSignal)
+      }));
       expect(result).toEqual(mockSubmissionResponse);
       expect(result.success).toBe(true);
       expect(result.business_inquiry?.inquiry_type).toBe('partnership');
@@ -85,11 +101,20 @@ describe('BusinessInquiryRestClient', () => {
         }
       };
 
-      mockPost.mockResolvedValue(responseWithOptionals);
+      mockFetch.mockResolvedValue(createMockResponse(responseWithOptionals));
 
       const result = await client.submitBusinessInquiry(submissionWithOptionalFields);
 
-      expect(mockPost).toHaveBeenCalledWith('/api/inquiries/business', submissionWithOptionalFields);
+      expect(mockFetch).toHaveBeenCalledWith('http://localhost:7220/api/inquiries/business', expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'X-Retry-Attempt': '1'
+        }),
+        body: JSON.stringify(submissionWithOptionalFields),
+        signal: expect.any(AbortSignal)
+      }));
       expect(result.business_inquiry?.industry).toBe('Healthcare Technology');
     });
 
@@ -108,7 +133,7 @@ describe('BusinessInquiryRestClient', () => {
         }
       };
 
-      mockPost.mockResolvedValue(researchResponse);
+      mockFetch.mockResolvedValue(createMockResponse(researchResponse));
 
       const result = await client.submitBusinessInquiry(researchInquiry);
 
@@ -124,7 +149,7 @@ describe('BusinessInquiryRestClient', () => {
         message: 'Invalid organization name'
       };
 
-      mockPost.mockRejectedValue(new Error('Network error'));
+      mockFetch.mockRejectedValue(new Error('Network error'));
 
       await expect(client.submitBusinessInquiry(mockSubmissionData))
         .rejects.toThrow('Network error');
@@ -141,7 +166,7 @@ describe('BusinessInquiryRestClient', () => {
         success: false
       };
 
-      mockPost.mockResolvedValue(validationErrorResponse);
+      mockFetch.mockResolvedValue(createMockResponse(validationErrorResponse));
 
       const result = await client.submitBusinessInquiry(mockSubmissionData);
 
@@ -159,7 +184,7 @@ describe('BusinessInquiryRestClient', () => {
         retry_after: 60
       };
 
-      mockPost.mockResolvedValue(rateLimitResponse);
+      mockFetch.mockResolvedValue(createMockResponse(rateLimitResponse));
 
       const result = await client.submitBusinessInquiry(mockSubmissionData);
 
@@ -176,11 +201,19 @@ describe('BusinessInquiryRestClient', () => {
         correlation_id: 'corr-get-123'
       };
 
-      mockGet.mockResolvedValue(getResponse);
+      mockFetch.mockResolvedValue(createMockResponse(getResponse));
 
       const result = await client.getBusinessInquiry('123e4567-e89b-12d3-a456-426614174000');
 
-      expect(mockGet).toHaveBeenCalledWith('/api/inquiries/business/123e4567-e89b-12d3-a456-426614174000');
+      expect(mockFetch).toHaveBeenCalledWith('http://localhost:7220/api/inquiries/business/123e4567-e89b-12d3-a456-426614174000', expect.objectContaining({
+        method: 'GET',
+        headers: expect.objectContaining({
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'X-Retry-Attempt': '1'
+        }),
+        signal: expect.any(AbortSignal)
+      }));
       expect(result).toEqual(getResponse);
       expect(result.business_inquiry?.inquiry_id).toBe('123e4567-e89b-12d3-a456-426614174000');
     });
@@ -192,7 +225,7 @@ describe('BusinessInquiryRestClient', () => {
         success: false
       };
 
-      mockGet.mockResolvedValue(notFoundResponse);
+      mockFetch.mockResolvedValue(createMockResponse(notFoundResponse));
 
       const result = await client.getBusinessInquiry('non-existent-id');
 
@@ -204,7 +237,7 @@ describe('BusinessInquiryRestClient', () => {
   describe('error handling', () => {
     it('should handle network errors appropriately', async () => {
       const networkError = new Error('Network connection failed');
-      mockPost.mockRejectedValue(networkError);
+      mockFetch.mockRejectedValue(networkError);
 
       await expect(client.submitBusinessInquiry(mockSubmissionData))
         .rejects.toThrow('Network connection failed');
@@ -212,14 +245,14 @@ describe('BusinessInquiryRestClient', () => {
 
     it('should handle timeout errors', async () => {
       const timeoutError = new Error('Request timeout');
-      mockPost.mockRejectedValue(timeoutError);
+      mockFetch.mockRejectedValue(timeoutError);
 
       await expect(client.submitBusinessInquiry(mockSubmissionData))
         .rejects.toThrow('Request timeout');
     });
 
     it('should handle malformed responses', async () => {
-      mockPost.mockResolvedValue(null);
+      mockFetch.mockResolvedValue(null);
 
       await expect(client.submitBusinessInquiry(mockSubmissionData))
         .rejects.toThrow();
@@ -228,11 +261,11 @@ describe('BusinessInquiryRestClient', () => {
 
   describe('request formatting', () => {
     it('should properly format business inquiry submission data', async () => {
-      mockPost.mockResolvedValue(mockSubmissionResponse);
+      mockFetch.mockResolvedValue(createMockResponse(mockSubmissionResponse));
 
       await client.submitBusinessInquiry(mockSubmissionData);
 
-      const calledWith = mockPost.mock.calls[0][1];
+      const calledWith = JSON.parse(mockFetch.mock.calls[0][1].body);
       expect(calledWith).toMatchObject({
         contact_name: 'John Smith',
         email: 'john.smith@company.com',
@@ -250,11 +283,11 @@ describe('BusinessInquiryRestClient', () => {
         industry: 'Healthcare'
       };
 
-      mockPost.mockResolvedValue(mockSubmissionResponse);
+      mockFetch.mockResolvedValue(createMockResponse(mockSubmissionResponse));
 
       await client.submitBusinessInquiry(submissionWithOptionals);
 
-      const calledWith = mockPost.mock.calls[0][1];
+      const calledWith = JSON.parse(mockFetch.mock.calls[0][1].body);
       expect(calledWith.phone).toBe('+1-555-123-4567');
       expect(calledWith.industry).toBe('Healthcare');
     });
@@ -266,11 +299,11 @@ describe('BusinessInquiryRestClient', () => {
         industry: undefined
       };
 
-      mockPost.mockResolvedValue(mockSubmissionResponse);
+      mockFetch.mockResolvedValue(createMockResponse(mockSubmissionResponse));
 
       await client.submitBusinessInquiry(submissionWithUndefined);
 
-      const calledWith = mockPost.mock.calls[0][1];
+      const calledWith = JSON.parse(mockFetch.mock.calls[0][1].body);
       expect(calledWith.phone).toBeUndefined();
       expect(calledWith.industry).toBeUndefined();
     });
@@ -278,7 +311,7 @@ describe('BusinessInquiryRestClient', () => {
 
   describe('response handling', () => {
     it('should properly parse successful submission response', async () => {
-      mockPost.mockResolvedValue(mockSubmissionResponse);
+      mockFetch.mockResolvedValue(createMockResponse(mockSubmissionResponse));
 
       const result = await client.submitBusinessInquiry(mockSubmissionData);
 
@@ -289,7 +322,7 @@ describe('BusinessInquiryRestClient', () => {
     });
 
     it('should handle responses with correlation IDs', async () => {
-      mockPost.mockResolvedValue(mockSubmissionResponse);
+      mockFetch.mockResolvedValue(createMockResponse(mockSubmissionResponse));
 
       const result = await client.submitBusinessInquiry(mockSubmissionData);
 
@@ -306,14 +339,14 @@ describe('BusinessInquiryRestClient', () => {
         message: 'We are seeking strategic partnerships for medical device development.'
       };
 
-      mockPost.mockResolvedValue({
+      mockFetch.mockResolvedValue(createMockResponse({
         ...mockSubmissionResponse,
         business_inquiry: {
           ...mockBusinessInquiry,
           inquiry_type: 'partnership',
           message: partnershipInquiry.message
         }
-      });
+      }));
 
       const result = await client.submitBusinessInquiry(partnershipInquiry);
 
@@ -328,14 +361,14 @@ describe('BusinessInquiryRestClient', () => {
         message: 'We are interested in licensing your patented medical technology.'
       };
 
-      mockPost.mockResolvedValue({
+      mockFetch.mockResolvedValue(createMockResponse({
         ...mockSubmissionResponse,
         business_inquiry: {
           ...mockBusinessInquiry,
           inquiry_type: 'licensing',
           message: licensingInquiry.message
         }
-      });
+      }));
 
       const result = await client.submitBusinessInquiry(licensingInquiry);
 
@@ -350,14 +383,14 @@ describe('BusinessInquiryRestClient', () => {
         message: 'We have innovative technology that could benefit your research.'
       };
 
-      mockPost.mockResolvedValue({
+      mockFetch.mockResolvedValue(createMockResponse({
         ...mockSubmissionResponse,
         business_inquiry: {
           ...mockBusinessInquiry,
           inquiry_type: 'technology',
           message: technologyInquiry.message
         }
-      });
+      }));
 
       const result = await client.submitBusinessInquiry(technologyInquiry);
 

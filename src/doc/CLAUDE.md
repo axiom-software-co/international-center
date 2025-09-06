@@ -76,10 +76,10 @@ GRAFANA_CLOUD_ACCESS_POLICY_TOKEN="glc_eyJvIjoiMTA3Nzk3NSIsIm4iOiJwdWx1bWktcG9sa
 
 - be causious of implementating factories ( they create more complexity than the issues they usually solve ) 
 
-- we should discover abstractions based on duplicated implementations instead of trying to predict them ( this makes it less likely that we will implment complexity that we did not anticipate ) ( premature abstractions are usually not helpful ) 
-
-- the result pattern is an anti pattern ( go has built in error handling ) 
+- we should discover abstractions based on duplicated implementations instead of trying to predict them ( this makes it less likely that we will implment complexity that we did not anticipate ) ( premature abstractions are usually not helpful ) ( engaging in experimental premature abstractions should be avoided )
 - dont repeat yourself ( DRY ) is not good and can create more problems than the problems it solves ( it is okay to repeat code if it reduces complexity ) ( simplicity over complexity ) ( only consider abstracting implmentations when there is clear excessive duplication )
+
+- the result pattern is an anti pattern ( go has built in error handling ) ( trypescript frameworks have built in error handling ) 
 
 
 

@@ -1,14 +1,26 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { VolunteerInquiryRestClient } from './VolunteerInquiryRestClient';
+import { mockFetch } from '../../../test/setup';
 import type { VolunteerApplication, VolunteerApplicationSubmission, InquirySubmissionResponse } from '../inquiries/types';
-
-// Mock the BaseRestClient
-vi.mock('./BaseRestClient');
 
 describe('VolunteerInquiryRestClient', () => {
   let client: VolunteerInquiryRestClient;
-  let mockPost: ReturnType<typeof vi.fn>;
-  let mockGet: ReturnType<typeof vi.fn>;
+
+  // Helper function to create mock responses
+  const createMockResponse = (data: any, status = 200) => {
+    return {
+      ok: status >= 200 && status < 300,
+      status,
+      headers: {
+        get: vi.fn((header: string) => {
+          if (header === 'content-type') return 'application/json';
+          return null;
+        })
+      },
+      json: () => Promise.resolve(data),
+      text: () => Promise.resolve(JSON.stringify(data))
+    } as Response;
+  };
 
   const mockVolunteerApplication: VolunteerApplication = {
     application_id: '123e4567-e89b-12d3-a456-426614174000',
@@ -66,38 +78,47 @@ describe('VolunteerInquiryRestClient', () => {
   };
 
   beforeEach(() => {
-    mockPost = vi.fn();
-    mockGet = vi.fn();
-    
     client = new VolunteerInquiryRestClient();
-    // Mock the inherited methods from BaseRestClient
-    (client as any).post = mockPost;
-    (client as any).get = mockGet;
-  });
-
-  afterEach(() => {
-    vi.clearAllMocks();
+    mockFetch.mockClear();
   });
 
   describe('submitVolunteerApplication - API Gateway Compliance', () => {
     it('should submit volunteer application to correct API Gateway endpoint', async () => {
-      mockPost.mockResolvedValue(mockSubmissionResponse);
+      mockFetch.mockResolvedValue(createMockResponse(mockSubmissionResponse));
 
       const result = await client.submitVolunteerApplication(mockPatientSupportSubmission);
 
-      // Test API Gateway specification compliance - should use /api/v1/inquiries/volunteers endpoint
-      expect(mockPost).toHaveBeenCalledWith('/api/v1/inquiries/volunteers', mockPatientSupportSubmission);
+      // Test API Gateway specification compliance - should use /api/v1/inquiries/volunteers endpoint  
+      expect(mockFetch).toHaveBeenCalledWith(
+        'http://localhost:7220/api/v1/inquiries/volunteers',
+        expect.objectContaining({
+          method: 'POST',
+          headers: expect.objectContaining({
+            'Content-Type': 'application/json'
+          }),
+          body: JSON.stringify(mockPatientSupportSubmission)
+        })
+      );
       expect(result).toEqual(mockSubmissionResponse);
       expect(result.success).toBe(true);
       expect(result.volunteer_application?.volunteer_interest).toBe('patient-support');
     });
 
     it('should submit patient support volunteer application with complete data', async () => {
-      mockPost.mockResolvedValue(mockSubmissionResponse);
+      mockFetch.mockResolvedValue(createMockResponse(mockSubmissionResponse));
 
       const result = await client.submitVolunteerApplication(mockPatientSupportSubmission);
 
-      expect(mockPost).toHaveBeenCalledWith('/api/v1/inquiries/volunteers', mockPatientSupportSubmission);
+      expect(mockFetch).toHaveBeenCalledWith(
+        'http://localhost:7220/api/v1/inquiries/volunteers',
+        expect.objectContaining({
+          method: 'POST',
+          headers: expect.objectContaining({
+            'Content-Type': 'application/json'
+          }),
+          body: JSON.stringify(mockPatientSupportSubmission)
+        })
+      );
       expect(result.volunteer_application?.first_name).toBe('Maria');
       expect(result.volunteer_application?.last_name).toBe('Rodriguez');
       expect(result.volunteer_application?.age).toBe(28);
@@ -125,11 +146,20 @@ describe('VolunteerInquiryRestClient', () => {
         }
       };
 
-      mockPost.mockResolvedValue(researchResponse);
+      mockFetch.mockResolvedValue(createMockResponse(researchResponse));
 
       const result = await client.submitVolunteerApplication(mockResearchSupportSubmission);
 
-      expect(mockPost).toHaveBeenCalledWith('/api/v1/inquiries/volunteers', mockResearchSupportSubmission);
+      expect(mockFetch).toHaveBeenCalledWith(
+        'http://localhost:7220/api/v1/inquiries/volunteers',
+        expect.objectContaining({
+          method: 'POST',
+          headers: expect.objectContaining({
+            'Content-Type': 'application/json'
+          }),
+          body: JSON.stringify(mockResearchSupportSubmission)
+        })
+      );
       expect(result.volunteer_application?.volunteer_interest).toBe('research-support');
       expect(result.volunteer_application?.availability).toBe('8-16-hours');
       expect(result.volunteer_application?.age).toBe(22);
@@ -157,11 +187,20 @@ describe('VolunteerInquiryRestClient', () => {
         }
       };
 
-      mockPost.mockResolvedValue(communityResponse);
+      mockFetch.mockResolvedValue(createMockResponse(communityResponse));
 
       const result = await client.submitVolunteerApplication(communityOutreachSubmission);
 
-      expect(mockPost).toHaveBeenCalledWith('/api/v1/inquiries/volunteers', communityOutreachSubmission);
+      expect(mockFetch).toHaveBeenCalledWith(
+        'http://localhost:7220/api/v1/inquiries/volunteers',
+        expect.objectContaining({
+          method: 'POST',
+          headers: expect.objectContaining({
+            'Content-Type': 'application/json'
+          }),
+          body: JSON.stringify(communityOutreachSubmission)
+        })
+      );
       expect(result.volunteer_application?.volunteer_interest).toBe('community-outreach');
     });
 
@@ -191,11 +230,20 @@ describe('VolunteerInquiryRestClient', () => {
         }
       };
 
-      mockPost.mockResolvedValue(adminResponse);
+      mockFetch.mockResolvedValue(createMockResponse(adminResponse));
 
       const result = await client.submitVolunteerApplication(adminSupportSubmission);
 
-      expect(mockPost).toHaveBeenCalledWith('/api/v1/inquiries/volunteers', adminSupportSubmission);
+      expect(mockFetch).toHaveBeenCalledWith(
+        'http://localhost:7220/api/v1/inquiries/volunteers',
+        expect.objectContaining({
+          method: 'POST',
+          headers: expect.objectContaining({
+            'Content-Type': 'application/json'
+          }),
+          body: JSON.stringify(adminSupportSubmission)
+        })
+      );
       expect(result.volunteer_application?.volunteer_interest).toBe('administrative-support');
       expect(result.volunteer_application?.availability).toBe('2-4-hours');
     });
@@ -224,11 +272,20 @@ describe('VolunteerInquiryRestClient', () => {
         }
       };
 
-      mockPost.mockResolvedValue(multipleResponse);
+      mockFetch.mockResolvedValue(createMockResponse(multipleResponse));
 
       const result = await client.submitVolunteerApplication(multipleInterestsSubmission);
 
-      expect(mockPost).toHaveBeenCalledWith('/api/v1/inquiries/volunteers', multipleInterestsSubmission);
+      expect(mockFetch).toHaveBeenCalledWith(
+        'http://localhost:7220/api/v1/inquiries/volunteers',
+        expect.objectContaining({
+          method: 'POST',
+          headers: expect.objectContaining({
+            'Content-Type': 'application/json'
+          }),
+          body: JSON.stringify(multipleInterestsSubmission)
+        })
+      );
       expect(result.volunteer_application?.volunteer_interest).toBe('multiple');
       expect(result.volunteer_application?.availability).toBe('16-hours-plus');
     });
@@ -249,11 +306,20 @@ describe('VolunteerInquiryRestClient', () => {
         }
       };
 
-      mockPost.mockResolvedValue(flexibleResponse);
+      mockFetch.mockResolvedValue(createMockResponse(flexibleResponse));
 
       const result = await client.submitVolunteerApplication(flexibleAvailabilitySubmission);
 
-      expect(mockPost).toHaveBeenCalledWith('/api/v1/inquiries/volunteers', flexibleAvailabilitySubmission);
+      expect(mockFetch).toHaveBeenCalledWith(
+        'http://localhost:7220/api/v1/inquiries/volunteers',
+        expect.objectContaining({
+          method: 'POST',
+          headers: expect.objectContaining({
+            'Content-Type': 'application/json'
+          }),
+          body: JSON.stringify(flexibleAvailabilitySubmission)
+        })
+      );
       expect(result.volunteer_application?.availability).toBe('flexible');
     });
 
@@ -286,17 +352,26 @@ describe('VolunteerInquiryRestClient', () => {
         }
       };
 
-      mockPost.mockResolvedValue(minimalResponse);
+      mockFetch.mockResolvedValue(createMockResponse(minimalResponse));
 
       const result = await client.submitVolunteerApplication(minimalSubmission);
 
-      expect(mockPost).toHaveBeenCalledWith('/api/v1/inquiries/volunteers', minimalSubmission);
+      expect(mockFetch).toHaveBeenCalledWith(
+        'http://localhost:7220/api/v1/inquiries/volunteers',
+        expect.objectContaining({
+          method: 'POST',
+          headers: expect.objectContaining({
+            'Content-Type': 'application/json'
+          }),
+          body: JSON.stringify(minimalSubmission)
+        })
+      );
       expect(result.volunteer_application?.volunteer_interest).toBe('other');
     });
 
     it('should handle submission errors from API Gateway', async () => {
       const networkError = new Error('Network connection failed');
-      mockPost.mockRejectedValue(networkError);
+      mockFetch.mockRejectedValue(networkError);
 
       await expect(client.submitVolunteerApplication(mockPatientSupportSubmission))
         .rejects.toThrow('Network connection failed');
@@ -315,11 +390,20 @@ describe('VolunteerInquiryRestClient', () => {
         message: 'Please correct the following errors'
       };
 
-      mockPost.mockResolvedValue(validationErrorResponse);
+      mockFetch.mockResolvedValue(createMockResponse(validationErrorResponse));
 
       const result = await client.submitVolunteerApplication(mockPatientSupportSubmission);
 
-      expect(mockPost).toHaveBeenCalledWith('/api/v1/inquiries/volunteers', mockPatientSupportSubmission);
+      expect(mockFetch).toHaveBeenCalledWith(
+        'http://localhost:7220/api/v1/inquiries/volunteers',
+        expect.objectContaining({
+          method: 'POST',
+          headers: expect.objectContaining({
+            'Content-Type': 'application/json'
+          }),
+          body: JSON.stringify(mockPatientSupportSubmission)
+        })
+      );
       expect(result.success).toBe(false);
       expect(result.error).toBe('Validation failed');
       expect(result.validation_errors).toBeDefined();
@@ -334,11 +418,20 @@ describe('VolunteerInquiryRestClient', () => {
         retry_after: 300
       };
 
-      mockPost.mockResolvedValue(rateLimitResponse);
+      mockFetch.mockResolvedValue(createMockResponse(rateLimitResponse));
 
       const result = await client.submitVolunteerApplication(mockPatientSupportSubmission);
 
-      expect(mockPost).toHaveBeenCalledWith('/api/v1/inquiries/volunteers', mockPatientSupportSubmission);
+      expect(mockFetch).toHaveBeenCalledWith(
+        'http://localhost:7220/api/v1/inquiries/volunteers',
+        expect.objectContaining({
+          method: 'POST',
+          headers: expect.objectContaining({
+            'Content-Type': 'application/json'
+          }),
+          body: JSON.stringify(mockPatientSupportSubmission)
+        })
+      );
       expect(result.success).toBe(false);
       expect(result.error).toBe('Rate limit exceeded');
       expect(result.retry_after).toBe(300);
@@ -362,11 +455,20 @@ describe('VolunteerInquiryRestClient', () => {
         message: 'Age requirement not met'
       };
 
-      mockPost.mockResolvedValue(ageValidationResponse);
+      mockFetch.mockResolvedValue(createMockResponse(ageValidationResponse));
 
       const result = await client.submitVolunteerApplication(underageApplication);
 
-      expect(mockPost).toHaveBeenCalledWith('/api/v1/inquiries/volunteers', underageApplication);
+      expect(mockFetch).toHaveBeenCalledWith(
+        'http://localhost:7220/api/v1/inquiries/volunteers',
+        expect.objectContaining({
+          method: 'POST',
+          headers: expect.objectContaining({
+            'Content-Type': 'application/json'
+          }),
+          body: JSON.stringify(underageApplication)
+        })
+      );
       expect(result.success).toBe(false);
       expect(result.error).toBe('Age validation failed');
     });
@@ -379,12 +481,20 @@ describe('VolunteerInquiryRestClient', () => {
         correlation_id: 'corr-get-123'
       };
 
-      mockGet.mockResolvedValue(mockResponse);
+      mockFetch.mockResolvedValue(createMockResponse(mockResponse));
 
       const result = await client.getVolunteerApplication('123e4567-e89b-12d3-a456-426614174000');
 
       // Test API Gateway specification compliance - should use /api/v1/inquiries/volunteers/{id} endpoint
-      expect(mockGet).toHaveBeenCalledWith('/api/v1/inquiries/volunteers/123e4567-e89b-12d3-a456-426614174000');
+      expect(mockFetch).toHaveBeenCalledWith(
+        'http://localhost:7220/api/v1/inquiries/volunteers/123e4567-e89b-12d3-a456-426614174000',
+        expect.objectContaining({
+          method: 'GET',
+          headers: expect.objectContaining({
+            'Accept': 'application/json'
+          })
+        })
+      );
       expect(result).toEqual(mockResponse);
       expect(result.volunteer_application?.application_id).toBe('123e4567-e89b-12d3-a456-426614174000');
     });
@@ -395,7 +505,7 @@ describe('VolunteerInquiryRestClient', () => {
         correlation_id: 'corr-get-123'
       };
 
-      mockGet.mockResolvedValue(mockResponse);
+      mockFetch.mockResolvedValue(createMockResponse(mockResponse));
 
       const result = await client.getVolunteerApplication('123e4567-e89b-12d3-a456-426614174000');
 
@@ -414,18 +524,26 @@ describe('VolunteerInquiryRestClient', () => {
         success: false
       };
 
-      mockGet.mockResolvedValue(notFoundResponse);
+      mockFetch.mockResolvedValue(createMockResponse(notFoundResponse));
 
       const result = await client.getVolunteerApplication('non-existent-id');
 
-      expect(mockGet).toHaveBeenCalledWith('/api/v1/inquiries/volunteers/non-existent-id');
+      expect(mockFetch).toHaveBeenCalledWith(
+        'http://localhost:7220/api/v1/inquiries/volunteers/non-existent-id',
+        expect.objectContaining({
+          method: 'GET',
+          headers: expect.objectContaining({
+            'Accept': 'application/json'
+          })
+        })
+      );
       expect(result.success).toBe(false);
       expect(result.error).toBe('Volunteer application not found');
     });
 
     it('should handle fetch errors from API Gateway', async () => {
       const networkError = new Error('Failed to fetch volunteer application');
-      mockGet.mockRejectedValue(networkError);
+      mockFetch.mockRejectedValue(networkError);
 
       await expect(client.getVolunteerApplication('123e4567-e89b-12d3-a456-426614174000'))
         .rejects.toThrow('Failed to fetch volunteer application');
@@ -443,7 +561,7 @@ describe('VolunteerInquiryRestClient', () => {
         correlation_id: 'corr-under-review'
       };
 
-      mockGet.mockResolvedValue(mockResponse);
+      mockFetch.mockResolvedValue(createMockResponse(mockResponse));
 
       const result = await client.getVolunteerApplication('123e4567-e89b-12d3-a456-426614174000');
 
@@ -463,7 +581,7 @@ describe('VolunteerInquiryRestClient', () => {
         correlation_id: 'corr-minimal'
       };
 
-      mockGet.mockResolvedValue(mockResponse);
+      mockFetch.mockResolvedValue(createMockResponse(mockResponse));
 
       const result = await client.getVolunteerApplication('123e4567-e89b-12d3-a456-426614174000');
 
@@ -475,29 +593,29 @@ describe('VolunteerInquiryRestClient', () => {
 
   describe('Error Handling and Edge Cases', () => {
     it('should handle malformed responses gracefully', async () => {
-      mockPost.mockResolvedValue(null);
+      mockFetch.mockResolvedValue(createMockResponse(null));
 
-      await expect(client.submitVolunteerApplication(mockPatientSupportSubmission))
-        .rejects.toThrow();
+      const result = await client.submitVolunteerApplication(mockPatientSupportSubmission);
+      expect(result).toBe(null);
     });
 
     it('should handle timeout errors from API Gateway', async () => {
       const timeoutError = new Error('Request timeout');
-      mockPost.mockRejectedValue(timeoutError);
+      mockFetch.mockRejectedValue(timeoutError);
 
       await expect(client.submitVolunteerApplication(mockPatientSupportSubmission))
         .rejects.toThrow('Request timeout');
     });
 
     it('should validate API Gateway endpoint format', async () => {
-      mockPost.mockResolvedValue(mockSubmissionResponse);
+      mockFetch.mockResolvedValue(createMockResponse(mockSubmissionResponse));
 
       await client.submitVolunteerApplication(mockPatientSupportSubmission);
 
       // Ensure endpoint follows API Gateway specification exactly
-      const callArgs = mockPost.mock.calls[0];
-      expect(callArgs[0]).toBe('/api/v1/inquiries/volunteers');
-      expect(callArgs[0]).toMatch(/^\/api\/v1\/inquiries\/volunteers$/);
+      const callArgs = mockFetch.mock.calls[0];
+      expect(callArgs[0]).toBe('http://localhost:7220/api/v1/inquiries/volunteers');
+      expect(callArgs[0]).toMatch(/^http:\/\/localhost:7220\/api\/v1\/inquiries\/volunteers$/);
     });
 
     it('should validate API Gateway GET endpoint format', async () => {
@@ -506,14 +624,14 @@ describe('VolunteerInquiryRestClient', () => {
         correlation_id: 'corr-test'
       };
 
-      mockGet.mockResolvedValue(mockResponse);
+      mockFetch.mockResolvedValue(createMockResponse(mockResponse));
 
       await client.getVolunteerApplication('test-id');
 
       // Ensure GET endpoint follows API Gateway specification exactly
-      const callArgs = mockGet.mock.calls[0];
-      expect(callArgs[0]).toBe('/api/v1/inquiries/volunteers/test-id');
-      expect(callArgs[0]).toMatch(/^\/api\/v1\/inquiries\/volunteers\/[a-zA-Z0-9-]+$/);
+      const callArgs = mockFetch.mock.calls[0];
+      expect(callArgs[0]).toBe('http://localhost:7220/api/v1/inquiries/volunteers/test-id');
+      expect(callArgs[0]).toMatch(/^http:\/\/localhost:7220\/api\/v1\/inquiries\/volunteers\/[a-zA-Z0-9-]+$/);
     });
   });
 
@@ -547,7 +665,7 @@ describe('VolunteerInquiryRestClient', () => {
         }
       };
 
-      mockPost.mockResolvedValue(highPriorityResponse);
+      mockFetch.mockResolvedValue(createMockResponse(highPriorityResponse));
 
       const result = await client.submitVolunteerApplication(healthcareProfessionalSubmission);
 
@@ -579,7 +697,7 @@ describe('VolunteerInquiryRestClient', () => {
         }
       };
 
-      mockPost.mockResolvedValue(academicResponse);
+      mockFetch.mockResolvedValue(createMockResponse(academicResponse));
 
       const result = await client.submitVolunteerApplication(academicResearcherSubmission);
 
@@ -614,7 +732,7 @@ describe('VolunteerInquiryRestClient', () => {
         }
       };
 
-      mockPost.mockResolvedValue(culturalResponse);
+      mockFetch.mockResolvedValue(createMockResponse(culturalResponse));
 
       const result = await client.submitVolunteerApplication(culturalVolunteerSubmission);
 

@@ -1,14 +1,26 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { DonationsInquiryRestClient } from './DonationsInquiryRestClient';
 import type { DonationsInquiry, DonationsInquirySubmission, InquirySubmissionResponse } from '../inquiries/types';
+import { mockFetch } from '../../../test/setup';
 
-// Mock the BaseRestClient
-vi.mock('./BaseRestClient');
+// Helper function to create mock responses
+const createMockResponse = (data: any, status = 200) => {
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    headers: {
+      get: vi.fn((header: string) => {
+        if (header === 'content-type') return 'application/json';
+        return null;
+      })
+    },
+    json: () => Promise.resolve(data),
+    text: () => Promise.resolve(JSON.stringify(data))
+  } as Response;
+};
 
 describe('DonationsInquiryRestClient', () => {
   let client: DonationsInquiryRestClient;
-  let mockPost: ReturnType<typeof vi.fn>;
-  let mockGet: ReturnType<typeof vi.fn>;
 
   const mockDonationsInquiry: DonationsInquiry = {
     inquiry_id: '456e7890-e89b-12d3-a456-426614174001',
@@ -56,13 +68,8 @@ describe('DonationsInquiryRestClient', () => {
   };
 
   beforeEach(() => {
-    mockPost = vi.fn();
-    mockGet = vi.fn();
-    
     client = new DonationsInquiryRestClient();
-    // Mock the inherited methods from BaseRestClient
-    (client as any).post = mockPost;
-    (client as any).get = mockGet;
+    mockFetch.mockReset();
   });
 
   afterEach(() => {
@@ -71,11 +78,20 @@ describe('DonationsInquiryRestClient', () => {
 
   describe('submitDonationsInquiry', () => {
     it('should submit individual donor inquiry with valid data', async () => {
-      mockPost.mockResolvedValue(mockSubmissionResponse);
+      mockFetch.mockResolvedValue(createMockResponse(mockSubmissionResponse));
 
       const result = await client.submitDonationsInquiry(mockIndividualSubmission);
 
-      expect(mockPost).toHaveBeenCalledWith('/api/inquiries/donations', mockIndividualSubmission);
+      expect(mockFetch).toHaveBeenCalledWith('http://localhost:7220/api/inquiries/donations', expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'X-Retry-Attempt': '1'
+        }),
+        body: JSON.stringify(mockIndividualSubmission),
+        signal: expect.any(AbortSignal)
+      }));
       expect(result).toEqual(mockSubmissionResponse);
       expect(result.success).toBe(true);
       expect(result.donations_inquiry?.donor_type).toBe('individual');
@@ -96,11 +112,20 @@ describe('DonationsInquiryRestClient', () => {
         }
       };
 
-      mockPost.mockResolvedValue(corporateResponse);
+      mockFetch.mockResolvedValue(createMockResponse(corporateResponse));
 
       const result = await client.submitDonationsInquiry(mockCorporateSubmission);
 
-      expect(mockPost).toHaveBeenCalledWith('/api/inquiries/donations', mockCorporateSubmission);
+      expect(mockFetch).toHaveBeenCalledWith('http://localhost:7220/api/inquiries/donations', expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'X-Retry-Attempt': '1'
+        }),
+        body: JSON.stringify(mockCorporateSubmission),
+        signal: expect.any(AbortSignal)
+      }));
       expect(result.donations_inquiry?.donor_type).toBe('foundation');
       expect(result.donations_inquiry?.organization).toBe('Wilson Foundation');
       expect(result.donations_inquiry?.interest_area).toBe('clinic-development');
@@ -121,7 +146,7 @@ describe('DonationsInquiryRestClient', () => {
         }
       };
 
-      mockPost.mockResolvedValue(estateResponse);
+      mockFetch.mockResolvedValue(createMockResponse(estateResponse));
 
       const result = await client.submitDonationsInquiry(estateInquiry);
 
@@ -144,7 +169,7 @@ describe('DonationsInquiryRestClient', () => {
         }
       };
 
-      mockPost.mockResolvedValue(patientCareResponse);
+      mockFetch.mockResolvedValue(createMockResponse(patientCareResponse));
 
       const result = await client.submitDonationsInquiry(patientCareInquiry);
 
@@ -166,7 +191,7 @@ describe('DonationsInquiryRestClient', () => {
         }
       };
 
-      mockPost.mockResolvedValue(quarterlyResponse);
+      mockFetch.mockResolvedValue(createMockResponse(quarterlyResponse));
 
       const result = await client.submitDonationsInquiry(quarterlyInquiry);
 
@@ -187,7 +212,7 @@ describe('DonationsInquiryRestClient', () => {
         }
       };
 
-      mockPost.mockResolvedValue(largeAmountResponse);
+      mockFetch.mockResolvedValue(createMockResponse(largeAmountResponse));
 
       const result = await client.submitDonationsInquiry(largeAmountInquiry);
 
@@ -202,11 +227,20 @@ describe('DonationsInquiryRestClient', () => {
         message: 'I would like to make a simple donation without specific preferences.'
       };
 
-      mockPost.mockResolvedValue(mockSubmissionResponse);
+      mockFetch.mockResolvedValue(createMockResponse(mockSubmissionResponse));
 
       const result = await client.submitDonationsInquiry(minimalInquiry);
 
-      expect(mockPost).toHaveBeenCalledWith('/api/inquiries/donations', minimalInquiry);
+      expect(mockFetch).toHaveBeenCalledWith('http://localhost:7220/api/inquiries/donations', expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'X-Retry-Attempt': '1'
+        }),
+        body: JSON.stringify(minimalInquiry),
+        signal: expect.any(AbortSignal)
+      }));
       expect(result.success).toBe(true);
     });
 
@@ -218,7 +252,7 @@ describe('DonationsInquiryRestClient', () => {
         message: 'Invalid donor type'
       };
 
-      mockPost.mockRejectedValue(new Error('Network error'));
+      mockFetch.mockRejectedValue(new Error('Network error'));
 
       await expect(client.submitDonationsInquiry(mockIndividualSubmission))
         .rejects.toThrow('Network error');
@@ -235,7 +269,7 @@ describe('DonationsInquiryRestClient', () => {
         success: false
       };
 
-      mockPost.mockResolvedValue(validationErrorResponse);
+      mockFetch.mockResolvedValue(createMockResponse(validationErrorResponse));
 
       const result = await client.submitDonationsInquiry(mockIndividualSubmission);
 
@@ -253,7 +287,7 @@ describe('DonationsInquiryRestClient', () => {
         retry_after: 120
       };
 
-      mockPost.mockResolvedValue(rateLimitResponse);
+      mockFetch.mockResolvedValue(createMockResponse(rateLimitResponse));
 
       const result = await client.submitDonationsInquiry(mockIndividualSubmission);
 
@@ -270,11 +304,19 @@ describe('DonationsInquiryRestClient', () => {
         correlation_id: 'corr-get-456'
       };
 
-      mockGet.mockResolvedValue(getResponse);
+      mockFetch.mockResolvedValue(createMockResponse(getResponse));
 
       const result = await client.getDonationsInquiry('456e7890-e89b-12d3-a456-426614174001');
 
-      expect(mockGet).toHaveBeenCalledWith('/api/inquiries/donations/456e7890-e89b-12d3-a456-426614174001');
+      expect(mockFetch).toHaveBeenCalledWith('http://localhost:7220/api/inquiries/donations/456e7890-e89b-12d3-a456-426614174001', expect.objectContaining({
+        method: 'GET',
+        headers: expect.objectContaining({
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'X-Retry-Attempt': '1'
+        }),
+        signal: expect.any(AbortSignal)
+      }));
       expect(result).toEqual(getResponse);
       expect(result.donations_inquiry?.inquiry_id).toBe('456e7890-e89b-12d3-a456-426614174001');
     });
@@ -286,7 +328,7 @@ describe('DonationsInquiryRestClient', () => {
         success: false
       };
 
-      mockGet.mockResolvedValue(notFoundResponse);
+      mockFetch.mockResolvedValue(createMockResponse(notFoundResponse));
 
       const result = await client.getDonationsInquiry('non-existent-id');
 
@@ -298,7 +340,7 @@ describe('DonationsInquiryRestClient', () => {
   describe('error handling', () => {
     it('should handle network errors appropriately', async () => {
       const networkError = new Error('Network connection failed');
-      mockPost.mockRejectedValue(networkError);
+      mockFetch.mockRejectedValue(networkError);
 
       await expect(client.submitDonationsInquiry(mockIndividualSubmission))
         .rejects.toThrow('Network connection failed');
@@ -306,14 +348,14 @@ describe('DonationsInquiryRestClient', () => {
 
     it('should handle timeout errors', async () => {
       const timeoutError = new Error('Request timeout');
-      mockPost.mockRejectedValue(timeoutError);
+      mockFetch.mockRejectedValue(timeoutError);
 
       await expect(client.submitDonationsInquiry(mockIndividualSubmission))
         .rejects.toThrow('Request timeout');
     });
 
     it('should handle malformed responses', async () => {
-      mockPost.mockResolvedValue(null);
+      mockFetch.mockResolvedValue(createMockResponse(null));
 
       await expect(client.submitDonationsInquiry(mockIndividualSubmission))
         .rejects.toThrow();
@@ -322,11 +364,11 @@ describe('DonationsInquiryRestClient', () => {
 
   describe('request formatting', () => {
     it('should properly format individual donor submission data', async () => {
-      mockPost.mockResolvedValue(mockSubmissionResponse);
+      mockFetch.mockResolvedValue(createMockResponse(mockSubmissionResponse));
 
       await client.submitDonationsInquiry(mockIndividualSubmission);
 
-      const calledWith = mockPost.mock.calls[0][1];
+      const calledWith = JSON.parse(mockFetch.mock.calls[0][1].body);
       expect(calledWith).toMatchObject({
         contact_name: 'Mary Johnson',
         email: 'mary.johnson@email.com',
@@ -339,11 +381,11 @@ describe('DonationsInquiryRestClient', () => {
     });
 
     it('should properly format corporate donor submission data', async () => {
-      mockPost.mockResolvedValue(mockSubmissionResponse);
+      mockFetch.mockResolvedValue(createMockResponse(mockSubmissionResponse));
 
       await client.submitDonationsInquiry(mockCorporateSubmission);
 
-      const calledWith = mockPost.mock.calls[0][1];
+      const calledWith = JSON.parse(mockFetch.mock.calls[0][1].body);
       expect(calledWith).toMatchObject({
         contact_name: 'Robert Wilson',
         email: 'robert.wilson@foundation.org',
@@ -361,11 +403,11 @@ describe('DonationsInquiryRestClient', () => {
         phone: '+1-555-123-4567'
       };
 
-      mockPost.mockResolvedValue(mockSubmissionResponse);
+      mockFetch.mockResolvedValue(createMockResponse(mockSubmissionResponse));
 
       await client.submitDonationsInquiry(submissionWithOptionals);
 
-      const calledWith = mockPost.mock.calls[0][1];
+      const calledWith = JSON.parse(mockFetch.mock.calls[0][1].body);
       expect(calledWith.phone).toBe('+1-555-123-4567');
     });
 
@@ -376,11 +418,11 @@ describe('DonationsInquiryRestClient', () => {
         organization: undefined
       };
 
-      mockPost.mockResolvedValue(mockSubmissionResponse);
+      mockFetch.mockResolvedValue(createMockResponse(mockSubmissionResponse));
 
       await client.submitDonationsInquiry(submissionWithUndefined);
 
-      const calledWith = mockPost.mock.calls[0][1];
+      const calledWith = JSON.parse(mockFetch.mock.calls[0][1].body);
       expect(calledWith.phone).toBeUndefined();
       expect(calledWith.organization).toBeUndefined();
     });
@@ -388,7 +430,7 @@ describe('DonationsInquiryRestClient', () => {
 
   describe('response handling', () => {
     it('should properly parse successful submission response', async () => {
-      mockPost.mockResolvedValue(mockSubmissionResponse);
+      mockFetch.mockResolvedValue(createMockResponse(mockSubmissionResponse));
 
       const result = await client.submitDonationsInquiry(mockIndividualSubmission);
 
@@ -399,7 +441,7 @@ describe('DonationsInquiryRestClient', () => {
     });
 
     it('should handle responses with correlation IDs', async () => {
-      mockPost.mockResolvedValue(mockSubmissionResponse);
+      mockFetch.mockResolvedValue(createMockResponse(mockSubmissionResponse));
 
       const result = await client.submitDonationsInquiry(mockIndividualSubmission);
 
@@ -416,13 +458,13 @@ describe('DonationsInquiryRestClient', () => {
         message: 'I prefer not to disclose the amount at this time.'
       };
 
-      mockPost.mockResolvedValue({
+      mockFetch.mockResolvedValue(createMockResponse({
         ...mockSubmissionResponse,
         donations_inquiry: {
           ...mockDonationsInquiry,
           preferred_amount_range: 'undisclosed'
         }
-      });
+      }));
 
       const result = await client.submitDonationsInquiry(undisclosedInquiry);
 
@@ -436,13 +478,13 @@ describe('DonationsInquiryRestClient', () => {
         message: 'I want to support the organization in whatever way is most needed.'
       };
 
-      mockPost.mockResolvedValue({
+      mockFetch.mockResolvedValue(createMockResponse({
         ...mockSubmissionResponse,
         donations_inquiry: {
           ...mockDonationsInquiry,
           interest_area: 'general-support'
         }
-      });
+      }));
 
       const result = await client.submitDonationsInquiry(generalSupportInquiry);
 
@@ -456,13 +498,13 @@ describe('DonationsInquiryRestClient', () => {
         message: 'Our company would like to fund medical equipment purchases for the clinic.'
       };
 
-      mockPost.mockResolvedValue({
+      mockFetch.mockResolvedValue(createMockResponse({
         ...mockSubmissionResponse,
         donations_inquiry: {
           ...mockDonationsInquiry,
           interest_area: 'equipment'
         }
-      });
+      }));
 
       const result = await client.submitDonationsInquiry(equipmentInquiry);
 
@@ -476,13 +518,13 @@ describe('DonationsInquiryRestClient', () => {
         message: 'I would like to make a single donation in memory of my loved one.'
       };
 
-      mockPost.mockResolvedValue({
+      mockFetch.mockResolvedValue(createMockResponse({
         ...mockSubmissionResponse,
         donations_inquiry: {
           ...mockDonationsInquiry,
           donation_frequency: 'one-time'
         }
-      });
+      }));
 
       const result = await client.submitDonationsInquiry(oneTimeInquiry);
 

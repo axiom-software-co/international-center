@@ -1,4 +1,5 @@
 import { config } from '../../environments';
+import { RestClientCache } from './RestClientCache';
 
 export interface RestClientConfig {
   baseUrl: string;
@@ -42,6 +43,7 @@ export abstract class BaseRestClient {
   protected readonly baseUrl: string;
   protected readonly timeout: number;
   protected readonly retryAttempts: number;
+  private cache = new RestClientCache();
 
   constructor(clientConfig: RestClientConfig) {
     this.baseUrl = clientConfig.baseUrl;
@@ -54,6 +56,19 @@ export abstract class BaseRestClient {
     options: RequestInit = {}
   ): Promise<T> {
     return this.requestWithRetry<T>(endpoint, options, this.retryAttempts);
+  }
+
+  protected async get<T>(endpoint: string): Promise<T> {
+    return this.request<T>(endpoint, {
+      method: 'GET',
+    });
+  }
+
+  protected async post<T>(endpoint: string, data?: any): Promise<T> {
+    return this.request<T>(endpoint, {
+      method: 'POST',
+      body: data ? JSON.stringify(data) : undefined,
+    });
   }
 
   private async requestWithRetry<T>(
@@ -226,6 +241,24 @@ export abstract class BaseRestClient {
 
   private delay(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  // Cache integration methods for domain REST clients
+  protected async requestWithCache<T>(
+    endpoint: string,
+    options: RequestInit,
+    cacheKey: string,
+    ttl: number
+  ): Promise<T> {
+    return this.cache.requestWithCache<T>(this, endpoint, options, cacheKey, ttl);
+  }
+
+  protected invalidateCacheKey(key: string): void {
+    this.cache.invalidateCacheKey(key);
+  }
+
+  protected invalidateCachePattern(pattern: string): void {
+    this.cache.invalidateCachePattern(pattern);
   }
 
   // Health check method

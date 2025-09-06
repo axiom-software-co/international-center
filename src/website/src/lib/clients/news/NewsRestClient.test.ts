@@ -66,11 +66,14 @@ describe('NewsRestClient', () => {
 
   beforeEach(() => {
     // Use setup.ts global cleanup, just initialize client
-    client = new NewsRestClient('http://localhost:8080');
+    client = new NewsRestClient('http://localhost:7220');
     
     // Ensure completely clean mock state for each test
     mockFetch.mockReset();
     mockFetch.mockClear();
+    
+    // Clear cache for complete test isolation
+    client.clearCache();
   });
 
   describe('Database Schema Compliance', () => {
@@ -178,17 +181,16 @@ describe('NewsRestClient', () => {
 
       const result = await client.getNews();
 
-      // Fetch call verification - console logs confirm calls are happening correctly
-      // expect(mockFetch).toHaveBeenCalledWith(
-      //   'http://localhost:8080/api/v1/news',
-      //   expect.objectContaining({
-      //     method: 'GET',
-      //     headers: expect.objectContaining({
-      //       'Accept': 'application/json',
-      //       'Content-Type': 'application/json',
-      //     }),
-      //   })
-      // );
+      expect(mockFetch).toHaveBeenCalledWith(
+        'http://localhost:7220/api/v1/news',
+        expect.objectContaining({
+          method: 'GET',
+          headers: expect.objectContaining({
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+          }),
+        })
+      );
 
       expect(result).toEqual(mockNewsResponse);
       
@@ -223,20 +225,16 @@ describe('NewsRestClient', () => {
 
       await client.getNews(params);
 
-      const expectedUrl = new URL('http://localhost:8080/api/v1/news');
-      expectedUrl.searchParams.set('page', '2');
-      expectedUrl.searchParams.set('pageSize', '20');
-      expectedUrl.searchParams.set('category', 'announcements');
-      expectedUrl.searchParams.set('featured', 'true');
-      expectedUrl.searchParams.set('sortBy', 'date-desc');
-
-      // Fetch call verification - console logs confirm calls are happening correctly
-      // expect(mockFetch).toHaveBeenCalledWith(
-      //   expectedUrl.toString(),
-      //   expect.objectContaining({
-      //     method: 'GET',
-      //   })
-      // );
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.stringMatching(new RegExp('http://localhost:7220/api/v1/news\\?page=2&pageSize=20&category=announcements&featured=true&sortBy=date-desc')),
+        expect.objectContaining({
+          method: 'GET',
+          headers: expect.objectContaining({
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+          })
+        })
+      );
     }, 5000);
 
     it('should handle API errors with correlation tracking', async () => {
@@ -295,9 +293,13 @@ describe('NewsRestClient', () => {
       const result = await client.getNewsArticleBySlug('single-news-article');
 
       expect(mockFetch).toHaveBeenCalledWith(
-        'http://localhost:8080/api/v1/news/slug/single-news-article',
+        'http://localhost:7220/api/v1/news/slug/single-news-article',
         expect.objectContaining({
           method: 'GET',
+          headers: expect.objectContaining({
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+          })
         })
       );
 
@@ -360,13 +362,16 @@ describe('NewsRestClient', () => {
 
       const result = await client.getFeaturedNews(5);
 
-      // Fetch call verification - functional behavior confirmed by console logs
-      // expect(mockFetch).toHaveBeenCalledWith(
-      //   'http://localhost:8080/api/v1/news/featured?limit=5',
-      //   expect.objectContaining({
-      //     method: 'GET',
-      //   })
-      // );
+      expect(mockFetch).toHaveBeenCalledWith(
+        'http://localhost:7220/api/v1/news/featured?limit=5',
+        expect.objectContaining({
+          method: 'GET',
+          headers: expect.objectContaining({
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+          })
+        })
+      );
 
       expect(result).toEqual(mockResponse);
       expect(result.news[0].news_type).toBe('feature');
@@ -387,13 +392,16 @@ describe('NewsRestClient', () => {
 
       await client.getFeaturedNews();
 
-      // Fetch call verification - functional behavior confirmed by console logs
-      // expect(mockFetch).toHaveBeenCalledWith(
-      //   'http://localhost:8080/api/v1/news/featured',
-      //   expect.objectContaining({
-      //     method: 'GET',
-      //   })
-      // );
+      expect(mockFetch).toHaveBeenCalledWith(
+        'http://localhost:7220/api/v1/news/featured',
+        expect.objectContaining({
+          method: 'GET',
+          headers: expect.objectContaining({
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+          })
+        })
+      );
     }, 5000);
   });
 
@@ -442,17 +450,14 @@ describe('NewsRestClient', () => {
 
       const result = await client.searchNews(params);
 
-      const expectedUrl = new URL('http://localhost:8080/api/v1/news/search');
-      expectedUrl.searchParams.set('q', 'breaking news');
-      expectedUrl.searchParams.set('page', '1');
-      expectedUrl.searchParams.set('pageSize', '10');
-      expectedUrl.searchParams.set('category', 'announcements');
-      expectedUrl.searchParams.set('sortBy', 'date-desc');
-
       expect(mockFetch).toHaveBeenCalledWith(
-        expectedUrl.toString(),
+        expect.stringMatching(new RegExp('http://localhost:7220/api/v1/news/search\\?q=breaking\+news&page=1&pageSize=10&category=announcements&sortBy=date-desc')),
         expect.objectContaining({
           method: 'GET',
+          headers: expect.objectContaining({
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+          })
         })
       );
 
@@ -506,9 +511,13 @@ describe('NewsRestClient', () => {
       const result = await client.getNewsCategories();
 
       expect(mockFetch).toHaveBeenCalledWith(
-        'http://localhost:8080/api/v1/news/categories',
+        'http://localhost:7220/api/v1/news/categories',
         expect.objectContaining({
           method: 'GET',
+          headers: expect.objectContaining({
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+          })
         })
       );
 

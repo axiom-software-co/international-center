@@ -6,10 +6,16 @@ export default defineConfig({
   plugins: [vue()],
   test: {
     globals: true,
-    environment: 'jsdom',
-    setupFiles: ['./src/test/setup.ts'],
-    include: ['src/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}'],
-    exclude: ['node_modules/**', 'dist/**', '.cache/**', 'e2e/**'],
+    environment: process.env.TEST_INTEGRATION ? 'node' : 'jsdom',
+    setupFiles: process.env.TEST_INTEGRATION 
+      ? ['./src/test/integration/setup.ts']
+      : ['./src/test/setup.ts'],
+    include: process.env.TEST_INTEGRATION 
+      ? ['src/test/integration/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}']
+      : ['src/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}'],
+    exclude: process.env.TEST_INTEGRATION
+      ? ['node_modules/**', 'dist/**', '.cache/**', 'e2e/**']
+      : ['node_modules/**', 'dist/**', '.cache/**', 'e2e/**', 'src/test/integration/**'],
     
     // Resource management - limit memory usage and processes
     pool: 'threads',
@@ -22,10 +28,10 @@ export default defineConfig({
       }
     },
     
-    // Timeout controls - fail fast for unit tests  
-    testTimeout: 5000,   // 5 seconds for unit tests (per axiom rules)
-    hookTimeout: 2000,   // 2 seconds for setup/teardown
-    teardownTimeout: 1000, // 1 second for cleanup
+    // Timeout controls - different for integration vs unit tests
+    testTimeout: process.env.TEST_INTEGRATION ? 30000 : 5000,   // 30s for integration, 5s for unit tests
+    hookTimeout: process.env.TEST_INTEGRATION ? 10000 : 2000,   // 10s for integration, 2s for unit tests
+    teardownTimeout: process.env.TEST_INTEGRATION ? 5000 : 1000, // 5s for integration, 1s for unit tests
     
     // Memory and performance optimization
     sequence: {
