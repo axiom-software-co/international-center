@@ -21,6 +21,10 @@ describe('EventsStore', () => {
   beforeEach(() => {
     // Create fresh pinia instance for each test
     setActivePinia(createPinia());
+    
+    // Clear any cached data to ensure clean test environment
+    const store = useEventsStore();
+    store.invalidateCache();
   });
 
   afterEach(() => {
@@ -147,7 +151,7 @@ describe('EventsStore', () => {
       (eventsClient.getEvents as any).mockResolvedValueOnce(mockResponse);
       
       const params: GetEventsParams = { page: 1, pageSize: 10 };
-      await store.fetchEvents(params);
+      await store.fetchEvents(params, { useCache: false });
       
       expect(eventsClient.getEvents).toHaveBeenCalledWith(params);
       expect(store.events).toEqual(mockResponse.events);

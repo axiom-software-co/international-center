@@ -423,7 +423,7 @@ describe('EventsRestClient', () => {
       await client.getFeaturedEvents();
 
       expect(mockFetch).toHaveBeenCalledWith(
-        expect.stringContaining('/api/v1/events/published'),
+        expect.stringContaining('/api/v1/events/featured'),
         expect.objectContaining({
           method: 'GET'
         })
@@ -442,7 +442,7 @@ describe('EventsRestClient', () => {
       await client.getFeaturedEvents(5);
 
       expect(mockFetch).toHaveBeenCalledWith(
-        expect.stringContaining('/api/v1/events/published'),
+        expect.stringContaining('/api/v1/events/featured'),
         expect.objectContaining({
           method: 'GET'
         })

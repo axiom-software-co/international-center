@@ -86,7 +86,7 @@ export const useResearchStore = defineStore('research', {
           params?.page || 1, 
           params?.pageSize || 10
         ),
-        () => this.setResearch([], 0, 1, 10),
+        (items, count) => this.setResearch(items, count, 1, 10),
         'Failed to fetch research'
       );
     },

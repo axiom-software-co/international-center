@@ -2,8 +2,7 @@
 // Updated to work with TABLES-RESEARCH.md aligned types
 // Features: Response caching, request deduplication, performance monitoring
 
-import { BaseRestClient } from '../rest/BaseRestClient';
-import { RestClientCache, STANDARD_CACHE_TTL } from '../rest/RestClientCache';
+import { BaseRestClient, STANDARD_CACHE_TTL } from '../rest/BaseRestClient';
 import { config } from '../../environments';
 import type {
   ResearchArticle,
@@ -18,7 +17,6 @@ import type {
 } from './types';
 
 export class ResearchRestClient extends BaseRestClient {
-  private cache = new RestClientCache();
 
   constructor() {
     // Handle test environment or missing configuration
@@ -59,8 +57,7 @@ export class ResearchRestClient extends BaseRestClient {
     const endpoint = `/api/v1/research${queryParams.toString() ? `?${queryParams}` : ''}`;
     const cacheKey = `research:${endpoint}`;
     
-    return this.cache.requestWithCache<ResearchResponse>(
-      this,
+    return this.requestWithCache<ResearchResponse>(
       endpoint,
       { method: 'GET' },
       cacheKey,
@@ -81,8 +78,7 @@ export class ResearchRestClient extends BaseRestClient {
     const endpoint = `/api/v1/research/slug/${encodeURIComponent(slug)}`;
     const cacheKey = `research:slug:${slug}`;
     
-    return this.cache.requestWithCache<ResearchArticleResponse>(
-      this,
+    return this.requestWithCache<ResearchArticleResponse>(
       endpoint,
       { method: 'GET' },
       cacheKey,
@@ -103,8 +99,7 @@ export class ResearchRestClient extends BaseRestClient {
     const endpoint = `/api/v1/research/${encodeURIComponent(research_id)}`;
     const cacheKey = `research:id:${research_id}`;
     
-    return this.cache.requestWithCache<ResearchArticleResponse>(
-      this,
+    return this.requestWithCache<ResearchArticleResponse>(
       endpoint,
       { method: 'GET' },
       cacheKey,
@@ -124,8 +119,7 @@ export class ResearchRestClient extends BaseRestClient {
     const endpoint = `/api/v1/research/featured${queryParams.toString() ? `?${queryParams}` : ''}`;
     const cacheKey = `research:featured${limit ? `:${limit}` : ''}`;
     
-    return this.cache.requestWithCache<FeaturedResearchResponse>(
-      this,
+    return this.requestWithCache<FeaturedResearchResponse>(
       endpoint,
       { method: 'GET' },
       cacheKey,
@@ -161,11 +155,15 @@ export class ResearchRestClient extends BaseRestClient {
     if (params.publication_date_to) queryParams.set('publication_date_to', params.publication_date_to);
     if (params.sortBy) queryParams.set('sortBy', params.sortBy);
 
+    const cacheKey = `research:search:${params.q}:${queryParams.toString()}`;
     const endpoint = `/api/v1/research/search?${queryParams}`;
     
-    return this.request<ResearchResponse>(endpoint, {
-      method: 'GET',
-    });
+    return this.requestWithCache<ResearchResponse>(
+      endpoint,
+      { method: 'GET' },
+      cacheKey,
+      30 * 1000 // 30 seconds for search results
+    );
   }
 
   /**
@@ -177,11 +175,15 @@ export class ResearchRestClient extends BaseRestClient {
     queryParams.set('limit', limit.toString());
     queryParams.set('sortBy', 'date-desc');
     
+    const cacheKey = `research:recent:${limit}`;
     const endpoint = `/api/v1/research?${queryParams}`;
     
-    return this.request<ResearchResponse>(endpoint, {
-      method: 'GET',
-    });
+    return this.requestWithCache<ResearchResponse>(
+      endpoint,
+      { method: 'GET' },
+      cacheKey,
+      STANDARD_CACHE_TTL.LIST
+    );
   }
 
   /**
@@ -193,11 +195,15 @@ export class ResearchRestClient extends BaseRestClient {
       throw new Error('Category is required');
     }
 
+    const cacheKey = `research:category:${category_id}`;
     const endpoint = `/api/v1/research/categories/${encodeURIComponent(category_id)}/articles`;
     
-    return this.request<ResearchResponse>(endpoint, {
-      method: 'GET',
-    });
+    return this.requestWithCache<ResearchResponse>(
+      endpoint,
+      { method: 'GET' },
+      cacheKey,
+      STANDARD_CACHE_TTL.LIST
+    );
   }
 
   /**
@@ -224,8 +230,7 @@ export class ResearchRestClient extends BaseRestClient {
     const endpoint = '/api/v1/research/categories';
     const cacheKey = 'research:categories';
     
-    return this.cache.requestWithCache<ResearchCategoriesResponse>(
-      this,
+    return this.requestWithCache<ResearchCategoriesResponse>(
       endpoint,
       { method: 'GET' },
       cacheKey,
@@ -317,24 +322,6 @@ export class ResearchRestClient extends BaseRestClient {
 
   // Performance optimization methods
   
-  /**
-   * Get performance metrics
-   */
-  public getMetrics() {
-    return this.cache.getMetrics();
-  }
-  
-  /**
-   * Get cache statistics
-   */
-  public getCacheStats() {
-    return this.cache.getCacheStats();
-  }
-  
-  /**
-   * Clear all cache entries and metrics
-   */
-  public clearCache(): void {
-    this.cache.clearCache();
-  }
+  // Performance optimization methods inherited from BaseRestClient
+  // getMetrics(), getCacheStats(), and clearCache() are available via inheritance
 }

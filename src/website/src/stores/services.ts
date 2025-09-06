@@ -65,7 +65,7 @@ export const useServicesStore = defineStore('services', {
           params?.page || 1, 
           params?.pageSize || 10
         ),
-        () => this.setServices([], 0, 1, 10),
+        (items, count) => this.setServices(items, count, 1, 10),
         'Failed to fetch services'
       );
     },

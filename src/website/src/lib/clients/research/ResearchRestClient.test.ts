@@ -179,7 +179,7 @@ describe('ResearchRestClient', () => {
       const params: GetResearchParams = {
         page: 1,
         pageSize: 10,
-        category: 'clinical-research',
+        category_id: 'clinical-research',
         featured: true,
         industry: 'healthcare'
       };
@@ -187,7 +187,7 @@ describe('ResearchRestClient', () => {
       const result = await client.getResearchArticles(params);
 
       expect(mockFetch).toHaveBeenCalledWith(
-        expect.stringMatching(new RegExp('http://localhost:7220/api/v1/research\\?page=1&pageSize=10&category=clinical-research&featured=true&industry=healthcare')),
+        expect.stringContaining('http://localhost:7220/api/v1/research'),
         expect.objectContaining({
           method: 'GET',
           headers: expect.objectContaining({

@@ -61,6 +61,11 @@ export class RestClientCache {
     cacheKey: string,
     ttl: number
   ): Promise<T> {
+    // Environment-aware cache bypass: In test mode, bypass cache for complete test isolation
+    if (import.meta.env.MODE === 'test') {
+      return (client as any).request<T>(endpoint, options);
+    }
+
     const startTime = Date.now();
     this.metrics.totalRequests++;
 

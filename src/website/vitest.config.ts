@@ -6,16 +6,10 @@ export default defineConfig({
   plugins: [vue()],
   test: {
     globals: true,
-    environment: process.env.TEST_INTEGRATION ? 'node' : 'jsdom',
-    setupFiles: process.env.TEST_INTEGRATION 
-      ? ['./src/test/integration/setup.ts']
-      : ['./src/test/setup.ts'],
-    include: process.env.TEST_INTEGRATION 
-      ? ['src/test/integration/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}']
-      : ['src/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}'],
-    exclude: process.env.TEST_INTEGRATION
-      ? ['node_modules/**', 'dist/**', '.cache/**', 'e2e/**']
-      : ['node_modules/**', 'dist/**', '.cache/**', 'e2e/**', 'src/test/integration/**'],
+    environment: 'jsdom',
+    setupFiles: ['./src/test/setup.ts'],
+    include: ['src/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}'],
+    exclude: ['node_modules/**', 'dist/**', '.cache/**', 'e2e/**'],
     
     // Resource management - limit memory usage and processes
     pool: 'threads',
@@ -28,10 +22,10 @@ export default defineConfig({
       }
     },
     
-    // Timeout controls - different for integration vs unit tests
-    testTimeout: process.env.TEST_INTEGRATION ? 30000 : 5000,   // 30s for integration, 5s for unit tests
-    hookTimeout: process.env.TEST_INTEGRATION ? 10000 : 2000,   // 10s for integration, 2s for unit tests
-    teardownTimeout: process.env.TEST_INTEGRATION ? 5000 : 1000, // 5s for integration, 1s for unit tests
+    // Unit test timeouts - fast failure for proper unit test isolation
+    testTimeout: 5000,     // 5s maximum for unit tests
+    hookTimeout: 2000,     // 2s for setup/teardown hooks
+    teardownTimeout: 1000, // 1s for cleanup
     
     // Memory and performance optimization
     sequence: {
@@ -46,13 +40,13 @@ export default defineConfig({
     unstubEnvs: true,
     unstubGlobals: true,
     
-    // Optimize for CI/memory constrained environments
+    // Optimize for unit test performance
     maxConcurrency: 4,
-    bail: 10, // Stop after 10 failures to prevent resource waste
+    bail: 10, // Stop after 10 failures
     
-    // Coverage configuration (disable for performance)
+    // Coverage configuration (disable by default for faster unit tests)
     coverage: {
-      enabled: false, // Only enable when needed
+      enabled: false,
     },
   },
   resolve: {

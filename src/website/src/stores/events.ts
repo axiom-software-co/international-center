@@ -78,7 +78,7 @@ export const useEventsStore = defineStore('events', {
           params?.page || 1, 
           params?.pageSize || 10
         ),
-        () => this.setEvents([], 0, 1, 10),
+        (items, count) => this.setEvents(items, count, 1, 10),
         'Failed to fetch events'
       );
     },

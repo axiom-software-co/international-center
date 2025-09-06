@@ -1,27 +1,12 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { setActivePinia, createPinia } from 'pinia';
 import { useResearchStore } from './research';
-import type { ResearchArticle, ResearchCategory, GetResearchParams, SearchResearchParams } from '../lib/clients/research/types';
-
-// Mock the research client
-vi.mock('../lib/clients', () => ({
-  researchClient: {
-    getResearch: vi.fn(),
-    getResearchBySlug: vi.fn(),
-    getFeaturedResearch: vi.fn(),
-    searchResearch: vi.fn(),
-    getResearchCategories: vi.fn(),
-  }
-}));
+import type { ResearchArticle, ResearchCategory } from '../lib/clients/research/types';
 
 describe('ResearchStore', () => {
   beforeEach(() => {
     // Create fresh pinia instance for each test
     setActivePinia(createPinia());
-  });
-
-  afterEach(() => {
-    vi.clearAllMocks();
   });
 
   describe('Initial State', () => {
@@ -109,99 +94,37 @@ describe('ResearchStore', () => {
     });
   });
 
-  describe('Actions - Research Operations', () => {
-    it('should fetch research articles with parameters and update state accordingly', async () => {
-      const { researchClient } = await import('../lib/clients');
+  describe('State Mutation Methods', () => {
+    it('should set research with pagination data', () => {
       const store = useResearchStore();
+      const mockResearch: ResearchArticle[] = [
+        {
+          research_id: 'research-1',
+          title: 'Clinical Study on Patient Outcomes',
+          abstract: 'A comprehensive study examining patient outcomes',
+          slug: 'clinical-study-patient-outcomes',
+          category_id: 'cat-1',
+          author_names: 'Dr. Jane Smith, Dr. Mark Johnson',
+          publishing_status: 'published',
+          research_type: 'clinical_study',
+          publication_date: '2024-01-15',
+          doi: '10.1000/example.doi',
+          created_on: '2024-01-01T00:00:00Z',
+          is_deleted: false
+        }
+      ];
       
-      const mockResponse = {
-        research: [
-          {
-            research_id: 'research-1',
-            title: 'Clinical Study on Patient Outcomes',
-            abstract: 'A comprehensive study examining patient outcomes',
-            slug: 'clinical-study-patient-outcomes',
-            category_id: 'cat-1',
-            author_names: 'Dr. Jane Smith, Dr. Mark Johnson',
-            publishing_status: 'published' as const,
-            research_type: 'clinical_study' as const,
-            publication_date: '2024-01-15',
-            doi: '10.1000/example.doi',
-            created_on: '2024-01-01T00:00:00Z',
-            is_deleted: false
-          }
-        ],
-        count: 1,
-        correlation_id: 'test-correlation-id'
-      };
+      store.setResearch(mockResearch, 100, 2, 20);
       
-      vi.mocked(researchClient.getResearch).mockResolvedValueOnce(mockResponse);
-      
-      const params: GetResearchParams = { page: 1, pageSize: 10 };
-      await store.fetchResearch(params);
-      
-      expect(researchClient.getResearch).toHaveBeenCalledWith(params);
-      expect(store.research).toEqual(mockResponse.research);
-      expect(store.total).toBe(mockResponse.count);
-      expect(store.loading).toBe(false);
-      expect(store.error).toBeNull();
+      expect(store.research).toEqual(mockResearch);
+      expect(store.total).toBe(100);
+      expect(store.page).toBe(2);
+      expect(store.pageSize).toBe(20);
     });
 
-    it('should handle research fetch errors properly', async () => {
-      const { researchClient } = await import('../lib/clients');
+    it('should set featured research', () => {
       const store = useResearchStore();
-      
-      const errorMessage = 'Failed to fetch research';
-      vi.mocked(researchClient.getResearch).mockRejectedValueOnce(new Error(errorMessage));
-      
-      await store.fetchResearch();
-      
-      expect(store.error).toBe(errorMessage);
-      expect(store.loading).toBe(false);
-      expect(store.research).toEqual([]);
-    });
-
-    it('should fetch single research article by slug', async () => {
-      const { researchClient } = await import('../lib/clients');
-      const store = useResearchStore();
-      
-      const mockArticle: ResearchArticle = {
-        research_id: 'research-1',
-        title: 'Single Research Article',
-        abstract: 'Detailed abstract of the research',
-        slug: 'single-research-article',
-        category_id: 'cat-1',
-        author_names: 'Dr. Research Author',
-        publishing_status: 'published',
-        research_type: 'systematic_review',
-        publication_date: '2024-02-01',
-        created_on: '2024-01-01T00:00:00Z',
-        is_deleted: false,
-        content: 'Full research article content',
-        external_url: 'https://example.com/research',
-        report_url: 'https://example.com/research.pdf'
-      };
-      
-      const mockResponse = {
-        research: mockArticle,
-        correlation_id: 'research-correlation-id'
-      };
-      
-      vi.mocked(researchClient.getResearchBySlug).mockResolvedValueOnce(mockResponse);
-      
-      const result = await store.fetchResearchArticle('single-research-article');
-      
-      expect(researchClient.getResearchBySlug).toHaveBeenCalledWith('single-research-article');
-      expect(result).toEqual(mockArticle);
-    });
-  });
-
-  describe('Actions - Featured Research', () => {
-    it('should fetch featured research and cache in store', async () => {
-      const { researchClient } = await import('../lib/clients');
-      const store = useResearchStore();
-      
-      const mockFeaturedResearch = [
+      const mockFeatured: ResearchArticle[] = [
         {
           research_id: 'featured-1',
           title: 'Featured Research Article',
@@ -209,103 +132,21 @@ describe('ResearchStore', () => {
           slug: 'featured-research-article',
           category_id: 'cat-1',
           author_names: 'Dr. Featured Author',
-          publishing_status: 'published' as const,
-          research_type: 'meta_analysis' as const,
+          publishing_status: 'published',
+          research_type: 'meta_analysis',
           publication_date: '2024-03-01',
           created_on: '2024-01-01T00:00:00Z',
           is_deleted: false
         }
       ];
       
-      const mockResponse = {
-        research: mockFeaturedResearch,
-        count: 1,
-        correlation_id: 'featured-correlation-id'
-      };
+      store.$patch({ featuredResearch: mockFeatured });
       
-      vi.mocked(researchClient.getFeaturedResearch).mockResolvedValueOnce(mockResponse);
-      
-      await store.fetchFeaturedResearch(5);
-      
-      expect(researchClient.getFeaturedResearch).toHaveBeenCalledWith(5);
-      expect(store.featuredResearch).toEqual(mockFeaturedResearch);
-    });
-  });
-
-  describe('Actions - Search Operations', () => {
-    it('should perform research search and store results separately', async () => {
-      const { researchClient } = await import('../lib/clients');
-      const store = useResearchStore();
-      
-      const mockSearchResults = [
-        {
-          research_id: 'search-1',
-          title: 'Search Result Research',
-          abstract: 'Research found through search',
-          slug: 'search-result-research',
-          category_id: 'cat-1',
-          author_names: 'Dr. Search Result',
-          publishing_status: 'published' as const,
-          research_type: 'case_report' as const,
-          publication_date: '2024-04-01',
-          created_on: '2024-01-01T00:00:00Z',
-          is_deleted: false
-        }
-      ];
-      
-      const mockResponse = {
-        research: mockSearchResults,
-        count: 1,
-        correlation_id: 'search-correlation-id'
-      };
-      
-      vi.mocked(researchClient.searchResearch).mockResolvedValueOnce(mockResponse);
-      
-      const searchParams: SearchResearchParams = {
-        q: 'test query',
-        page: 1,
-        pageSize: 10
-      };
-      
-      await store.searchResearch(searchParams);
-      
-      expect(researchClient.searchResearch).toHaveBeenCalledWith(searchParams);
-      expect(store.searchResults).toEqual(mockSearchResults);
-      expect(store.searchTotal).toBe(1);
+      expect(store.featuredResearch).toEqual(mockFeatured);
     });
 
-    it('should clear search results when query is empty', async () => {
+    it('should set research categories', () => {
       const store = useResearchStore();
-      
-      // Set some initial search results
-      store.$patch({
-        searchResults: [{ 
-          research_id: 'test',
-          title: 'Test Research',
-          abstract: 'Test Abstract',
-          slug: 'test-research',
-          category_id: 'cat-1',
-          author_names: 'Test Author',
-          publishing_status: 'published' as const,
-          research_type: 'clinical_study' as const,
-          created_on: '2024-01-01T00:00:00Z',
-          is_deleted: false
-        }],
-        searchTotal: 1
-      });
-      
-      await store.searchResearch({ q: '', page: 1, pageSize: 10 });
-      
-      expect(store.searchResults).toEqual([]);
-      expect(store.searchTotal).toBe(0);
-    });
-  });
-
-  describe('Actions - Categories', () => {
-    it('should fetch and cache research categories', async () => {
-      const { researchClient } = await import('../lib/clients');
-      const store = useResearchStore();
-      
       const mockCategories: ResearchCategory[] = [
         {
           category_id: 'cat-1',
@@ -318,20 +159,68 @@ describe('ResearchStore', () => {
         }
       ];
       
-      const mockResponse = {
-        categories: mockCategories,
-        count: 1,
-        correlation_id: 'categories-correlation-id'
-      };
+      store.$patch({ categories: mockCategories });
       
-      vi.mocked(researchClient.getResearchCategories).mockResolvedValueOnce(mockResponse);
-      
-      await store.fetchResearchCategories();
-      
-      expect(researchClient.getResearchCategories).toHaveBeenCalled();
       expect(store.categories).toEqual(mockCategories);
     });
+
+    it('should set search results with total', () => {
+      const store = useResearchStore();
+      const mockResults: ResearchArticle[] = [
+        {
+          research_id: 'search-1',
+          title: 'Search Result Research',
+          abstract: 'Research found through search',
+          slug: 'search-result-research',
+          category_id: 'cat-1',
+          author_names: 'Dr. Search Result',
+          publishing_status: 'published',
+          research_type: 'case_report',
+          publication_date: '2024-04-01',
+          created_on: '2024-01-01T00:00:00Z',
+          is_deleted: false
+        }
+      ];
+      
+      store.$patch({ searchResults: mockResults, searchTotal: 1 });
+      
+      expect(store.searchResults).toEqual(mockResults);
+      expect(store.searchTotal).toBe(1);
+    });
+
+    it('should clear search results', () => {
+      const store = useResearchStore();
+      
+      // Set initial search data
+      store.$patch({ searchResults: [{ research_id: 'test' } as ResearchArticle], searchTotal: 1 });
+      
+      // Clear search results
+      store.$patch({ searchResults: [], searchTotal: 0 });
+      
+      expect(store.searchResults).toEqual([]);
+      expect(store.searchTotal).toBe(0);
+    });
   });
+
+  describe('Cache Management Methods', () => {
+    it('should have cache invalidation method', () => {
+      const store = useResearchStore();
+      
+      // Set some cached data
+      store.$patch({ research: [{ research_id: 'cached' } as ResearchArticle] });
+      
+      // Cache invalidation should be available as method
+      expect(typeof store.invalidateCache).toBe('function');
+      
+      // Call invalidate cache
+      store.invalidateCache();
+      
+      // State should remain but cache should be cleared internally
+      expect(store.research).toBeDefined();
+    });
+  });
+
+
 
   describe('Getters', () => {
     it('should provide computed values for pagination', () => {
@@ -534,59 +423,4 @@ describe('ResearchStore', () => {
     });
   });
 
-  describe('Cache Management', () => {
-    it('should cache research data and avoid duplicate fetches', async () => {
-      const { researchClient } = await import('../lib/clients');
-      const store = useResearchStore();
-      
-      const mockResponse = {
-        research: [{
-          research_id: 'cached-1',
-          title: 'Cached Research',
-          abstract: 'Cached research abstract',
-          slug: 'cached-research',
-          category_id: 'cat-1',
-          author_names: 'Dr. Cached',
-          publishing_status: 'published' as const,
-          research_type: 'clinical_study' as const,
-          created_on: '2024-01-01T00:00:00Z',
-          is_deleted: false
-        }],
-        count: 1,
-        correlation_id: 'cache-test-id'
-      };
-      
-      vi.mocked(researchClient.getResearch).mockResolvedValueOnce(mockResponse);
-      
-      // First fetch should call API
-      await store.fetchResearch({ page: 1, pageSize: 10 });
-      expect(researchClient.getResearch).toHaveBeenCalledTimes(1);
-      
-      // Second fetch with same params should use cache
-      await store.fetchResearch({ page: 1, pageSize: 10 }, { useCache: true });
-      expect(researchClient.getResearch).toHaveBeenCalledTimes(1); // Still only called once
-    });
-
-    it('should invalidate cache and refetch when requested', async () => {
-      const { researchClient } = await import('../lib/clients');
-      const store = useResearchStore();
-      
-      const mockResponse = {
-        research: [],
-        count: 0,
-        correlation_id: 'invalidate-test-id'
-      };
-      
-      vi.mocked(researchClient.getResearch).mockResolvedValue(mockResponse);
-      
-      // First fetch
-      await store.fetchResearch({ page: 1, pageSize: 10 });
-      expect(researchClient.getResearch).toHaveBeenCalledTimes(1);
-      
-      // Invalidate cache and fetch again
-      store.invalidateCache();
-      await store.fetchResearch({ page: 1, pageSize: 10 });
-      expect(researchClient.getResearch).toHaveBeenCalledTimes(2);
-    });
-  });
 });

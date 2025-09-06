@@ -3,7 +3,7 @@
 
 - IMPORTANT AXIOM RULE TO FOLLOW : outside of unit tests , consider mocks and stubs the worst architectural anti pattern ( stop metioning the fact that you are using real implmentations , this is explicit in the implementation , keep the naming professional )
 
-- IMPORTANT AXIOM RULE TO FOLLOW : we cannot create new files outside of our current folders and files structure ( this is deliberate ) . you may alter implmentation details . you may ask to delete/create files if you have a proper reason to do so 
+- IMPORTANT AXIOM RULE TO FOLLOW : you may alter implmentation details . you may ask to delete/create files if you have a proper reason to do so 
 
 - IMPORTANT AXIOM RULE TO FOLLOW : do not edit any markdown files without permission . ensure you stop and ask for permission and provide your reasoning
 
@@ -52,14 +52,14 @@ GRAFANA_CLOUD_ACCESS_POLICY_TOKEN="glc_eyJvIjoiMTA3Nzk3NSIsIm4iOiJwdWx1bWktcG9sa
 - red phase , green phase , refactor phase 
 - tests drive and validate the design of our architecture 
 
-- during analysis for planning , run all tests for context 
-
-- ensure creating new methods from refactoring should not require us to write new tests ( this violates the contract-first testing principle ) 
+- ensure that during analysis for planning , you run all tests for context 
 - ensure tests pass before marking the green phase as done 
+- ensure tests pass before marking the refactor phase as done 
 - ensure we address tests that are currently failing in future planned tdd cycles
+- ensure creating new methods from refactoring should not require us to write new tests ( this violates the contract-first testing principle ) 
+- when planning a new TDD cycle , provide a list of all the files you intend to edit and what you intend to do in each phase 
 
 - you are allowed to modify the project and tests implementations as you see fit ( since project and/or tests abstractions and/or implementations sometimes need to be updated )
-- when planning a new TDD cycle , provide a list of all the files you intend to edit and what you intend to do in each phase 
 - you may alter existing tests in new tdd cycles if there are good reasons to do so
 
 - you do not have to create new files if you are still validating our development environmnet and ensuring all tests pass 
@@ -78,6 +78,7 @@ GRAFANA_CLOUD_ACCESS_POLICY_TOKEN="glc_eyJvIjoiMTA3Nzk3NSIsIm4iOiJwdWx1bWktcG9sa
 
 - cohesion over coupling
 - seperation of concerns
+- base abstractions should deal with cross cutting concerns
 
 - best practices in our stack
 

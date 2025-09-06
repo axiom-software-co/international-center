@@ -1,5 +1,4 @@
-import { BaseRestClient, RestClientConfig } from './BaseRestClient';
-import { RestClientCache, STANDARD_CACHE_TTL } from './RestClientCache';
+import { BaseRestClient, RestClientConfig, STANDARD_CACHE_TTL } from './BaseRestClient';
 import { config } from '../../../environments';
 import type { 
   Service, 
@@ -16,7 +15,6 @@ import type {
 } from './BackendTypes';
 
 export class ServicesRestClient extends BaseRestClient {
-  private cache = new RestClientCache();
 
   constructor() {
     super({
@@ -50,8 +48,7 @@ export class ServicesRestClient extends BaseRestClient {
     // Use caching for non-search queries
     if (!params.search) {
       const cacheKey = `services:${queryParams.toString()}`;
-      return this.cache.requestWithCache<BackendServicesResponse>(
-        this,
+      return this.requestWithCache<BackendServicesResponse>(
         endpoint,
         { method: 'GET' },
         cacheKey,
@@ -79,8 +76,7 @@ export class ServicesRestClient extends BaseRestClient {
     const endpoint = `/api/v1/services/slug/${encodeURIComponent(slug)}`;
     const cacheKey = `services:slug:${slug}`;
     
-    return this.cache.requestWithCache<BackendServiceResponse>(
-      this,
+    return this.requestWithCache<BackendServiceResponse>(
       endpoint,
       { method: 'GET' },
       cacheKey,
@@ -98,8 +94,7 @@ export class ServicesRestClient extends BaseRestClient {
     const endpoint = '/api/v1/services/categories';
     const cacheKey = 'services:categories';
     
-    return this.cache.requestWithCache<BackendServiceCategoriesResponse>(
-      this,
+    return this.requestWithCache<BackendServiceCategoriesResponse>(
       endpoint,
       { method: 'GET' },
       cacheKey,
@@ -117,8 +112,7 @@ export class ServicesRestClient extends BaseRestClient {
     const endpoint = '/api/v1/services/published';
     const cacheKey = `services:featured${limit ? `:${limit}` : ''}`;
     
-    return this.cache.requestWithCache<BackendServicesResponse>(
-      this,
+    return this.requestWithCache<BackendServicesResponse>(
       endpoint,
       { method: 'GET' },
       cacheKey,
@@ -159,24 +153,6 @@ export class ServicesRestClient extends BaseRestClient {
     });
   }
 
-  /**
-   * Get performance metrics
-   */
-  public getMetrics() {
-    return this.cache.getMetrics();
-  }
-  
-  /**
-   * Get cache statistics
-   */
-  public getCacheStats() {
-    return this.cache.getCacheStats();
-  }
-  
-  /**
-   * Clear all cache entries and reset metrics
-   */
-  public clearCache(): void {
-    this.cache.clearCache();
-  }
+  // Performance optimization methods inherited from BaseRestClient
+  // getMetrics(), getCacheStats(), and clearCache() are available via inheritance
 }

@@ -506,19 +506,24 @@ describe('useMediaInquiry composables', () => {
         correlation_id: 'corr-2'
       };
 
-      mockGetMediaInquiry.mockResolvedValueOnce(mockResponse1);
+      // Set up mock to return different responses for each call
+      mockGetMediaInquiry
+        .mockResolvedValueOnce(mockResponse1)
+        .mockResolvedValueOnce(mockResponse2);
 
       const inquiryId = ref('id-1');
       const { inquiry } = useMediaInquiry(inquiryId);
 
-      await nextTick();
+      // Wait for initial fetch to complete
+      await new Promise(resolve => setTimeout(resolve, 10));
       expect(inquiry.value?.inquiry_id).toBe('id-1');
 
-      // Change ID and mock second response
-      mockGetMediaInquiry.mockResolvedValueOnce(mockResponse2);
+      // Change ID - watcher should trigger refetch automatically
       inquiryId.value = 'id-2';
 
-      await nextTick();
+      // Wait for refetch to complete
+      await new Promise(resolve => setTimeout(resolve, 10));
+      
       expect(inquiry.value?.inquiry_id).toBe('id-2');
       expect(inquiry.value?.outlet).toBe('New Outlet');
       expect(mockGetMediaInquiry).toHaveBeenCalledTimes(2);
@@ -539,10 +544,8 @@ describe('useMediaInquiry composables', () => {
       const inquiryId = ref('789e0123-e89b-12d3-a456-426614174002');
       const { inquiry, loading, error } = useMediaInquiry(inquiryId);
 
-      await nextTick();
-
-      // Should be loading
-      expect(loading.value).toBe(true);
+      // Due to immediate: true watcher, loading starts synchronously
+      expect(loading.value).toBe(true); // Should be loading immediately
       expect(inquiry.value).toBe(null);
       expect(error.value).toBe(null);
 

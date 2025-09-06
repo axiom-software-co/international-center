@@ -2,8 +2,7 @@
 // Updated to work with TABLES-NEWS.md aligned types
 // Features: Response caching, request deduplication, performance monitoring
 
-import { BaseRestClient } from '../rest/BaseRestClient';
-import { RestClientCache, STANDARD_CACHE_TTL } from '../rest/RestClientCache';
+import { BaseRestClient, STANDARD_CACHE_TTL } from '../rest/BaseRestClient';
 import { config } from '../../environments';
 import type {
   NewsArticle,
@@ -15,7 +14,6 @@ import type {
 } from './types';
 
 export class NewsRestClient extends BaseRestClient {
-  private cache = new RestClientCache();
 
   constructor(baseUrl?: string) {
     // Handle test environment or missing configuration
@@ -49,8 +47,7 @@ export class NewsRestClient extends BaseRestClient {
     const cacheKey = `news:${queryParams.toString()}`;
     const url = `/api/v1/news${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
     
-    return this.cache.requestWithCache<NewsResponse>(
-      this,
+    return this.requestWithCache<NewsResponse>(
       url,
       { method: 'GET' },
       cacheKey,
@@ -71,8 +68,7 @@ export class NewsRestClient extends BaseRestClient {
     const cacheKey = `news:slug:${slug}`;
     const url = `/api/v1/news/slug/${encodeURIComponent(slug)}`;
     
-    return this.cache.requestWithCache<NewsArticleResponse>(
-      this,
+    return this.requestWithCache<NewsArticleResponse>(
       url,
       { method: 'GET' },
       cacheKey,
@@ -92,8 +88,7 @@ export class NewsRestClient extends BaseRestClient {
     const cacheKey = `news:featured:${limit || 'all'}`;
     const url = `/api/v1/news/featured${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
     
-    return this.cache.requestWithCache<NewsResponse>(
-      this,
+    return this.requestWithCache<NewsResponse>(
       url,
       { method: 'GET' },
       cacheKey,
@@ -124,10 +119,16 @@ export class NewsRestClient extends BaseRestClient {
     if (params.category) queryParams.set('category', params.category);
     if (params.sortBy) queryParams.set('sortBy', params.sortBy);
 
+    const cacheKey = `news:search:${params.q}:${queryParams.toString()}`;
     const url = `/api/v1/news/search?${queryParams.toString()}`;
     
-    // Search results are not cached for real-time freshness
-    return this.request<NewsResponse>(url, { method: 'GET' });
+    // Search results use short TTL for real-time freshness
+    return this.requestWithCache<NewsResponse>(
+      url,
+      { method: 'GET' },
+      cacheKey,
+      30 * 1000 // 30 seconds
+    );
   }
 
   /**
@@ -139,8 +140,7 @@ export class NewsRestClient extends BaseRestClient {
     const cacheKey = 'news:categories';
     const url = '/api/v1/news/categories';
     
-    return this.cache.requestWithCache<NewsCategoriesResponse>(
-      this,
+    return this.requestWithCache<NewsCategoriesResponse>(
       url,
       { method: 'GET' },
       cacheKey,

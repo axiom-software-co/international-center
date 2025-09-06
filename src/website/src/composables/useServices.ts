@@ -114,7 +114,7 @@ export function useFeaturedServices(limit?: Ref<number | undefined> | number | u
     await store.fetchFeaturedServices(unref(limitRef));
   };
 
-  // Trigger initial fetch
+  // Trigger initial fetch immediately
   fetchFeaturedServices();
   
   // Watch for limit changes

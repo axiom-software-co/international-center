@@ -2,10 +2,8 @@
 // Updated to work with TABLES-EVENTS.md aligned types
 // Features: Response caching, request deduplication, performance monitoring
 
-import { BaseRestClient } from '../rest/BaseRestClient';
-import { RestClientCache, STANDARD_CACHE_TTL } from '../rest/RestClientCache';
+import { BaseRestClient, STANDARD_CACHE_TTL } from '../rest/BaseRestClient';
 import { config } from '../../environments';
-// Removed factory imports for direct cache integration
 import type {
   Event,
   EventsResponse,
@@ -19,9 +17,6 @@ import type {
 } from './types';
 
 export class EventsRestClient extends BaseRestClient {
-  private cache = new RestClientCache();
-  
-// Direct cache integration - no factory configuration needed
 
   constructor() {
     // Handle test environment or missing configuration
@@ -57,8 +52,7 @@ export class EventsRestClient extends BaseRestClient {
     const cacheKey = `events:${queryParams.toString()}`;
     const url = `/api/v1/events${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
     
-    return this.cache.requestWithCache<EventsResponse>(
-      this,
+    return this.requestWithCache<EventsResponse>(
       url,
       { method: 'GET' },
       cacheKey,
@@ -79,8 +73,7 @@ export class EventsRestClient extends BaseRestClient {
     const cacheKey = `events:slug:${slug}`;
     const url = `/api/v1/events/slug/${encodeURIComponent(slug)}`;
     
-    return this.cache.requestWithCache<EventResponse>(
-      this,
+    return this.requestWithCache<EventResponse>(
       url,
       { method: 'GET' },
       cacheKey,
@@ -101,8 +94,7 @@ export class EventsRestClient extends BaseRestClient {
     const cacheKey = `events:id:${id}`;
     const url = `/api/v1/events/${encodeURIComponent(id)}`;
     
-    return this.cache.requestWithCache<EventResponse>(
-      this,
+    return this.requestWithCache<EventResponse>(
       url,
       { method: 'GET' },
       cacheKey,
@@ -112,7 +104,7 @@ export class EventsRestClient extends BaseRestClient {
 
   /**
    * Get featured events with optional limit
-   * Maps to GET /api/v1/events/published endpoint through Public Gateway
+   * Maps to GET /api/v1/events/featured endpoint through Public Gateway
    * Uses caching for featured content with database schema compliance
    */
   async getFeaturedEvents(limit?: number): Promise<FeaturedEventResponse> {
@@ -120,10 +112,9 @@ export class EventsRestClient extends BaseRestClient {
     if (limit !== undefined) queryParams.set('limit', limit.toString());
 
     const cacheKey = `events:featured:${limit || 'all'}`;
-    const url = `/api/v1/events/published${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+    const url = `/api/v1/events/featured${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
     
-    return this.cache.requestWithCache<FeaturedEventResponse>(
-      this,
+    return this.requestWithCache<FeaturedEventResponse>(
       url,
       { method: 'GET' },
       cacheKey,
@@ -162,10 +153,16 @@ export class EventsRestClient extends BaseRestClient {
     if (params.category) queryParams.set('category', params.category);
     if (params.sortBy) queryParams.set('sortBy', params.sortBy);
 
+    const cacheKey = `events:search:${params.q}:${queryParams.toString()}`;
     const url = `/api/v1/events?${queryParams.toString()}`;
     
-    // Search results are not cached for real-time freshness
-    return this.request<EventsResponse>(url, { method: 'GET' });
+    // Search results use short TTL for real-time freshness
+    return this.requestWithCache<EventsResponse>(
+      url,
+      { method: 'GET' },
+      cacheKey,
+      30 * 1000 // 30 seconds
+    );
   }
 
   /**
@@ -177,9 +174,15 @@ export class EventsRestClient extends BaseRestClient {
     queryParams.set('limit', limit.toString());
     queryParams.set('sortBy', 'date-desc');
     
+    const cacheKey = `events:recent:${limit}`;
     const url = `/api/v1/events?${queryParams.toString()}`;
     
-    return this.request<EventsResponse>(url, { method: 'GET' });
+    return this.requestWithCache<EventsResponse>(
+      url,
+      { method: 'GET' },
+      cacheKey,
+      STANDARD_CACHE_TTL.LIST
+    );
   }
 
   /**
@@ -191,9 +194,15 @@ export class EventsRestClient extends BaseRestClient {
       throw new Error('Category is required');
     }
 
+    const cacheKey = `events:category:${category_id}`;
     const url = `/api/v1/events/categories/${encodeURIComponent(category_id)}/events`;
     
-    return this.request<EventsResponse>(url, { method: 'GET' });
+    return this.requestWithCache<EventsResponse>(
+      url,
+      { method: 'GET' },
+      cacheKey,
+      STANDARD_CACHE_TTL.LIST
+    );
   }
 
   /**
@@ -205,8 +214,7 @@ export class EventsRestClient extends BaseRestClient {
     const cacheKey = 'events:categories';
     const url = '/api/v1/events/categories';
     
-    return this.cache.requestWithCache<EventCategoriesResponse>(
-      this,
+    return this.requestWithCache<EventCategoriesResponse>(
       url,
       { method: 'GET' },
       cacheKey,
@@ -232,7 +240,7 @@ export class EventsRestClient extends BaseRestClient {
       });
       
       // Invalidate relevant caches
-      this.cache.invalidateCachePattern('events:');
+      this.invalidateCachePattern('events:');
       
       return result;
     } catch (error) {
@@ -259,8 +267,8 @@ export class EventsRestClient extends BaseRestClient {
       });
       
       // Invalidate specific event caches and event lists
-      this.cache.invalidateCacheKey(`events:id:${event_id}`);
-      this.cache.invalidateCachePattern('events:');
+      this.invalidateCacheKey(`events:id:${event_id}`);
+      this.invalidateCachePattern('events:');
       
       return result;
     } catch (error) {
@@ -284,8 +292,8 @@ export class EventsRestClient extends BaseRestClient {
       await this.request<void>(url, { method: 'DELETE' });
       
       // Invalidate specific event caches and event lists
-      this.cache.invalidateCacheKey(`events:id:${event_id}`);
-      this.cache.invalidateCachePattern('events:');
+      this.invalidateCacheKey(`events:id:${event_id}`);
+      this.invalidateCachePattern('events:');
     } catch (error) {
       throw error;
     }
@@ -293,24 +301,6 @@ export class EventsRestClient extends BaseRestClient {
 
 
 
-  /**
-   * Get performance metrics
-   */
-  public getMetrics() {
-    return this.cache.getMetrics();
-  }
-  
-  /**
-   * Get cache statistics
-   */
-  public getCacheStats() {
-    return this.cache.getCacheStats();
-  }
-  
-  /**
-   * Clear all cache entries and metrics
-   */
-  public clearCache(): void {
-    this.cache.clearCache();
-  }
+  // Performance optimization methods inherited from BaseRestClient
+  // getMetrics(), getCacheStats(), and clearCache() are available via inheritance
 }
