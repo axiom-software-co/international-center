@@ -7,6 +7,8 @@ import (
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/axiom-software-co/international-center/src/cicd/components"
 )
 
 // TestDeploymentOrchestratorImageBuilding validates orchestrator handles image building
@@ -119,13 +121,82 @@ func TestDeploymentOrchestratorImageLifecycle(t *testing.T) {
 			
 			// Test orchestrator can rollback with image cleanup
 			outputs := &ComponentOutputs{
-				Database:      &DummyDatabaseOutputs{},
-				Storage:       &DummyStorageOutputs{},
-				Vault:         &DummyVaultOutputs{},
-				Observability: &DummyObservabilityOutputs{},
-				Dapr:          &DummyDaprOutputs{},
-				Services:      &DummyServicesOutputs{},
-				Website:       &DummyWebsiteOutputs{},
+				Database:      &components.DatabaseOutputs{
+					DeploymentType:   pulumi.String("container").ToStringOutput(),
+					InstanceType:     pulumi.String("test").ToStringOutput(),
+					ConnectionString: pulumi.String("postgresql://localhost:5432/test").ToStringOutput(),
+					Port:            pulumi.Int(5432).ToIntOutput(),
+					DatabaseName:    pulumi.String("test").ToStringOutput(),
+					StorageSize:     pulumi.String("1GB").ToStringOutput(),
+					BackupRetention: pulumi.String("7days").ToStringOutput(),
+					HighAvailability: pulumi.Bool(false).ToBoolOutput(),
+				},
+				Storage:       &components.StorageOutputs{
+					StorageType:      pulumi.String("container").ToStringOutput(),
+					ConnectionString: pulumi.String("http://localhost:10000").ToStringOutput(),
+					AccountName:      pulumi.String("test").ToStringOutput(),
+					ContainerName:    pulumi.String("test-container").ToStringOutput(),
+					ReplicationType:  pulumi.String("LRS").ToStringOutput(),
+					AccessTier:       pulumi.String("Hot").ToStringOutput(),
+					BackupEnabled:    pulumi.Bool(false).ToBoolOutput(),
+				},
+				Vault:         &components.VaultOutputs{
+					VaultType:     pulumi.String("container").ToStringOutput(),
+					VaultAddress:  pulumi.String("http://localhost:8200").ToStringOutput(),
+					AuthMethod:    pulumi.String("token").ToStringOutput(),
+					SecretEngine:  pulumi.String("kv").ToStringOutput(),
+					ClusterTier:   pulumi.String("dev").ToStringOutput(),
+					AuditEnabled:  pulumi.Bool(true).ToBoolOutput(),
+				},
+				Observability: &components.ObservabilityOutputs{
+					StackType:       pulumi.String("container").ToStringOutput(),
+					GrafanaURL:      pulumi.String("http://localhost:3000").ToStringOutput(),
+					PrometheusURL:   pulumi.String("http://localhost:9090").ToStringOutput(),
+					LokiURL:         pulumi.String("http://localhost:3100").ToStringOutput(),
+					RetentionDays:   pulumi.Int(30).ToIntOutput(),
+					AuditLogging:    pulumi.Bool(true).ToBoolOutput(),
+					AlertingEnabled: pulumi.Bool(false).ToBoolOutput(),
+				},
+				Dapr:          &components.DaprOutputs{
+					DeploymentType:      pulumi.String("container").ToStringOutput(),
+					RuntimePort:         pulumi.Int(3500).ToIntOutput(),
+					ControlPlaneURL:     pulumi.String("http://localhost:50005").ToStringOutput(),
+					SidecarConfig:       pulumi.String("development").ToStringOutput(),
+					MiddlewareEnabled:   pulumi.Bool(true).ToBoolOutput(),
+					PolicyEnabled:       pulumi.Bool(true).ToBoolOutput(),
+				},
+				Services:      &components.ServicesOutputs{
+					DeploymentType:        pulumi.String("container").ToStringOutput(),
+					InquiriesServices:     pulumi.Map{"inquiries": pulumi.String("http://localhost:8001")}.ToMapOutput(),
+					ContentServices:       pulumi.Map{"content": pulumi.String("http://localhost:8002")}.ToMapOutput(),
+					GatewayServices:       pulumi.Map{"public": pulumi.String("http://localhost:8080")}.ToMapOutput(),
+					TestServices:          pulumi.Map{"test": pulumi.String("http://localhost:8003")}.ToMapOutput(),
+					APIServices:           pulumi.Map{"api": pulumi.String("http://localhost:8004")}.ToMapOutput(),
+					PublicGatewayURL:      pulumi.String("http://localhost:8080").ToStringOutput(),
+					AdminGatewayURL:       pulumi.String("http://localhost:8081").ToStringOutput(),
+					HealthCheckEnabled:    pulumi.Bool(true).ToBoolOutput(),
+					DaprSidecarEnabled:    pulumi.Bool(true).ToBoolOutput(),
+					ObservabilityEnabled:  pulumi.Bool(true).ToBoolOutput(),
+					TestingEnabled:        pulumi.Bool(true).ToBoolOutput(),
+					ScalingPolicy:         pulumi.String("manual").ToStringOutput(),
+					SecurityPolicies:      pulumi.Bool(true).ToBoolOutput(),
+					AuditLogging:          pulumi.Bool(true).ToBoolOutput(),
+				},
+				Website:       &components.WebsiteOutputs{
+					DeploymentType:        pulumi.String("container").ToStringOutput(),
+					ContainerID:           pulumi.String("website-dev").ToStringOutput(),
+					ContainerStatus:       pulumi.String("running").ToStringOutput(),
+					ServerURL:             pulumi.String("http://localhost:3000").ToStringOutput(),
+					BuildCommand:          pulumi.String("pnpm run build").ToStringOutput(),
+					BuildDirectory:        pulumi.String("dist").ToStringOutput(),
+					NodeVersion:           pulumi.String("20").ToStringOutput(),
+					CDNEnabled:            pulumi.Bool(false).ToBoolOutput(),
+					CachePolicy:           pulumi.String("no-cache").ToStringOutput(),
+					CompressionEnabled:    pulumi.Bool(true).ToBoolOutput(),
+					SecurityHeaders:       pulumi.Bool(true).ToBoolOutput(),
+					APIGatewayURL:         pulumi.String("http://localhost:8080").ToStringOutput(),
+					APIIntegrationEnabled: pulumi.Bool(true).ToBoolOutput(),
+				},
 			}
 			
 			err = orchestrator.performRollback(outputs)
@@ -206,11 +277,3 @@ func TestDeploymentOrchestratorImageIntegration(t *testing.T) {
 	})
 }
 
-// Dummy output types for testing rollback scenarios
-type DummyDatabaseOutputs struct{}
-type DummyStorageOutputs struct{}
-type DummyVaultOutputs struct{}
-type DummyObservabilityOutputs struct{}
-type DummyDaprOutputs struct{}
-type DummyServicesOutputs struct{}
-type DummyWebsiteOutputs struct{}

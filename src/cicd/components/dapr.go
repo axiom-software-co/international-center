@@ -57,8 +57,7 @@ func deployDevelopmentDapr(ctx *pulumi.Context, cfg *config.Config) (*DaprOutput
 	daprHealthCheck, err := local.NewCommand(ctx, "dapr-health-check", &local.CommandArgs{
 		Create: pulumi.String("timeout 30 sh -c 'until curl -f http://127.0.0.1:50005/v1.0/healthz >/dev/null 2>&1; do echo \"Waiting for Dapr placement service...\"; sleep 2; done; echo \"Dapr placement service ready\"'"),
 		Delete: pulumi.String("echo 'Dapr health check cleanup'"),
-		DependsOn: pulumi.Array{daprPlacementContainer},
-	})
+	}, pulumi.DependsOn([]pulumi.Resource{daprPlacementContainer}))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Dapr health check: %w", err)
 	}

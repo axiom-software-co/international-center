@@ -45,9 +45,24 @@ GRAFANA_CLOUD_ACCESS_POLICY_TOKEN="glc_eyJvIjoiMTA3Nzk3NSIsIm4iOiJwdWx1bWktcG9sa
 
 # development workflow
 
-- test-driven development ( red phase , green phase , refactor phase ) ( tests drive and validate the design of our architecture ) ( creating new methods from refactoring should not require us to write new tests , this violates the contract-first testing principle ) ( you are allowed to modify the project and tests implementations as you see fit , since project and/or tests abstractions and/or implementations sometimes need to be updated ) ( when planning a new TDD cycle , provide a list of all the files you intend to edit and what you intend to do in each phase ) ( you may alter existing tests in new tdd cycles if there are good reasons to do so )
-
 - use pulumi for local development environment ( using podman instead of docker ) 
+
+## test driven development
+
+- red phase , green phase , refactor phase 
+- tests drive and validate the design of our architecture 
+
+- during analysis for planning , run all tests for context 
+
+- ensure creating new methods from refactoring should not require us to write new tests ( this violates the contract-first testing principle ) 
+- ensure tests pass before marking the green phase as done 
+- ensure we address tests that are currently failing in future planned tdd cycles
+
+- you are allowed to modify the project and tests implementations as you see fit ( since project and/or tests abstractions and/or implementations sometimes need to be updated )
+- when planning a new TDD cycle , provide a list of all the files you intend to edit and what you intend to do in each phase 
+- you may alter existing tests in new tdd cycles if there are good reasons to do so
+
+- you do not have to create new files if you are still validating our development environmnet and ensuring all tests pass 
 
 
 
