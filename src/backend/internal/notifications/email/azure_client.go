@@ -2,7 +2,6 @@ package email
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -42,15 +41,15 @@ func NewAzureCommunicationEmailClient(logger *slog.Logger) *AzureCommunicationEm
 // Initialize initializes the Azure email client with configuration
 func (a *AzureCommunicationEmailClient) Initialize(ctx context.Context, config *AzureEmailConfig) error {
 	if config == nil {
-		return domain.NewValidationError("Azure email configuration cannot be nil", nil)
+		return domain.NewValidationError("Azure email configuration cannot be nil")
 	}
 
 	if config.ConnectionString == "" {
-		return domain.NewValidationError("Azure connection string is required", nil)
+		return domain.NewValidationError("Azure connection string is required")
 	}
 
 	if config.SenderAddress == "" {
-		return domain.NewValidationError("sender address is required", nil)
+		return domain.NewValidationError("sender address is required")
 	}
 
 	// Parse connection string to extract endpoint
@@ -85,12 +84,12 @@ func (a *AzureCommunicationEmailClient) SendEmail(ctx context.Context, request *
 	logger.Debug("Sending email via Azure Communication Services")
 
 	// Create HTTP request
-	url := fmt.Sprintf("%s/emails:send?api-version=%s", a.endpoint, a.apiVersion)
+	// url := fmt.Sprintf("%s/emails:send?api-version=%s", a.endpoint, a.apiVersion)
 	
-	requestBody, err := json.Marshal(request)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal request: %w", err)
-	}
+	// requestBody, err := json.Marshal(request)
+	// if err != nil {
+	//	return nil, fmt.Errorf("failed to marshal request: %w", err)
+	// }
 
 	// In a real implementation, this would make an actual HTTP request to Azure
 	// For now, we simulate the response based on the request
@@ -106,14 +105,14 @@ func (a *AzureCommunicationEmailClient) SendEmail(ctx context.Context, request *
 // GetDeliveryStatus retrieves the delivery status from Azure
 func (a *AzureCommunicationEmailClient) GetDeliveryStatus(ctx context.Context, messageID string) (*AzureDeliveryStatus, error) {
 	if messageID == "" {
-		return nil, domain.NewValidationError("message ID is required", nil)
+		return nil, domain.NewValidationError("message ID is required")
 	}
 
 	logger := a.logger.With("message_id", messageID)
 	logger.Debug("Getting delivery status from Azure")
 
 	// Create HTTP request for status
-	url := fmt.Sprintf("%s/emails/operations/%s?api-version=%s", a.endpoint, messageID, a.apiVersion)
+	// url := fmt.Sprintf("%s/emails/operations/%s?api-version=%s", a.endpoint, messageID, a.apiVersion)
 	
 	// In a real implementation, this would make an actual HTTP request to Azure
 	// For now, we simulate the response
@@ -163,34 +162,34 @@ func (a *AzureCommunicationEmailClient) parseConnectionString(connectionString s
 // validateSendRequest validates the send email request
 func (a *AzureCommunicationEmailClient) validateSendRequest(request *AzureSendEmailRequest) error {
 	if request == nil {
-		return domain.NewValidationError("send request cannot be nil", nil)
+		return domain.NewValidationError("send request cannot be nil")
 	}
 
 	if request.SenderAddress == "" {
-		return domain.NewValidationError("sender address is required", nil)
+		return domain.NewValidationError("sender address is required")
 	}
 
 	if len(request.Recipients.To) == 0 {
-		return domain.NewValidationError("at least one recipient is required", nil)
+		return domain.NewValidationError("at least one recipient is required")
 	}
 
 	if request.Content.Subject == "" {
-		return domain.NewValidationError("subject is required", nil)
+		return domain.NewValidationError("subject is required")
 	}
 
 	if request.Content.PlainText == "" && request.Content.Html == "" {
-		return domain.NewValidationError("either plain text or HTML content is required", nil)
+		return domain.NewValidationError("either plain text or HTML content is required")
 	}
 
 	// Validate recipient addresses
 	for _, recipient := range request.Recipients.To {
 		if recipient.Address == "" {
-			return domain.NewValidationError("recipient address cannot be empty", nil)
+			return domain.NewValidationError("recipient address cannot be empty")
 		}
 		
 		// Basic email validation
 		if !isValidEmailAddress(recipient.Address) {
-			return domain.NewValidationError(fmt.Sprintf("invalid email address: %s", recipient.Address), nil)
+			return domain.NewValidationError(fmt.Sprintf("invalid email address: %s", recipient.Address))
 		}
 	}
 
@@ -311,10 +310,3 @@ type EmailRepository interface {
 	HealthCheck(ctx context.Context) error
 }
 
-// EmailTemplateRenderer interface for rendering email templates
-type EmailTemplateRenderer interface {
-	RenderTemplate(ctx context.Context, templateID string, data *EmailTemplateData) (htmlContent, textContent string, err error)
-	LoadTemplate(ctx context.Context, templateID string) (*EmailTemplate, error)
-	ValidateTemplate(ctx context.Context, template *EmailTemplate) error
-	ClearCache() error
-}

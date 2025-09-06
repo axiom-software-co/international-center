@@ -46,20 +46,20 @@ func NewSlackWebAPIClient(logger *slog.Logger) *SlackWebAPIClient {
 // Initialize initializes the Slack client with configuration
 func (s *SlackWebAPIClient) Initialize(ctx context.Context, config *SlackConfig) error {
 	if config == nil {
-		return domain.NewValidationError("Slack configuration cannot be nil", nil)
+		return domain.NewValidationError("Slack configuration cannot be nil")
 	}
 
 	if config.BotToken == "" {
-		return domain.NewValidationError("Slack bot token is required", nil)
+		return domain.NewValidationError("Slack bot token is required")
 	}
 
 	if config.DefaultChannel == "" {
-		return domain.NewValidationError("default channel is required", nil)
+		return domain.NewValidationError("default channel is required")
 	}
 
 	// Validate default channel format
 	if !IsValidSlackChannel(config.DefaultChannel) {
-		return domain.NewValidationError("default channel format is invalid", nil)
+		return domain.NewValidationError("default channel format is invalid")
 	}
 
 	s.config = config
@@ -199,10 +199,10 @@ func (s *SlackWebAPIClient) UpdateMessage(ctx context.Context, request *SlackUpd
 // DeleteMessage deletes a message from Slack
 func (s *SlackWebAPIClient) DeleteMessage(ctx context.Context, channel, messageTS string) error {
 	if channel == "" {
-		return domain.NewValidationError("channel is required", nil)
+		return domain.NewValidationError("channel is required")
 	}
 	if messageTS == "" {
-		return domain.NewValidationError("message timestamp is required", nil)
+		return domain.NewValidationError("message timestamp is required")
 	}
 
 	logger := s.logger.With("channel", channel, "message_ts", messageTS)
@@ -244,7 +244,7 @@ func (s *SlackWebAPIClient) DeleteMessage(ctx context.Context, channel, messageT
 // GetChannelInfo retrieves information about a Slack channel
 func (s *SlackWebAPIClient) GetChannelInfo(ctx context.Context, channel string) (*SlackChannelInfo, error) {
 	if channel == "" {
-		return nil, domain.NewValidationError("channel is required", nil)
+		return nil, domain.NewValidationError("channel is required")
 	}
 
 	logger := s.logger.With("channel", channel)
@@ -267,7 +267,7 @@ func (s *SlackWebAPIClient) GetChannelInfo(ctx context.Context, channel string) 
 			"channel": strings.TrimPrefix(channel, "@"),
 		}
 	} else {
-		return nil, domain.NewValidationError("unsupported channel format", nil)
+		return nil, domain.NewValidationError("unsupported channel format")
 	}
 
 	// Make HTTP request
@@ -407,26 +407,26 @@ func (s *SlackWebAPIClient) makeAPIRequest(ctx context.Context, method, url stri
 // validateSendRequest validates a send message request
 func (s *SlackWebAPIClient) validateSendRequest(request *SlackSendMessageRequest) error {
 	if request == nil {
-		return domain.NewValidationError("send request cannot be nil", nil)
+		return domain.NewValidationError("send request cannot be nil")
 	}
 
 	if request.Channel == "" {
-		return domain.NewValidationError("channel is required", nil)
+		return domain.NewValidationError("channel is required")
 	}
 
 	if request.Text == "" && len(request.Attachments) == 0 && len(request.Blocks) == 0 {
-		return domain.NewValidationError("text, attachments, or blocks are required", nil)
+		return domain.NewValidationError("text, attachments, or blocks are required")
 	}
 
 	// Validate channel format
 	if !IsValidSlackChannel(request.Channel) {
-		return domain.NewValidationError(fmt.Sprintf("invalid channel format: %s", request.Channel), nil)
+		return domain.NewValidationError(fmt.Sprintf("invalid channel format: %s", request.Channel))
 	}
 
 	// Validate text length
 	if len(request.Text) > MaxSlackMessageLength {
 		return domain.NewValidationError(fmt.Sprintf("text too long: %d characters (max %d)", 
-			len(request.Text), MaxSlackMessageLength), nil)
+			len(request.Text), MaxSlackMessageLength))
 	}
 
 	return nil
@@ -435,24 +435,24 @@ func (s *SlackWebAPIClient) validateSendRequest(request *SlackSendMessageRequest
 // validateUpdateRequest validates an update message request
 func (s *SlackWebAPIClient) validateUpdateRequest(request *SlackUpdateMessageRequest) error {
 	if request == nil {
-		return domain.NewValidationError("update request cannot be nil", nil)
+		return domain.NewValidationError("update request cannot be nil")
 	}
 
 	if request.Channel == "" {
-		return domain.NewValidationError("channel is required", nil)
+		return domain.NewValidationError("channel is required")
 	}
 
 	if request.MessageTS == "" {
-		return domain.NewValidationError("message timestamp is required", nil)
+		return domain.NewValidationError("message timestamp is required")
 	}
 
 	if request.Text == "" && len(request.Attachments) == 0 && len(request.Blocks) == 0 {
-		return domain.NewValidationError("text, attachments, or blocks are required", nil)
+		return domain.NewValidationError("text, attachments, or blocks are required")
 	}
 
 	// Validate channel format
 	if !IsValidSlackChannel(request.Channel) {
-		return domain.NewValidationError(fmt.Sprintf("invalid channel format: %s", request.Channel), nil)
+		return domain.NewValidationError(fmt.Sprintf("invalid channel format: %s", request.Channel))
 	}
 
 	return nil

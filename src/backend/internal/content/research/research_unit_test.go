@@ -295,7 +295,7 @@ func (m *MockResearchRepository) GetResearchCategoryAudit(ctx context.Context, c
 	// Return mock audit events for this category
 	var events []*domain.AuditEvent
 	for _, auditEvent := range m.auditEvents {
-		if auditEvent.EntityID == categoryID && auditEvent.EntityType == domain.EntityTypeCategory {
+		if auditEvent.EntityID == categoryID && auditEvent.EntityType == domain.EntityTypeResearchCategory {
 			events = append(events, &domain.AuditEvent{
 				AuditID:       "audit-" + categoryID + "-1", 
 				EntityType:    auditEvent.EntityType,
@@ -658,7 +658,7 @@ func TestResearchService_GetResearchCategoryAudit(t *testing.T) {
 			userID:     "admin-550e8400-e29b-41d4-a716-446655440003",
 			setupFunc: func(repo *MockResearchRepository) {
 				repo.auditEvents = append(repo.auditEvents, MockAuditEvent{
-					EntityType:    domain.EntityTypeCategory,
+					EntityType:    domain.EntityTypeResearchCategory,
 					EntityID:      "550e8400-e29b-41d4-a716-446655440002",
 					OperationType: domain.AuditEventUpdate,
 					UserID:        "admin-550e8400-e29b-41d4-a716-446655440003",

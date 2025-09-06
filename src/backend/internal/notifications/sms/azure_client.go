@@ -2,7 +2,6 @@ package sms
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -42,20 +41,20 @@ func NewAzureCommunicationSMSClient(logger *slog.Logger) *AzureCommunicationSMSC
 // Initialize initializes the Azure SMS client with configuration
 func (a *AzureCommunicationSMSClient) Initialize(ctx context.Context, config *AzureSMSConfig) error {
 	if config == nil {
-		return domain.NewValidationError("Azure SMS configuration cannot be nil", nil)
+		return domain.NewValidationError("Azure SMS configuration cannot be nil")
 	}
 
 	if config.ConnectionString == "" {
-		return domain.NewValidationError("Azure connection string is required", nil)
+		return domain.NewValidationError("Azure connection string is required")
 	}
 
 	if config.FromNumber == "" {
-		return domain.NewValidationError("from number is required", nil)
+		return domain.NewValidationError("from number is required")
 	}
 
 	// Validate from number format
 	if !IsValidUSPhoneNumber(config.FromNumber) {
-		return domain.NewValidationError("from number is not a valid US phone number", nil)
+		return domain.NewValidationError("from number is not a valid US phone number")
 	}
 
 	// Parse connection string to extract endpoint
@@ -108,19 +107,19 @@ func (a *AzureCommunicationSMSClient) SendSMS(ctx context.Context, request *Azur
 	}
 
 	if len(validRecipients) == 0 {
-		return nil, domain.NewValidationError("no valid phone numbers to send SMS to", nil)
+		return nil, domain.NewValidationError("no valid phone numbers to send SMS to")
 	}
 
 	// Update request with valid recipients
 	request.To = validRecipients
 
 	// Create HTTP request
-	url := fmt.Sprintf("%s/sms?api-version=%s", a.endpoint, a.apiVersion)
+	// url := fmt.Sprintf("%s/sms?api-version=%s", a.endpoint, a.apiVersion)
 	
-	requestBody, err := json.Marshal(request)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal request: %w", err)
-	}
+	// requestBody, err := json.Marshal(request)
+	// if err != nil {
+	//	return nil, fmt.Errorf("failed to marshal request: %w", err)
+	// }
 
 	// In a real implementation, this would make an actual HTTP request to Azure
 	// For now, we simulate the response based on the request
@@ -136,14 +135,14 @@ func (a *AzureCommunicationSMSClient) SendSMS(ctx context.Context, request *Azur
 // GetDeliveryStatus retrieves the delivery status from Azure
 func (a *AzureCommunicationSMSClient) GetDeliveryStatus(ctx context.Context, messageID string) (*AzureSMSDeliveryStatus, error) {
 	if messageID == "" {
-		return nil, domain.NewValidationError("message ID is required", nil)
+		return nil, domain.NewValidationError("message ID is required")
 	}
 
 	logger := a.logger.With("message_id", messageID)
 	logger.Debug("Getting SMS delivery status from Azure")
 
 	// Create HTTP request for status
-	url := fmt.Sprintf("%s/sms/deliveryReports?api-version=%s&messageId=%s", a.endpoint, a.apiVersion, messageID)
+	// url := fmt.Sprintf("%s/sms/deliveryReports?api-version=%s&messageId=%s", a.endpoint, a.apiVersion, messageID)
 	
 	// In a real implementation, this would make an actual HTTP request to Azure
 	// For now, we simulate the response
@@ -188,35 +187,35 @@ func (a *AzureCommunicationSMSClient) parseConnectionString(connectionString str
 // validateSendRequest validates the send SMS request
 func (a *AzureCommunicationSMSClient) validateSendRequest(request *AzureSendSMSRequest) error {
 	if request == nil {
-		return domain.NewValidationError("send request cannot be nil", nil)
+		return domain.NewValidationError("send request cannot be nil")
 	}
 
 	if request.From == "" {
-		return domain.NewValidationError("from number is required", nil)
+		return domain.NewValidationError("from number is required")
 	}
 
 	if len(request.To) == 0 {
-		return domain.NewValidationError("at least one recipient is required", nil)
+		return domain.NewValidationError("at least one recipient is required")
 	}
 
 	if request.Message == "" {
-		return domain.NewValidationError("message content is required", nil)
+		return domain.NewValidationError("message content is required")
 	}
 
 	// Validate from number
 	if !IsValidUSPhoneNumber(request.From) {
-		return domain.NewValidationError(fmt.Sprintf("invalid from number: %s", request.From), nil)
+		return domain.NewValidationError(fmt.Sprintf("invalid from number: %s", request.From))
 	}
 
 	// Validate message length
 	if len(request.Message) > MaxSMSLength {
-		return domain.NewValidationError(fmt.Sprintf("message too long: %d characters (max %d)", len(request.Message), MaxSMSLength), nil)
+		return domain.NewValidationError(fmt.Sprintf("message too long: %d characters (max %d)", len(request.Message), MaxSMSLength))
 	}
 
 	// Validate recipient numbers (basic validation)
 	for i, phone := range request.To {
 		if phone == "" {
-			return domain.NewValidationError(fmt.Sprintf("recipient %d phone number cannot be empty", i), nil)
+			return domain.NewValidationError(fmt.Sprintf("recipient %d phone number cannot be empty", i))
 		}
 		
 		// Note: Detailed phone validation will happen in the service layer
@@ -248,206 +247,3 @@ func (a *AzureCommunicationSMSClient) simulateAzureResponse(request *AzureSendSM
 	}
 }
 
-// SMS Character Limits and Validation (from domain.go)
-
-const (
-	MaxSMSLength         = 160  // Standard SMS character limit
-	MaxConcatSMSLength   = 1600 // Maximum for concatenated SMS
-	MaxPhoneNumberLength = 15   // E.164 format maximum
-	MinPhoneNumberLength = 10   // US format minimum
-)
-
-// Phone number validation functions (would be imported from domain.go in real implementation)
-
-// IsValidUSPhoneNumber validates US phone number format
-func IsValidUSPhoneNumber(phone string) bool {
-	// This would use the implementation from domain.go
-	// Simplified version for compilation
-	if len(phone) < 10 || len(phone) > 15 {
-		return false
-	}
-	
-	// Basic validation - starts with +1 for international or area code 2-9 for domestic
-	cleaned := phone
-	for _, char := range "()- " {
-		cleaned = ""
-		for _, c := range phone {
-			if c != char {
-				cleaned += string(c)
-			}
-		}
-	}
-	
-	if len(cleaned) == 10 && cleaned[0] >= '2' && cleaned[0] <= '9' {
-		return true
-	}
-	
-	if len(cleaned) == 11 && cleaned[0] == '1' && cleaned[1] >= '2' && cleaned[1] <= '9' {
-		return true
-	}
-	
-	return false
-}
-
-// FormatPhoneNumberE164 formats phone number to E.164 format
-func FormatPhoneNumberE164(phone string) string {
-	// This would use the implementation from domain.go
-	// Simplified version for compilation
-	cleaned := ""
-	for _, c := range phone {
-		if c >= '0' && c <= '9' {
-			cleaned += string(c)
-		}
-	}
-	
-	if len(cleaned) == 10 {
-		return "+1" + cleaned
-	}
-	
-	if len(cleaned) == 11 && cleaned[0] == '1' {
-		return "+" + cleaned
-	}
-	
-	return phone // Return original if formatting fails
-}
-
-// TruncateSMSContent truncates SMS content to character limit
-func TruncateSMSContent(content string, maxLength int) string {
-	if len(content) <= maxLength {
-		return content
-	}
-	
-	// Try to truncate at word boundary
-	if maxLength > 3 {
-		truncated := content[:maxLength-3]
-		// Find last space in the second half to avoid cutting too early
-		lastSpace := -1
-		for i := len(truncated) - 1; i >= maxLength/2; i-- {
-			if truncated[i] == ' ' {
-				lastSpace = i
-				break
-			}
-		}
-		
-		if lastSpace > 0 {
-			return truncated[:lastSpace] + "..."
-		}
-		return truncated + "..."
-	}
-	
-	return content[:maxLength]
-}
-
-// SMS content generation functions (would be imported from domain.go in real implementation)
-
-// GenerateSMSContent generates SMS content by event type
-func GenerateSMSContent(eventType string, eventData map[string]interface{}) string {
-	switch eventType {
-	case "inquiry-business":
-		return generateBusinessInquirySMS(eventData)
-	case "inquiry-media":
-		return generateMediaInquirySMS(eventData)
-	case "inquiry-donations":
-		return generateDonationInquirySMS(eventData)
-	case "inquiry-volunteers":
-		return generateVolunteerInquirySMS(eventData)
-	case "event-registration":
-		return generateContentPublicationSMS(eventData)
-	case "system-error":
-		return generateSystemErrorSMS(eventData)
-	case "capacity-alert":
-		return generateCapacityAlertSMS(eventData)
-	case "admin-action-required":
-		return generateAdminActionSMS(eventData)
-	case "compliance-alert":
-		return generateComplianceAlertSMS(eventData)
-	default:
-		return "New notification alert. Check admin dashboard for details."
-	}
-}
-
-func generateBusinessInquirySMS(eventData map[string]interface{}) string {
-	entityID := extractString(eventData, "entity_id")
-	if entityID != "" {
-		return fmt.Sprintf("New business inquiry %s received. Review in admin dashboard.", entityID)
-	}
-	return "New business inquiry received. Check admin dashboard."
-}
-
-func generateMediaInquirySMS(eventData map[string]interface{}) string {
-	entityID := extractString(eventData, "entity_id")
-	if entityID != "" {
-		return fmt.Sprintf("New media inquiry %s received. Review in admin dashboard.", entityID)
-	}
-	return "New media inquiry received. Check admin dashboard."
-}
-
-func generateDonationInquirySMS(eventData map[string]interface{}) string {
-	entityID := extractString(eventData, "entity_id")
-	if entityID != "" {
-		return fmt.Sprintf("New donation inquiry %s received. Review in admin dashboard.", entityID)
-	}
-	return "New donation inquiry received. Check admin dashboard."
-}
-
-func generateVolunteerInquirySMS(eventData map[string]interface{}) string {
-	entityID := extractString(eventData, "entity_id")
-	if entityID != "" {
-		return fmt.Sprintf("New volunteer application %s received. Review in admin dashboard.", entityID)
-	}
-	return "New volunteer application received. Check admin dashboard."
-}
-
-func generateContentPublicationSMS(eventData map[string]interface{}) string {
-	entityType := extractString(eventData, "entity_type")
-	entityID := extractString(eventData, "entity_id")
-	
-	if entityType != "" && entityID != "" {
-		return fmt.Sprintf("New %s content %s published. View details in dashboard.", entityType, entityID)
-	} else if entityType != "" {
-		return fmt.Sprintf("New %s content published. Check dashboard for details.", entityType)
-	}
-	return "New content published. Check dashboard for details."
-}
-
-func generateSystemErrorSMS(eventData map[string]interface{}) string {
-	errorType := extractString(eventData, "error_type")
-	if errorType != "" {
-		return fmt.Sprintf("URGENT: System error (%s) detected. Immediate action required.", errorType)
-	}
-	return "URGENT: System error detected. Immediate action required."
-}
-
-func generateCapacityAlertSMS(eventData map[string]interface{}) string {
-	resourceType := extractString(eventData, "resource_type")
-	if resourceType != "" {
-		return fmt.Sprintf("WARNING: %s capacity alert. Check system resources immediately.", resourceType)
-	}
-	return "WARNING: Capacity alert detected. Check system resources."
-}
-
-func generateAdminActionSMS(eventData map[string]interface{}) string {
-	actionType := extractString(eventData, "action_type")
-	if actionType != "" {
-		return fmt.Sprintf("Admin action required: %s. Check dashboard for details.", actionType)
-	}
-	return "Admin action required. Check dashboard for details."
-}
-
-func generateComplianceAlertSMS(eventData map[string]interface{}) string {
-	alertType := extractString(eventData, "alert_type")
-	if alertType != "" {
-		return fmt.Sprintf("COMPLIANCE: %s alert. Immediate review required.", alertType)
-	}
-	return "COMPLIANCE: Alert detected. Immediate review required."
-}
-
-// extractString helper function
-func extractString(data map[string]interface{}, key string) string {
-	if value, exists := data[key]; exists {
-		if str, ok := value.(string); ok {
-			return str
-		}
-	}
-	return ""
-}

@@ -151,7 +151,7 @@ func (e *EmailHandlerService) ProcessEmailRequest(ctx context.Context, request *
 	// Validate email message
 	if !emailMessage.IsValid() {
 		logger.Error("Invalid email message created")
-		return domain.NewValidationError("invalid email message", nil)
+		return domain.NewValidationError("invalid email message")
 	}
 
 	// Save email message to database
@@ -222,11 +222,11 @@ func (e *EmailHandlerService) RetryFailedEmail(ctx context.Context, messageID st
 
 	// Check if retry is allowed
 	if deliveryStatus.Status.IsFinalStatus() && deliveryStatus.Status != DeliveryStatusFailed {
-		return domain.NewValidationError("email already delivered or cannot be retried", nil)
+		return domain.NewValidationError("email already delivered or cannot be retried")
 	}
 
 	if deliveryStatus.AttemptCount >= e.config.MaxRetries {
-		return domain.NewValidationError("maximum retry attempts exceeded", nil)
+		return domain.NewValidationError("maximum retry attempts exceeded")
 	}
 
 	logger.Info("Retrying failed email", "attempt", deliveryStatus.AttemptCount+1)
@@ -372,8 +372,8 @@ func (e *EmailHandlerService) createEmailMessage(ctx context.Context, request *E
 	templateData := &EmailTemplateData{
 		EventType:         request.EventType,
 		Priority:          request.Priority,
-		EntityID:          extractString(request.EventData, "entity_id"),
-		UserID:            extractString(request.EventData, "user_id"),
+		EntityID:          domain.ExtractString(request.EventData, "entity_id"),
+		UserID:            domain.ExtractString(request.EventData, "user_id"),
 		Timestamp:         request.CreatedAt.Format(time.RFC3339),
 		CorrelationID:     request.CorrelationID,
 		EventData:         request.EventData,
@@ -502,31 +502,31 @@ func (e *EmailHandlerService) scheduleRetry(ctx context.Context, message *EmailM
 // validateConfiguration validates the email handler configuration
 func (e *EmailHandlerService) validateConfiguration() error {
 	if e.config == nil {
-		return domain.NewValidationError("configuration cannot be nil", nil)
+		return domain.NewValidationError("configuration cannot be nil")
 	}
 
 	if e.config.QueueName == "" {
-		return domain.NewValidationError("queue name is required", nil)
+		return domain.NewValidationError("queue name is required")
 	}
 
 	if e.config.Workers <= 0 {
-		return domain.NewValidationError("workers must be positive", nil)
+		return domain.NewValidationError("workers must be positive")
 	}
 
 	if e.config.MaxRetries < 0 {
-		return domain.NewValidationError("max retries cannot be negative", nil)
+		return domain.NewValidationError("max retries cannot be negative")
 	}
 
 	if e.config.Azure == nil {
-		return domain.NewValidationError("Azure configuration is required", nil)
+		return domain.NewValidationError("Azure configuration is required")
 	}
 
 	if e.config.Azure.ConnectionString == "" {
-		return domain.NewValidationError("Azure connection string is required", nil)
+		return domain.NewValidationError("Azure connection string is required")
 	}
 
 	if e.config.Azure.SenderAddress == "" {
-		return domain.NewValidationError("Azure sender address is required", nil)
+		return domain.NewValidationError("Azure sender address is required")
 	}
 
 	return nil
@@ -542,12 +542,12 @@ func generateActionURL(eventType string, eventData map[string]interface{}) strin
 	// Generate appropriate action URL based on event type
 	switch eventType {
 	case "inquiry-business", "inquiry-media", "inquiry-donations", "inquiry-volunteers":
-		if entityID := extractString(eventData, "entity_id"); entityID != "" {
+		if entityID := domain.ExtractString(eventData, "entity_id"); entityID != "" {
 			return fmt.Sprintf("https://admin.international-center.app/inquiries/%s", entityID)
 		}
 		return "https://admin.international-center.app/inquiries"
 	case "event-registration":
-		if entityID := extractString(eventData, "entity_id"); entityID != "" {
+		if entityID := domain.ExtractString(eventData, "entity_id"); entityID != "" {
 			return fmt.Sprintf("https://admin.international-center.app/content/%s", entityID)
 		}
 		return "https://admin.international-center.app/content"

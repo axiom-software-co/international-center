@@ -103,10 +103,10 @@
               </div>
 
               <div class="grid gap-4 sm:gap-6 md:grid-cols-2 lg:grid-cols-3" role="list">
-                <RouterLink
+                <a
                   v-for="service in category.services"
                   :key="service.service_id"
-                  :to="`/services/${service.slug}`"
+                  :href="`/services/${service.slug}`"
                   class="block group service-card rounded-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
                   :aria-label="`${service.title} - ${getServiceStatus(service)}`"
                   role="listitem"
@@ -175,7 +175,7 @@
                       </div>
                     </div>
                   </div>
-                </RouterLink>
+                </a>
               </div>
             </div>
           </div>
@@ -187,7 +187,6 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
-import { RouterLink } from 'vue-router';
 import { Badge } from '../vue-ui';
 import ServicesFilter from '../ServicesFilter.vue';
 import { useServices, useServiceCategories } from '../../composables/useServices';

@@ -131,3 +131,13 @@ func ValidateEnum(fieldName, value string, allowedValues []string) error {
 	
 	return NewValidationFieldError(fieldName, "invalid "+fieldName+" value: "+value)
 }
+
+// ExtractString safely extracts a string value from a map
+func ExtractString(data map[string]interface{}, key string) string {
+	if value, exists := data[key]; exists {
+		if str, ok := value.(string); ok {
+			return str
+		}
+	}
+	return ""
+}

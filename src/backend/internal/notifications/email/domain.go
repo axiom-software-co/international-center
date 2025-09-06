@@ -2,8 +2,6 @@ package email
 
 import (
 	"time"
-
-	"github.com/axiom-software-co/international-center/src/backend/internal/shared/domain"
 )
 
 // Email notification domain models

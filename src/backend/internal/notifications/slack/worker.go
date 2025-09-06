@@ -593,17 +593,6 @@ type DeadLetterMessage struct {
 	Reason         string                   `json:"reason"`
 }
 
-// SlackNotificationRequest represents a request to send Slack notifications
-type SlackNotificationRequest struct {
-	SubscriberID  string                 `json:"subscriber_id"`
-	EventType     string                 `json:"event_type"`
-	Priority      string                 `json:"priority"`
-	Channels      []string               `json:"channels"`
-	EventData     map[string]interface{} `json:"event_data"`
-	Schedule      string                 `json:"schedule"`
-	CreatedAt     time.Time              `json:"created_at"`
-	CorrelationID string                 `json:"correlation_id"`
-}
 
 // Slack-specific worker capabilities
 

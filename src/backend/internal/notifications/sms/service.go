@@ -139,7 +139,7 @@ func (s *SMSHandlerService) ProcessSMSRequest(ctx context.Context, request *SMSN
 	// Validate SMS message
 	if !smsMessage.IsValid() {
 		logger.Error("Invalid SMS message created")
-		return domain.NewValidationError("invalid SMS message", nil)
+		return domain.NewValidationError("invalid SMS message")
 	}
 
 	// Save SMS message to database
@@ -210,11 +210,11 @@ func (s *SMSHandlerService) RetryFailedSMS(ctx context.Context, messageID string
 
 	// Check if retry is allowed
 	if deliveryStatus.Status.IsFinalStatus() && deliveryStatus.Status != SMSStatusFailed {
-		return domain.NewValidationError("SMS already delivered or cannot be retried", nil)
+		return domain.NewValidationError("SMS already delivered or cannot be retried")
 	}
 
 	if deliveryStatus.AttemptCount >= s.config.MaxRetries {
-		return domain.NewValidationError("maximum retry attempts exceeded", nil)
+		return domain.NewValidationError("maximum retry attempts exceeded")
 	}
 
 	logger.Info("Retrying failed SMS", "attempt", deliveryStatus.AttemptCount+1)
@@ -364,7 +364,7 @@ func (s *SMSHandlerService) createSMSMessage(ctx context.Context, request *SMSNo
 	}
 
 	if len(validRecipients) == 0 {
-		return nil, domain.NewValidationError("no valid phone numbers found in request", nil)
+		return nil, domain.NewValidationError("no valid phone numbers found in request")
 	}
 
 	// Generate SMS content based on event type
@@ -463,36 +463,36 @@ func (s *SMSHandlerService) scheduleRetry(ctx context.Context, message *SMSMessa
 // validateConfiguration validates the SMS handler configuration
 func (s *SMSHandlerService) validateConfiguration() error {
 	if s.config == nil {
-		return domain.NewValidationError("configuration cannot be nil", nil)
+		return domain.NewValidationError("configuration cannot be nil")
 	}
 
 	if s.config.QueueName == "" {
-		return domain.NewValidationError("queue name is required", nil)
+		return domain.NewValidationError("queue name is required")
 	}
 
 	if s.config.Workers <= 0 {
-		return domain.NewValidationError("workers must be positive", nil)
+		return domain.NewValidationError("workers must be positive")
 	}
 
 	if s.config.MaxRetries < 0 {
-		return domain.NewValidationError("max retries cannot be negative", nil)
+		return domain.NewValidationError("max retries cannot be negative")
 	}
 
 	if s.config.Azure == nil {
-		return domain.NewValidationError("Azure configuration is required", nil)
+		return domain.NewValidationError("Azure configuration is required")
 	}
 
 	if s.config.Azure.ConnectionString == "" {
-		return domain.NewValidationError("Azure connection string is required", nil)
+		return domain.NewValidationError("Azure connection string is required")
 	}
 
 	if s.config.Azure.FromNumber == "" {
-		return domain.NewValidationError("Azure from number is required", nil)
+		return domain.NewValidationError("Azure from number is required")
 	}
 
 	// Validate from number format
 	if !IsValidUSPhoneNumber(s.config.Azure.FromNumber) {
-		return domain.NewValidationError("Azure from number is not a valid US phone number", nil)
+		return domain.NewValidationError("Azure from number is not a valid US phone number")
 	}
 
 	return nil
@@ -527,14 +527,6 @@ type SMSRepository interface {
 	HealthCheck(ctx context.Context) error
 }
 
-// AzureSMSClient interface for Azure Communication Services SMS
-type AzureSMSClient interface {
-	Initialize(ctx context.Context, config *AzureSMSConfig) error
-	SendSMS(ctx context.Context, request *AzureSendSMSRequest) (*AzureSendSMSResponse, error)
-	GetDeliveryStatus(ctx context.Context, messageID string) (*AzureSMSDeliveryStatus, error)
-	HealthCheck(ctx context.Context) error
-}
-
 // Queue Message Types
 
 // QueueMessage represents a message from the queue
@@ -544,18 +536,6 @@ type QueueMessage struct {
 	Headers       map[string]string `json:"headers"`
 	CorrelationID string            `json:"correlation_id"`
 	Timestamp     time.Time         `json:"timestamp"`
-}
-
-// SMSNotificationRequest represents a request to send SMS notifications
-type SMSNotificationRequest struct {
-	SubscriberID  string                 `json:"subscriber_id"`
-	EventType     string                 `json:"event_type"`
-	Priority      string                 `json:"priority"`
-	Recipients    []string               `json:"recipients"`
-	EventData     map[string]interface{} `json:"event_data"`
-	Schedule      string                 `json:"schedule"`
-	CreatedAt     time.Time              `json:"created_at"`
-	CorrelationID string                 `json:"correlation_id"`
 }
 
 // Health Status Types

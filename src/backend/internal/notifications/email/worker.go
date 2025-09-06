@@ -375,14 +375,3 @@ type DeadLetterMessage struct {
 	Reason         string                   `json:"reason"`
 }
 
-// EmailNotificationRequest represents a request to send an email notification
-type EmailNotificationRequest struct {
-	SubscriberID  string                 `json:"subscriber_id"`
-	EventType     string                 `json:"event_type"`
-	Priority      string                 `json:"priority"`
-	Recipients    []string               `json:"recipients"`
-	EventData     map[string]interface{} `json:"event_data"`
-	Schedule      string                 `json:"schedule"`
-	CreatedAt     time.Time              `json:"created_at"`
-	CorrelationID string                 `json:"correlation_id"`
-}

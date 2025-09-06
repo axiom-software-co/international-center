@@ -2,7 +2,6 @@ package slack
 
 import (
 	"testing"
-	"time"
 )
 
 // Domain Model Validation Tests
@@ -744,17 +743,6 @@ type SlackService interface {
 	ValidateWebhookSignature(signature string, body []byte) bool
 }
 
-type SlackRepository interface {
-	SaveMessage(message *SlackMessage) error
-	GetMessage(messageID string) (*SlackMessage, error)
-	UpdateMessage(message *SlackMessage) error
-	DeleteMessage(messageID string) error
-	SaveDeliveryStatus(status *SlackDeliveryStatus) error
-	GetDeliveryStatus(messageID string) (*SlackDeliveryStatus, error)
-	UpdateDeliveryStatus(status *SlackDeliveryStatus) error
-	GetPendingMessages() ([]*SlackMessage, error)
-	GetFailedMessages(limit int) ([]*SlackMessage, error)
-}
 
 func TestSlackServiceInterface(t *testing.T) {
 	t.Run("service interface contract", func(t *testing.T) {

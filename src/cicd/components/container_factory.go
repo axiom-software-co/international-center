@@ -271,7 +271,7 @@ func DeployServiceContainer(ctx *pulumi.Context, config ContainerConfig) (pulumi
 	
 	// Create Dapr sidecar container
 	daprCmd, err := local.NewCommand(ctx, fmt.Sprintf("%s-dapr-sidecar", config.ServiceName), &local.CommandArgs{
-		Create: pulumi.Sprintf("podman run -d --name %s-dapr --network=container:%s daprio/daprd:latest dapr run --app-id %s --app-port %d --dapr-http-port 3500 --dapr-grpc-port %d --components-path /tmp/components", 
+		Create: pulumi.Sprintf("podman run -d --name %s-dapr --network=container:%s daprio/daprd:latest /daprd --app-id %s --app-port %d --dapr-http-port 3500 --dapr-grpc-port %d --resources-path /tmp/components", 
 			config.ServiceName, config.ContainerName, config.AppID, config.ContainerPort, config.DaprGrpcPort),
 		Delete: pulumi.Sprintf("podman rm -f %s-dapr", config.ServiceName),
 	}, pulumi.DependsOn([]pulumi.Resource{containerCmd}))
@@ -636,14 +636,20 @@ type BuildOptimizations struct {
 
 // getDefaultBuildOptimizations returns optimized default settings for builds
 func getDefaultBuildOptimizations(serviceName, environment string) BuildOptimizations {
+	// For development environment, disable cache-from to avoid issues with non-existent images
+	var cacheFromTags []string
+	if environment != "development" {
+		cacheFromTags = []string{fmt.Sprintf("%s:latest", serviceName), fmt.Sprintf("%s:%s", serviceName, environment)}
+	}
+	
 	return BuildOptimizations{
 		CacheStrategy: BuildCacheStrategy{
 			EnableCache:      true,
-			CacheFromTags:    []string{fmt.Sprintf("%s:latest", serviceName), fmt.Sprintf("%s:%s", serviceName, environment)},
+			CacheFromTags:    cacheFromTags,
 			MaxCacheAge:      "24h",
 			CacheCompression: true,
 		},
-		MultiStage:     true,
+		MultiStage:     environment != "development", // Disable multi-stage targeting for development
 		MinimizeLayers: true,
 		BuildArgs: map[string]string{
 			"BUILDKIT_INLINE_CACHE": "1",
@@ -707,7 +713,7 @@ func buildImageFromSpecWithOptimizations(ctx *pulumi.Context, spec ImageBuildSpe
 	return buildCmd, nil
 }
 
-// constructOptimizedBuildCommand constructs an optimized build command with cache and layer management
+// constructOptimizedBuildCommand constructs a Podman-compatible optimized build command 
 func constructOptimizedBuildCommand(spec ImageBuildSpec, opts BuildOptimizations) string {
 	var commandParts []string
 	
@@ -724,43 +730,17 @@ func constructOptimizedBuildCommand(spec ImageBuildSpec, opts BuildOptimizations
 		commandParts = append(commandParts, createIgnoreFile, "&&")
 	}
 	
-	// Construct main build command with optimizations
+	// Construct main build command with Podman-compatible optimizations
 	buildCommand := []string{"podman", "build"}
-	
-	// Add cache optimizations
-	if opts.CacheStrategy.EnableCache {
-		// Use cache from previous builds
-		for _, cacheTag := range opts.CacheStrategy.CacheFromTags {
-			buildCommand = append(buildCommand, "--cache-from", cacheTag)
-		}
-		
-		// Enable BuildKit inline cache
-		buildCommand = append(buildCommand, "--build-arg", "BUILDKIT_INLINE_CACHE=1")
-		
-		// Add cache compression if enabled
-		if opts.CacheStrategy.CacheCompression {
-			buildCommand = append(buildCommand, "--compress")
-		}
-	}
 	
 	// Add build arguments for optimization
 	for key, value := range opts.BuildArgs {
 		buildCommand = append(buildCommand, "--build-arg", fmt.Sprintf("%s=%s", key, value))
 	}
 	
-	// Enable parallel builds if supported
-	if opts.ParallelBuilds {
-		buildCommand = append(buildCommand, "--jobs", "4") // Use 4 parallel jobs
-	}
-	
-	// Layer optimization
-	if opts.MinimizeLayers {
-		buildCommand = append(buildCommand, "--squash") // Squash layers to minimize image size
-	}
-	
-	// Multi-stage optimization
+	// Multi-stage optimization (Podman supports --target)
 	if opts.MultiStage {
-		buildCommand = append(buildCommand, "--target", "production") // Target production stage
+		buildCommand = append(buildCommand, "--target", "production")
 	}
 	
 	// Add standard build parameters
@@ -993,4 +973,315 @@ func restartContainerWithImageUpdate(ctx *pulumi.Context, serviceName, container
 	}
 	
 	return restartCmd, nil
+}
+
+// TestContainerConfig represents configuration for deploying test containers
+type TestContainerConfig struct {
+	ServiceName        string
+	TestType          string   // "unit", "integration", "e2e"
+	BackendSourcePath string   // Path to backend source code
+	TestCommands      []string // Commands to execute for testing
+	Timeout           string   // Test execution timeout (e.g., "30s")
+	RetainResults     bool     // Whether to retain test results for analysis
+	ParallelExecution bool     // Whether to run tests in parallel
+}
+
+// TestVolumeConfig represents configuration for test volume management
+type TestVolumeConfig struct {
+	SourcePath      string // Host source code path
+	ContainerPath   string // Container mount path
+	ResultsPath     string // Test results output path
+	CachePath       string // Go module cache path
+	VolumePrefix    string // Prefix for volume names
+}
+
+// TestExecutionResult represents the result of test execution
+type TestExecutionResult struct {
+	ContainerID     pulumi.StringOutput
+	TestStatus      pulumi.StringOutput
+	ExecutionTime   pulumi.StringOutput
+	ResultsLocation pulumi.StringOutput
+	LogLocation     pulumi.StringOutput
+	CoverageReport  pulumi.StringOutput
+}
+
+// DeployTestContainers deploys test containers for backend services with volume management
+func DeployTestContainers(ctx *pulumi.Context) (pulumi.Map, error) {
+	logger := NewOperationLogger(ctx, "test-infrastructure", "test container deployment")
+	
+	// Define test volume configuration
+	testVolumeConfig := TestVolumeConfig{
+		SourcePath:      "/home/tojkuv/Documents/GitHub/international-center-workspace/international-center/src/backend",
+		ContainerPath:   "/app",
+		ResultsPath:     "/tmp/test-results",
+		CachePath:       "/go/pkg/mod",
+		VolumePrefix:    "test",
+	}
+	
+	// Create test volumes
+	logger.LogProgress("Creating test volumes", map[string]interface{}{
+		"source_path":      testVolumeConfig.SourcePath,
+		"container_path":   testVolumeConfig.ContainerPath,
+		"results_path":     testVolumeConfig.ResultsPath,
+		"cache_path":       testVolumeConfig.CachePath,
+	})
+	
+	testVolumes, err := createTestVolumes(ctx, testVolumeConfig)
+	if err != nil {
+		logger.LogError(err, map[string]interface{}{
+			"operation": "test_volume_creation",
+		})
+		return nil, fmt.Errorf("failed to create test volumes: %w", err)
+	}
+	
+	testContainers := pulumi.Map{}
+	
+	// Define test configurations for different test types
+	testConfigs := []TestContainerConfig{
+		{
+			ServiceName:        "backend-unit-tests",
+			TestType:          "unit",
+			BackendSourcePath: testVolumeConfig.SourcePath,
+			TestCommands: []string{
+				"go test ./... -v -timeout=30s -race -coverprofile=coverage.out",
+				"go tool cover -html=coverage.out -o coverage.html",
+			},
+			Timeout:           "60s",
+			RetainResults:     true,
+			ParallelExecution: true,
+		},
+		{
+			ServiceName:        "backend-integration-tests",
+			TestType:          "integration",
+			BackendSourcePath: testVolumeConfig.SourcePath,
+			TestCommands: []string{
+				"go test ./... -tags=integration -v -timeout=300s -race",
+			},
+			Timeout:           "600s",
+			RetainResults:     true,
+			ParallelExecution: false,
+		},
+		{
+			ServiceName:        "backend-module-tests",
+			TestType:          "module",
+			BackendSourcePath: testVolumeConfig.SourcePath,
+			TestCommands: []string{
+				"go test ./internal/content/news/... -v -timeout=10s",
+				"go test ./internal/content/research/... -v -timeout=10s",
+				"go test ./internal/content/events/... -v -timeout=10s",
+				"go test ./internal/content/services/... -v -timeout=10s",
+				"go test ./internal/inquiries/business/... -v -timeout=10s",
+				"go test ./internal/inquiries/donations/... -v -timeout=10s",
+				"go test ./internal/inquiries/media/... -v -timeout=10s",
+				"go test ./internal/inquiries/volunteers/... -v -timeout=10s",
+				"go test ./internal/notifications/... -v -timeout=10s",
+				"go test ./internal/shared/... -v -timeout=10s",
+			},
+			Timeout:           "120s",
+			RetainResults:     true,
+			ParallelExecution: false,
+		},
+	}
+	
+	// Deploy test containers for each configuration
+	for _, config := range testConfigs {
+		logger.LogProgress("Deploying test container", map[string]interface{}{
+			"service_name": config.ServiceName,
+			"test_type":    config.TestType,
+			"timeout":      config.Timeout,
+			"parallel":     config.ParallelExecution,
+			"commands":     len(config.TestCommands),
+		})
+		
+		testResult, err := deployTestContainer(ctx, config, testVolumes, testVolumeConfig)
+		if err != nil {
+			logger.LogError(err, map[string]interface{}{
+				"service_name": config.ServiceName,
+				"test_type":    config.TestType,
+			})
+			return nil, fmt.Errorf("failed to deploy test container %s: %w", config.ServiceName, err)
+		}
+		
+		testContainers[config.ServiceName] = pulumi.Map{
+			"container_id":     testResult.ContainerID,
+			"test_status":      testResult.TestStatus,
+			"execution_time":   testResult.ExecutionTime,
+			"results_location": testResult.ResultsLocation,
+			"log_location":     testResult.LogLocation,
+			"coverage_report":  testResult.CoverageReport,
+			"test_type":        pulumi.String(config.TestType),
+			"timeout":          pulumi.String(config.Timeout),
+			"parallel":         pulumi.Bool(config.ParallelExecution),
+		}
+	}
+	
+	logger.LogSuccess(map[string]interface{}{
+		"test_containers_deployed": len(testConfigs),
+		"volume_configuration":     "source+results+cache",
+		"test_types":               []string{"unit", "integration", "module"},
+	})
+	
+	return testContainers, nil
+}
+
+// createTestVolumes creates and manages volumes for test execution
+func createTestVolumes(ctx *pulumi.Context, config TestVolumeConfig) (pulumi.Map, error) {
+	logger := NewOperationLogger(ctx, "test-volumes", "test volume creation")
+	
+	// Create test results directory volume
+	resultsDirCmd, err := local.NewCommand(ctx, fmt.Sprintf("%s-results-volume", config.VolumePrefix), &local.CommandArgs{
+		Create: pulumi.Sprintf("mkdir -p %s && echo 'Test results volume created at %s'", 
+			config.ResultsPath, config.ResultsPath),
+		Delete: pulumi.Sprintf("rm -rf %s || true", config.ResultsPath),
+	})
+	if err != nil {
+		logger.LogError(err, map[string]interface{}{
+			"operation": "results_volume_creation",
+			"path":      config.ResultsPath,
+		})
+		return nil, fmt.Errorf("failed to create test results volume: %w", err)
+	}
+	
+	// Create Go module cache directory
+	cacheDirCmd, err := local.NewCommand(ctx, fmt.Sprintf("%s-cache-volume", config.VolumePrefix), &local.CommandArgs{
+		Create: pulumi.String("mkdir -p /tmp/go-cache && echo 'Go module cache volume created'"),
+		Delete: pulumi.String("rm -rf /tmp/go-cache || true"),
+	})
+	if err != nil {
+		logger.LogError(err, map[string]interface{}{
+			"operation": "cache_volume_creation",
+		})
+		return nil, fmt.Errorf("failed to create Go cache volume: %w", err)
+	}
+	
+	logger.LogSuccess(map[string]interface{}{
+		"results_path": config.ResultsPath,
+		"cache_path":   "/tmp/go-cache",
+		"source_mount": config.SourcePath,
+	})
+	
+	return pulumi.Map{
+		"results_volume": resultsDirCmd.Stdout,
+		"cache_volume":   cacheDirCmd.Stdout,
+		"source_path":    pulumi.String(config.SourcePath),
+		"container_path": pulumi.String(config.ContainerPath),
+		"results_path":   pulumi.String(config.ResultsPath),
+	}, nil
+}
+
+// deployTestContainer deploys a single test container with comprehensive configuration
+func deployTestContainer(ctx *pulumi.Context, config TestContainerConfig, volumes pulumi.Map, volumeConfig TestVolumeConfig) (*TestExecutionResult, error) {
+	logger := NewOperationLogger(ctx, config.ServiceName, fmt.Sprintf("%s test container deployment", config.TestType))
+	
+	// Construct test execution script
+	testScript := constructTestExecutionScript(config, volumeConfig)
+	
+	logger.LogProgress("Constructing test execution script", map[string]interface{}{
+		"test_commands":  len(config.TestCommands),
+		"timeout":        config.Timeout,
+		"parallel":       config.ParallelExecution,
+		"retain_results": config.RetainResults,
+	})
+	
+	// Define volume mounts for the container
+	volumeMounts := []string{
+		fmt.Sprintf("-v %s:%s", volumeConfig.SourcePath, volumeConfig.ContainerPath),
+		fmt.Sprintf("-v %s:%s", volumeConfig.ResultsPath, "/test-results"),
+		fmt.Sprintf("-v /tmp/go-cache:/go/pkg/mod"),
+	}
+	
+	// Construct container run command
+	containerRunCmd := fmt.Sprintf(
+		"podman run --rm --name %s-test %s -w %s -e GOCACHE=/go/pkg/mod -e CGO_ENABLED=1 golang:1.24 /bin/sh -c \"%s\"",
+		config.ServiceName,
+		strings.Join(volumeMounts, " "),
+		volumeConfig.ContainerPath,
+		testScript,
+	)
+	
+	logger.LogProgress("Creating test container command", map[string]interface{}{
+		"container_name": fmt.Sprintf("%s-test", config.ServiceName),
+		"volume_mounts":  len(volumeMounts),
+		"working_dir":    volumeConfig.ContainerPath,
+	})
+	
+	// Create the test execution command
+	testCmd, err := local.NewCommand(ctx, fmt.Sprintf("%s-execution", config.ServiceName), &local.CommandArgs{
+		Create: pulumi.String(containerRunCmd),
+	}, pulumi.DependsOn([]pulumi.Resource{volumes}))
+	
+	if err != nil {
+		logger.LogError(err, map[string]interface{}{
+			"container_command": containerRunCmd,
+			"service_name":      config.ServiceName,
+		})
+		return nil, fmt.Errorf("failed to create test container command for %s: %w", config.ServiceName, err)
+	}
+	
+	logger.LogSuccess(map[string]interface{}{
+		"service_name":    config.ServiceName,
+		"test_type":       config.TestType,
+		"execution_ready": true,
+	})
+	
+	// Return test execution result structure
+	return &TestExecutionResult{
+		ContainerID:     testCmd.Stdout,
+		TestStatus:      pulumi.String("completed").ToStringOutput(),
+		ExecutionTime:   pulumi.String(config.Timeout).ToStringOutput(),
+		ResultsLocation: pulumi.Sprintf("%s/%s", volumeConfig.ResultsPath, config.ServiceName).ToStringOutput(),
+		LogLocation:     pulumi.Sprintf("%s/%s.log", volumeConfig.ResultsPath, config.ServiceName).ToStringOutput(),
+		CoverageReport:  pulumi.Sprintf("%s/%s-coverage.html", volumeConfig.ResultsPath, config.ServiceName).ToStringOutput(),
+	}, nil
+}
+
+// constructTestExecutionScript creates a comprehensive test execution script
+func constructTestExecutionScript(config TestContainerConfig, volumeConfig TestVolumeConfig) string {
+	var scriptParts []string
+	
+	// Add test execution header
+	scriptParts = append(scriptParts, fmt.Sprintf("echo 'Starting %s tests for %s'", config.TestType, config.ServiceName))
+	scriptParts = append(scriptParts, fmt.Sprintf("echo 'Timeout: %s, Parallel: %t'", config.Timeout, config.ParallelExecution))
+	
+	// Add Go environment setup
+	scriptParts = append(scriptParts, "export GO111MODULE=on")
+	scriptParts = append(scriptParts, "export GOPROXY=https://proxy.golang.org,direct")
+	scriptParts = append(scriptParts, "export GOSUMDB=sum.golang.org")
+	
+	// Add dependency download
+	scriptParts = append(scriptParts, "echo 'Downloading Go dependencies...'")
+	scriptParts = append(scriptParts, "go mod download")
+	
+	// Add test result directory setup
+	if config.RetainResults {
+		scriptParts = append(scriptParts, fmt.Sprintf("mkdir -p /test-results/%s", config.ServiceName))
+	}
+	
+	// Add test commands execution
+	for i, testCmd := range config.TestCommands {
+		if config.ParallelExecution && len(config.TestCommands) > 1 {
+			scriptParts = append(scriptParts, fmt.Sprintf("echo 'Running test command %d in parallel: %s'", i+1, testCmd))
+			scriptParts = append(scriptParts, fmt.Sprintf("(%s) &", testCmd))
+		} else {
+			scriptParts = append(scriptParts, fmt.Sprintf("echo 'Running test command %d: %s'", i+1, testCmd))
+			scriptParts = append(scriptParts, testCmd)
+		}
+	}
+	
+	// Wait for parallel executions to complete
+	if config.ParallelExecution && len(config.TestCommands) > 1 {
+		scriptParts = append(scriptParts, "wait")
+		scriptParts = append(scriptParts, "echo 'All parallel test executions completed'")
+	}
+	
+	// Add result collection
+	if config.RetainResults {
+		scriptParts = append(scriptParts, fmt.Sprintf("echo 'Collecting test results for %s'", config.ServiceName))
+		scriptParts = append(scriptParts, fmt.Sprintf("find . -name '*.out' -o -name '*.html' -o -name '*.xml' -o -name '*.json' | xargs -I {} cp {} /test-results/%s/ 2>/dev/null || true", config.ServiceName))
+	}
+	
+	// Add completion message
+	scriptParts = append(scriptParts, fmt.Sprintf("echo '%s tests completed for %s'", config.TestType, config.ServiceName))
+	
+	return strings.Join(scriptParts, " && ")
 }

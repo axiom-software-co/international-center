@@ -139,7 +139,7 @@ func (s *SlackHandlerService) ProcessSlackRequest(ctx context.Context, request *
 	// Validate Slack message
 	if !slackMessage.IsValid() {
 		logger.Error("Invalid Slack message created")
-		return domain.NewValidationError("invalid Slack message", nil)
+		return domain.NewValidationError("invalid Slack message")
 	}
 
 	// Save Slack message to database
@@ -210,11 +210,11 @@ func (s *SlackHandlerService) RetryFailedSlackMessage(ctx context.Context, messa
 
 	// Check if retry is allowed
 	if deliveryStatus.Status.IsFinalStatus() && deliveryStatus.Status != SlackStatusFailed {
-		return domain.NewValidationError("Slack message already delivered or cannot be retried", nil)
+		return domain.NewValidationError("Slack message already delivered or cannot be retried")
 	}
 
 	if deliveryStatus.AttemptCount >= s.config.MaxRetries {
-		return domain.NewValidationError("maximum retry attempts exceeded", nil)
+		return domain.NewValidationError("maximum retry attempts exceeded")
 	}
 
 	logger.Info("Retrying failed Slack message", "attempt", deliveryStatus.AttemptCount+1)
@@ -502,36 +502,36 @@ func (s *SlackHandlerService) scheduleRetry(ctx context.Context, message *SlackM
 // validateConfiguration validates the Slack handler configuration
 func (s *SlackHandlerService) validateConfiguration() error {
 	if s.config == nil {
-		return domain.NewValidationError("configuration cannot be nil", nil)
+		return domain.NewValidationError("configuration cannot be nil")
 	}
 
 	if s.config.QueueName == "" {
-		return domain.NewValidationError("queue name is required", nil)
+		return domain.NewValidationError("queue name is required")
 	}
 
 	if s.config.Workers <= 0 {
-		return domain.NewValidationError("workers must be positive", nil)
+		return domain.NewValidationError("workers must be positive")
 	}
 
 	if s.config.MaxRetries < 0 {
-		return domain.NewValidationError("max retries cannot be negative", nil)
+		return domain.NewValidationError("max retries cannot be negative")
 	}
 
 	if s.config.Slack == nil {
-		return domain.NewValidationError("Slack configuration is required", nil)
+		return domain.NewValidationError("Slack configuration is required")
 	}
 
 	if s.config.Slack.BotToken == "" {
-		return domain.NewValidationError("Slack bot token is required", nil)
+		return domain.NewValidationError("Slack bot token is required")
 	}
 
 	if s.config.Slack.DefaultChannel == "" {
-		return domain.NewValidationError("Slack default channel is required", nil)
+		return domain.NewValidationError("Slack default channel is required")
 	}
 
 	// Validate default channel format
 	if !IsValidSlackChannel(s.config.Slack.DefaultChannel) {
-		return domain.NewValidationError("Slack default channel is not valid", nil)
+		return domain.NewValidationError("Slack default channel is not valid")
 	}
 
 	return nil
@@ -570,15 +570,6 @@ type SlackRepository interface {
 	HealthCheck(ctx context.Context) error
 }
 
-// SlackAPIClient interface for Slack API integration
-type SlackAPIClient interface {
-	Initialize(ctx context.Context, config *SlackConfig) error
-	SendMessage(ctx context.Context, request *SlackSendMessageRequest) (*SlackSendMessageResponse, error)
-	UpdateMessage(ctx context.Context, request *SlackUpdateMessageRequest) (*SlackUpdateMessageResponse, error)
-	DeleteMessage(ctx context.Context, channel, messageTS string) error
-	GetChannelInfo(ctx context.Context, channel string) (*SlackChannelInfo, error)
-	HealthCheck(ctx context.Context) error
-}
 
 // Queue Message Types
 
@@ -591,17 +582,6 @@ type QueueMessage struct {
 	Timestamp     time.Time         `json:"timestamp"`
 }
 
-// SlackNotificationRequest represents a request to send Slack notifications
-type SlackNotificationRequest struct {
-	SubscriberID  string                 `json:"subscriber_id"`
-	EventType     string                 `json:"event_type"`
-	Priority      string                 `json:"priority"`
-	Channels      []string               `json:"channels"`
-	EventData     map[string]interface{} `json:"event_data"`
-	Schedule      string                 `json:"schedule"`
-	CreatedAt     time.Time              `json:"created_at"`
-	CorrelationID string                 `json:"correlation_id"`
-}
 
 // Health Status Types
 

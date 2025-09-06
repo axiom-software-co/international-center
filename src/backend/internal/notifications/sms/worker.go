@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"strings"
 	"sync"
 	"time"
 )
@@ -415,17 +416,6 @@ type DeadLetterMessage struct {
 	Reason         string                 `json:"reason"`
 }
 
-// SMSNotificationRequest represents a request to send SMS notifications
-type SMSNotificationRequest struct {
-	SubscriberID  string                 `json:"subscriber_id"`
-	EventType     string                 `json:"event_type"`
-	Priority      string                 `json:"priority"`
-	Recipients    []string               `json:"recipients"`
-	EventData     map[string]interface{} `json:"event_data"`
-	Schedule      string                 `json:"schedule"`
-	CreatedAt     time.Time              `json:"created_at"`
-	CorrelationID string                 `json:"correlation_id"`
-}
 
 // SMS-specific worker capabilities
 
@@ -534,5 +524,3 @@ func (w *SMSWorker) normalizeWhitespace(content string) string {
 	return strings.TrimSpace(content)
 }
 
-// Helper function imports
-import "strings"

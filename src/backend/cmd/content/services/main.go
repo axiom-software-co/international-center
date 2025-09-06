@@ -10,7 +10,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/axiom-software-co/international-center/src/backend/internal/services"
+	"github.com/axiom-software-co/international-center/src/backend/internal/content/services"
 	"github.com/axiom-software-co/international-center/src/backend/internal/shared/dapr"
 	"github.com/gorilla/mux"
 )

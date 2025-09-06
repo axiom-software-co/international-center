@@ -3,11 +3,11 @@ package email
 import (
 	"context"
 	"fmt"
-	"html/template"
+	htmltemplate "html/template"
 	"log/slog"
 	"strings"
 	"sync"
-	"text/template"
+	texttemplate "text/template"
 	"time"
 
 	"github.com/axiom-software-co/international-center/src/backend/internal/shared/domain"
@@ -24,8 +24,8 @@ type EmailTemplateRenderer interface {
 // DefaultEmailTemplateRenderer implements EmailTemplateRenderer
 type DefaultEmailTemplateRenderer struct {
 	templates     map[string]*EmailTemplate
-	htmlTemplates map[string]*htmlTemplate.Template
-	textTemplates map[string]*textTemplate.Template
+	htmlTemplates map[string]*htmltemplate.Template
+	textTemplates map[string]*texttemplate.Template
 	cache         sync.RWMutex
 	logger        *slog.Logger
 	config        *TemplateRendererConfig
@@ -44,8 +44,8 @@ type TemplateRendererConfig struct {
 func NewDefaultEmailTemplateRenderer(logger *slog.Logger, config *TemplateRendererConfig) *DefaultEmailTemplateRenderer {
 	renderer := &DefaultEmailTemplateRenderer{
 		templates:     make(map[string]*EmailTemplate),
-		htmlTemplates: make(map[string]*htmlTemplate.Template),
-		textTemplates: make(map[string]*textTemplate.Template),
+		htmlTemplates: make(map[string]*htmltemplate.Template),
+		textTemplates: make(map[string]*texttemplate.Template),
 		logger:        logger,
 		config:        config,
 	}
@@ -107,7 +107,7 @@ func (r *DefaultEmailTemplateRenderer) LoadTemplate(ctx context.Context, templat
 	// Load from predefined templates
 	template := r.getDefaultTemplate(templateID)
 	if template == nil {
-		return nil, domain.NewNotFoundError(fmt.Sprintf("template not found: %s", templateID), nil)
+		return nil, domain.NewNotFoundError(fmt.Sprintf("template not found: %s", templateID), "")
 	}
 
 	// Cache the template
@@ -123,38 +123,38 @@ func (r *DefaultEmailTemplateRenderer) LoadTemplate(ctx context.Context, templat
 // ValidateTemplate validates a template
 func (r *DefaultEmailTemplateRenderer) ValidateTemplate(ctx context.Context, template *EmailTemplate) error {
 	if template == nil {
-		return domain.NewValidationError("template cannot be nil", nil)
+		return domain.NewValidationError("template cannot be nil")
 	}
 
 	if template.TemplateID == "" {
-		return domain.NewValidationError("template ID is required", nil)
+		return domain.NewValidationError("template ID is required")
 	}
 
 	if template.EventType == "" {
-		return domain.NewValidationError("event type is required", nil)
+		return domain.NewValidationError("event type is required")
 	}
 
 	if template.Subject == "" {
-		return domain.NewValidationError("subject is required", nil)
+		return domain.NewValidationError("subject is required")
 	}
 
 	if template.HtmlTemplate == "" && template.TextTemplate == "" {
-		return domain.NewValidationError("either HTML or text template is required", nil)
+		return domain.NewValidationError("either HTML or text template is required")
 	}
 
 	// Validate HTML template syntax
 	if template.HtmlTemplate != "" {
-		_, err := htmlTemplate.New("validation").Parse(template.HtmlTemplate)
+		_, err := htmltemplate.New("validation").Parse(template.HtmlTemplate)
 		if err != nil {
-			return domain.NewValidationError(fmt.Sprintf("invalid HTML template syntax: %v", err), err)
+			return domain.NewValidationError(fmt.Sprintf("invalid HTML template syntax: %v", err))
 		}
 	}
 
 	// Validate text template syntax
 	if template.TextTemplate != "" {
-		_, err := textTemplate.New("validation").Parse(template.TextTemplate)
+		_, err := texttemplate.New("validation").Parse(template.TextTemplate)
 		if err != nil {
-			return domain.NewValidationError(fmt.Sprintf("invalid text template syntax: %v", err), err)
+			return domain.NewValidationError(fmt.Sprintf("invalid text template syntax: %v", err))
 		}
 	}
 
@@ -167,8 +167,8 @@ func (r *DefaultEmailTemplateRenderer) ClearCache() error {
 	defer r.cache.Unlock()
 
 	r.templates = make(map[string]*EmailTemplate)
-	r.htmlTemplates = make(map[string]*htmlTemplate.Template)
-	r.textTemplates = make(map[string]*textTemplate.Template)
+	r.htmlTemplates = make(map[string]*htmltemplate.Template)
+	r.textTemplates = make(map[string]*texttemplate.Template)
 
 	r.logger.Info("Template cache cleared")
 	return nil
@@ -226,7 +226,7 @@ func (r *DefaultEmailTemplateRenderer) renderHTMLTemplate(templateID, templateCo
 	}
 
 	// Parse template
-	tmpl, err := htmlTemplate.New(templateID).Funcs(r.getHTMLTemplateFuncs()).Parse(templateContent)
+	tmpl, err := htmltemplate.New(templateID).Funcs(r.getHTMLTemplateFuncs()).Parse(templateContent)
 	if err != nil {
 		return "", fmt.Errorf("failed to parse HTML template: %w", err)
 	}
@@ -254,7 +254,7 @@ func (r *DefaultEmailTemplateRenderer) renderTextTemplate(templateID, templateCo
 	}
 
 	// Parse template
-	tmpl, err := textTemplate.New(templateID).Funcs(r.getTextTemplateFuncs()).Parse(templateContent)
+	tmpl, err := texttemplate.New(templateID).Funcs(r.getTextTemplateFuncs()).Parse(templateContent)
 	if err != nil {
 		return "", fmt.Errorf("failed to parse text template: %w", err)
 	}
@@ -270,7 +270,7 @@ func (r *DefaultEmailTemplateRenderer) renderTextTemplate(templateID, templateCo
 }
 
 // executeHTMLTemplate executes HTML template with data
-func (r *DefaultEmailTemplateRenderer) executeHTMLTemplate(tmpl *htmlTemplate.Template, data map[string]interface{}) (string, error) {
+func (r *DefaultEmailTemplateRenderer) executeHTMLTemplate(tmpl *htmltemplate.Template, data map[string]interface{}) (string, error) {
 	var buf strings.Builder
 	if err := tmpl.Execute(&buf, data); err != nil {
 		return "", fmt.Errorf("failed to execute HTML template: %w", err)
@@ -279,7 +279,7 @@ func (r *DefaultEmailTemplateRenderer) executeHTMLTemplate(tmpl *htmlTemplate.Te
 }
 
 // executeTextTemplate executes text template with data
-func (r *DefaultEmailTemplateRenderer) executeTextTemplate(tmpl *textTemplate.Template, data map[string]interface{}) (string, error) {
+func (r *DefaultEmailTemplateRenderer) executeTextTemplate(tmpl *texttemplate.Template, data map[string]interface{}) (string, error) {
 	var buf strings.Builder
 	if err := tmpl.Execute(&buf, data); err != nil {
 		return "", fmt.Errorf("failed to execute text template: %w", err)
@@ -288,8 +288,8 @@ func (r *DefaultEmailTemplateRenderer) executeTextTemplate(tmpl *textTemplate.Te
 }
 
 // getHTMLTemplateFuncs returns HTML template functions
-func (r *DefaultEmailTemplateRenderer) getHTMLTemplateFuncs() htmlTemplate.FuncMap {
-	return htmlTemplate.FuncMap{
+func (r *DefaultEmailTemplateRenderer) getHTMLTemplateFuncs() htmltemplate.FuncMap {
+	return htmltemplate.FuncMap{
 		"upper":      strings.ToUpper,
 		"lower":      strings.ToLower,
 		"title":      strings.Title,
@@ -300,8 +300,8 @@ func (r *DefaultEmailTemplateRenderer) getHTMLTemplateFuncs() htmlTemplate.FuncM
 }
 
 // getTextTemplateFuncs returns text template functions
-func (r *DefaultEmailTemplateRenderer) getTextTemplateFuncs() textTemplate.FuncMap {
-	return textTemplate.FuncMap{
+func (r *DefaultEmailTemplateRenderer) getTextTemplateFuncs() texttemplate.FuncMap {
+	return texttemplate.FuncMap{
 		"upper":      strings.ToUpper,
 		"lower":      strings.ToLower,
 		"title":      strings.Title,

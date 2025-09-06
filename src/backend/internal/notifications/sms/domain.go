@@ -5,8 +5,6 @@ import (
 	"regexp"
 	"strings"
 	"time"
-
-	"github.com/axiom-software-co/international-center/src/backend/internal/shared/domain"
 )
 
 // SMS notification domain models
@@ -27,7 +25,7 @@ type SMSDeliveryStatus struct {
 	MessageID      string                `json:"message_id"`
 	SubscriberID   string                `json:"subscriber_id"`
 	Recipients     []SMSRecipientStatus  `json:"recipients"`
-	Status         SMSDeliveryStatus     `json:"status"`
+	Status         SMSDeliveryStatusType `json:"status"`
 	AttemptCount   int                   `json:"attempt_count"`
 	LastAttemptAt  time.Time             `json:"last_attempt_at"`
 	DeliveredAt    *time.Time            `json:"delivered_at,omitempty"`

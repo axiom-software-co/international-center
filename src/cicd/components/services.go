@@ -13,12 +13,14 @@ type ServicesOutputs struct {
 	InquiriesServices     pulumi.MapOutput
 	ContentServices       pulumi.MapOutput
 	GatewayServices       pulumi.MapOutput
+	TestServices          pulumi.MapOutput // Test container services for reproducible testing
 	APIServices           pulumi.MapOutput // Kept for backward compatibility with staging/production
 	PublicGatewayURL      pulumi.StringOutput
 	AdminGatewayURL       pulumi.StringOutput
 	HealthCheckEnabled    pulumi.BoolOutput
 	DaprSidecarEnabled    pulumi.BoolOutput
 	ObservabilityEnabled  pulumi.BoolOutput
+	TestingEnabled        pulumi.BoolOutput
 	ScalingPolicy         pulumi.StringOutput
 	SecurityPolicies      pulumi.BoolOutput
 	AuditLogging          pulumi.BoolOutput
@@ -45,6 +47,7 @@ func deployDevelopmentServices(ctx *pulumi.Context, cfg *config.Config) (*Servic
 	healthCheckEnabled := pulumi.Bool(true).ToBoolOutput()
 	daprSidecarEnabled := pulumi.Bool(true).ToBoolOutput()
 	observabilityEnabled := pulumi.Bool(true).ToBoolOutput()
+	testingEnabled := pulumi.Bool(true).ToBoolOutput()
 	scalingPolicy := pulumi.String("none").ToStringOutput()
 	securityPolicies := pulumi.Bool(true).ToBoolOutput()
 	auditLogging := pulumi.Bool(false).ToBoolOutput()
@@ -69,6 +72,12 @@ func deployDevelopmentServices(ctx *pulumi.Context, cfg *config.Config) (*Servic
 		return nil, fmt.Errorf("failed to deploy gateway services: %w", err)
 	}
 
+	// Deploy test containers for reproducible testing environment
+	testServices, err := DeployTestContainers(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to deploy test containers: %w", err)
+	}
+
 	// Maintain backward compatibility with APIServices for staging/production environments
 	apiServices := pulumi.Map{}
 
@@ -77,12 +86,14 @@ func deployDevelopmentServices(ctx *pulumi.Context, cfg *config.Config) (*Servic
 		InquiriesServices:     inquiriesServices.ToMapOutput(),
 		ContentServices:       contentServices.ToMapOutput(),
 		GatewayServices:       gatewayServices.ToMapOutput(),
+		TestServices:          testServices.ToMapOutput(),
 		APIServices:           apiServices.ToMapOutput(),
 		PublicGatewayURL:      publicGatewayURL,
 		AdminGatewayURL:       adminGatewayURL,
 		HealthCheckEnabled:    healthCheckEnabled,
 		DaprSidecarEnabled:    daprSidecarEnabled,
 		ObservabilityEnabled:  observabilityEnabled,
+		TestingEnabled:        testingEnabled,
 		ScalingPolicy:         scalingPolicy,
 		SecurityPolicies:      securityPolicies,
 		AuditLogging:          auditLogging,

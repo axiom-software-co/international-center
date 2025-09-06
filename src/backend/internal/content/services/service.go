@@ -929,7 +929,7 @@ func (s *ServicesService) AdminSetFeaturedCategories(ctx context.Context, catego
 		}
 
 		// Publish audit event for each featured category
-		if err := s.repository.PublishAuditEvent(ctx, domain.EntityTypeFeatured, featured.FeaturedCategoryID, domain.AuditEventInsert, userID, nil, featured); err != nil {
+		if err := s.repository.PublishAuditEvent(ctx, domain.EntityTypeFeaturedCategory, featured.FeaturedCategoryID, domain.AuditEventInsert, userID, nil, featured); err != nil {
 			return err
 		}
 	}

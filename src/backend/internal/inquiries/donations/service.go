@@ -104,7 +104,7 @@ func (s *DonationsService) AdminCreateInquiry(ctx context.Context, request Admin
 		return nil, domain.NewInternalError("failed to save donations inquiry", err)
 	}
 
-	if err := s.repository.PublishAuditEvent(ctx, domain.EntityTypeDonations, inquiry.InquiryID, domain.AuditEventInsert, userID, nil, inquiry); err != nil {
+	if err := s.repository.PublishAuditEvent(ctx, domain.EntityTypeDonationsInquiry, inquiry.InquiryID, domain.AuditEventInsert, userID, nil, inquiry); err != nil {
 		return nil, domain.NewInternalError("failed to publish audit event", err)
 	}
 
@@ -196,7 +196,7 @@ func (s *DonationsService) AdminUpdateInquiry(ctx context.Context, inquiryID str
 		return nil, domain.NewInternalError("failed to update donations inquiry", err)
 	}
 
-	if err := s.repository.PublishAuditEvent(ctx, domain.EntityTypeDonations, inquiry.InquiryID, domain.AuditEventUpdate, userID, beforeData, *inquiry); err != nil {
+	if err := s.repository.PublishAuditEvent(ctx, domain.EntityTypeDonationsInquiry, inquiry.InquiryID, domain.AuditEventUpdate, userID, beforeData, *inquiry); err != nil {
 		return nil, domain.NewInternalError("failed to publish audit event", err)
 	}
 
@@ -220,7 +220,7 @@ func (s *DonationsService) AdminDeleteInquiry(ctx context.Context, inquiryID str
 		return domain.NewInternalError("failed to delete donations inquiry", err)
 	}
 
-	if err := s.repository.PublishAuditEvent(ctx, domain.EntityTypeDonations, inquiryID, domain.AuditEventDelete, userID, beforeData, nil); err != nil {
+	if err := s.repository.PublishAuditEvent(ctx, domain.EntityTypeDonationsInquiry, inquiryID, domain.AuditEventDelete, userID, beforeData, nil); err != nil {
 		return domain.NewInternalError("failed to publish audit event", err)
 	}
 
@@ -252,7 +252,7 @@ func (s *DonationsService) AdminAcknowledgeInquiry(ctx context.Context, inquiryI
 		return nil, domain.NewInternalError("failed to acknowledge donations inquiry", err)
 	}
 
-	if err := s.repository.PublishAuditEvent(ctx, domain.EntityTypeDonations, inquiry.InquiryID, domain.AuditEventUpdate, userID, beforeData, *inquiry); err != nil {
+	if err := s.repository.PublishAuditEvent(ctx, domain.EntityTypeDonationsInquiry, inquiry.InquiryID, domain.AuditEventUpdate, userID, beforeData, *inquiry); err != nil {
 		return nil, domain.NewInternalError("failed to publish audit event", err)
 	}
 
@@ -284,7 +284,7 @@ func (s *DonationsService) AdminResolveInquiry(ctx context.Context, inquiryID st
 		return nil, domain.NewInternalError("failed to resolve donations inquiry", err)
 	}
 
-	if err := s.repository.PublishAuditEvent(ctx, domain.EntityTypeDonations, inquiry.InquiryID, domain.AuditEventUpdate, userID, beforeData, *inquiry); err != nil {
+	if err := s.repository.PublishAuditEvent(ctx, domain.EntityTypeDonationsInquiry, inquiry.InquiryID, domain.AuditEventUpdate, userID, beforeData, *inquiry); err != nil {
 		return nil, domain.NewInternalError("failed to publish audit event", err)
 	}
 
@@ -312,7 +312,7 @@ func (s *DonationsService) AdminCloseInquiry(ctx context.Context, inquiryID stri
 		return nil, domain.NewInternalError("failed to close donations inquiry", err)
 	}
 
-	if err := s.repository.PublishAuditEvent(ctx, domain.EntityTypeDonations, inquiry.InquiryID, domain.AuditEventUpdate, userID, beforeData, *inquiry); err != nil {
+	if err := s.repository.PublishAuditEvent(ctx, domain.EntityTypeDonationsInquiry, inquiry.InquiryID, domain.AuditEventUpdate, userID, beforeData, *inquiry); err != nil {
 		return nil, domain.NewInternalError("failed to publish audit event", err)
 	}
 
@@ -340,7 +340,7 @@ func (s *DonationsService) AdminSetPriority(ctx context.Context, inquiryID strin
 		return nil, domain.NewInternalError("failed to set inquiry priority", err)
 	}
 
-	if err := s.repository.PublishAuditEvent(ctx, domain.EntityTypeDonations, inquiry.InquiryID, domain.AuditEventUpdate, userID, beforeData, *inquiry); err != nil {
+	if err := s.repository.PublishAuditEvent(ctx, domain.EntityTypeDonationsInquiry, inquiry.InquiryID, domain.AuditEventUpdate, userID, beforeData, *inquiry); err != nil {
 		return nil, domain.NewInternalError("failed to publish audit event", err)
 	}
 

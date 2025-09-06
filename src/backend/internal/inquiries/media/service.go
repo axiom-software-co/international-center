@@ -78,7 +78,7 @@ func (s *MediaService) AdminCreateInquiry(ctx context.Context, request AdminCrea
 		return nil, domain.NewInternalError("failed to save media inquiry", err)
 	}
 
-	if err := s.repository.PublishAuditEvent(ctx, domain.EntityTypeMedia, inquiry.InquiryID, domain.AuditEventInsert, userID, nil, inquiry); err != nil {
+	if err := s.repository.PublishAuditEvent(ctx, domain.EntityTypeMediaInquiry, inquiry.InquiryID, domain.AuditEventInsert, userID, nil, inquiry); err != nil {
 		return nil, domain.NewInternalError("failed to publish audit event", err)
 	}
 
@@ -163,7 +163,7 @@ func (s *MediaService) AdminUpdateInquiry(ctx context.Context, inquiryID string,
 		return nil, domain.NewInternalError("failed to update media inquiry", err)
 	}
 
-	if err := s.repository.PublishAuditEvent(ctx, domain.EntityTypeMedia, inquiry.InquiryID, domain.AuditEventUpdate, userID, beforeData, *inquiry); err != nil {
+	if err := s.repository.PublishAuditEvent(ctx, domain.EntityTypeMediaInquiry, inquiry.InquiryID, domain.AuditEventUpdate, userID, beforeData, *inquiry); err != nil {
 		return nil, domain.NewInternalError("failed to publish audit event", err)
 	}
 
@@ -187,7 +187,7 @@ func (s *MediaService) AdminDeleteInquiry(ctx context.Context, inquiryID string,
 		return domain.NewInternalError("failed to delete media inquiry", err)
 	}
 
-	if err := s.repository.PublishAuditEvent(ctx, domain.EntityTypeMedia, inquiryID, domain.AuditEventDelete, userID, beforeData, nil); err != nil {
+	if err := s.repository.PublishAuditEvent(ctx, domain.EntityTypeMediaInquiry, inquiryID, domain.AuditEventDelete, userID, beforeData, nil); err != nil {
 		return domain.NewInternalError("failed to publish audit event", err)
 	}
 
@@ -219,7 +219,7 @@ func (s *MediaService) AdminAcknowledgeInquiry(ctx context.Context, inquiryID st
 		return nil, domain.NewInternalError("failed to acknowledge media inquiry", err)
 	}
 
-	if err := s.repository.PublishAuditEvent(ctx, domain.EntityTypeMedia, inquiry.InquiryID, domain.AuditEventUpdate, userID, beforeData, *inquiry); err != nil {
+	if err := s.repository.PublishAuditEvent(ctx, domain.EntityTypeMediaInquiry, inquiry.InquiryID, domain.AuditEventUpdate, userID, beforeData, *inquiry); err != nil {
 		return nil, domain.NewInternalError("failed to publish audit event", err)
 	}
 
@@ -251,7 +251,7 @@ func (s *MediaService) AdminResolveInquiry(ctx context.Context, inquiryID string
 		return nil, domain.NewInternalError("failed to resolve media inquiry", err)
 	}
 
-	if err := s.repository.PublishAuditEvent(ctx, domain.EntityTypeMedia, inquiry.InquiryID, domain.AuditEventUpdate, userID, beforeData, *inquiry); err != nil {
+	if err := s.repository.PublishAuditEvent(ctx, domain.EntityTypeMediaInquiry, inquiry.InquiryID, domain.AuditEventUpdate, userID, beforeData, *inquiry); err != nil {
 		return nil, domain.NewInternalError("failed to publish audit event", err)
 	}
 
@@ -279,7 +279,7 @@ func (s *MediaService) AdminCloseInquiry(ctx context.Context, inquiryID string, 
 		return nil, domain.NewInternalError("failed to close media inquiry", err)
 	}
 
-	if err := s.repository.PublishAuditEvent(ctx, domain.EntityTypeMedia, inquiry.InquiryID, domain.AuditEventUpdate, userID, beforeData, *inquiry); err != nil {
+	if err := s.repository.PublishAuditEvent(ctx, domain.EntityTypeMediaInquiry, inquiry.InquiryID, domain.AuditEventUpdate, userID, beforeData, *inquiry); err != nil {
 		return nil, domain.NewInternalError("failed to publish audit event", err)
 	}
 
@@ -307,7 +307,7 @@ func (s *MediaService) AdminSetPriority(ctx context.Context, inquiryID string, p
 		return nil, domain.NewInternalError("failed to set inquiry priority", err)
 	}
 
-	if err := s.repository.PublishAuditEvent(ctx, domain.EntityTypeMedia, inquiry.InquiryID, domain.AuditEventUpdate, userID, beforeData, *inquiry); err != nil {
+	if err := s.repository.PublishAuditEvent(ctx, domain.EntityTypeMediaInquiry, inquiry.InquiryID, domain.AuditEventUpdate, userID, beforeData, *inquiry); err != nil {
 		return nil, domain.NewInternalError("failed to publish audit event", err)
 	}
 
