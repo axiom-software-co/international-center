@@ -45,7 +45,9 @@ GRAFANA_CLOUD_ACCESS_POLICY_TOKEN="glc_eyJvIjoiMTA3Nzk3NSIsIm4iOiJwdWx1bWktcG9sa
 
 # development workflow
 
-- use pulumi for local development environment ( using podman instead of docker ) 
+- use pulumi for local development environment ( using podman instead of docker )
+
+- critical : use 'pulumi destroy' to teardown the development environment , instead on killing individual processes
 
 ## test driven development
 

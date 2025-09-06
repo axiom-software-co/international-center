@@ -34,7 +34,7 @@ type ServiceResponse struct {
 // ServiceEndpoints contains the configured service endpoints
 type ServiceEndpoints struct {
 	ContentAPI      string
-	ServicesAPI     string
+	InquiriesAPI    string
 	NotificationAPI string
 	AdminGW         string
 	PublicGW        string
@@ -51,7 +51,7 @@ func NewServiceInvocation(client *Client) *ServiceInvocation {
 func (s *ServiceInvocation) GetServiceEndpoints() *ServiceEndpoints {
 	return &ServiceEndpoints{
 		ContentAPI:      getEnv("CONTENT_API_APP_ID", "content-api"),
-		ServicesAPI:     getEnv("SERVICES_API_APP_ID", "services-api"),
+		InquiriesAPI:    getEnv("INQUIRIES_API_APP_ID", "inquiries-api"),
 		NotificationAPI: getEnv("NOTIFICATION_API_APP_ID", "notification-api"),
 		AdminGW:         getEnv("ADMIN_GATEWAY_APP_ID", "admin-gateway"),
 		PublicGW:        getEnv("PUBLIC_GATEWAY_APP_ID", "public-gateway"),
@@ -134,12 +134,12 @@ func (s *ServiceInvocation) InvokeContentAPI(ctx context.Context, method, httpVe
 	return s.InvokeService(ctx, req)
 }
 
-// InvokeServicesAPI invokes a method on the services API service
-func (s *ServiceInvocation) InvokeServicesAPI(ctx context.Context, method, httpVerb string, data []byte) (*ServiceResponse, error) {
+// InvokeInquiriesAPI invokes a method on the inquiries API service (handles business, donations, media, volunteers)
+func (s *ServiceInvocation) InvokeInquiriesAPI(ctx context.Context, method, httpVerb string, data []byte) (*ServiceResponse, error) {
 	endpoints := s.GetServiceEndpoints()
 	
 	req := &ServiceRequest{
-		AppID:       endpoints.ServicesAPI,
+		AppID:       endpoints.InquiriesAPI,
 		MethodName:  method,
 		HTTPVerb:    httpVerb,
 		Data:        data,
@@ -187,37 +187,37 @@ func (s *ServiceInvocation) GetContentPreview(ctx context.Context, contentID str
 	return s.InvokeContentAPI(ctx, method, "GET", nil)
 }
 
-// GetService retrieves service by ID from services API
+// GetService retrieves service by ID from content API (services domain consolidated)
 func (s *ServiceInvocation) GetService(ctx context.Context, serviceID string) (*ServiceResponse, error) {
 	method := fmt.Sprintf("api/v1/services/%s", serviceID)
-	return s.InvokeServicesAPI(ctx, method, "GET", nil)
+	return s.InvokeContentAPI(ctx, method, "GET", nil)
 }
 
-// GetAllServices retrieves all services from services API
+// GetAllServices retrieves all services from content API (services domain consolidated)
 func (s *ServiceInvocation) GetAllServices(ctx context.Context) (*ServiceResponse, error) {
-	return s.InvokeServicesAPI(ctx, "api/v1/services", "GET", nil)
+	return s.InvokeContentAPI(ctx, "api/v1/services", "GET", nil)
 }
 
-// GetServiceBySlug retrieves service by slug from services API
+// GetServiceBySlug retrieves service by slug from content API (services domain consolidated)
 func (s *ServiceInvocation) GetServiceBySlug(ctx context.Context, slug string) (*ServiceResponse, error) {
 	method := fmt.Sprintf("api/v1/services/slug/%s", slug)
-	return s.InvokeServicesAPI(ctx, method, "GET", nil)
+	return s.InvokeContentAPI(ctx, method, "GET", nil)
 }
 
-// GetFeaturedServices retrieves featured services from services API
+// GetFeaturedServices retrieves featured services from content API (services domain consolidated)
 func (s *ServiceInvocation) GetFeaturedServices(ctx context.Context) (*ServiceResponse, error) {
-	return s.InvokeServicesAPI(ctx, "api/v1/services/featured", "GET", nil)
+	return s.InvokeContentAPI(ctx, "api/v1/services/featured", "GET", nil)
 }
 
-// GetServiceCategories retrieves service categories from services API
+// GetServiceCategories retrieves service categories from content API (services domain consolidated)
 func (s *ServiceInvocation) GetServiceCategories(ctx context.Context) (*ServiceResponse, error) {
-	return s.InvokeServicesAPI(ctx, "api/v1/services/categories", "GET", nil)
+	return s.InvokeContentAPI(ctx, "api/v1/services/categories", "GET", nil)
 }
 
-// GetServicesByCategory retrieves services by category from services API
+// GetServicesByCategory retrieves services by category from content API (services domain consolidated)
 func (s *ServiceInvocation) GetServicesByCategory(ctx context.Context, categoryID string) (*ServiceResponse, error) {
 	method := fmt.Sprintf("api/v1/services/categories/%s/services", categoryID)
-	return s.InvokeServicesAPI(ctx, method, "GET", nil)
+	return s.InvokeContentAPI(ctx, method, "GET", nil)
 }
 
 // CheckServiceHealth checks if a service is healthy
@@ -255,7 +255,7 @@ func (s *ServiceInvocation) CheckServiceReadiness(ctx context.Context, appID str
 // CheckAllServicesHealth checks the health of all core services
 func (s *ServiceInvocation) CheckAllServicesHealth(ctx context.Context) error {
 	endpoints := s.GetServiceEndpoints()
-	services := []string{endpoints.ContentAPI, endpoints.ServicesAPI}
+	services := []string{endpoints.ContentAPI, endpoints.InquiriesAPI}
 
 	for _, service := range services {
 		if err := s.CheckServiceHealth(ctx, service); err != nil {
@@ -269,7 +269,7 @@ func (s *ServiceInvocation) CheckAllServicesHealth(ctx context.Context) error {
 // CheckAllServicesReadiness checks the readiness of all core services
 func (s *ServiceInvocation) CheckAllServicesReadiness(ctx context.Context) error {
 	endpoints := s.GetServiceEndpoints()
-	services := []string{endpoints.ContentAPI, endpoints.ServicesAPI}
+	services := []string{endpoints.ContentAPI, endpoints.InquiriesAPI}
 
 	for _, service := range services {
 		if err := s.CheckServiceReadiness(ctx, service); err != nil {
@@ -316,10 +316,10 @@ func (s *ServiceInvocation) CheckContentAPIHealth(ctx context.Context) (bool, er
 	return true, nil
 }
 
-// CheckServicesAPIHealth checks if the services API service is healthy
-func (s *ServiceInvocation) CheckServicesAPIHealth(ctx context.Context) (bool, error) {
+// CheckInquiriesAPIHealth checks if the inquiries API service is healthy
+func (s *ServiceInvocation) CheckInquiriesAPIHealth(ctx context.Context) (bool, error) {
 	endpoints := s.GetServiceEndpoints()
-	err := s.CheckServiceHealth(ctx, endpoints.ServicesAPI)
+	err := s.CheckServiceHealth(ctx, endpoints.InquiriesAPI)
 	if err != nil {
 		return false, err
 	}
@@ -347,14 +347,18 @@ func (s *ServiceInvocation) GetContentAPIMetrics(ctx context.Context) (map[strin
 	}, nil
 }
 
-// GetServicesAPIMetrics retrieves metrics from the services API service  
-func (s *ServiceInvocation) GetServicesAPIMetrics(ctx context.Context) (map[string]interface{}, error) {
+// GetInquiriesAPIMetrics retrieves metrics from the inquiries API service (business, donations, media, volunteers)
+func (s *ServiceInvocation) GetInquiriesAPIMetrics(ctx context.Context) (map[string]interface{}, error) {
 	// For TDD GREEN phase - simplified implementation
 	// In production, this would fetch actual metrics
 	return map[string]interface{}{
 		"status": "healthy",
 		"uptime": "1h25m",
-		"requests": 200,
+		"inquiries_processed": 200,
+		"business_inquiries": 45,
+		"donation_inquiries": 80,
+		"media_requests": 35,
+		"volunteer_applications": 40,
 	}, nil
 }
 

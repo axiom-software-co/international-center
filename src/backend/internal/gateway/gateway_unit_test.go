@@ -42,7 +42,7 @@ func NewMockServiceInvocation() *MockServiceInvocation {
 		invocations:  make([]MockInvocation, 0),
 		endpoints: &dapr.ServiceEndpoints{
 			ContentAPI:       "content-api",
-			ServicesAPI:      "services-api",
+			InquiriesAPI:     "inquiries-api",
 			NotificationAPI:  "notification-api",
 			AdminGW:          "admin-gateway",
 			PublicGW:         "public-gateway",
@@ -132,14 +132,14 @@ func (m *MockServiceInvocation) InvokeContentAPI(ctx context.Context, method, ht
 	return m.InvokeService(ctx, req)
 }
 
-// InvokeServicesAPI mocks services API invocation
-func (m *MockServiceInvocation) InvokeServicesAPI(ctx context.Context, method, httpVerb string, data []byte) (*dapr.ServiceResponse, error) {
-	if err, exists := m.failures["InvokeServicesAPI"]; exists {
+// InvokeInquiriesAPI mocks inquiries API invocation
+func (m *MockServiceInvocation) InvokeInquiriesAPI(ctx context.Context, method, httpVerb string, data []byte) (*dapr.ServiceResponse, error) {
+	if err, exists := m.failures["InvokeInquiriesAPI"]; exists {
 		return nil, err
 	}
 	
 	req := &dapr.ServiceRequest{
-		AppID:       m.endpoints.ServicesAPI,
+		AppID:       m.endpoints.InquiriesAPI,
 		MethodName:  method,
 		HTTPVerb:    httpVerb,
 		Data:        data,
@@ -197,7 +197,7 @@ func (m *MockServiceInvocation) CheckAllServicesHealth(ctx context.Context) erro
 	}
 	
 	endpoints := m.GetServiceEndpoints()
-	services := []string{endpoints.ContentAPI, endpoints.ServicesAPI, endpoints.NotificationAPI}
+	services := []string{endpoints.ContentAPI, endpoints.InquiriesAPI, endpoints.NotificationAPI}
 	
 	for _, service := range services {
 		if err := m.CheckServiceHealth(ctx, service); err != nil {
@@ -226,13 +226,13 @@ func (m *MockServiceInvocation) CheckContentAPIHealth(ctx context.Context) (bool
 	return true, nil // default to healthy
 }
 
-// CheckServicesAPIHealth checks if the services API service is healthy
-func (m *MockServiceInvocation) CheckServicesAPIHealth(ctx context.Context) (bool, error) {
-	if err, exists := m.failures["CheckServicesAPIHealth"]; exists {
+// CheckInquiriesAPIHealth checks if the inquiries API service is healthy
+func (m *MockServiceInvocation) CheckInquiriesAPIHealth(ctx context.Context) (bool, error) {
+	if err, exists := m.failures["CheckInquiriesAPIHealth"]; exists {
 		return false, err
 	}
 	
-	if healthy, exists := m.healthChecks[m.endpoints.ServicesAPI]; exists {
+	if healthy, exists := m.healthChecks[m.endpoints.InquiriesAPI]; exists {
 		return healthy, nil
 	}
 	
@@ -252,9 +252,9 @@ func (m *MockServiceInvocation) GetContentAPIMetrics(ctx context.Context) (map[s
 	}, nil
 }
 
-// GetServicesAPIMetrics retrieves metrics from the services API service
-func (m *MockServiceInvocation) GetServicesAPIMetrics(ctx context.Context) (map[string]interface{}, error) {
-	if err, exists := m.failures["GetServicesAPIMetrics"]; exists {
+// GetInquiriesAPIMetrics retrieves metrics from the inquiries API service
+func (m *MockServiceInvocation) GetInquiriesAPIMetrics(ctx context.Context) (map[string]interface{}, error) {
+	if err, exists := m.failures["GetInquiriesAPIMetrics"]; exists {
 		return nil, err
 	}
 	
@@ -476,11 +476,11 @@ func TestGatewayHandler_ProxyToServicesAPI(t *testing.T) {
 		validateResponse func(*testing.T, *httptest.ResponseRecorder, *MockServiceInvocation)
 	}{
 		{
-			name: "successfully proxy GET request to services API",
-			path: "/api/v1/services",
+			name: "successfully proxy GET request to inquiries API",
+			path: "/api/v1/inquiries",
 			setupMock: func(mock *MockServiceInvocation) {
-				mock.SetMockResponse("services-api", "GET", map[string]interface{}{
-					"services": []string{"service1", "service2"},
+				mock.SetMockResponse("inquiries-api", "GET", map[string]interface{}{
+					"inquiries": []string{"inquiry1", "inquiry2"},
 				})
 			},
 			expectedStatus: http.StatusOK,
@@ -488,28 +488,28 @@ func TestGatewayHandler_ProxyToServicesAPI(t *testing.T) {
 				// Verify service was invoked
 				invocations := mock.GetInvocations()
 				assert.Len(t, invocations, 1)
-				assert.Equal(t, "services-api", invocations[0].AppID)
+				assert.Equal(t, "inquiries-api", invocations[0].AppID)
 				assert.Equal(t, "GET", invocations[0].HTTPVerb)
 			},
 		},
 		{
-			name: "successfully proxy specific service endpoint",
-			path: "/api/v1/services/featured",
+			name: "successfully proxy specific inquiry endpoint",
+			path: "/api/v1/inquiries/featured",
 			setupMock: func(mock *MockServiceInvocation) {
-				mock.SetMockResponse("services-api", "/api/v1/services/featured", map[string]interface{}{
-					"featured": []string{"service1"},
+				mock.SetMockResponse("inquiries-api", "/api/v1/inquiries/featured", map[string]interface{}{
+					"featured": []string{"inquiry1"},
 				})
 			},
 			expectedStatus: http.StatusOK,
 		},
 		{
 			name: "handle service invocation failure",
-			path: "/api/v1/services",
+			path: "/api/v1/inquiries",
 			setupMock: func(mock *MockServiceInvocation) {
-				mock.SetFailure("InvokeService", domain.NewDependencyError("services API unavailable", nil))
+				mock.SetFailure("InvokeService", domain.NewDependencyError("inquiries API unavailable", nil))
 			},
 			expectedStatus: http.StatusBadGateway,
-			expectedError:  "services API unavailable",
+			expectedError:  "inquiries API unavailable",
 		},
 	}
 
@@ -561,7 +561,7 @@ func TestGatewayHandler_HealthCheck(t *testing.T) {
 			name: "return healthy when all services are healthy",
 			setupMock: func(mock *MockServiceInvocation) {
 				mock.SetHealthCheck("content-api", true)
-				mock.SetHealthCheck("services-api", true)
+				mock.SetHealthCheck("inquiries-api", true)
 			},
 			expectedStatus: http.StatusOK,
 			expectedHealth: "healthy",
@@ -574,7 +574,7 @@ func TestGatewayHandler_HealthCheck(t *testing.T) {
 			name: "return unhealthy when service is down",
 			setupMock: func(mock *MockServiceInvocation) {
 				mock.SetHealthCheck("content-api", false)
-				mock.SetHealthCheck("services-api", true)
+				mock.SetHealthCheck("inquiries-api", true)
 			},
 			expectedStatus: http.StatusServiceUnavailable,
 			expectedHealth: "unhealthy",
@@ -643,14 +643,14 @@ func TestServiceProxy_ProxyRequest(t *testing.T) {
 			},
 		},
 		{
-			name:          "successfully proxy services API request",
-			path:          "/api/v1/services",
-			targetService: "services-api",
+			name:          "successfully proxy inquiries API request",
+			path:          "/api/v1/inquiries",
+			targetService: "inquiries-api",
 			setupMock:     func(mock *MockServiceInvocation) {},
 			validateResult: func(t *testing.T, mock *MockServiceInvocation) {
 				invocations := mock.GetInvocations()
 				assert.Len(t, invocations, 1)
-				assert.Equal(t, "services-api", invocations[0].AppID)
+				assert.Equal(t, "inquiries-api", invocations[0].AppID)
 			},
 		},
 		{
@@ -807,11 +807,11 @@ func TestGatewayHandler_RegisterRoutes(t *testing.T) {
 			expectedFound: true,
 		},
 		{
-			name: "disable content API routes",
+			name: "disable services API routes",
 			modifyConfig: func(config *GatewayConfiguration) {
-				config.ServiceRouting.ContentAPIEnabled = false
+				config.ServiceRouting.ServicesAPIEnabled = false
 			},
-			testPath:      "/api/v1/content",
+			testPath:      "/api/v1/services",
 			testMethod:    "GET",
 			expectedFound: false,
 		},
@@ -1134,7 +1134,7 @@ func TestGatewayHandler_NotificationServiceHealthCheck(t *testing.T) {
 			name: "return healthy when notification service is healthy",
 			setupMock: func(mock *MockServiceInvocation) {
 				mock.SetHealthCheck("content-api", true)
-				mock.SetHealthCheck("services-api", true)
+				mock.SetHealthCheck("inquiries-api", true)
 				mock.SetHealthCheck("notification-api", true)
 			},
 			expectedStatus: http.StatusOK,
@@ -1148,7 +1148,7 @@ func TestGatewayHandler_NotificationServiceHealthCheck(t *testing.T) {
 			name: "return unhealthy when notification service is down",
 			setupMock: func(mock *MockServiceInvocation) {
 				mock.SetHealthCheck("content-api", true)
-				mock.SetHealthCheck("services-api", true)
+				mock.SetHealthCheck("inquiries-api", true)
 				mock.SetHealthCheck("notification-api", false)
 			},
 			expectedStatus: http.StatusServiceUnavailable,
@@ -1158,7 +1158,7 @@ func TestGatewayHandler_NotificationServiceHealthCheck(t *testing.T) {
 			name: "return unhealthy when notification health check fails",
 			setupMock: func(mock *MockServiceInvocation) {
 				mock.SetHealthCheck("content-api", true)
-				mock.SetHealthCheck("services-api", true)
+				mock.SetHealthCheck("inquiries-api", true)
 				mock.SetFailure("CheckNotificationAPIHealth", domain.NewDependencyError("notification health check failed", nil))
 			},
 			expectedStatus: http.StatusServiceUnavailable,

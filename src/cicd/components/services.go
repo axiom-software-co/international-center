@@ -116,55 +116,19 @@ func deployStagingServices(ctx *pulumi.Context, cfg *config.Config) (*ServicesOu
 	publicGatewayURL := pulumi.String("https://public-gateway-staging.azurecontainerapp.io").ToStringOutput()
 	adminGatewayURL := pulumi.String("https://admin-gateway-staging.azurecontainerapp.io").ToStringOutput()
 
-	// Configure API services for staging
+	// Configure consolidated API services for staging
 	apiServices := pulumi.Map{
-		"business": pulumi.Map{
-			"image":        pulumi.String("registry.azurecr.io/backend/business:staging"),
-			"replicas":     pulumi.Int(2),
+		"content": pulumi.Map{
+			"image":        pulumi.String("registry.azurecr.io/backend/content:staging"),
+			"replicas":     pulumi.Int(3),
 			"health_check": pulumi.String("/health"),
-			"dapr_app_id":  pulumi.String("business-api"),
+			"dapr_app_id":  pulumi.String("content-api"),
 		},
-		"donations": pulumi.Map{
-			"image":        pulumi.String("registry.azurecr.io/backend/donations:staging"),
-			"replicas":     pulumi.Int(2),
+		"inquiries": pulumi.Map{
+			"image":        pulumi.String("registry.azurecr.io/backend/inquiries:staging"),
+			"replicas":     pulumi.Int(3),
 			"health_check": pulumi.String("/health"),
-			"dapr_app_id":  pulumi.String("donations-api"),
-		},
-		"events": pulumi.Map{
-			"image":        pulumi.String("registry.azurecr.io/backend/events:staging"),
-			"replicas":     pulumi.Int(2),
-			"health_check": pulumi.String("/health"),
-			"dapr_app_id":  pulumi.String("events-api"),
-		},
-		"media": pulumi.Map{
-			"image":        pulumi.String("registry.azurecr.io/backend/media:staging"),
-			"replicas":     pulumi.Int(2),
-			"health_check": pulumi.String("/health"),
-			"dapr_app_id":  pulumi.String("media-api"),
-		},
-		"news": pulumi.Map{
-			"image":        pulumi.String("registry.azurecr.io/backend/news:staging"),
-			"replicas":     pulumi.Int(2),
-			"health_check": pulumi.String("/health"),
-			"dapr_app_id":  pulumi.String("news-api"),
-		},
-		"research": pulumi.Map{
-			"image":        pulumi.String("registry.azurecr.io/backend/research:staging"),
-			"replicas":     pulumi.Int(2),
-			"health_check": pulumi.String("/health"),
-			"dapr_app_id":  pulumi.String("research-api"),
-		},
-		"services": pulumi.Map{
-			"image":        pulumi.String("registry.azurecr.io/backend/services:staging"),
-			"replicas":     pulumi.Int(2),
-			"health_check": pulumi.String("/health"),
-			"dapr_app_id":  pulumi.String("services-api"),
-		},
-		"volunteers": pulumi.Map{
-			"image":        pulumi.String("registry.azurecr.io/backend/volunteers:staging"),
-			"replicas":     pulumi.Int(2),
-			"health_check": pulumi.String("/health"),
-			"dapr_app_id":  pulumi.String("volunteers-api"),
+			"dapr_app_id":  pulumi.String("inquiries-api"),
 		},
 	}
 
@@ -221,55 +185,19 @@ func deployProductionServices(ctx *pulumi.Context, cfg *config.Config) (*Service
 	publicGatewayURL := pulumi.String("https://public-gateway-production.azurecontainerapp.io").ToStringOutput()
 	adminGatewayURL := pulumi.String("https://admin-gateway-production.azurecontainerapp.io").ToStringOutput()
 
-	// Configure API services for production
+	// Configure consolidated API services for production
 	apiServices := pulumi.Map{
-		"business": pulumi.Map{
-			"image":        pulumi.String("registry.azurecr.io/backend/business:production"),
+		"content": pulumi.Map{
+			"image":        pulumi.String("registry.azurecr.io/backend/content:production"),
 			"replicas":     pulumi.Int(5),
 			"health_check": pulumi.String("/health"),
-			"dapr_app_id":  pulumi.String("business-api"),
+			"dapr_app_id":  pulumi.String("content-api"),
 		},
-		"donations": pulumi.Map{
-			"image":        pulumi.String("registry.azurecr.io/backend/donations:production"),
-			"replicas":     pulumi.Int(3),
+		"inquiries": pulumi.Map{
+			"image":        pulumi.String("registry.azurecr.io/backend/inquiries:production"),
+			"replicas":     pulumi.Int(5),
 			"health_check": pulumi.String("/health"),
-			"dapr_app_id":  pulumi.String("donations-api"),
-		},
-		"events": pulumi.Map{
-			"image":        pulumi.String("registry.azurecr.io/backend/events:production"),
-			"replicas":     pulumi.Int(4),
-			"health_check": pulumi.String("/health"),
-			"dapr_app_id":  pulumi.String("events-api"),
-		},
-		"media": pulumi.Map{
-			"image":        pulumi.String("registry.azurecr.io/backend/media:production"),
-			"replicas":     pulumi.Int(3),
-			"health_check": pulumi.String("/health"),
-			"dapr_app_id":  pulumi.String("media-api"),
-		},
-		"news": pulumi.Map{
-			"image":        pulumi.String("registry.azurecr.io/backend/news:production"),
-			"replicas":     pulumi.Int(4),
-			"health_check": pulumi.String("/health"),
-			"dapr_app_id":  pulumi.String("news-api"),
-		},
-		"research": pulumi.Map{
-			"image":        pulumi.String("registry.azurecr.io/backend/research:production"),
-			"replicas":     pulumi.Int(3),
-			"health_check": pulumi.String("/health"),
-			"dapr_app_id":  pulumi.String("research-api"),
-		},
-		"services": pulumi.Map{
-			"image":        pulumi.String("registry.azurecr.io/backend/services:production"),
-			"replicas":     pulumi.Int(4),
-			"health_check": pulumi.String("/health"),
-			"dapr_app_id":  pulumi.String("services-api"),
-		},
-		"volunteers": pulumi.Map{
-			"image":        pulumi.String("registry.azurecr.io/backend/volunteers:production"),
-			"replicas":     pulumi.Int(3),
-			"health_check": pulumi.String("/health"),
-			"dapr_app_id":  pulumi.String("volunteers-api"),
+			"dapr_app_id":  pulumi.String("inquiries-api"),
 		},
 	}
 

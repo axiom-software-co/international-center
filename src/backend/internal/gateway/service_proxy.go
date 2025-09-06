@@ -16,13 +16,13 @@ import (
 // ServiceInvocationInterface defines the contract for service invocation operations
 type ServiceInvocationInterface interface {
 	InvokeContentAPI(ctx context.Context, method, httpVerb string, data []byte) (*dapr.ServiceResponse, error)
-	InvokeServicesAPI(ctx context.Context, method, httpVerb string, data []byte) (*dapr.ServiceResponse, error)
+	InvokeInquiriesAPI(ctx context.Context, method, httpVerb string, data []byte) (*dapr.ServiceResponse, error)
 	InvokeNotificationAPI(ctx context.Context, method, httpVerb string, data []byte) (*dapr.ServiceResponse, error)
 	CheckContentAPIHealth(ctx context.Context) (bool, error)
-	CheckServicesAPIHealth(ctx context.Context) (bool, error)
+	CheckInquiriesAPIHealth(ctx context.Context) (bool, error)
 	CheckNotificationAPIHealth(ctx context.Context) (bool, error)
 	GetContentAPIMetrics(ctx context.Context) (map[string]interface{}, error)
-	GetServicesAPIMetrics(ctx context.Context) (map[string]interface{}, error)
+	GetInquiriesAPIMetrics(ctx context.Context) (map[string]interface{}, error)
 	GetNotificationAPIMetrics(ctx context.Context) (map[string]interface{}, error)
 }
 
@@ -91,8 +91,8 @@ func (p *ServiceProxy) ProxyRequest(ctx context.Context, w http.ResponseWriter, 
 	switch serviceName {
 	case "content-api":
 		response, err = p.invokeContentAPI(requestCtx, httpMethod, targetPath, requestData, headers)
-	case "services-api":
-		response, err = p.invokeServicesAPI(requestCtx, httpMethod, targetPath, requestData, headers)
+	case "inquiries-api":
+		response, err = p.invokeInquiriesAPI(requestCtx, httpMethod, targetPath, requestData, headers)
 	case "notification-api":
 		response, err = p.invokeNotificationAPI(requestCtx, httpMethod, targetPath, requestData, headers)
 	default:
@@ -128,7 +128,11 @@ func (p *ServiceProxy) parseTargetService(path, targetService string) (string, s
 	case "content":
 		serviceName = "content-api"
 	case "services":
-		serviceName = "services-api"
+		// Services domain consolidated into content-api
+		serviceName = "content-api"
+	case "inquiries":
+		// Handle inquiries domain via consolidated inquiries-api
+		serviceName = "inquiries-api"
 	case "notifications":
 		serviceName = "notification-api"
 	default:
@@ -141,10 +145,10 @@ func (p *ServiceProxy) parseTargetService(path, targetService string) (string, s
 	return serviceName, "GET", targetPath, nil // Currently only GET endpoints
 }
 
-// invokeContentAPI invokes content API service
+// invokeContentAPI invokes content API service (handles content and services domains)
 func (p *ServiceProxy) invokeContentAPI(ctx context.Context, method, path string, data interface{}, headers map[string]string) (interface{}, error) {
 	switch {
-	case strings.HasPrefix(path, "/api/v1/content"):
+	case strings.HasPrefix(path, "/api/v1/content"), strings.HasPrefix(path, "/api/v1/services"):
 		// Convert data to []byte if needed
 		var requestData []byte
 		if data != nil {
@@ -171,10 +175,10 @@ func (p *ServiceProxy) invokeContentAPI(ctx context.Context, method, path string
 	}
 }
 
-// invokeServicesAPI invokes services API service
-func (p *ServiceProxy) invokeServicesAPI(ctx context.Context, method, path string, data interface{}, headers map[string]string) (interface{}, error) {
+// invokeInquiriesAPI invokes inquiries API service (handles business, donations, media, volunteers)
+func (p *ServiceProxy) invokeInquiriesAPI(ctx context.Context, method, path string, data interface{}, headers map[string]string) (interface{}, error) {
 	switch {
-	case strings.HasPrefix(path, "/api/v1/services"):
+	case strings.HasPrefix(path, "/api/v1/inquiries"):
 		// Convert data to []byte if needed
 		var requestData []byte
 		if data != nil {
@@ -184,7 +188,7 @@ func (p *ServiceProxy) invokeServicesAPI(ctx context.Context, method, path strin
 				return nil, domain.NewValidationError("failed to marshal request data")
 			}
 		}
-		response, err := p.serviceInvocation.InvokeServicesAPI(ctx, path, method, requestData)
+		response, err := p.serviceInvocation.InvokeInquiriesAPI(ctx, path, method, requestData)
 		if err != nil {
 			return nil, err
 		}
@@ -197,7 +201,7 @@ func (p *ServiceProxy) invokeServicesAPI(ctx context.Context, method, path strin
 		}
 		return result, nil
 	default:
-		return nil, domain.NewNotFoundError("services API endpoint", path)
+		return nil, domain.NewNotFoundError("inquiries API endpoint", path)
 	}
 }
 
@@ -288,10 +292,10 @@ func (p *ServiceProxy) HealthCheck(ctx context.Context) error {
 		return fmt.Errorf("content API health check failed: %v", err)
 	}
 	
-	// Check services API health
-	servicesHealthy, err := p.serviceInvocation.CheckServicesAPIHealth(ctx)
-	if err != nil || !servicesHealthy {
-		return fmt.Errorf("services API health check failed: %v", err)
+	// Check inquiries API health
+	inquiriesHealthy, err := p.serviceInvocation.CheckInquiriesAPIHealth(ctx)
+	if err != nil || !inquiriesHealthy {
+		return fmt.Errorf("inquiries API health check failed: %v", err)
 	}
 	
 	// Check notification API health
@@ -313,10 +317,10 @@ func (p *ServiceProxy) GetServiceMetrics(ctx context.Context) (map[string]interf
 		metrics["content_api"] = contentMetrics
 	}
 	
-	// Get services API metrics
-	servicesMetrics, err := p.serviceInvocation.GetServicesAPIMetrics(ctx)
+	// Get inquiries API metrics
+	inquiriesMetrics, err := p.serviceInvocation.GetInquiriesAPIMetrics(ctx)
 	if err == nil {
-		metrics["services_api"] = servicesMetrics
+		metrics["inquiries_api"] = inquiriesMetrics
 	}
 	
 	// Get notification API metrics

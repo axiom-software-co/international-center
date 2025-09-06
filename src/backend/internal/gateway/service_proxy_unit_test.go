@@ -102,8 +102,8 @@ func (m *MockServiceInvocationForProxy) InvokeContentAPI(ctx context.Context, me
 	}, nil
 }
 
-// InvokeServicesAPI mocks services API invocation for proxy tests
-func (m *MockServiceInvocationForProxy) InvokeServicesAPI(ctx context.Context, method, httpVerb string, data []byte) (*dapr.ServiceResponse, error) {
+// InvokeInquiriesAPI mocks inquiries API invocation for proxy tests
+func (m *MockServiceInvocationForProxy) InvokeInquiriesAPI(ctx context.Context, method, httpVerb string, data []byte) (*dapr.ServiceResponse, error) {
 	// Record invocation
 	m.invocations = append(m.invocations, ProxyMockInvocation{
 		Method:      method,
@@ -234,11 +234,11 @@ func (m *MockServiceInvocationForProxy) CheckContentAPIHealth(ctx context.Contex
 	return true, nil
 }
 
-func (m *MockServiceInvocationForProxy) CheckServicesAPIHealth(ctx context.Context) (bool, error) {
-	if err, exists := m.failures["CheckServicesAPIHealth"]; exists {
+func (m *MockServiceInvocationForProxy) CheckInquiriesAPIHealth(ctx context.Context) (bool, error) {
+	if err, exists := m.failures["CheckInquiriesAPIHealth"]; exists {
 		return false, err
 	}
-	if healthy, exists := m.healthChecks["services-api"]; exists {
+	if healthy, exists := m.healthChecks["inquiries-api"]; exists {
 		return healthy, nil
 	}
 	return true, nil
@@ -266,8 +266,8 @@ func (m *MockServiceInvocationForProxy) GetContentAPIMetrics(ctx context.Context
 	}, nil
 }
 
-func (m *MockServiceInvocationForProxy) GetServicesAPIMetrics(ctx context.Context) (map[string]interface{}, error) {
-	if err, exists := m.failures["GetServicesAPIMetrics"]; exists {
+func (m *MockServiceInvocationForProxy) GetInquiriesAPIMetrics(ctx context.Context) (map[string]interface{}, error) {
+	if err, exists := m.failures["GetInquiriesAPIMetrics"]; exists {
 		return nil, err
 	}
 	return map[string]interface{}{
@@ -656,7 +656,7 @@ func TestServiceProxy_HealthCheck_WithNotificationService(t *testing.T) {
 			name: "all services healthy including notification service",
 			setupMock: func(mock *MockServiceInvocationForProxy) {
 				mock.SetHealthStatus("content-api", true)
-				mock.SetHealthStatus("services-api", true)
+				mock.SetHealthStatus("inquiries-api", true)
 				mock.SetHealthStatus("notification-api", true)
 			},
 			validateHealth: func(t *testing.T, mock *MockServiceInvocationForProxy) {
@@ -667,7 +667,7 @@ func TestServiceProxy_HealthCheck_WithNotificationService(t *testing.T) {
 			name: "notification service unhealthy",
 			setupMock: func(mock *MockServiceInvocationForProxy) {
 				mock.SetHealthStatus("content-api", true)
-				mock.SetHealthStatus("services-api", true)
+				mock.SetHealthStatus("inquiries-api", true)
 				mock.SetHealthStatus("notification-api", false)
 			},
 			expectedError: "notification API health check failed",
@@ -676,7 +676,7 @@ func TestServiceProxy_HealthCheck_WithNotificationService(t *testing.T) {
 			name: "notification service health check error",
 			setupMock: func(mock *MockServiceInvocationForProxy) {
 				mock.SetHealthStatus("content-api", true)
-				mock.SetHealthStatus("services-api", true)
+				mock.SetHealthStatus("inquiries-api", true)
 				mock.SetFailure("CheckNotificationAPIHealth", fmt.Errorf("connection timeout"))
 			},
 			expectedError: "notification API health check failed",

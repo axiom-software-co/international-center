@@ -33,7 +33,7 @@ func TestNewServiceInvocation(t *testing.T) {
 				endpoints := si.GetServiceEndpoints()
 				assert.NotNil(t, endpoints)
 				assert.NotEmpty(t, endpoints.ContentAPI)
-				assert.NotEmpty(t, endpoints.ServicesAPI)
+				assert.NotEmpty(t, endpoints.InquiriesAPI)
 			},
 		},
 		{
@@ -72,7 +72,7 @@ func TestServiceInvocation_GetServiceEndpoints(t *testing.T) {
 			envVars: map[string]string{},
 			expectedEndpoints: map[string]string{
 				"ContentAPI":  "content-api",
-				"ServicesAPI": "services-api",
+				"InquiriesAPI": "inquiries-api",
 				"AdminGW":     "admin-gateway",
 				"PublicGW":    "public-gateway",
 			},
@@ -81,13 +81,13 @@ func TestServiceInvocation_GetServiceEndpoints(t *testing.T) {
 			name: "custom service endpoints",
 			envVars: map[string]string{
 				"CONTENT_API_APP_ID":    "custom-content-api",
-				"SERVICES_API_APP_ID":   "custom-services-api",
+				"INQUIRIES_API_APP_ID":   "custom-inquiries-api",
 				"ADMIN_GATEWAY_APP_ID":  "custom-admin-gateway",
 				"PUBLIC_GATEWAY_APP_ID": "custom-public-gateway",
 			},
 			expectedEndpoints: map[string]string{
 				"ContentAPI":  "custom-content-api",
-				"ServicesAPI": "custom-services-api",
+				"InquiriesAPI": "custom-inquiries-api",
 				"AdminGW":     "custom-admin-gateway",
 				"PublicGW":    "custom-public-gateway",
 			},
@@ -113,7 +113,7 @@ func TestServiceInvocation_GetServiceEndpoints(t *testing.T) {
 			// Assert
 			assert.NotNil(t, endpoints)
 			assert.Equal(t, tt.expectedEndpoints["ContentAPI"], endpoints.ContentAPI)
-			assert.Equal(t, tt.expectedEndpoints["ServicesAPI"], endpoints.ServicesAPI)
+			assert.Equal(t, tt.expectedEndpoints["InquiriesAPI"], endpoints.InquiriesAPI)
 			assert.Equal(t, tt.expectedEndpoints["AdminGW"], endpoints.AdminGW)
 			assert.Equal(t, tt.expectedEndpoints["PublicGW"], endpoints.PublicGW)
 		})
@@ -318,7 +318,7 @@ func TestServiceInvocation_InvokeContentAPI(t *testing.T) {
 	}
 }
 
-func TestServiceInvocation_InvokeServicesAPI(t *testing.T) {
+func TestServiceInvocation_InvokeInquiriesAPI(t *testing.T) {
 	tests := []struct {
 		name           string
 		method         string
@@ -329,8 +329,8 @@ func TestServiceInvocation_InvokeServicesAPI(t *testing.T) {
 		validateResult func(*testing.T, *ServiceResponse)
 	}{
 		{
-			name:     "invoke services API GET method",
-			method:   "api/v1/services",
+			name:     "invoke inquiries API GET method",
+			method:   "api/v1/inquiries",
 			httpVerb: "GET",
 			data:     nil,
 			setupContext: func() (context.Context, context.CancelFunc) {
@@ -343,10 +343,10 @@ func TestServiceInvocation_InvokeServicesAPI(t *testing.T) {
 			},
 		},
 		{
-			name:     "invoke services API POST method",
-			method:   "api/v1/services",
+			name:     "invoke inquiries API POST method",
+			method:   "api/v1/inquiries",
 			httpVerb: "POST",
-			data:     []byte(`{"name": "Test Service", "description": "Test Description"}`),
+			data:     []byte(`{"type": "business", "description": "Test Inquiry"}`),
 			setupContext: func() (context.Context, context.CancelFunc) {
 				return sharedtesting.CreateUnitTestContext()
 			},
@@ -356,8 +356,8 @@ func TestServiceInvocation_InvokeServicesAPI(t *testing.T) {
 			},
 		},
 		{
-			name:     "invoke services API with featured endpoint",
-			method:   "api/v1/services/featured",
+			name:     "invoke inquiries API with business endpoint",
+			method:   "api/v1/inquiries/business",
 			httpVerb: "GET",
 			data:     nil,
 			setupContext: func() (context.Context, context.CancelFunc) {
@@ -383,7 +383,7 @@ func TestServiceInvocation_InvokeServicesAPI(t *testing.T) {
 			serviceInvocation := NewServiceInvocation(client)
 
 			// Act
-			response, err := serviceInvocation.InvokeServicesAPI(ctx, tt.method, tt.httpVerb, tt.data)
+			response, err := serviceInvocation.InvokeInquiriesAPI(ctx, tt.method, tt.httpVerb, tt.data)
 
 			// Assert
 			if tt.expectedError != "" {
@@ -813,8 +813,8 @@ func TestServiceInvocation_CheckServiceHealth(t *testing.T) {
 			},
 		},
 		{
-			name:  "check health for services API",
-			appID: "services-api",
+			name:  "check health for inquiries API",
+			appID: "inquiries-api",
 			setupContext: func() (context.Context, context.CancelFunc) {
 				return sharedtesting.CreateUnitTestContext()
 			},
@@ -872,8 +872,8 @@ func TestServiceInvocation_CheckServiceReadiness(t *testing.T) {
 			appID: "content-api",
 		},
 		{
-			name:  "check readiness for services API",
-			appID: "services-api",
+			name:  "check readiness for inquiries API",
+			appID: "inquiries-api",
 		},
 		{
 			name:  "check readiness for admin gateway",
@@ -1078,7 +1078,7 @@ func TestServiceInvocation_CheckContentAPIHealth(t *testing.T) {
 	assert.IsType(t, true, healthy)
 }
 
-func TestServiceInvocation_CheckServicesAPIHealth(t *testing.T) {
+func TestServiceInvocation_CheckInquiriesAPIHealth(t *testing.T) {
 	// Arrange
 	ctx, cancel := sharedtesting.CreateUnitTestContext()
 	defer cancel()
@@ -1090,7 +1090,7 @@ func TestServiceInvocation_CheckServicesAPIHealth(t *testing.T) {
 	serviceInvocation := NewServiceInvocation(client)
 
 	// Act
-	healthy, err := serviceInvocation.CheckServicesAPIHealth(ctx)
+	healthy, err := serviceInvocation.CheckInquiriesAPIHealth(ctx)
 
 	// Assert - Should not panic, may be healthy or unhealthy
 	assert.IsType(t, true, healthy)
@@ -1118,7 +1118,7 @@ func TestServiceInvocation_GetContentAPIMetrics(t *testing.T) {
 	assert.Contains(t, metrics, "requests")
 }
 
-func TestServiceInvocation_GetServicesAPIMetrics(t *testing.T) {
+func TestServiceInvocation_GetInquiriesAPIMetrics(t *testing.T) {
 	// Arrange
 	ctx, cancel := sharedtesting.CreateUnitTestContext()
 	defer cancel()
@@ -1130,7 +1130,7 @@ func TestServiceInvocation_GetServicesAPIMetrics(t *testing.T) {
 	serviceInvocation := NewServiceInvocation(client)
 
 	// Act
-	metrics, err := serviceInvocation.GetServicesAPIMetrics(ctx)
+	metrics, err := serviceInvocation.GetInquiriesAPIMetrics(ctx)
 
 	// Assert
 	assert.NoError(t, err)
