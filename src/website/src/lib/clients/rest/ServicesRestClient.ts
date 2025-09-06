@@ -1,4 +1,5 @@
 import { BaseRestClient, RestClientConfig } from './BaseRestClient';
+import { RestClientCache, STANDARD_CACHE_TTL } from './RestClientCache';
 import { config } from '../../../environments';
 import type { 
   Service, 
@@ -14,40 +15,8 @@ import type {
   BackendSearchServicesParams
 } from './BackendTypes';
 
-// Cache interface for response caching
-interface CacheEntry<T> {
-  data: T;
-  timestamp: number;
-  ttl: number;
-}
-
-// Performance metrics tracking
-interface RequestMetrics {
-  totalRequests: number;
-  cacheHits: number;
-  cacheMisses: number;
-  averageResponseTime: number;
-  errorCount: number;
-}
-
 export class ServicesRestClient extends BaseRestClient {
-  private cache = new Map<string, CacheEntry<any>>();
-  private pendingRequests = new Map<string, Promise<any>>();
-  private metrics: RequestMetrics = {
-    totalRequests: 0,
-    cacheHits: 0,
-    cacheMisses: 0,
-    averageResponseTime: 0,
-    errorCount: 0,
-  };
-  
-  // Cache TTL values in milliseconds
-  private static readonly CACHE_TTL = {
-    CATEGORIES: 15 * 60 * 1000, // 15 minutes - categories change infrequently
-    FEATURED: 5 * 60 * 1000, // 5 minutes - featured services change occasionally
-    SERVICE_DETAIL: 2 * 60 * 1000, // 2 minutes - services may be updated frequently
-    SERVICE_LIST: 30 * 1000, // 30 seconds - service lists change more frequently
-  };
+  private cache = new RestClientCache();
 
   constructor() {
     super({
@@ -55,9 +24,6 @@ export class ServicesRestClient extends BaseRestClient {
       timeout: config.domains.services.timeout,
       retryAttempts: config.domains.services.retryAttempts,
     });
-
-    // Clear expired cache entries every 5 minutes
-    setInterval(() => this.clearExpiredCache(), 5 * 60 * 1000);
   }
 
   /**
@@ -84,11 +50,12 @@ export class ServicesRestClient extends BaseRestClient {
     // Use caching for non-search queries
     if (!params.search) {
       const cacheKey = `services:${queryParams.toString()}`;
-      return this.requestWithCache<BackendServicesResponse>(
+      return this.cache.requestWithCache<BackendServicesResponse>(
+        this,
         endpoint,
         { method: 'GET' },
         cacheKey,
-        ServicesRestClient.CACHE_TTL.SERVICE_LIST
+        STANDARD_CACHE_TTL.LIST
       );
     }
     
@@ -112,11 +79,12 @@ export class ServicesRestClient extends BaseRestClient {
     const endpoint = `/api/v1/services/slug/${encodeURIComponent(slug)}`;
     const cacheKey = `services:slug:${slug}`;
     
-    return this.requestWithCache<BackendServiceResponse>(
+    return this.cache.requestWithCache<BackendServiceResponse>(
+      this,
       endpoint,
       { method: 'GET' },
       cacheKey,
-      ServicesRestClient.CACHE_TTL.SERVICE_DETAIL
+      STANDARD_CACHE_TTL.DETAIL
     );
   }
 
@@ -130,11 +98,12 @@ export class ServicesRestClient extends BaseRestClient {
     const endpoint = '/api/v1/services/categories';
     const cacheKey = 'services:categories';
     
-    return this.requestWithCache<BackendServiceCategoriesResponse>(
+    return this.cache.requestWithCache<BackendServiceCategoriesResponse>(
+      this,
       endpoint,
       { method: 'GET' },
       cacheKey,
-      ServicesRestClient.CACHE_TTL.CATEGORIES
+      STANDARD_CACHE_TTL.CATEGORIES
     );
   }
 
@@ -148,11 +117,12 @@ export class ServicesRestClient extends BaseRestClient {
     const endpoint = '/api/v1/services/published';
     const cacheKey = `services:featured${limit ? `:${limit}` : ''}`;
     
-    return this.requestWithCache<BackendServicesResponse>(
+    return this.cache.requestWithCache<BackendServicesResponse>(
+      this,
       endpoint,
       { method: 'GET' },
       cacheKey,
-      ServicesRestClient.CACHE_TTL.FEATURED
+      STANDARD_CACHE_TTL.FEATURED
     );
   }
 
@@ -189,144 +159,24 @@ export class ServicesRestClient extends BaseRestClient {
     });
   }
 
-  // Performance optimization methods
-  
-  /**
-   * Request with caching and deduplication
-   */
-  private async requestWithCache<T>(
-    endpoint: string,
-    options: RequestInit,
-    cacheKey: string,
-    ttl: number
-  ): Promise<T> {
-    const startTime = Date.now();
-    this.metrics.totalRequests++;
-    
-    // Check cache first
-    const cached = this.getFromCache<T>(cacheKey);
-    if (cached) {
-      this.metrics.cacheHits++;
-      this.updateResponseTime(startTime);
-      return cached;
-    }
-    
-    this.metrics.cacheMisses++;
-    
-    // Check for pending request to prevent duplicate requests
-    const requestKey = `${endpoint}:${JSON.stringify(options)}`;
-    if (this.pendingRequests.has(requestKey)) {
-      return this.pendingRequests.get(requestKey)!;
-    }
-    
-    // Make the request
-    const requestPromise = this.request<T>(endpoint, options);
-    this.pendingRequests.set(requestKey, requestPromise);
-    
-    try {
-      const result = await requestPromise;
-      
-      // Cache the result
-      this.setCache(cacheKey, result, ttl);
-      
-      // Update performance metrics
-      this.updateResponseTime(startTime);
-      
-      return result;
-    } catch (error) {
-      this.metrics.errorCount++;
-      throw error;
-    } finally {
-      this.pendingRequests.delete(requestKey);
-    }
-  }
-  
-  /**
-   * Get data from cache if not expired
-   */
-  private getFromCache<T>(key: string): T | null {
-    const entry = this.cache.get(key);
-    if (!entry) return null;
-    
-    const now = Date.now();
-    if (now > entry.timestamp + entry.ttl) {
-      this.cache.delete(key);
-      return null;
-    }
-    
-    return entry.data;
-  }
-  
-  /**
-   * Set data in cache with TTL
-   */
-  private setCache<T>(key: string, data: T, ttl: number): void {
-    this.cache.set(key, {
-      data,
-      timestamp: Date.now(),
-      ttl,
-    });
-  }
-  
-  /**
-   * Clear expired cache entries
-   */
-  private clearExpiredCache(): void {
-    const now = Date.now();
-    const keysToDelete = [];
-    
-    for (const [key, entry] of this.cache.entries()) {
-      if (now > entry.timestamp + entry.ttl) {
-        keysToDelete.push(key);
-      }
-    }
-    
-    keysToDelete.forEach(key => this.cache.delete(key));
-  }
-  
-  /**
-   * Update average response time metric
-   */
-  private updateResponseTime(startTime: number): void {
-    const responseTime = Date.now() - startTime;
-    this.metrics.averageResponseTime = 
-      (this.metrics.averageResponseTime * (this.metrics.totalRequests - 1) + responseTime) / 
-      this.metrics.totalRequests;
-  }
-  
   /**
    * Get performance metrics
    */
-  public getMetrics(): RequestMetrics {
-    return { ...this.metrics };
+  public getMetrics() {
+    return this.cache.getMetrics();
+  }
+  
+  /**
+   * Get cache statistics
+   */
+  public getCacheStats() {
+    return this.cache.getCacheStats();
   }
   
   /**
    * Clear all cache entries and reset metrics
    */
   public clearCache(): void {
-    this.cache.clear();
-    this.pendingRequests.clear();
-    this.metrics = {
-      totalRequests: 0,
-      cacheHits: 0,
-      cacheMisses: 0,
-      averageResponseTime: 0,
-      errorCount: 0,
-    };
-  }
-  
-  /**
-   * Get cache statistics
-   */
-  public getCacheStats(): { size: number; hitRate: number } {
-    const hitRate = this.metrics.totalRequests > 0 
-      ? (this.metrics.cacheHits / this.metrics.totalRequests) * 100 
-      : 0;
-    
-    return {
-      size: this.cache.size,
-      hitRate: Math.round(hitRate * 100) / 100,
-    };
+    this.cache.clearCache();
   }
 }

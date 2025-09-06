@@ -3,6 +3,7 @@
 // Features: Response caching, request deduplication, performance monitoring
 
 import { BaseRestClient } from '../rest/BaseRestClient';
+import { RestClientCache, STANDARD_CACHE_TTL } from '../rest/RestClientCache';
 import { config } from '../../environments';
 import type {
   NewsArticle,
@@ -13,40 +14,8 @@ import type {
   SearchNewsParams,
 } from './types';
 
-// Cache interface for response caching
-interface CacheEntry<T> {
-  data: T;
-  timestamp: number;
-  ttl: number;
-}
-
-// Performance metrics tracking
-interface RequestMetrics {
-  totalRequests: number;
-  cacheHits: number;
-  cacheMisses: number;
-  averageResponseTime: number;
-  errorCount: number;
-}
-
 export class NewsRestClient extends BaseRestClient {
-  private cache = new Map<string, CacheEntry<any>>();
-  private pendingRequests = new Map<string, Promise<any>>();
-  private metrics: RequestMetrics = {
-    totalRequests: 0,
-    cacheHits: 0,
-    cacheMisses: 0,
-    averageResponseTime: 0,
-    errorCount: 0,
-  };
-  
-  // Cache TTL values in milliseconds
-  private static readonly CACHE_TTL = {
-    CATEGORIES: 15 * 60 * 1000, // 15 minutes - categories change infrequently
-    FEATURED: 5 * 60 * 1000, // 5 minutes - featured news changes occasionally
-    ARTICLE_DETAIL: 2 * 60 * 1000, // 2 minutes - news articles may be updated frequently
-    ARTICLE_LIST: 30 * 1000, // 30 seconds - news lists change very frequently
-  };
+  private cache = new RestClientCache();
 
   constructor(baseUrl?: string) {
     // Handle test environment or missing configuration
@@ -61,9 +30,6 @@ export class NewsRestClient extends BaseRestClient {
       timeout: newsConfig.timeout,
       retryAttempts: newsConfig.retryAttempts,
     });
-
-    // Clear expired cache entries every 5 minutes
-    setInterval(() => this.clearExpiredCache(), 5 * 60 * 1000);
   }
 
   /**
@@ -83,7 +49,13 @@ export class NewsRestClient extends BaseRestClient {
     const cacheKey = `news:${queryParams.toString()}`;
     const url = `/api/v1/news${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
     
-    return this.cachedRequest(cacheKey, () => this.request<NewsResponse>(url, { method: 'GET' }), NewsRestClient.CACHE_TTL.ARTICLE_LIST);
+    return this.cache.requestWithCache<NewsResponse>(
+      this,
+      url,
+      { method: 'GET' },
+      cacheKey,
+      STANDARD_CACHE_TTL.LIST
+    );
   }
 
   /**
@@ -99,10 +71,12 @@ export class NewsRestClient extends BaseRestClient {
     const cacheKey = `news:slug:${slug}`;
     const url = `/api/v1/news/slug/${encodeURIComponent(slug)}`;
     
-    return this.cachedRequest(
+    return this.cache.requestWithCache<NewsArticleResponse>(
+      this,
+      url,
+      { method: 'GET' },
       cacheKey,
-      () => this.request<NewsArticleResponse>(url, { method: 'GET' }),
-      NewsRestClient.CACHE_TTL.ARTICLE_DETAIL
+      STANDARD_CACHE_TTL.DETAIL
     );
   }
 
@@ -118,10 +92,12 @@ export class NewsRestClient extends BaseRestClient {
     const cacheKey = `news:featured:${limit || 'all'}`;
     const url = `/api/v1/news/featured${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
     
-    return this.cachedRequest(
+    return this.cache.requestWithCache<NewsResponse>(
+      this,
+      url,
+      { method: 'GET' },
       cacheKey,
-      () => this.request<NewsResponse>(url, { method: 'GET' }),
-      NewsRestClient.CACHE_TTL.FEATURED
+      STANDARD_CACHE_TTL.FEATURED
     );
   }
 
@@ -163,108 +139,33 @@ export class NewsRestClient extends BaseRestClient {
     const cacheKey = 'news:categories';
     const url = '/api/v1/news/categories';
     
-    return this.cachedRequest(
+    return this.cache.requestWithCache<NewsCategoriesResponse>(
+      this,
+      url,
+      { method: 'GET' },
       cacheKey,
-      () => this.request<NewsCategoriesResponse>(url, { method: 'GET' }),
-      NewsRestClient.CACHE_TTL.CATEGORIES
+      STANDARD_CACHE_TTL.CATEGORIES
     );
-  }
-
-  /**
-   * Cached request wrapper with performance monitoring and deduplication
-   */
-  private async cachedRequest<T>(
-    cacheKey: string,
-    requestFn: () => Promise<T>,
-    ttl: number
-  ): Promise<T> {
-    const startTime = Date.now();
-    this.metrics.totalRequests++;
-
-    // Check cache first
-    const cachedEntry = this.cache.get(cacheKey);
-    if (cachedEntry && (Date.now() - cachedEntry.timestamp) < cachedEntry.ttl) {
-      this.metrics.cacheHits++;
-      this.updateResponseTime(startTime);
-      return cachedEntry.data;
-    }
-
-    this.metrics.cacheMisses++;
-
-    // Check for pending request to avoid duplicate requests
-    if (this.pendingRequests.has(cacheKey)) {
-      return this.pendingRequests.get(cacheKey)!;
-    }
-
-    // Make the request
-    const requestPromise = requestFn()
-      .then((data) => {
-        // Cache successful response
-        this.cache.set(cacheKey, {
-          data,
-          timestamp: Date.now(),
-          ttl,
-        });
-
-        this.updateResponseTime(startTime);
-        return data;
-      })
-      .catch((error) => {
-        this.metrics.errorCount++;
-        throw error;
-      })
-      .finally(() => {
-        // Remove from pending requests
-        this.pendingRequests.delete(cacheKey);
-      });
-
-    // Store pending request
-    this.pendingRequests.set(cacheKey, requestPromise);
-
-    return requestPromise;
-  }
-
-  /**
-   * Clear expired cache entries to prevent memory leaks
-   */
-  private clearExpiredCache(): void {
-    const now = Date.now();
-    for (const [key, entry] of this.cache.entries()) {
-      if ((now - entry.timestamp) >= entry.ttl) {
-        this.cache.delete(key);
-      }
-    }
-  }
-
-  /**
-   * Update average response time metrics
-   */
-  private updateResponseTime(startTime: number): void {
-    const responseTime = Date.now() - startTime;
-    this.metrics.averageResponseTime = 
-      (this.metrics.averageResponseTime * (this.metrics.totalRequests - 1) + responseTime) / 
-      this.metrics.totalRequests;
   }
 
   /**
    * Get performance metrics for monitoring
    */
-  public getMetrics(): RequestMetrics {
-    return { ...this.metrics };
+  public getMetrics() {
+    return this.cache.getMetrics();
+  }
+
+  /**
+   * Get cache statistics
+   */
+  public getCacheStats() {
+    return this.cache.getCacheStats();
   }
 
   /**
    * Clear all cached data and metrics
    */
   public clearCache(): void {
-    this.cache.clear();
-    this.pendingRequests.clear();
-    this.metrics = {
-      totalRequests: 0,
-      cacheHits: 0,
-      cacheMisses: 0,
-      averageResponseTime: 0,
-      errorCount: 0,
-    };
+    this.cache.clearCache();
   }
 }
