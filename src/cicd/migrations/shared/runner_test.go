@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/axiom-software-co/international-center/src/cicd/components"
+	"github.com/axiom-software-co/international-center/src/cicd/shared"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi/config"
 	"github.com/stretchr/testify/assert"
@@ -12,15 +13,15 @@ import (
 
 // TestMigrationRunner_DevelopmentEnvironment validates aggressive migration strategy
 func TestMigrationRunner_DevelopmentEnvironment(t *testing.T) {
-	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
-		cfg := config.New(ctx, "")
-		
+	framework := shared.NewContractTestingFramework("international-center", "migration-dev-strategy-test")
+	
+	framework.RunComponentContractTest(t, "development", func(t *testing.T, ctx *pulumi.Context, cfg *config.Config, env string) error {
 		// Deploy database component first to get connection details
-		databaseOutputs, err := components.DeployDatabase(ctx, cfg, "development")
+		databaseOutputs, err := components.DeployDatabase(ctx, cfg, env)
 		require.NoError(t, err)
 		
 		// Initialize migration runner with development strategy
-		runner, err := NewMigrationRunner(ctx, cfg, "development", databaseOutputs)
+		runner, err := NewMigrationRunner(ctx, cfg, env, databaseOutputs)
 		require.NoError(t, err)
 		
 		// Verify development strategy configuration
@@ -38,22 +39,20 @@ func TestMigrationRunner_DevelopmentEnvironment(t *testing.T) {
 		})
 		
 		return nil
-	}, pulumi.WithMocks("test", "stack", &MigrationMocks{}))
-	
-	assert.NoError(t, err)
+	})
 }
 
 // TestMigrationRunner_StagingEnvironment validates careful migration strategy
 func TestMigrationRunner_StagingEnvironment(t *testing.T) {
-	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
-		cfg := config.New(ctx, "")
-		
+	framework := shared.NewContractTestingFramework("international-center", "migration-staging-strategy-test")
+	
+	framework.RunComponentContractTest(t, "staging", func(t *testing.T, ctx *pulumi.Context, cfg *config.Config, env string) error {
 		// Deploy database component first to get connection details
-		databaseOutputs, err := components.DeployDatabase(ctx, cfg, "staging")
+		databaseOutputs, err := components.DeployDatabase(ctx, cfg, env)
 		require.NoError(t, err)
 		
 		// Initialize migration runner with staging strategy
-		runner, err := NewMigrationRunner(ctx, cfg, "staging", databaseOutputs)
+		runner, err := NewMigrationRunner(ctx, cfg, env, databaseOutputs)
 		require.NoError(t, err)
 		
 		// Verify staging strategy configuration
@@ -73,22 +72,20 @@ func TestMigrationRunner_StagingEnvironment(t *testing.T) {
 		})
 		
 		return nil
-	}, pulumi.WithMocks("test", "stack", &MigrationMocks{}))
-	
-	assert.NoError(t, err)
+	})
 }
 
 // TestMigrationRunner_ProductionEnvironment validates conservative migration strategy
 func TestMigrationRunner_ProductionEnvironment(t *testing.T) {
-	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
-		cfg := config.New(ctx, "")
-		
+	framework := shared.NewContractTestingFramework("international-center", "migration-production-strategy-test")
+	
+	framework.RunComponentContractTest(t, "production", func(t *testing.T, ctx *pulumi.Context, cfg *config.Config, env string) error {
 		// Deploy database component first to get connection details
-		databaseOutputs, err := components.DeployDatabase(ctx, cfg, "production")
+		databaseOutputs, err := components.DeployDatabase(ctx, cfg, env)
 		require.NoError(t, err)
 		
 		// Initialize migration runner with production strategy
-		runner, err := NewMigrationRunner(ctx, cfg, "production", databaseOutputs)
+		runner, err := NewMigrationRunner(ctx, cfg, env, databaseOutputs)
 		require.NoError(t, err)
 		
 		// Verify production strategy configuration
@@ -110,9 +107,7 @@ func TestMigrationRunner_ProductionEnvironment(t *testing.T) {
 		})
 		
 		return nil
-	}, pulumi.WithMocks("test", "stack", &MigrationMocks{}))
-	
-	assert.NoError(t, err)
+	})
 }
 
 // TestMigrationRunner_DatabaseSchemaValidation validates migration runner loads correct database schemas
@@ -121,15 +116,15 @@ func TestMigrationRunner_DatabaseSchemaValidation(t *testing.T) {
 	
 	for _, domain := range domains {
 		t.Run("Domain_"+domain, func(t *testing.T) {
-			err := pulumi.RunErr(func(ctx *pulumi.Context) error {
-				cfg := config.New(ctx, "")
-				
+			framework := shared.NewContractTestingFramework("international-center", "migration-schema-"+domain+"-test")
+			
+			framework.RunComponentContractTest(t, "development", func(t *testing.T, ctx *pulumi.Context, cfg *config.Config, env string) error {
 				// Deploy database component
-				databaseOutputs, err := components.DeployDatabase(ctx, cfg, "development")
+				databaseOutputs, err := components.DeployDatabase(ctx, cfg, env)
 				require.NoError(t, err)
 				
 				// Initialize migration runner
-				runner, err := NewMigrationRunner(ctx, cfg, "development", databaseOutputs)
+				runner, err := NewMigrationRunner(ctx, cfg, env, databaseOutputs)
 				require.NoError(t, err)
 				
 				// Verify domain migration files are loaded
@@ -152,9 +147,7 @@ func TestMigrationRunner_DatabaseSchemaValidation(t *testing.T) {
 				})
 				
 				return nil
-			}, pulumi.WithMocks("test", "stack", &MigrationMocks{}))
-			
-			assert.NoError(t, err)
+			})
 		})
 	}
 }
@@ -165,15 +158,15 @@ func TestMigrationRunner_EnvironmentParity(t *testing.T) {
 	
 	for _, env := range environments {
 		t.Run("Environment_"+env, func(t *testing.T) {
-			err := pulumi.RunErr(func(ctx *pulumi.Context) error {
-				cfg := config.New(ctx, "")
-				
+			framework := shared.NewContractTestingFramework("international-center", "migration-parity-"+env+"-test")
+			
+			framework.RunComponentContractTest(t, env, func(t *testing.T, ctx *pulumi.Context, cfg *config.Config, testEnv string) error {
 				// Deploy database component
-				databaseOutputs, err := components.DeployDatabase(ctx, cfg, env)
+				databaseOutputs, err := components.DeployDatabase(ctx, cfg, testEnv)
 				require.NoError(t, err)
 				
 				// Initialize migration runner
-				runner, err := NewMigrationRunner(ctx, cfg, env, databaseOutputs)
+				runner, err := NewMigrationRunner(ctx, cfg, testEnv, databaseOutputs)
 				require.NoError(t, err)
 				
 				// Verify all environments provide required outputs
@@ -189,9 +182,7 @@ func TestMigrationRunner_EnvironmentParity(t *testing.T) {
 				})
 				
 				return nil
-			}, pulumi.WithMocks("test", "stack", &MigrationMocks{}))
-			
-			assert.NoError(t, err)
+			})
 		})
 	}
 }
@@ -202,15 +193,15 @@ func TestMigrationRunner_MigrationExecution(t *testing.T) {
 	
 	for _, env := range environments {
 		t.Run("Environment_"+env, func(t *testing.T) {
-			err := pulumi.RunErr(func(ctx *pulumi.Context) error {
-				cfg := config.New(ctx, "")
-				
+			framework := shared.NewContractTestingFramework("international-center", "migration-execution-"+env+"-test")
+			
+			framework.RunComponentContractTest(t, env, func(t *testing.T, ctx *pulumi.Context, cfg *config.Config, testEnv string) error {
 				// Deploy database component
-				databaseOutputs, err := components.DeployDatabase(ctx, cfg, env)
+				databaseOutputs, err := components.DeployDatabase(ctx, cfg, testEnv)
 				require.NoError(t, err)
 				
 				// Initialize migration runner
-				runner, err := NewMigrationRunner(ctx, cfg, env, databaseOutputs)
+				runner, err := NewMigrationRunner(ctx, cfg, testEnv, databaseOutputs)
 				require.NoError(t, err)
 				
 				// Execute migration with environment-specific validation
@@ -219,14 +210,12 @@ func TestMigrationRunner_MigrationExecution(t *testing.T) {
 				
 				// Verify migration execution results
 				result.ExecutionStatus.ApplyT(func(status string) error {
-					assert.Equal(t, "completed", status, "Migration should complete successfully in %s environment", env)
+					assert.Equal(t, "completed", status, "Migration should complete successfully in %s environment", testEnv)
 					return nil
 				})
 				
 				return nil
-			}, pulumi.WithMocks("test", "stack", &MigrationMocks{}))
-			
-			assert.NoError(t, err)
+			})
 		})
 	}
 }

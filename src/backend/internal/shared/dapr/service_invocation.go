@@ -50,9 +50,9 @@ func NewServiceInvocation(client *Client) *ServiceInvocation {
 // GetServiceEndpoints returns the configured service endpoints
 func (s *ServiceInvocation) GetServiceEndpoints() *ServiceEndpoints {
 	return &ServiceEndpoints{
-		ContentAPI:      getEnv("CONTENT_API_APP_ID", "content-api"),
-		InquiriesAPI:    getEnv("INQUIRIES_API_APP_ID", "inquiries-api"),
-		NotificationAPI: getEnv("NOTIFICATION_API_APP_ID", "notification-api"),
+		ContentAPI:      getEnv("CONTENT_API_APP_ID", "content"),
+		InquiriesAPI:    getEnv("INQUIRIES_API_APP_ID", "inquiries"),
+		NotificationAPI: getEnv("NOTIFICATION_API_APP_ID", "notifications"),
 		AdminGW:         getEnv("ADMIN_GATEWAY_APP_ID", "admin-gateway"),
 		PublicGW:        getEnv("PUBLIC_GATEWAY_APP_ID", "public-gateway"),
 	}

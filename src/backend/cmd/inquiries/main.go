@@ -19,7 +19,7 @@ func main() {
 	port := getEnv("PORT", "8090")
 	environment := getEnv("ENVIRONMENT", "development")
 	
-	log.Printf("Starting Inquiries API on port %s in %s environment", port, environment)
+	log.Printf("Starting Inquiries Service (business, donations, media, volunteers) on port %s in %s environment", port, environment)
 
 	// Initialize Dapr client
 	daprClient, err := dapr.NewClient()
@@ -55,7 +55,7 @@ func main() {
 
 	// Start server in goroutine
 	go func() {
-		log.Printf("Inquiries API server listening on port %s", port)
+		log.Printf("Inquiries Service listening on port %s", port)
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("Failed to start server: %v", err)
 		}
@@ -66,7 +66,7 @@ func main() {
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 	<-c
 
-	log.Println("Shutting down Inquiries API server...")
+	log.Println("Shutting down Inquiries Service...")
 
 	// Create shutdown context with timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -77,7 +77,7 @@ func main() {
 		log.Fatalf("Server shutdown failed: %v", err)
 	}
 
-	log.Println("Inquiries API server shutdown complete")
+	log.Println("Inquiries Service shutdown complete")
 }
 
 func getEnv(key, defaultValue string) string {

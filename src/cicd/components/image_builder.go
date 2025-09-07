@@ -39,6 +39,10 @@ func (b *ImageBuilder) BuildServiceImage(serviceName, serviceType string) (strin
 		dockerfilePath = filepath.Join(b.baseDir, "backend", "cmd", "content", serviceName, "Dockerfile")
 		contextPath = filepath.Join(b.baseDir, "backend")
 		imageTag = fmt.Sprintf("backend/%s:latest", serviceName)
+	case "notifications":
+		dockerfilePath = filepath.Join(b.baseDir, "backend", "cmd", "notifications", serviceName, "Dockerfile")
+		contextPath = filepath.Join(b.baseDir, "backend")
+		imageTag = fmt.Sprintf("backend/%s:latest", serviceName)
 	default:
 		return "", fmt.Errorf("unknown service type: %s", serviceType)
 	}
@@ -118,24 +122,25 @@ func (b *ImageBuilder) ImageExists(imageRef string) (bool, error) {
 func (b *ImageBuilder) BuildAllRequiredImages() error {
 	b.ctx.Log.Info("Building all required images for development environment", nil)
 
-	// Build inquiries service images
-	inquiriesServices := []string{"media", "donations", "volunteers", "business"}
-	for _, service := range inquiriesServices {
-		b.ctx.Log.Info(fmt.Sprintf("Building %s inquiries service image", service), nil)
-		_, err := b.BuildServiceImage(service, "inquiries")
-		if err != nil {
-			return fmt.Errorf("failed to build %s inquiries service image: %w", service, err)
-		}
+	// Build consolidated inquiries service image
+	b.ctx.Log.Info("Building consolidated inquiries service image", nil)
+	_, err := b.BuildServiceImage("inquiries", "inquiries")
+	if err != nil {
+		return fmt.Errorf("failed to build consolidated inquiries service image: %w", err)
 	}
 
-	// Build content service images
-	contentServices := []string{"research", "services", "events", "news"}
-	for _, service := range contentServices {
-		b.ctx.Log.Info(fmt.Sprintf("Building %s content service image", service), nil)
-		_, err := b.BuildServiceImage(service, "content")
-		if err != nil {
-			return fmt.Errorf("failed to build %s content service image: %w", service, err)
-		}
+	// Build consolidated content service image
+	b.ctx.Log.Info("Building consolidated content service image", nil)
+	_, err = b.BuildServiceImage("content", "content")
+	if err != nil {
+		return fmt.Errorf("failed to build consolidated content service image: %w", err)
+	}
+
+	// Build consolidated notifications service image
+	b.ctx.Log.Info("Building consolidated notifications service image", nil)
+	_, err = b.BuildServiceImage("notifications", "notifications")
+	if err != nil {
+		return fmt.Errorf("failed to build consolidated notifications service image: %w", err)
 	}
 
 	// Build gateway images
@@ -150,7 +155,7 @@ func (b *ImageBuilder) BuildAllRequiredImages() error {
 
 	// Build website image
 	b.ctx.Log.Info("Building website image", nil)
-	_, err := b.BuildWebsiteImage()
+	_, err = b.BuildWebsiteImage()
 	if err != nil {
 		return fmt.Errorf("failed to build website image: %w", err)
 	}

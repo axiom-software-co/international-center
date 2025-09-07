@@ -71,8 +71,8 @@ func TestServiceInvocation_GetServiceEndpoints(t *testing.T) {
 			name:    "default service endpoints",
 			envVars: map[string]string{},
 			expectedEndpoints: map[string]string{
-				"ContentAPI":  "content-api",
-				"InquiriesAPI": "inquiries-api",
+				"ContentAPI":  "content",
+				"InquiriesAPI": "inquiries",
 				"AdminGW":     "admin-gateway",
 				"PublicGW":    "public-gateway",
 			},

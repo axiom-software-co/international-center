@@ -13,6 +13,8 @@
 
 - IMPORTANT AXIOM RULE TO FOLLOW : only run integration tests when the entire development environment is up ( only the deployer implements integration tests ) 
 
+- IMPORTANT AXIOM RULE TO FOLLOW : use 'export PULUMI_CONFIG_PASSPHRASE="development" && pulumi destroy' to teardown the development environment , instead on killing individual processes
+
 - note : stop using the term 'medical-grade' ( this is implicit and there is no need to mention it in the naming system )
 
 - note : do not work with github actions for now
@@ -46,8 +48,6 @@ GRAFANA_CLOUD_ACCESS_POLICY_TOKEN="glc_eyJvIjoiMTA3Nzk3NSIsIm4iOiJwdWx1bWktcG9sa
 # development workflow
 
 - use pulumi for local development environment ( using podman instead of docker )
-
-- critical : use 'export PULUMI_CONFIG_PASSPHRASE="development" && pulumi destroy' to teardown the development environment , instead on killing individual processes
 
 ## test driven development
 

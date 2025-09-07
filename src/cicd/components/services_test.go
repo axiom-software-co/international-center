@@ -20,31 +20,32 @@ func TestServicesComponent_DevelopmentEnvironment(t *testing.T) {
 		}
 
 		// Verify development environment deploys Podman containers
-		pulumi.All(outputs.DeploymentType, outputs.InquiriesServices, outputs.ContentServices, outputs.GatewayServices).ApplyT(func(args []interface{}) error {
+		pulumi.All(outputs.DeploymentType, outputs.InquiriesServices, outputs.ContentServices, outputs.NotificationServices, outputs.GatewayServices).ApplyT(func(args []interface{}) error {
 			deploymentType := args[0].(string)
 			inquiriesServices := args[1].(map[string]interface{})
 			contentServices := args[2].(map[string]interface{})
-			gatewayServices := args[3].(map[string]interface{})
+			notificationServices := args[3].(map[string]interface{})
+			gatewayServices := args[4].(map[string]interface{})
 
 			assert.Equal(t, "podman_containers", deploymentType, "Development should use Podman containers")
 			
-			// Verify all 4 inquiries services containers are deployed
-			expectedInquiriesServices := []string{"media", "donations", "volunteers", "business"}
-			for _, serviceName := range expectedInquiriesServices {
-				assert.Contains(t, inquiriesServices, serviceName, "Should deploy %s inquiries service container", serviceName)
-				serviceConfig := inquiriesServices[serviceName].(map[string]interface{})
-				assert.Contains(t, serviceConfig, "container_id", "%s should have container_id", serviceName)
-				assert.Contains(t, serviceConfig, "container_status", "%s should have container_status", serviceName)
-			}
+			// Verify consolidated inquiries service container is deployed
+			assert.Contains(t, inquiriesServices, "inquiries", "Should deploy consolidated inquiries service container")
+			inquiriesConfig := inquiriesServices["inquiries"].(map[string]interface{})
+			assert.Contains(t, inquiriesConfig, "container_id", "Inquiries should have container_id")
+			assert.Contains(t, inquiriesConfig, "container_status", "Inquiries should have container_status")
 			
-			// Verify all 4 content services containers are deployed
-			expectedContentServices := []string{"research", "services", "events", "news"}
-			for _, serviceName := range expectedContentServices {
-				assert.Contains(t, contentServices, serviceName, "Should deploy %s content service container", serviceName)
-				serviceConfig := contentServices[serviceName].(map[string]interface{})
-				assert.Contains(t, serviceConfig, "container_id", "%s should have container_id", serviceName)
-				assert.Contains(t, serviceConfig, "container_status", "%s should have container_status", serviceName)
-			}
+			// Verify consolidated content service container is deployed
+			assert.Contains(t, contentServices, "content", "Should deploy consolidated content service container")
+			contentConfig := contentServices["content"].(map[string]interface{})
+			assert.Contains(t, contentConfig, "container_id", "Content should have container_id")
+			assert.Contains(t, contentConfig, "container_status", "Content should have container_status")
+			
+			// Verify consolidated notifications service container is deployed
+			assert.Contains(t, notificationServices, "notifications", "Should deploy consolidated notifications service container")
+			notificationsConfig := notificationServices["notifications"].(map[string]interface{})
+			assert.Contains(t, notificationsConfig, "container_id", "Notifications should have container_id")
+			assert.Contains(t, notificationsConfig, "container_status", "Notifications should have container_status")
 			
 			// Verify both gateway services containers are deployed
 			expectedGateways := []string{"admin", "public"}
@@ -160,43 +161,42 @@ func TestServicesComponent_ContainerConfiguration(t *testing.T) {
 			return err
 		}
 
-		// Verify inquiries services containers have required deployment attributes
-		pulumi.All(outputs.InquiriesServices).ApplyT(func(args []interface{}) error {
+		// Verify consolidated services containers have required deployment attributes
+		pulumi.All(outputs.InquiriesServices, outputs.ContentServices, outputs.NotificationServices).ApplyT(func(args []interface{}) error {
 			inquiriesServices := args[0].(map[string]interface{})
+			contentServices := args[1].(map[string]interface{})
+			notificationServices := args[2].(map[string]interface{})
 
-			// Each inquiries service container should have required attributes
-			for serviceName, serviceConfig := range inquiriesServices {
-				config, ok := serviceConfig.(map[string]interface{})
-				assert.True(t, ok, "Inquiries service %s should have container configuration", serviceName)
-				
-				// Verify each service has required container attributes
-				assert.Contains(t, config, "container_id", "Service %s should have container_id", serviceName)
-				assert.Contains(t, config, "container_status", "Service %s should have container_status", serviceName)
-				assert.Contains(t, config, "host_port", "Service %s should have host_port", serviceName)
-				assert.Contains(t, config, "health_endpoint", "Service %s should have health_endpoint", serviceName)
-				assert.Contains(t, config, "dapr_app_id", "Service %s should have Dapr app ID", serviceName)
-				assert.Contains(t, config, "dapr_sidecar_id", "Service %s should have Dapr sidecar container", serviceName)
-			}
-			return nil
-		})
-
-		// Verify content services containers have required deployment attributes  
-		pulumi.All(outputs.ContentServices).ApplyT(func(args []interface{}) error {
-			contentServices := args[0].(map[string]interface{})
-
-			// Each content service container should have required attributes
-			for serviceName, serviceConfig := range contentServices {
-				config, ok := serviceConfig.(map[string]interface{})
-				assert.True(t, ok, "Content service %s should have container configuration", serviceName)
-				
-				// Verify each service has required container attributes
-				assert.Contains(t, config, "container_id", "Service %s should have container_id", serviceName)
-				assert.Contains(t, config, "container_status", "Service %s should have container_status", serviceName)
-				assert.Contains(t, config, "host_port", "Service %s should have host_port", serviceName)
-				assert.Contains(t, config, "health_endpoint", "Service %s should have health_endpoint", serviceName)
-				assert.Contains(t, config, "dapr_app_id", "Service %s should have Dapr app ID", serviceName)
-				assert.Contains(t, config, "dapr_sidecar_id", "Service %s should have Dapr sidecar container", serviceName)
-			}
+			// Verify consolidated inquiries service has required attributes
+			inquiriesConfig, ok := inquiriesServices["inquiries"].(map[string]interface{})
+			assert.True(t, ok, "Consolidated inquiries service should have container configuration")
+			assert.Contains(t, inquiriesConfig, "container_id", "Inquiries service should have container_id")
+			assert.Contains(t, inquiriesConfig, "container_status", "Inquiries service should have container_status")
+			assert.Contains(t, inquiriesConfig, "host_port", "Inquiries service should have host_port")
+			assert.Contains(t, inquiriesConfig, "health_endpoint", "Inquiries service should have health_endpoint")
+			assert.Contains(t, inquiriesConfig, "dapr_app_id", "Inquiries service should have Dapr app ID")
+			assert.Contains(t, inquiriesConfig, "dapr_sidecar_id", "Inquiries service should have Dapr sidecar container")
+			
+			// Verify consolidated content service has required attributes
+			contentConfig, ok := contentServices["content"].(map[string]interface{})
+			assert.True(t, ok, "Consolidated content service should have container configuration")
+			assert.Contains(t, contentConfig, "container_id", "Content service should have container_id")
+			assert.Contains(t, contentConfig, "container_status", "Content service should have container_status")
+			assert.Contains(t, contentConfig, "host_port", "Content service should have host_port")
+			assert.Contains(t, contentConfig, "health_endpoint", "Content service should have health_endpoint")
+			assert.Contains(t, contentConfig, "dapr_app_id", "Content service should have Dapr app ID")
+			assert.Contains(t, contentConfig, "dapr_sidecar_id", "Content service should have Dapr sidecar container")
+			
+			// Verify consolidated notifications service has required attributes
+			notificationsConfig, ok := notificationServices["notifications"].(map[string]interface{})
+			assert.True(t, ok, "Consolidated notifications service should have container configuration")
+			assert.Contains(t, notificationsConfig, "container_id", "Notifications service should have container_id")
+			assert.Contains(t, notificationsConfig, "container_status", "Notifications service should have container_status")
+			assert.Contains(t, notificationsConfig, "host_port", "Notifications service should have host_port")
+			assert.Contains(t, notificationsConfig, "health_endpoint", "Notifications service should have health_endpoint")
+			assert.Contains(t, notificationsConfig, "dapr_app_id", "Notifications service should have Dapr app ID")
+			assert.Contains(t, notificationsConfig, "dapr_sidecar_id", "Notifications service should have Dapr sidecar container")
+			
 			return nil
 		})
 
@@ -221,12 +221,13 @@ func TestServicesComponent_EnvironmentParity(t *testing.T) {
 				}
 
 				// Verify all environments provide required outputs
-				pulumi.All(outputs.DeploymentType, outputs.InquiriesServices, outputs.ContentServices, outputs.GatewayServices, outputs.APIServices).ApplyT(func(args []interface{}) error {
+				pulumi.All(outputs.DeploymentType, outputs.InquiriesServices, outputs.ContentServices, outputs.NotificationServices, outputs.GatewayServices, outputs.APIServices).ApplyT(func(args []interface{}) error {
 					deploymentType := args[0].(string)
 					inquiriesServices := args[1].(map[string]interface{})
 					contentServices := args[2].(map[string]interface{})
-					gatewayServices := args[3].(map[string]interface{})
-					apiServices := args[4].(map[string]interface{})
+					notificationServices := args[3].(map[string]interface{})
+					gatewayServices := args[4].(map[string]interface{})
+					apiServices := args[5].(map[string]interface{})
 
 					assert.NotEmpty(t, deploymentType, "All environments should provide deployment type")
 					assert.NotEmpty(t, gatewayServices, "All environments should provide gateway services")
@@ -235,8 +236,9 @@ func TestServicesComponent_EnvironmentParity(t *testing.T) {
 					if env == "development" {
 						assert.NotEmpty(t, inquiriesServices, "Development should provide inquiries services")
 						assert.NotEmpty(t, contentServices, "Development should provide content services")
+						assert.NotEmpty(t, notificationServices, "Development should provide notification services")
 					} else {
-						// Staging and production use APIServices instead of InquiriesServices/ContentServices
+						// Staging and production use APIServices instead of InquiriesServices/ContentServices/NotificationServices
 						assert.NotEmpty(t, apiServices, "Staging and production should provide API services")
 					}
 					return nil

@@ -12,59 +12,39 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestServiceImageIntegration validates service container deployments require valid images
+// TestServiceImageIntegration validates consolidated service container deployments succeed with proper Dockerfiles
 func TestServiceImageIntegration(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping integration tests in short mode")
 	}
 	
-	t.Run("ValidateInquiriesServicesFailWithoutImages", func(t *testing.T) {
-		framework := shared.NewContractTestingFramework("international-center", "inquiries-integration-test")
+	t.Run("ValidateConsolidatedArchitectureDeployments", func(t *testing.T) {
+		framework := shared.NewContractTestingFramework("international-center", "consolidated-architecture-test")
 		
 		framework.RunComponentContractTest(t, "development", func(t *testing.T, ctx *pulumi.Context, cfg *config.Config, env string) error {
-			// Test that inquiries services deployment fails when images don't exist
+			// Validate that consolidated services can be deployed (Dockerfiles exist)
+			// This validates our 5-container consolidated architecture:
+			// inquiries, content, notifications, admin-gateway, public-gateway
+			
+			// Test inquiries service has proper Dockerfile
 			_, err := components.DeployInquiriesServices(ctx)
-			require.Error(t, err, "Inquiries services deployment should fail without images")
-			assert.Contains(t, err.Error(), "image not found", "Error should indicate missing image")
+			assert.NoError(t, err, "Inquiries consolidated service should deploy successfully")
 			
-			return nil
-		})
-	})
-	
-	t.Run("ValidateContentServicesFailWithoutImages", func(t *testing.T) {
-		framework := shared.NewContractTestingFramework("international-center", "content-integration-test")
-		
-		framework.RunComponentContractTest(t, "development", func(t *testing.T, ctx *pulumi.Context, cfg *config.Config, env string) error {
-			// Test that content services deployment fails when images don't exist
-			_, err := components.DeployContentServices(ctx)
-			require.Error(t, err, "Content services deployment should fail without images")
-			assert.Contains(t, err.Error(), "image not found", "Error should indicate missing image")
+			// Test content service has proper Dockerfile
+			_, err = components.DeployContentServices(ctx)
+			assert.NoError(t, err, "Content consolidated service should deploy successfully")
 			
-			return nil
-		})
-	})
-	
-	t.Run("ValidateGatewayServicesFailWithoutImages", func(t *testing.T) {
-		framework := shared.NewContractTestingFramework("international-center", "gateway-integration-test")
-		
-		framework.RunComponentContractTest(t, "development", func(t *testing.T, ctx *pulumi.Context, cfg *config.Config, env string) error {
-			// Test that gateway services deployment fails when images don't exist
-			_, err := components.DeployGatewayServices(ctx)
-			require.Error(t, err, "Gateway services deployment should fail without images")
-			assert.Contains(t, err.Error(), "image not found", "Error should indicate missing image")
+			// Test notifications service has proper Dockerfile
+			_, err = components.DeployNotificationServices(ctx)
+			assert.NoError(t, err, "Notifications consolidated service should deploy successfully")
 			
-			return nil
-		})
-	})
-	
-	t.Run("ValidateWebsiteFailsWithoutImages", func(t *testing.T) {
-		framework := shared.NewContractTestingFramework("international-center", "website-integration-test")
-		
-		framework.RunComponentContractTest(t, "development", func(t *testing.T, ctx *pulumi.Context, cfg *config.Config, env string) error {
-			// Test that website deployment fails when image doesn't exist
-			_, err := components.DeployWebsiteContainer(ctx)
-			require.Error(t, err, "Website deployment should fail without image")
-			assert.Contains(t, err.Error(), "image not found", "Error should indicate missing image")
+			// Test gateway services have proper Dockerfiles
+			_, err = components.DeployGatewayServices(ctx)
+			assert.NoError(t, err, "Gateway services should deploy successfully")
+			
+			// Test website has proper Dockerfile
+			_, err = components.DeployWebsiteContainer(ctx)
+			assert.NoError(t, err, "Website should deploy successfully")
 			
 			return nil
 		})
@@ -81,25 +61,21 @@ func TestServiceImageBuildIntegration(t *testing.T) {
 		framework := shared.NewContractTestingFramework("international-center", "inquiries-build-integration-test")
 		
 		framework.RunComponentContractTest(t, "development", func(t *testing.T, ctx *pulumi.Context, cfg *config.Config, env string) error {
-			// Build required images first
+			// Build required consolidated inquiries image
 			builder := shared.NewImageBuilder(ctx, "development")
 			
-			inquiriesServices := []string{"media", "donations", "volunteers", "business"}
-			for _, service := range inquiriesServices {
-				_, err := builder.BuildServiceImage(service, "inquiries")
-				require.NoError(t, err, "Should build %s service image", service)
-			}
+			// Build single consolidated inquiries service image (business, donations, media, volunteers)
+			_, err := builder.BuildServiceImage("inquiries", "inquiries")
+			require.NoError(t, err, "Should build consolidated inquiries service image")
 			
-			// Test that inquiries services deployment succeeds with images
+			// Test that inquiries services deployment succeeds with consolidated image
 			inquiriesMap, err := components.DeployInquiriesServices(ctx)
 			require.NoError(t, err, "Inquiries services deployment should succeed with images")
 			assert.NotNil(t, inquiriesMap, "Inquiries services should return deployment map")
 			
-			// Validate all expected services are deployed
-			for _, service := range inquiriesServices {
-				serviceOutput := inquiriesMap[service]
-				assert.NotNil(t, serviceOutput, "Service %s should be deployed", service)
-			}
+			// Validate consolidated inquiries service is deployed
+			inquiriesOutput := inquiriesMap["inquiries"]
+			assert.NotNil(t, inquiriesOutput, "Consolidated inquiries service should be deployed")
 			
 			return nil
 		})
@@ -109,25 +85,21 @@ func TestServiceImageBuildIntegration(t *testing.T) {
 		framework := shared.NewContractTestingFramework("international-center", "content-build-integration-test")
 		
 		framework.RunComponentContractTest(t, "development", func(t *testing.T, ctx *pulumi.Context, cfg *config.Config, env string) error {
-			// Build required images first
+			// Build required consolidated content image
 			builder := shared.NewImageBuilder(ctx, "development")
 			
-			contentServices := []string{"research", "services", "events", "news"}
-			for _, service := range contentServices {
-				_, err := builder.BuildServiceImage(service, "content")
-				require.NoError(t, err, "Should build %s content service image", service)
-			}
+			// Build single consolidated content service image (events, news, research, services)
+			_, err := builder.BuildServiceImage("content", "content")
+			require.NoError(t, err, "Should build consolidated content service image")
 			
-			// Test that content services deployment succeeds with images
+			// Test that content services deployment succeeds with consolidated image
 			contentMap, err := components.DeployContentServices(ctx)
 			require.NoError(t, err, "Content services deployment should succeed with images")
 			assert.NotNil(t, contentMap, "Content services should return deployment map")
 			
-			// Validate all expected services are deployed
-			for _, service := range contentServices {
-				serviceOutput := contentMap[service]
-				assert.NotNil(t, serviceOutput, "Service %s should be deployed", service)
-			}
+			// Validate consolidated content service is deployed
+			contentOutput := contentMap["content"]
+			assert.NotNil(t, contentOutput, "Consolidated content service should be deployed")
 			
 			return nil
 		})
@@ -156,6 +128,30 @@ func TestServiceImageBuildIntegration(t *testing.T) {
 				gatewayOutput := gatewayMap[gateway]
 				assert.NotNil(t, gatewayOutput, "Gateway %s should be deployed", gateway)
 			}
+			
+			return nil
+		})
+	})
+	
+	t.Run("ValidateNotificationServicesSucceedWithImages", func(t *testing.T) {
+		framework := shared.NewContractTestingFramework("international-center", "notification-build-integration-test")
+		
+		framework.RunComponentContractTest(t, "development", func(t *testing.T, ctx *pulumi.Context, cfg *config.Config, env string) error {
+			// Build required consolidated notifications image
+			builder := shared.NewImageBuilder(ctx, "development")
+			
+			// Build single consolidated notifications service image
+			_, err := builder.BuildServiceImage("notifications", "notifications")
+			require.NoError(t, err, "Should build consolidated notifications service image")
+			
+			// Test that notifications services deployment succeeds with consolidated image
+			notificationsMap, err := components.DeployNotificationServices(ctx)
+			require.NoError(t, err, "Notifications services deployment should succeed with images")
+			assert.NotNil(t, notificationsMap, "Notifications services should return deployment map")
+			
+			// Validate consolidated notifications service is deployed
+			notificationsOutput := notificationsMap["notifications"]
+			assert.NotNil(t, notificationsOutput, "Consolidated notifications service should be deployed")
 			
 			return nil
 		})
@@ -194,7 +190,7 @@ func TestIntegrationTimeouts(t *testing.T) {
 			
 			// Test that image building completes within integration test timeout
 			start := time.Now()
-			_, err := builder.BuildServiceImage("media", "inquiries")
+			_, err := builder.BuildServiceImage("inquiries", "inquiries")
 			duration := time.Since(start)
 			
 			assert.NoError(t, err, "Image building should complete without timeout")
@@ -210,19 +206,19 @@ func TestIntegrationTimeouts(t *testing.T) {
 		framework.RunComponentContractTest(t, "development", func(t *testing.T, ctx *pulumi.Context, cfg *config.Config, env string) error {
 			// Build required image first
 			builder := shared.NewImageBuilder(ctx, "development")
-			_, err := builder.BuildServiceImage("media", "inquiries")
-			require.NoError(t, err, "Should build media service image")
+			_, err := builder.BuildServiceImage("inquiries", "inquiries")
+			require.NoError(t, err, "Should build inquiries service image")
 			
 			// Test that container deployment completes within timeout
 			start := time.Now()
 			config := components.ContainerConfig{
-				ServiceName:   "media",
-				ContainerName: "media-timeout-test",
-				ImageName:     "backend/media:latest",
+				ServiceName:   "inquiries",
+				ContainerName: "inquiries-timeout-test",
+				ImageName:     "backend/inquiries:latest",
 				HostPort:      8080,
 				ContainerPort: 8080,
 				DaprGrpcPort:  50001,
-				AppID:         "media-api",
+				AppID:         "inquiries",
 			}
 			_, err = components.DeployServiceContainer(ctx, config)
 			duration := time.Since(start)

@@ -464,60 +464,56 @@ func validateContainerConfig(config ContainerConfig) error {
 	return nil
 }
 
-// DeployInquiriesServices deploys all inquiries service containers
+// DeployInquiriesServices deploys consolidated inquiries service container
 func DeployInquiriesServices(ctx *pulumi.Context) (pulumi.Map, error) {
 	inquiriesServices := pulumi.Map{}
-	serviceNames := []string{"media", "donations", "volunteers", "business"}
 	
-	for i, serviceName := range serviceNames {
-		config := ContainerConfig{
-			ServiceName:   serviceName,
-			ContainerName: fmt.Sprintf("%s-dev", serviceName),
-			ImageName:     fmt.Sprintf("backend/%s:latest", serviceName),
-			HostPort:      8080 + i,
-			ContainerPort: 8080,
-			DaprGrpcPort:  50001 + i,
-			AppID:         fmt.Sprintf("%s-api", serviceName),
-			CleanupImages: false, // Keep images for development reuse
-			HealthCheck:   true,  // Enable health checks for development validation
-		}
-		
-		serviceMap, err := DeployServiceContainer(ctx, config)
-		if err != nil {
-			return nil, err
-		}
-		
-		inquiriesServices[serviceName] = serviceMap
+	// Deploy single consolidated inquiries service (business, donations, media, volunteers)
+	config := ContainerConfig{
+		ServiceName:   "inquiries",
+		ContainerName: "inquiries-dev",
+		ImageName:     "backend/inquiries:latest",
+		HostPort:      8080,
+		ContainerPort: 8080,
+		DaprGrpcPort:  50001,
+		AppID:         "inquiries",
+		CleanupImages: false, // Keep images for development reuse
+		HealthCheck:   true,  // Enable health checks for development validation
 	}
+	
+	serviceMap, err := DeployServiceContainer(ctx, config)
+	if err != nil {
+		return nil, err
+	}
+	
+	inquiriesServices["inquiries"] = serviceMap
 	
 	return inquiriesServices, nil
 }
 
-// DeployContentServices deploys all content service containers
+// DeployContentServices deploys consolidated content service container
 func DeployContentServices(ctx *pulumi.Context) (pulumi.Map, error) {
 	contentServices := pulumi.Map{}
-	serviceNames := []string{"research", "services", "events", "news"}
 	
-	for i, serviceName := range serviceNames {
-		config := ContainerConfig{
-			ServiceName:   serviceName,
-			ContainerName: fmt.Sprintf("%s-dev", serviceName),
-			ImageName:     fmt.Sprintf("backend/%s:latest", serviceName),
-			HostPort:      8090 + i,
-			ContainerPort: 8080,
-			DaprGrpcPort:  50010 + i,
-			AppID:         fmt.Sprintf("%s-api", serviceName),
-			CleanupImages: false, // Keep images for development reuse
-			HealthCheck:   true,  // Enable health checks for development validation
-		}
-		
-		serviceMap, err := DeployServiceContainer(ctx, config)
-		if err != nil {
-			return nil, err
-		}
-		
-		contentServices[serviceName] = serviceMap
+	// Deploy single consolidated content service (events, news, research, services)
+	config := ContainerConfig{
+		ServiceName:   "content",
+		ContainerName: "content-dev",
+		ImageName:     "backend/content:latest",
+		HostPort:      8090,
+		ContainerPort: 8080,
+		DaprGrpcPort:  50010,
+		AppID:         "content",
+		CleanupImages: false, // Keep images for development reuse
+		HealthCheck:   true,  // Enable health checks for development validation
 	}
+	
+	serviceMap, err := DeployServiceContainer(ctx, config)
+	if err != nil {
+		return nil, err
+	}
+	
+	contentServices["content"] = serviceMap
 	
 	return contentServices, nil
 }
@@ -957,15 +953,46 @@ func buildWebsiteImage(ctx *pulumi.Context, serviceName string) (*local.Command,
 	return buildImageFromSpec(ctx, spec)
 }
 
+// DeployNotificationServices deploys consolidated notifications service container
+func DeployNotificationServices(ctx *pulumi.Context) (pulumi.Map, error) {
+	notificationServices := pulumi.Map{}
+	
+	// Deploy single consolidated notifications service
+	config := ContainerConfig{
+		ServiceName:   "notifications",
+		ContainerName: "notifications-dev",
+		ImageName:     "backend/notifications:latest",
+		HostPort:      8095,
+		ContainerPort: 8095,
+		DaprGrpcPort:  50030,
+		AppID:         "notifications",
+		CleanupImages: false, // Keep images for development reuse
+		HealthCheck:   true,  // Enable health checks for development validation
+	}
+	
+	serviceMap, err := DeployServiceContainer(ctx, config)
+	if err != nil {
+		return nil, err
+	}
+	
+	notificationServices["notifications"] = serviceMap
+	
+	return notificationServices, nil
+}
+
 // determineServiceType determines the service type based on service name
 func determineServiceType(serviceName string) string {
-	inquiriesServices := []string{"media", "donations", "volunteers", "business"}
-	for _, service := range inquiriesServices {
-		if service == serviceName {
-			return "inquiries"
-		}
+	// Map consolidated service names to their types
+	switch serviceName {
+	case "inquiries":
+		return "inquiries"
+	case "content":
+		return "content"
+	case "notifications":
+		return "notifications"
+	default:
+		return "content" // Default fallback
 	}
-	return "content"
 }
 
 // ImageValidationSpec defines the specification for image validation operations

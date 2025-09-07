@@ -67,49 +67,71 @@ func TestContentHandler_RegisterRoutes(t *testing.T) {
 
 	// Events routes should be registered
 	expectedRoutes := []string{
-		// Events domain routes
-		"/api/admin/events",
-		"/api/admin/events/{id}",
-		"/api/admin/events/{id}/publish",
-		"/api/admin/events/{id}/unpublish",
-		"/api/admin/events/categories",
-		"/api/admin/events/categories/{id}",
-		"/api/public/events",
-		"/api/public/events/{id}",
-		"/api/public/events/categories",
+		// Events domain routes - Admin
+		"/admin/api/v1/events",
+		"/admin/api/v1/events/{id}",
+		"/admin/api/v1/events/{id}/publish",
+		"/admin/api/v1/events/{id}/archive",
+		"/admin/api/v1/events/categories",
+		"/admin/api/v1/events/categories/{id}",
+		"/admin/api/v1/events/featured",
+		"/admin/api/v1/events/{id}/registrations",
 
-		// News domain routes
-		"/api/admin/news",
-		"/api/admin/news/{id}",
-		"/api/admin/news/{id}/publish",
-		"/api/admin/news/{id}/unpublish",
-		"/api/admin/news/categories",
-		"/api/admin/news/categories/{id}",
-		"/api/public/news",
-		"/api/public/news/{id}",
-		"/api/public/news/categories",
+		// Events domain routes - Public
+		"/api/v1/events",
+		"/api/v1/events/{id}",
+		"/api/v1/events/categories",
+		"/api/v1/events/featured",
+		"/api/v1/events/published",
+		"/api/v1/events/upcoming",
 
-		// Research domain routes
-		"/api/admin/research",
-		"/api/admin/research/{id}",
-		"/api/admin/research/{id}/publish",
-		"/api/admin/research/{id}/unpublish",
-		"/api/admin/research/categories",
-		"/api/admin/research/categories/{id}",
-		"/api/public/research",
-		"/api/public/research/{id}",
-		"/api/public/research/categories",
+		// News domain routes - Admin
+		"/admin/api/v1/news",
+		"/admin/api/v1/news/{id}",
+		"/admin/api/v1/news/{id}/publish",
+		"/admin/api/v1/news/{id}/archive",
+		"/admin/api/v1/news/categories",
+		"/admin/api/v1/news/categories/{id}",
+		"/admin/api/v1/news/featured",
 
-		// Services domain routes
-		"/api/admin/services",
-		"/api/admin/services/{id}",
-		"/api/admin/services/{id}/publish",
-		"/api/admin/services/{id}/unpublish",
-		"/api/admin/services/categories",
-		"/api/admin/services/categories/{id}",
-		"/api/public/services",
-		"/api/public/services/{id}",
-		"/api/public/services/categories",
+		// News domain routes - Public
+		"/api/v1/news",
+		"/api/v1/news/{id}",
+		"/api/v1/news/categories",
+		"/api/v1/news/featured",
+		"/api/v1/news/search",
+
+		// Research domain routes - Admin
+		"/admin/api/v1/research",
+		"/admin/api/v1/research/{id}",
+		"/admin/api/v1/research/{id}/publish",
+		"/admin/api/v1/research/{id}/archive",
+		"/admin/api/v1/research/categories",
+		"/admin/api/v1/research/categories/{id}",
+		"/admin/api/v1/research/featured",
+
+		// Research domain routes - Public
+		"/api/v1/research",
+		"/api/v1/research/{id}",
+		"/api/v1/research/categories",
+		"/api/v1/research/featured",
+		"/api/v1/research/search",
+
+		// Services domain routes - Admin
+		"/admin/api/v1/services",
+		"/admin/api/v1/services/{id}",
+		"/admin/api/v1/services/{id}/publish",
+		"/admin/api/v1/services/{id}/archive",
+		"/admin/api/v1/services/categories",
+		"/admin/api/v1/services/categories/{id}",
+		"/admin/api/v1/services/featured",
+
+		// Services domain routes - Public
+		"/api/v1/services",
+		"/api/v1/services/{id}",
+		"/api/v1/services/categories",
+		"/api/v1/services/featured",
+		"/api/v1/services/published",
 	}
 
 	for _, expectedRoute := range expectedRoutes {

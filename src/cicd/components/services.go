@@ -12,6 +12,7 @@ type ServicesOutputs struct {
 	DeploymentType        pulumi.StringOutput
 	InquiriesServices     pulumi.MapOutput
 	ContentServices       pulumi.MapOutput
+	NotificationServices  pulumi.MapOutput
 	GatewayServices       pulumi.MapOutput
 	TestServices          pulumi.MapOutput // Test container services for reproducible testing
 	APIServices           pulumi.MapOutput // Kept for backward compatibility with staging/production
@@ -72,6 +73,12 @@ func deployDevelopmentServices(ctx *pulumi.Context, cfg *config.Config) (*Servic
 		return nil, fmt.Errorf("failed to deploy gateway services: %w", err)
 	}
 
+	// Deploy notification services using factory
+	notificationServices, err := DeployNotificationServices(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to deploy notification services: %w", err)
+	}
+
 	// Deploy test containers for reproducible testing environment
 	testServices, err := DeployTestContainers(ctx)
 	if err != nil {
@@ -85,6 +92,7 @@ func deployDevelopmentServices(ctx *pulumi.Context, cfg *config.Config) (*Servic
 		DeploymentType:        deploymentType,
 		InquiriesServices:     inquiriesServices.ToMapOutput(),
 		ContentServices:       contentServices.ToMapOutput(),
+		NotificationServices:  notificationServices.ToMapOutput(),
 		GatewayServices:       gatewayServices.ToMapOutput(),
 		TestServices:          testServices.ToMapOutput(),
 		APIServices:           apiServices.ToMapOutput(),
@@ -122,13 +130,19 @@ func deployStagingServices(ctx *pulumi.Context, cfg *config.Config) (*ServicesOu
 			"image":        pulumi.String("registry.azurecr.io/backend/content:staging"),
 			"replicas":     pulumi.Int(3),
 			"health_check": pulumi.String("/health"),
-			"dapr_app_id":  pulumi.String("content-api"),
+			"dapr_app_id":  pulumi.String("content"),
 		},
 		"inquiries": pulumi.Map{
 			"image":        pulumi.String("registry.azurecr.io/backend/inquiries:staging"),
 			"replicas":     pulumi.Int(3),
 			"health_check": pulumi.String("/health"),
-			"dapr_app_id":  pulumi.String("inquiries-api"),
+			"dapr_app_id":  pulumi.String("inquiries"),
+		},
+		"notifications": pulumi.Map{
+			"image":        pulumi.String("registry.azurecr.io/backend/notifications:staging"),
+			"replicas":     pulumi.Int(2),
+			"health_check": pulumi.String("/health"),
+			"dapr_app_id":  pulumi.String("notifications"),
 		},
 	}
 
@@ -148,14 +162,16 @@ func deployStagingServices(ctx *pulumi.Context, cfg *config.Config) (*ServicesOu
 		},
 	}
 
-	// For staging, use APIServices instead of InquiriesServices/ContentServices
+	// For staging, use APIServices instead of InquiriesServices/ContentServices/NotificationServices
 	emptyInquiries := pulumi.Map{}
 	emptyContent := pulumi.Map{}
+	emptyNotifications := pulumi.Map{}
 
 	return &ServicesOutputs{
 		DeploymentType:        deploymentType,
 		InquiriesServices:     emptyInquiries.ToMapOutput(),
 		ContentServices:       emptyContent.ToMapOutput(),
+		NotificationServices:  emptyNotifications.ToMapOutput(),
 		APIServices:           apiServices.ToMapOutput(),
 		GatewayServices:       gatewayServices.ToMapOutput(),
 		PublicGatewayURL:      publicGatewayURL,
@@ -191,13 +207,19 @@ func deployProductionServices(ctx *pulumi.Context, cfg *config.Config) (*Service
 			"image":        pulumi.String("registry.azurecr.io/backend/content:production"),
 			"replicas":     pulumi.Int(5),
 			"health_check": pulumi.String("/health"),
-			"dapr_app_id":  pulumi.String("content-api"),
+			"dapr_app_id":  pulumi.String("content"),
 		},
 		"inquiries": pulumi.Map{
 			"image":        pulumi.String("registry.azurecr.io/backend/inquiries:production"),
 			"replicas":     pulumi.Int(5),
 			"health_check": pulumi.String("/health"),
-			"dapr_app_id":  pulumi.String("inquiries-api"),
+			"dapr_app_id":  pulumi.String("inquiries"),
+		},
+		"notifications": pulumi.Map{
+			"image":        pulumi.String("registry.azurecr.io/backend/notifications:production"),
+			"replicas":     pulumi.Int(3),
+			"health_check": pulumi.String("/health"),
+			"dapr_app_id":  pulumi.String("notifications"),
 		},
 	}
 
@@ -217,14 +239,16 @@ func deployProductionServices(ctx *pulumi.Context, cfg *config.Config) (*Service
 		},
 	}
 
-	// For production, use APIServices instead of InquiriesServices/ContentServices
+	// For production, use APIServices instead of InquiriesServices/ContentServices/NotificationServices
 	emptyInquiries := pulumi.Map{}
 	emptyContent := pulumi.Map{}
+	emptyNotifications := pulumi.Map{}
 
 	return &ServicesOutputs{
 		DeploymentType:        deploymentType,
 		InquiriesServices:     emptyInquiries.ToMapOutput(),
 		ContentServices:       emptyContent.ToMapOutput(),
+		NotificationServices:  emptyNotifications.ToMapOutput(),
 		APIServices:           apiServices.ToMapOutput(),
 		GatewayServices:       gatewayServices.ToMapOutput(),
 		PublicGatewayURL:      publicGatewayURL,

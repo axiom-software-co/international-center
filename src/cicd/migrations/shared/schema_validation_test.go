@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/axiom-software-co/international-center/src/cicd/components"
+	"github.com/axiom-software-co/international-center/src/cicd/shared"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi/config"
 	"github.com/stretchr/testify/assert"
@@ -16,15 +17,15 @@ func TestSchemaValidator_BusinessDomain(t *testing.T) {
 	
 	for _, env := range environments {
 		t.Run("Environment_"+env, func(t *testing.T) {
-			err := pulumi.RunErr(func(ctx *pulumi.Context) error {
-				cfg := config.New(ctx, "")
-				
+			framework := shared.NewContractTestingFramework("international-center", "schema-business-"+env+"-test")
+			
+			framework.RunComponentContractTest(t, env, func(t *testing.T, ctx *pulumi.Context, cfg *config.Config, testEnv string) error {
 				// Deploy database component
-				databaseOutputs, err := components.DeployDatabase(ctx, cfg, env)
+				databaseOutputs, err := components.DeployDatabase(ctx, cfg, testEnv)
 				require.NoError(t, err)
 				
 				// Initialize schema validator
-				validator, err := NewSchemaValidator(ctx, cfg, env, databaseOutputs)
+				validator, err := NewSchemaValidator(ctx, cfg, testEnv, databaseOutputs)
 				require.NoError(t, err)
 				
 				// Validate business domain schema against markdown specification
@@ -33,7 +34,7 @@ func TestSchemaValidator_BusinessDomain(t *testing.T) {
 				
 				// Verify schema validation results
 				result.IsValid.ApplyT(func(isValid bool) error {
-					assert.True(t, isValid, "Business domain schema should match markdown specification in %s environment", env)
+					assert.True(t, isValid, "Business domain schema should match markdown specification in %s environment", testEnv)
 					return nil
 				})
 				
@@ -60,9 +61,7 @@ func TestSchemaValidator_BusinessDomain(t *testing.T) {
 				})
 				
 				return nil
-			}, pulumi.WithMocks("test", "stack", &MigrationMocks{}))
-			
-			assert.NoError(t, err)
+			})
 		})
 	}
 }
@@ -73,15 +72,15 @@ func TestSchemaValidator_DonationsDomain(t *testing.T) {
 	
 	for _, env := range environments {
 		t.Run("Environment_"+env, func(t *testing.T) {
-			err := pulumi.RunErr(func(ctx *pulumi.Context) error {
-				cfg := config.New(ctx, "")
-				
+			framework := shared.NewContractTestingFramework("international-center", "schema-donations-"+env+"-test")
+			
+			framework.RunComponentContractTest(t, env, func(t *testing.T, ctx *pulumi.Context, cfg *config.Config, testEnv string) error {
 				// Deploy database component
-				databaseOutputs, err := components.DeployDatabase(ctx, cfg, env)
+				databaseOutputs, err := components.DeployDatabase(ctx, cfg, testEnv)
 				require.NoError(t, err)
 				
 				// Initialize schema validator
-				validator, err := NewSchemaValidator(ctx, cfg, env, databaseOutputs)
+				validator, err := NewSchemaValidator(ctx, cfg, testEnv, databaseOutputs)
 				require.NoError(t, err)
 				
 				// Validate donations domain schema
@@ -111,9 +110,7 @@ func TestSchemaValidator_DonationsDomain(t *testing.T) {
 				})
 				
 				return nil
-			}, pulumi.WithMocks("test", "stack", &MigrationMocks{}))
-			
-			assert.NoError(t, err)
+			})
 		})
 	}
 }
@@ -124,15 +121,15 @@ func TestSchemaValidator_EventsDomain(t *testing.T) {
 	
 	for _, env := range environments {
 		t.Run("Environment_"+env, func(t *testing.T) {
-			err := pulumi.RunErr(func(ctx *pulumi.Context) error {
-				cfg := config.New(ctx, "")
-				
+			framework := shared.NewContractTestingFramework("international-center", "schema-events-"+env+"-test")
+			
+			framework.RunComponentContractTest(t, env, func(t *testing.T, ctx *pulumi.Context, cfg *config.Config, testEnv string) error {
 				// Deploy database component
-				databaseOutputs, err := components.DeployDatabase(ctx, cfg, env)
+				databaseOutputs, err := components.DeployDatabase(ctx, cfg, testEnv)
 				require.NoError(t, err)
 				
 				// Initialize schema validator
-				validator, err := NewSchemaValidator(ctx, cfg, env, databaseOutputs)
+				validator, err := NewSchemaValidator(ctx, cfg, testEnv, databaseOutputs)
 				require.NoError(t, err)
 				
 				// Validate events domain schema
@@ -163,9 +160,7 @@ func TestSchemaValidator_EventsDomain(t *testing.T) {
 				})
 				
 				return nil
-			}, pulumi.WithMocks("test", "stack", &MigrationMocks{}))
-			
-			assert.NoError(t, err)
+			})
 		})
 	}
 }
@@ -174,15 +169,15 @@ func TestSchemaValidator_EventsDomain(t *testing.T) {
 func TestSchemaValidator_AllDomains(t *testing.T) {
 	domains := []string{"business", "donations", "events", "media", "news", "research", "services", "volunteers"}
 	
-	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
-		cfg := config.New(ctx, "")
-		
+	framework := shared.NewContractTestingFramework("international-center", "schema-all-domains-test")
+	
+	framework.RunComponentContractTest(t, "development", func(t *testing.T, ctx *pulumi.Context, cfg *config.Config, testEnv string) error {
 		// Deploy database component
-		databaseOutputs, err := components.DeployDatabase(ctx, cfg, "development")
+		databaseOutputs, err := components.DeployDatabase(ctx, cfg, testEnv)
 		require.NoError(t, err)
 		
 		// Initialize schema validator
-		validator, err := NewSchemaValidator(ctx, cfg, "development", databaseOutputs)
+		validator, err := NewSchemaValidator(ctx, cfg, testEnv, databaseOutputs)
 		require.NoError(t, err)
 		
 		for _, domain := range domains {
@@ -198,78 +193,57 @@ func TestSchemaValidator_AllDomains(t *testing.T) {
 		}
 		
 		return nil
-	}, pulumi.WithMocks("test", "stack", &MigrationMocks{}))
-	
-	assert.NoError(t, err)
+	})
 }
 
 // TestSchemaValidator_EnvironmentConsistency validates schema consistency across environments
 func TestSchemaValidator_EnvironmentConsistency(t *testing.T) {
 	domains := []string{"business", "donations", "events", "media", "news", "research", "services", "volunteers"}
+	environments := []string{"development", "staging", "production"}
 	
 	for _, domain := range domains {
 		t.Run("Domain_"+domain, func(t *testing.T) {
-			var devResult, stagingResult, prodResult *SchemaValidationResult
+			results := make(map[string]*SchemaValidationResult)
 			
-			// Validate schema in development
-			err := pulumi.RunErr(func(ctx *pulumi.Context) error {
-				cfg := config.New(ctx, "")
+			for _, env := range environments {
+				framework := shared.NewContractTestingFramework("international-center", "schema-consistency-"+domain+"-"+env+"-test")
 				
-				databaseOutputs, err := components.DeployDatabase(ctx, cfg, "development")
-				require.NoError(t, err)
-				
-				validator, err := NewSchemaValidator(ctx, cfg, "development", databaseOutputs)
-				require.NoError(t, err)
-				
-				result, err := validator.ValidateDomainSchema(ctx, domain)
-				devResult = result
-				return err
-			}, pulumi.WithMocks("test", "stack", &MigrationMocks{}))
-			require.NoError(t, err)
+				framework.RunComponentContractTest(t, env, func(t *testing.T, ctx *pulumi.Context, cfg *config.Config, testEnv string) error {
+					// Deploy database component
+					databaseOutputs, err := components.DeployDatabase(ctx, cfg, testEnv)
+					require.NoError(t, err)
+					
+					// Initialize schema validator
+					validator, err := NewSchemaValidator(ctx, cfg, testEnv, databaseOutputs)
+					require.NoError(t, err)
+					
+					// Validate domain schema
+					result, err := validator.ValidateDomainSchema(ctx, domain)
+					require.NoError(t, err)
+					
+					results[testEnv] = result
+					return nil
+				})
+			}
 			
-			// Validate schema in staging
-			err = pulumi.RunErr(func(ctx *pulumi.Context) error {
-				cfg := config.New(ctx, "")
-				
-				databaseOutputs, err := components.DeployDatabase(ctx, cfg, "staging")
-				require.NoError(t, err)
-				
-				validator, err := NewSchemaValidator(ctx, cfg, "staging", databaseOutputs)
-				require.NoError(t, err)
-				
-				result, err := validator.ValidateDomainSchema(ctx, domain)
-				stagingResult = result
-				return err
-			}, pulumi.WithMocks("test", "stack", &MigrationMocks{}))
-			require.NoError(t, err)
-			
-			// Validate schema in production
-			err = pulumi.RunErr(func(ctx *pulumi.Context) error {
-				cfg := config.New(ctx, "")
-				
-				databaseOutputs, err := components.DeployDatabase(ctx, cfg, "production")
-				require.NoError(t, err)
-				
-				validator, err := NewSchemaValidator(ctx, cfg, "production", databaseOutputs)
-				require.NoError(t, err)
-				
-				result, err := validator.ValidateDomainSchema(ctx, domain)
-				prodResult = result
-				return err
-			}, pulumi.WithMocks("test", "stack", &MigrationMocks{}))
-			require.NoError(t, err)
-			
-			// Verify environment consistency
-			pulumi.All(devResult.RequiredTables, stagingResult.RequiredTables, prodResult.RequiredTables).ApplyT(func(args []interface{}) error {
-				devTables := args[0].([]interface{})
-				stagingTables := args[1].([]interface{})
-				prodTables := args[2].([]interface{})
-				
-				assert.Equal(t, len(devTables), len(stagingTables), "Development and staging should have same number of tables for domain %s", domain)
-				assert.Equal(t, len(stagingTables), len(prodTables), "Staging and production should have same number of tables for domain %s", domain)
-				
-				return nil
-			})
+			// Verify environment consistency after all environments are validated
+			if devResult, devOk := results["development"]; devOk {
+				if stagingResult, stagingOk := results["staging"]; stagingOk {
+					if prodResult, prodOk := results["production"]; prodOk {
+						// Verify environment consistency
+						pulumi.All(devResult.RequiredTables, stagingResult.RequiredTables, prodResult.RequiredTables).ApplyT(func(args []interface{}) error {
+							devTables := args[0].([]interface{})
+							stagingTables := args[1].([]interface{})
+							prodTables := args[2].([]interface{})
+							
+							assert.Equal(t, len(devTables), len(stagingTables), "Development and staging should have same number of tables for domain %s", domain)
+							assert.Equal(t, len(stagingTables), len(prodTables), "Staging and production should have same number of tables for domain %s", domain)
+							
+							return nil
+						})
+					}
+				}
+			}
 		})
 	}
 }
