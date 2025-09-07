@@ -2,10 +2,12 @@ package gateway
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 
 	"github.com/axiom-software-co/international-center/src/backend/internal/notifications"
@@ -17,7 +19,86 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// setupGatewayTestEnvironment sets up environment variables needed for gateway configuration
+func setupGatewayTestEnvironment() func() {
+	os.Setenv("ADMIN_GATEWAY_PORT", "8081")
+	os.Setenv("ENVIRONMENT", "testing")
+	os.Setenv("ADMIN_ALLOWED_ORIGINS", "*")
+	
+	return func() {
+		os.Unsetenv("ADMIN_GATEWAY_PORT")
+		os.Unsetenv("ENVIRONMENT")
+		os.Unsetenv("ADMIN_ALLOWED_ORIGINS")
+	}
+}
 
+// TestSubscriberRepository implements SubscriberRepository for testing
+type TestSubscriberRepository struct {
+	subscribers map[string]*notifications.NotificationSubscriber
+}
+
+func NewTestSubscriberRepository() *TestSubscriberRepository {
+	return &TestSubscriberRepository{
+		subscribers: make(map[string]*notifications.NotificationSubscriber),
+	}
+}
+
+func (r *TestSubscriberRepository) CreateSubscriber(ctx context.Context, subscriber *notifications.NotificationSubscriber) error {
+	r.subscribers[subscriber.SubscriberID] = subscriber
+	return nil
+}
+
+func (r *TestSubscriberRepository) GetSubscriber(ctx context.Context, subscriberID string) (*notifications.NotificationSubscriber, error) {
+	if subscriber, exists := r.subscribers[subscriberID]; exists {
+		return subscriber, nil
+	}
+	return nil, fmt.Errorf("subscriber not found")
+}
+
+func (r *TestSubscriberRepository) UpdateSubscriber(ctx context.Context, subscriber *notifications.NotificationSubscriber) error {
+	r.subscribers[subscriber.SubscriberID] = subscriber
+	return nil
+}
+
+func (r *TestSubscriberRepository) DeleteSubscriber(ctx context.Context, subscriberID string, deletedBy string) error {
+	delete(r.subscribers, subscriberID)
+	return nil
+}
+
+func (r *TestSubscriberRepository) ListSubscribers(ctx context.Context, status *notifications.SubscriberStatus, limit, offset int) ([]*notifications.NotificationSubscriber, int, error) {
+	var result []*notifications.NotificationSubscriber
+	for _, subscriber := range r.subscribers {
+		if status == nil || subscriber.Status == *status {
+			result = append(result, subscriber)
+		}
+	}
+	return result, len(result), nil
+}
+
+func (r *TestSubscriberRepository) GetSubscribersByEventType(ctx context.Context, eventType notifications.EventType) ([]*notifications.NotificationSubscriber, error) {
+	var result []*notifications.NotificationSubscriber
+	for _, subscriber := range r.subscribers {
+		for _, et := range subscriber.EventTypes {
+			if et == eventType {
+				result = append(result, subscriber)
+				break
+			}
+		}
+	}
+	return result, nil
+}
+
+func (r *TestSubscriberRepository) CheckEmailExists(ctx context.Context, email string, excludeSubscriberID *string) (bool, error) {
+	for id, subscriber := range r.subscribers {
+		if subscriber.Email == email {
+			if excludeSubscriberID != nil && id == *excludeSubscriberID {
+				continue
+			}
+			return true, nil
+		}
+	}
+	return false, nil
+}
 
 // Domain Model Validation Tests
 
@@ -85,6 +166,10 @@ func TestNotificationGatewayHandler_CreateSubscriber(t *testing.T) {
 			ctx, cancel := sharedtesting.CreateUnitTestContext()
 			defer cancel()
 			
+			// Set up environment variables for gateway configuration
+			cleanupEnv := setupGatewayTestEnvironment()
+			defer cleanupEnv()
+			
 			// Create mock service invocation
 			mockService := NewMockServiceInvocation()
 			
@@ -101,7 +186,7 @@ func TestNotificationGatewayHandler_CreateSubscriber(t *testing.T) {
 			config := NewAdminGatewayConfiguration()
 			
 			// Create subscriber service and handler
-			subscriberService := NewDefaultSubscriberService(nil) // Using nil repository for this test
+			subscriberService := NewDefaultSubscriberService(NewTestSubscriberRepository())
 			handler := NewSubscriberHandler(subscriberService, config)
 			
 			var requestBody []byte
@@ -182,6 +267,10 @@ func TestNotificationGatewayHandler_GetSubscriber(t *testing.T) {
 			ctx, cancel := sharedtesting.CreateUnitTestContext()
 			defer cancel()
 			
+			// Set up environment variables for gateway configuration
+			cleanupEnv := setupGatewayTestEnvironment()
+			defer cleanupEnv()
+			
 			// Create mock service invocation
 			mockService := NewMockServiceInvocation()
 			
@@ -198,7 +287,7 @@ func TestNotificationGatewayHandler_GetSubscriber(t *testing.T) {
 			config := NewAdminGatewayConfiguration()
 			
 			// Create subscriber service and handler
-			subscriberService := NewDefaultSubscriberService(nil) // Using nil repository for this test
+			subscriberService := NewDefaultSubscriberService(NewTestSubscriberRepository())
 			handler := NewSubscriberHandler(subscriberService, config)
 			
 			req := httptest.NewRequest("GET", fmt.Sprintf("/admin/api/v1/notifications/subscribers/%s", tt.subscriberID), nil)
@@ -274,6 +363,10 @@ func TestNotificationGatewayHandler_ListSubscribers(t *testing.T) {
 			ctx, cancel := sharedtesting.CreateUnitTestContext()
 			defer cancel()
 			
+			// Set up environment variables for gateway configuration
+			cleanupEnv := setupGatewayTestEnvironment()
+			defer cleanupEnv()
+			
 			// Create mock service invocation
 			mockService := NewMockServiceInvocation()
 			
@@ -290,7 +383,7 @@ func TestNotificationGatewayHandler_ListSubscribers(t *testing.T) {
 			config := NewAdminGatewayConfiguration()
 			
 			// Create subscriber service and handler
-			subscriberService := NewDefaultSubscriberService(nil) // Using nil repository for this test
+			subscriberService := NewDefaultSubscriberService(NewTestSubscriberRepository())
 			handler := NewSubscriberHandler(subscriberService, config)
 			
 			req := httptest.NewRequest("GET", "/admin/api/v1/notifications/subscribers"+tt.queryParams, nil)
@@ -364,6 +457,10 @@ func TestNotificationGatewayHandler_UpdateSubscriber(t *testing.T) {
 			ctx, cancel := sharedtesting.CreateUnitTestContext()
 			defer cancel()
 			
+			// Set up environment variables for gateway configuration
+			cleanupEnv := setupGatewayTestEnvironment()
+			defer cleanupEnv()
+			
 			// Create mock service invocation
 			mockService := NewMockServiceInvocation()
 			
@@ -380,7 +477,7 @@ func TestNotificationGatewayHandler_UpdateSubscriber(t *testing.T) {
 			config := NewAdminGatewayConfiguration()
 			
 			// Create subscriber service and handler
-			subscriberService := NewDefaultSubscriberService(nil) // Using nil repository for this test
+			subscriberService := NewDefaultSubscriberService(NewTestSubscriberRepository())
 			handler := NewSubscriberHandler(subscriberService, config)
 			
 			requestBody, err := json.Marshal(tt.requestBody)
@@ -443,6 +540,10 @@ func TestNotificationGatewayHandler_DeleteSubscriber(t *testing.T) {
 			ctx, cancel := sharedtesting.CreateUnitTestContext()
 			defer cancel()
 			
+			// Set up environment variables for gateway configuration
+			cleanupEnv := setupGatewayTestEnvironment()
+			defer cleanupEnv()
+			
 			// Create mock service invocation
 			mockService := NewMockServiceInvocation()
 			
@@ -456,7 +557,7 @@ func TestNotificationGatewayHandler_DeleteSubscriber(t *testing.T) {
 			config := NewAdminGatewayConfiguration()
 			
 			// Create subscriber service and handler
-			subscriberService := NewDefaultSubscriberService(nil) // Using nil repository for this test
+			subscriberService := NewDefaultSubscriberService(NewTestSubscriberRepository())
 			handler := NewSubscriberHandler(subscriberService, config)
 			
 			req := httptest.NewRequest("DELETE", fmt.Sprintf("/admin/api/v1/notifications/subscribers/%s", tt.subscriberID), nil)
@@ -506,7 +607,7 @@ func TestNotificationGatewayHandler_HealthCheck(t *testing.T) {
 			config := NewAdminGatewayConfiguration()
 			
 			// Create subscriber service and handler
-			subscriberService := NewDefaultSubscriberService(nil) // Using nil repository for this test
+			subscriberService := NewDefaultSubscriberService(NewTestSubscriberRepository())
 			handler := NewSubscriberHandler(subscriberService, config)
 			
 			req := httptest.NewRequest("GET", "/admin/api/v1/notifications/health", nil)

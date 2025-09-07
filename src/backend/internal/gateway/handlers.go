@@ -16,6 +16,7 @@ type GatewayHandler struct {
 	config            *GatewayConfiguration
 	serviceProxy      *ServiceProxy
 	middleware        *Middleware
+	auditService      *AuditService
 	subscriberHandler *SubscriberHandler
 }
 
@@ -42,6 +43,11 @@ func (h *GatewayHandler) RegisterRoutes(router *mux.Router) {
 	// Apply middleware to all routes
 	router.Use(h.middleware.ApplyMiddleware)
 	
+	// Apply audit middleware for admin gateways after other middleware
+	if h.auditService != nil {
+		router.Use(h.auditService.AuditMiddleware())
+	}
+	
 	// Health and metrics endpoints (bypass proxy)
 	if h.config.Observability.HealthCheckPath != "" {
 		router.HandleFunc(h.config.Observability.HealthCheckPath, h.HealthCheck).Methods("GET")
@@ -55,25 +61,37 @@ func (h *GatewayHandler) RegisterRoutes(router *mux.Router) {
 		router.HandleFunc(h.config.Observability.MetricsPath, h.MetricsEndpoint).Methods("GET")
 	}
 	
-	// Service proxy routes
+	// Service proxy routes - admin gateways use /admin prefix, public gateways use /api prefix
+	apiPrefix := "/api"
+	if h.config.IsAdmin() {
+		apiPrefix = "/admin/api"
+	}
+	
 	if h.config.ServiceRouting.ContentAPIEnabled {
-		// Content API routes
-		router.PathPrefix("/api/v1/content").HandlerFunc(h.ProxyToContentAPI).Methods("GET")
+		// Content API routes (includes research and events)
+		router.PathPrefix(apiPrefix + "/v1/content").HandlerFunc(h.ProxyToContentAPI).Methods("GET", "OPTIONS")
+		router.PathPrefix(apiPrefix + "/v1/research").HandlerFunc(h.ProxyToContentAPI).Methods("GET", "PUT", "POST", "DELETE", "OPTIONS")
+		router.PathPrefix(apiPrefix + "/v1/events").HandlerFunc(h.ProxyToContentAPI).Methods("GET", "OPTIONS")
 	}
 	
 	if h.config.ServiceRouting.ServicesAPIEnabled {
 		// Services API routes
-		router.PathPrefix("/api/v1/services").HandlerFunc(h.ProxyToServicesAPI).Methods("GET")
+		router.PathPrefix(apiPrefix + "/v1/services").HandlerFunc(h.ProxyToServicesAPI).Methods("GET", "POST", "PUT", "DELETE", "OPTIONS")
 	}
 	
 	if h.config.ServiceRouting.NewsAPIEnabled {
 		// News API routes
-		router.PathPrefix("/api/v1/news").HandlerFunc(h.ProxyToNewsAPI).Methods("GET", "POST", "PUT", "DELETE")
+		router.PathPrefix(apiPrefix + "/v1/news").HandlerFunc(h.ProxyToNewsAPI).Methods("GET", "POST", "PUT", "DELETE", "OPTIONS")
+	}
+	
+	// Inquiries API routes (always enabled for public gateway)
+	if h.config.IsPublic() {
+		router.PathPrefix("/api/v1/inquiries").HandlerFunc(h.ProxyToInquiriesAPI).Methods("POST", "OPTIONS")
 	}
 	
 	if h.config.ServiceRouting.NotificationAPIEnabled {
 		// Notification API routes (admin-only)
-		router.PathPrefix("/api/v1/notifications").HandlerFunc(h.ProxyToNotificationAPI).Methods("GET", "POST", "PUT", "DELETE")
+		router.PathPrefix(apiPrefix + "/v1/notifications").HandlerFunc(h.ProxyToNotificationAPI).Methods("GET", "POST", "PUT", "DELETE")
 	}
 	
 	// Gateway information endpoint
@@ -112,8 +130,8 @@ func (h *GatewayHandler) ProxyToServicesAPI(w http.ResponseWriter, r *http.Reque
 	ctx, cancel := context.WithTimeout(ctx, h.config.Timeouts.RequestTimeout)
 	defer cancel()
 	
-	// Proxy request to services API
-	err := h.serviceProxy.ProxyRequest(ctx, w, r, "services-api")
+	// Proxy request to content API (services domain is consolidated)
+	err := h.serviceProxy.ProxyRequest(ctx, w, r, "content-api")
 	if err != nil {
 		h.handleError(w, r, err)
 		return
@@ -128,8 +146,8 @@ func (h *GatewayHandler) ProxyToNewsAPI(w http.ResponseWriter, r *http.Request) 
 	ctx, cancel := context.WithTimeout(ctx, h.config.Timeouts.RequestTimeout)
 	defer cancel()
 	
-	// Proxy request to news API
-	err := h.serviceProxy.ProxyRequest(ctx, w, r, "news-api")
+	// Proxy request to content API (news domain is consolidated)
+	err := h.serviceProxy.ProxyRequest(ctx, w, r, "content-api")
 	if err != nil {
 		h.handleError(w, r, err)
 		return
@@ -146,6 +164,22 @@ func (h *GatewayHandler) ProxyToNotificationAPI(w http.ResponseWriter, r *http.R
 	
 	// Proxy request to notification API
 	err := h.serviceProxy.ProxyRequest(ctx, w, r, "notification-api")
+	if err != nil {
+		h.handleError(w, r, err)
+		return
+	}
+}
+
+// ProxyToInquiriesAPI proxies requests to inquiries API service
+func (h *GatewayHandler) ProxyToInquiriesAPI(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	
+	// Add request timeout
+	ctx, cancel := context.WithTimeout(ctx, h.config.Timeouts.RequestTimeout)
+	defer cancel()
+	
+	// Proxy request to inquiries API
+	err := h.serviceProxy.ProxyRequest(ctx, w, r, "inquiries-api")
 	if err != nil {
 		h.handleError(w, r, err)
 		return
@@ -372,11 +406,6 @@ func (h *GatewayHandler) writeJSONResponse(w http.ResponseWriter, r *http.Reques
 	}
 	w.Header().Set("Content-Type", "application/json")
 	
-	// Add security headers
-	w.Header().Set("X-Content-Type-Options", "nosniff")
-	w.Header().Set("X-Frame-Options", "DENY")
-	w.Header().Set("X-XSS-Protection", "1; mode=block")
-	
 	// Set cache control based on gateway configuration
 	if h.config.CacheControl.Enabled && statusCode == http.StatusOK {
 		w.Header().Set("Cache-Control", fmt.Sprintf("public, max-age=%d", h.config.CacheControl.MaxAge))
@@ -395,6 +424,10 @@ func (h *GatewayHandler) writeJSONResponse(w http.ResponseWriter, r *http.Reques
 func (h *GatewayHandler) CreateRouter() *mux.Router {
 	router := mux.NewRouter()
 	h.RegisterRoutes(router)
+	
+	// Register 404 handler with middleware applied
+	router.NotFoundHandler = h.middleware.ApplyMiddleware(http.HandlerFunc(h.NotFoundHandler))
+	
 	return router
 }
 
@@ -411,4 +444,9 @@ func (h *GatewayHandler) SetSubscriberHandler(subscriberHandler *SubscriberHandl
 // GetSubscriberHandler returns the subscriber handler
 func (h *GatewayHandler) GetSubscriberHandler() *SubscriberHandler {
 	return h.subscriberHandler
+}
+
+// SetAuditService sets the audit service for admin gateways
+func (h *GatewayHandler) SetAuditService(auditService *AuditService) {
+	h.auditService = auditService
 }

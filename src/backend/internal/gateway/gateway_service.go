@@ -15,6 +15,7 @@ type GatewayService struct {
 	daprClient    *dapr.Client
 	serviceProxy  *ServiceProxy
 	middleware    *Middleware
+	auditService  *AuditService
 	handler       *GatewayHandler
 	server        *http.Server
 }
@@ -27,8 +28,19 @@ func NewGatewayService(config *GatewayConfiguration, daprClient *dapr.Client) *G
 	// Initialize middleware
 	middleware := NewMiddleware(config)
 	
+	// Initialize audit service for admin gateways
+	var auditService *AuditService
+	if config.IsAdmin() {
+		auditService = NewAuditService(config.Environment, config.Version)
+	}
+	
 	// Initialize handler
 	handler := NewGatewayHandler(config, serviceProxy, middleware)
+	
+	// Set audit service in handler for admin gateways
+	if auditService != nil {
+		handler.SetAuditService(auditService)
+	}
 	
 	// Create HTTP server
 	server := &http.Server{
@@ -44,6 +56,7 @@ func NewGatewayService(config *GatewayConfiguration, daprClient *dapr.Client) *G
 		daprClient:   daprClient,
 		serviceProxy: serviceProxy,
 		middleware:   middleware,
+		auditService: auditService,
 		handler:      handler,
 		server:       server,
 	}
@@ -59,6 +72,49 @@ func NewPublicGatewayService(daprClient *dapr.Client) *GatewayService {
 func NewAdminGatewayService(daprClient *dapr.Client) *GatewayService {
 	config := NewAdminGatewayConfiguration()
 	return NewGatewayService(config, daprClient)
+}
+
+// NewGatewayServiceWithTestProxy creates a new gateway service with test service proxy for testing
+func NewGatewayServiceWithTestProxy(config *GatewayConfiguration, daprClient *dapr.Client) *GatewayService {
+	// Create test service proxy
+	testServiceInvocation := &TestServiceInvocation{}
+	serviceProxy := NewServiceProxyWithInvocation(testServiceInvocation, config)
+	
+	// Initialize middleware
+	middleware := NewMiddleware(config)
+	
+	// Initialize audit service for admin gateways
+	var auditService *AuditService
+	if config.IsAdmin() {
+		auditService = NewAuditService(config.Environment, config.Version)
+	}
+	
+	// Initialize handler
+	handler := NewGatewayHandler(config, serviceProxy, middleware)
+	
+	// Set audit service in handler for admin gateways
+	if auditService != nil {
+		handler.SetAuditService(auditService)
+	}
+	
+	// Create HTTP server
+	server := &http.Server{
+		Addr:         config.GetListenAddress(),
+		Handler:      handler.CreateRouter(),
+		ReadTimeout:  config.Timeouts.ReadTimeout,
+		WriteTimeout: config.Timeouts.WriteTimeout,
+		IdleTimeout:  config.Timeouts.IdleTimeout,
+	}
+	
+	return &GatewayService{
+		config:       config,
+		daprClient:   daprClient,
+		serviceProxy: serviceProxy,
+		middleware:   middleware,
+		auditService: auditService,
+		handler:      handler,
+		server:       server,
+	}
 }
 
 // Start starts the gateway service

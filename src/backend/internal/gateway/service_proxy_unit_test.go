@@ -133,6 +133,37 @@ func (m *MockServiceInvocationForProxy) InvokeInquiriesAPI(ctx context.Context, 
 	}, nil
 }
 
+// InvokeNewsAPI mocks news API invocation for proxy tests
+func (m *MockServiceInvocationForProxy) InvokeNewsAPI(ctx context.Context, method, httpVerb string, data []byte) (*dapr.ServiceResponse, error) {
+	// Record invocation
+	m.invocations = append(m.invocations, ProxyMockInvocation{
+		Method:      method,
+		HTTPVerb:    httpVerb,
+		Data:        data,
+		Timestamp:   time.Now(),
+		ServiceType: "news",
+	})
+
+	// Check for failures first
+	if err, exists := m.failures[method]; exists {
+		m.lastInvocationError = err
+		return nil, err
+	}
+
+	// Return mock response if available
+	if response, exists := m.responses[method]; exists {
+		return response, nil
+	}
+
+	// Default response
+	return &dapr.ServiceResponse{
+		Data:        []byte(`{"message": "news response"}`),
+		ContentType: "application/json",
+		StatusCode:  200,
+		Headers:     make(map[string]string),
+	}, nil
+}
+
 // InvokeNotificationAPI mocks notification API invocation for proxy tests
 func (m *MockServiceInvocationForProxy) InvokeNotificationAPI(ctx context.Context, method, httpVerb string, data []byte) (*dapr.ServiceResponse, error) {
 	// Record invocation
@@ -244,6 +275,16 @@ func (m *MockServiceInvocationForProxy) CheckInquiriesAPIHealth(ctx context.Cont
 	return true, nil
 }
 
+func (m *MockServiceInvocationForProxy) CheckNewsAPIHealth(ctx context.Context) (bool, error) {
+	if err, exists := m.failures["CheckNewsAPIHealth"]; exists {
+		return false, err
+	}
+	if healthy, exists := m.healthChecks["news-api"]; exists {
+		return healthy, nil
+	}
+	return true, nil
+}
+
 func (m *MockServiceInvocationForProxy) CheckNotificationAPIHealth(ctx context.Context) (bool, error) {
 	if err, exists := m.failures["CheckNotificationAPIHealth"]; exists {
 		return false, err
@@ -274,6 +315,17 @@ func (m *MockServiceInvocationForProxy) GetInquiriesAPIMetrics(ctx context.Conte
 		"status":   "healthy",
 		"requests": len(m.getInvocationsByType("services")),
 		"uptime":   "2h10m",
+	}, nil
+}
+
+func (m *MockServiceInvocationForProxy) GetNewsAPIMetrics(ctx context.Context) (map[string]interface{}, error) {
+	if err, exists := m.failures["GetNewsAPIMetrics"]; exists {
+		return nil, err
+	}
+	return map[string]interface{}{
+		"status":   "healthy",
+		"requests": len(m.getInvocationsByType("news")),
+		"uptime":   "1h45m",
 	}, nil
 }
 

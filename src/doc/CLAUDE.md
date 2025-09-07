@@ -47,7 +47,7 @@ GRAFANA_CLOUD_ACCESS_POLICY_TOKEN="glc_eyJvIjoiMTA3Nzk3NSIsIm4iOiJwdWx1bWktcG9sa
 
 - use pulumi for local development environment ( using podman instead of docker )
 
-- critical : use 'pulumi destroy' to teardown the development environment , instead on killing individual processes
+- critical : use 'export PULUMI_CONFIG_PASSPHRASE="development" && pulumi destroy' to teardown the development environment , instead on killing individual processes
 
 ## test driven development
 
@@ -232,12 +232,16 @@ GRAFANA_CLOUD_ACCESS_POLICY_TOKEN="glc_eyJvIjoiMTA3Nzk3NSIsIm4iOiJwdWx1bWktcG9sa
 
 ## telemetry observability 
 
-- objeservability : grafana , mimir , loki , tempo , pyroscope in container with their respective data volumes containers ( grafana-data , mimir-data , loki-data , tempo-data , pyroscope-data ) for local development ( grafana cloud for production ) 
+- objeservability : otel-lgtm stack ( https://github.com/grafana/docker-otel-lgtm ) . container for local development ( grafana cloud for production ) 
 
 ## website content delivery
 
 - website hosting : cloudflare pages
 - content delivery network : cloudflare cdn
+
+## website admin portal
+
+- directus ( for UI only ) ( we use our own backend for admin apis and authentication and authorization ) ( this allows us to avoid backend vendor lock in for our admin portal )
 
 ## persistent storage migrations
 

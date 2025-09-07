@@ -246,7 +246,7 @@ func NewAdminGatewayConfiguration() *GatewayConfiguration {
 		Version:     "1.0.0",
 		
 		Security: SecurityConfig{
-			RequireAuthentication: true, // Admin gateway requires authentication
+			RequireAuthentication: false, // DAPR bearer middleware handles authentication
 			AllowedOrigins:        strings.Split(allowedOrigins, ","),
 			SecurityHeaders: SecurityHeadersConfig{
 				Enabled:                  true,

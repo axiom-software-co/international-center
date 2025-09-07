@@ -13,6 +13,13 @@ import (
 	"github.com/google/uuid"
 )
 
+// ProxyResponse wraps response data with status code information
+type ProxyResponse struct {
+	Data       interface{}
+	StatusCode int
+	Headers    map[string]string
+}
+
 // ServiceInvocationInterface defines the contract for service invocation operations
 type ServiceInvocationInterface interface {
 	InvokeContentAPI(ctx context.Context, method, httpVerb string, data []byte) (*dapr.ServiceResponse, error)
@@ -51,7 +58,7 @@ func NewServiceProxyWithInvocation(serviceInvocation ServiceInvocationInterface,
 // ProxyRequest proxies HTTP request to backend service via Dapr service invocation
 func (p *ServiceProxy) ProxyRequest(ctx context.Context, w http.ResponseWriter, r *http.Request, targetService string) error {
 	// Determine target service and method based on path
-	serviceName, httpMethod, targetPath, err := p.parseTargetService(r.URL.Path, targetService)
+	serviceName, httpMethod, targetPath, err := p.parseTargetService(r.URL.Path, targetService, r.Method)
 	if err != nil {
 		return domain.NewValidationError(fmt.Sprintf("failed to parse target service: %v", err))
 	}
@@ -78,16 +85,35 @@ func (p *ServiceProxy) ProxyRequest(ctx context.Context, w http.ResponseWriter, 
 	if userID := r.Header.Get("X-User-ID"); userID != "" {
 		headers["X-User-ID"] = userID
 	}
+	
+	// Forward authentication headers for admin operations
+	if authHeader := r.Header.Get("Authorization"); authHeader != "" {
+		headers["Authorization"] = authHeader
+	}
+	
+	// Forward JWT-related headers
+	if jwtHeader := r.Header.Get("X-JWT-Token"); jwtHeader != "" {
+		headers["X-JWT-Token"] = jwtHeader
+	}
+	
+	// Forward role information if present
+	if rolesHeader := r.Header.Get("X-User-Roles"); rolesHeader != "" {
+		headers["X-User-Roles"] = rolesHeader
+	}
 
 	// Add correlation ID
 	headers["X-Correlation-ID"] = correlationCtx.CorrelationID
+	
+	// Add gateway context for service-to-service audit trail
+	headers["X-Gateway-Type"] = string(p.configuration.Type)
+	headers["X-Gateway-Version"] = p.configuration.Version
 
 	// Create request context with timeout
 	requestCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
 	// Invoke service based on target
-	var response interface{}
+	var response *ProxyResponse
 	switch serviceName {
 	case "content-api":
 		response, err = p.invokeContentAPI(requestCtx, httpMethod, targetPath, requestData, headers)
@@ -108,19 +134,30 @@ func (p *ServiceProxy) ProxyRequest(ctx context.Context, w http.ResponseWriter, 
 }
 
 // parseTargetService parses the request path to determine target service
-func (p *ServiceProxy) parseTargetService(path, targetService string) (string, string, string, error) {
+func (p *ServiceProxy) parseTargetService(path, targetService, httpMethod string) (string, string, string, error) {
 	// Remove leading slash
 	path = strings.TrimPrefix(path, "/")
 	
 	// Parse path components
 	parts := strings.Split(path, "/")
-	if len(parts) < 3 || parts[0] != "api" {
+	
+	// Handle both public (/api/v1/...) and admin (/admin/api/v1/...) paths
+	var versionIndex, serviceIndex int
+	if len(parts) >= 3 && parts[0] == "api" {
+		// Public path: /api/v1/service
+		versionIndex = 1
+		serviceIndex = 2
+	} else if len(parts) >= 4 && parts[0] == "admin" && parts[1] == "api" {
+		// Admin path: /admin/api/v1/service
+		versionIndex = 2
+		serviceIndex = 3
+	} else {
 		return "", "", "", fmt.Errorf("invalid API path format")
 	}
 
 	// Extract version and service from path
-	_ = parts[1] // version - e.g., "v1" (currently unused)
-	service := parts[2] // e.g., "content" or "services"
+	_ = parts[versionIndex] // version - e.g., "v1" (currently unused)
+	service := parts[serviceIndex] // e.g., "content" or "services"
 	
 	// Determine service name and remaining path
 	var serviceName string
@@ -129,6 +166,15 @@ func (p *ServiceProxy) parseTargetService(path, targetService string) (string, s
 		serviceName = "content-api"
 	case "services":
 		// Services domain consolidated into content-api
+		serviceName = "content-api"
+	case "news":
+		// News domain consolidated into content-api
+		serviceName = "content-api"
+	case "research":
+		// Research domain consolidated into content-api
+		serviceName = "content-api"
+	case "events":
+		// Events domain consolidated into content-api
 		serviceName = "content-api"
 	case "inquiries":
 		// Handle inquiries domain via consolidated inquiries-api
@@ -142,13 +188,22 @@ func (p *ServiceProxy) parseTargetService(path, targetService string) (string, s
 	// Reconstruct target path
 	targetPath := "/" + strings.Join(parts, "/")
 	
-	return serviceName, "GET", targetPath, nil // Currently only GET endpoints
+	return serviceName, httpMethod, targetPath, nil
 }
 
-// invokeContentAPI invokes content API service (handles content and services domains)
-func (p *ServiceProxy) invokeContentAPI(ctx context.Context, method, path string, data interface{}, headers map[string]string) (interface{}, error) {
+// invokeContentAPI invokes content API service (handles content, services, research, events, and news domains)
+func (p *ServiceProxy) invokeContentAPI(ctx context.Context, method, path string, data interface{}, headers map[string]string) (*ProxyResponse, error) {
 	switch {
-	case strings.HasPrefix(path, "/api/v1/content"), strings.HasPrefix(path, "/api/v1/services"):
+	case strings.HasPrefix(path, "/api/v1/content"), 
+		 strings.HasPrefix(path, "/api/v1/services"),
+		 strings.HasPrefix(path, "/api/v1/research"),
+		 strings.HasPrefix(path, "/api/v1/events"),
+		 strings.HasPrefix(path, "/api/v1/news"),
+		 strings.HasPrefix(path, "/admin/api/v1/content"), 
+		 strings.HasPrefix(path, "/admin/api/v1/services"),
+		 strings.HasPrefix(path, "/admin/api/v1/research"),
+		 strings.HasPrefix(path, "/admin/api/v1/events"),
+		 strings.HasPrefix(path, "/admin/api/v1/news"):
 		// Convert data to []byte if needed
 		var requestData []byte
 		if data != nil {
@@ -169,14 +224,18 @@ func (p *ServiceProxy) invokeContentAPI(ctx context.Context, method, path string
 				return nil, domain.NewInternalError("failed to unmarshal response", err)
 			}
 		}
-		return result, nil
+		return &ProxyResponse{
+			Data:       result,
+			StatusCode: response.StatusCode,
+			Headers:    response.Headers,
+		}, nil
 	default:
 		return nil, domain.NewNotFoundError("content API endpoint", path)
 	}
 }
 
 // invokeInquiriesAPI invokes inquiries API service (handles business, donations, media, volunteers)
-func (p *ServiceProxy) invokeInquiriesAPI(ctx context.Context, method, path string, data interface{}, headers map[string]string) (interface{}, error) {
+func (p *ServiceProxy) invokeInquiriesAPI(ctx context.Context, method, path string, data interface{}, headers map[string]string) (*ProxyResponse, error) {
 	switch {
 	case strings.HasPrefix(path, "/api/v1/inquiries"):
 		// Convert data to []byte if needed
@@ -199,23 +258,33 @@ func (p *ServiceProxy) invokeInquiriesAPI(ctx context.Context, method, path stri
 				return nil, domain.NewInternalError("failed to unmarshal response", err)
 			}
 		}
-		return result, nil
+		return &ProxyResponse{
+			Data:       result,
+			StatusCode: response.StatusCode,
+			Headers:    response.Headers,
+		}, nil
 	default:
 		return nil, domain.NewNotFoundError("inquiries API endpoint", path)
 	}
 }
 
+
 // invokeNotificationAPI invokes notification API service
-func (p *ServiceProxy) invokeNotificationAPI(ctx context.Context, method, path string, data interface{}, headers map[string]string) (interface{}, error) {
+func (p *ServiceProxy) invokeNotificationAPI(ctx context.Context, method, path string, data interface{}, headers map[string]string) (*ProxyResponse, error) {
 	switch {
 	case strings.HasPrefix(path, "/api/v1/notifications"):
 		// Convert data to []byte if needed
 		var requestData []byte
 		if data != nil {
-			var err error
-			requestData, err = json.Marshal(data)
-			if err != nil {
-				return nil, domain.NewValidationError("failed to marshal request data")
+			// Check if data is already []byte (avoid double marshaling)
+			if bytes, ok := data.([]byte); ok {
+				requestData = bytes
+			} else {
+				var err error
+				requestData, err = json.Marshal(data)
+				if err != nil {
+					return nil, domain.NewValidationError("failed to marshal request data")
+				}
 			}
 		}
 		response, err := p.serviceInvocation.InvokeNotificationAPI(ctx, path, method, requestData)
@@ -229,7 +298,11 @@ func (p *ServiceProxy) invokeNotificationAPI(ctx context.Context, method, path s
 				return nil, domain.NewInternalError("failed to unmarshal response", err)
 			}
 		}
-		return result, nil
+		return &ProxyResponse{
+			Data:       result,
+			StatusCode: response.StatusCode,
+			Headers:    response.Headers,
+		}, nil
 	default:
 		return nil, domain.NewNotFoundError("notification API endpoint", path)
 	}
@@ -261,7 +334,7 @@ func (p *ServiceProxy) extractForwardableHeaders(r *http.Request) map[string]str
 }
 
 // writeProxyResponse writes the proxied response back to the client
-func (p *ServiceProxy) writeProxyResponse(w http.ResponseWriter, response interface{}, correlationCtx *domain.CorrelationContext) error {
+func (p *ServiceProxy) writeProxyResponse(w http.ResponseWriter, response *ProxyResponse, correlationCtx *domain.CorrelationContext) error {
 	// Set response headers
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("X-Correlation-ID", correlationCtx.CorrelationID)
@@ -278,10 +351,10 @@ func (p *ServiceProxy) writeProxyResponse(w http.ResponseWriter, response interf
 		w.Header().Set("Cache-Control", "no-cache")
 	}
 	
-	w.WriteHeader(http.StatusOK)
+	w.WriteHeader(response.StatusCode)
 	
-	// Encode response as JSON
-	return json.NewEncoder(w).Encode(response)
+	// Encode response data as JSON
+	return json.NewEncoder(w).Encode(response.Data)
 }
 
 // HealthCheck performs health check for the service proxy
