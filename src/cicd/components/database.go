@@ -38,7 +38,7 @@ func DeployDatabase(ctx *pulumi.Context, cfg *config.Config, environment string)
 func deployDevelopmentDatabase(ctx *pulumi.Context, cfg *config.Config) (*DatabaseOutputs, error) {
 	// Create PostgreSQL container using Podman
 	dbContainer, err := local.NewCommand(ctx, "postgresql-container", &local.CommandArgs{
-		Create: pulumi.String("podman run -d --name postgresql-dev -e POSTGRES_USER=user -e POSTGRES_PASSWORD=password -e POSTGRES_DB=international_center -p 5432:5432 postgres:15-alpine"),
+		Create: pulumi.String("podman run -d --name postgresql-dev -e POSTGRES_USER=user -e POSTGRES_PASSWORD=password -e POSTGRES_DB=international_center -p 5432:5432 postgres:15"),
 		Delete: pulumi.String("podman stop postgresql-dev && podman rm postgresql-dev"),
 	})
 	if err != nil {

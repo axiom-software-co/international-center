@@ -34,7 +34,7 @@ func TestWebsiteComponent_DevelopmentEnvironment(t *testing.T) {
 			assert.Equal(t, "podman_container", deploymentType, "Development should use Podman container")
 			assert.NotEmpty(t, containerID, "Should have container ID")
 			assert.Equal(t, "running", containerStatus, "Website container should be running")
-			assert.Contains(t, serverURL, "http://localhost:3000", "Should use local development server")
+			assert.Contains(t, serverURL, "http://localhost:3001", "Should use local development server")
 			return nil
 		})
 
@@ -296,8 +296,8 @@ func (mocks *WebsiteMocks) NewResource(args pulumi.MockResourceArgs) (string, re
 			outputs["id"] = resource.NewStringProperty("website-dev-container-id")
 			outputs["ports"] = resource.NewArrayProperty([]resource.PropertyValue{
 				resource.NewObjectProperty(resource.PropertyMap{
-					"internal": resource.NewNumberProperty(3000),
-					"external": resource.NewNumberProperty(3000),
+					"internal": resource.NewNumberProperty(3001),
+					"external": resource.NewNumberProperty(3001),
 				}),
 			})
 			outputs["env"] = resource.NewArrayProperty([]resource.PropertyValue{

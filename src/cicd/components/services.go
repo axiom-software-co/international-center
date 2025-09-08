@@ -14,7 +14,6 @@ type ServicesOutputs struct {
 	ContentServices       pulumi.MapOutput
 	NotificationServices  pulumi.MapOutput
 	GatewayServices       pulumi.MapOutput
-	TestServices          pulumi.MapOutput // Test container services for reproducible testing
 	APIServices           pulumi.MapOutput // Kept for backward compatibility with staging/production
 	PublicGatewayURL      pulumi.StringOutput
 	AdminGatewayURL       pulumi.StringOutput
@@ -79,12 +78,6 @@ func deployDevelopmentServices(ctx *pulumi.Context, cfg *config.Config) (*Servic
 		return nil, fmt.Errorf("failed to deploy notification services: %w", err)
 	}
 
-	// Deploy test containers for reproducible testing environment
-	testServices, err := DeployTestContainers(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to deploy test containers: %w", err)
-	}
-
 	// Maintain backward compatibility with APIServices for staging/production environments
 	apiServices := pulumi.Map{}
 
@@ -94,7 +87,6 @@ func deployDevelopmentServices(ctx *pulumi.Context, cfg *config.Config) (*Servic
 		ContentServices:       contentServices.ToMapOutput(),
 		NotificationServices:  notificationServices.ToMapOutput(),
 		GatewayServices:       gatewayServices.ToMapOutput(),
-		TestServices:          testServices.ToMapOutput(),
 		APIServices:           apiServices.ToMapOutput(),
 		PublicGatewayURL:      publicGatewayURL,
 		AdminGatewayURL:       adminGatewayURL,

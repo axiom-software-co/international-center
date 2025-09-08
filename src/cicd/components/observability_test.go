@@ -19,16 +19,16 @@ func TestObservabilityComponent_DevelopmentEnvironment(t *testing.T) {
 			return err
 		}
 
-		// Verify development environment generates local Grafana stack configuration
+		// Verify development environment generates consolidated otel-lgtm stack configuration
 		pulumi.All(outputs.StackType, outputs.GrafanaURL, outputs.PrometheusURL, outputs.LokiURL).ApplyT(func(args []interface{}) error {
 			stackType := args[0].(string)
 			grafanaURL := args[1].(string)
 			prometheusURL := args[2].(string)
 			lokiURL := args[3].(string)
 
-			assert.Equal(t, "podman_containers", stackType, "Development should use local container stack")
+			assert.Equal(t, "otel_lgtm_container", stackType, "Development should use consolidated otel-lgtm container")
 			assert.Contains(t, grafanaURL, "http://127.0.0.1:3000", "Should use local Grafana URL")
-			assert.Contains(t, prometheusURL, "http://127.0.0.1:9091", "Should use local Prometheus URL")
+			assert.Contains(t, prometheusURL, "http://127.0.0.1:9090", "Should use standard Prometheus URL")
 			assert.Contains(t, lokiURL, "http://127.0.0.1:3100", "Should use local Loki URL")
 			return nil
 		})

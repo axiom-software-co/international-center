@@ -49,7 +49,7 @@ func deployDevelopmentWebsite(ctx *pulumi.Context, cfg *config.Config) (*Website
 	deploymentType := pulumi.String("podman_container").ToStringOutput()
 	containerID := containerCmd.Stdout
 	containerStatus := pulumi.String("running").ToStringOutput()
-	serverURL := pulumi.String("http://localhost:3000").ToStringOutput()
+	serverURL := pulumi.String("http://localhost:3001").ToStringOutput()
 	buildCommand := pulumi.String("npm run build").ToStringOutput()
 	buildDirectory := pulumi.String("dist").ToStringOutput()
 	nodeVersion := pulumi.String("20.11.0").ToStringOutput()

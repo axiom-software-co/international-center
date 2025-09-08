@@ -16,7 +16,7 @@ import (
 
 func main() {
 	// Get environment variables
-	port := getEnv("PORT", "8090")
+	port := getEnv("PORT", "8080")
 	environment := getEnv("ENVIRONMENT", "development")
 	
 	log.Printf("Starting Inquiries Service (business, donations, media, volunteers) on port %s in %s environment", port, environment)

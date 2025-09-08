@@ -71,13 +71,6 @@ func (eds *EnvironmentDeploymentStrategy) Deploy(ctx *pulumi.Context, cfg *confi
 			}
 			outputs["vault_address"] = vault.VaultAddress
 
-		case "redis":
-			redis, err := components.DeployRedis(ctx, cfg, environment)
-			if err != nil {
-				return nil, err
-			}
-			outputs["redis_endpoint"] = redis.Endpoint
-
 		case "rabbitmq":
 			rabbitmq, err := components.DeployRabbitMQ(ctx, cfg, environment)
 			if err != nil {

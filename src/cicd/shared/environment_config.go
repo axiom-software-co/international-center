@@ -31,19 +31,18 @@ func LoadEnvironmentConfiguration(environment string, cfg *config.Config) (*Envi
 		return nil, fmt.Errorf("unsupported environment: %s", environment)
 	}
 
-	// Define standard deployment order based on current main.go logic
+	// Define standard deployment order for RabbitMQ-only architecture
 	deploymentOrder := []string{
-		"database", "storage", "vault", "redis", "rabbitmq",
+		"database", "storage", "vault", "rabbitmq",
 		"observability", "dapr", "services", "website",
 	}
 
-	// Define standard output mappings based on current main.go exports
+	// Define standard output mappings for RabbitMQ-only architecture
 	outputMappings := map[string]string{
 		"environment":                environment,
 		"database_connection_string": "database.ConnectionString",
 		"storage_connection_string":  "storage.ConnectionString",
 		"vault_address":              "vault.VaultAddress",
-		"redis_endpoint":             "redis.Endpoint",
 		"rabbitmq_endpoint":          "rabbitmq.Endpoint",
 		"grafana_url":                "observability.GrafanaURL",
 		"dapr_control_plane_url":     "dapr.ControlPlaneURL",

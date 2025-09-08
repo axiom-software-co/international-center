@@ -1,6 +1,8 @@
 package components
 
 import (
+	"os/exec"
+	"strings"
 	"testing"
 
 	"github.com/pulumi/pulumi/sdk/v3/go/common/resource"
@@ -8,6 +10,76 @@ import (
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi/config"
 	"github.com/stretchr/testify/assert"
 )
+
+// TestDaprPlacementContainerDeployment_Development validates that dapr-placement-dev container is deployed and running
+func TestDaprPlacementContainerDeployment_Development(t *testing.T) {
+	t.Run("DaprPlacementContainerExists_Development", func(t *testing.T) {
+		validateDaprPlacementContainerExists(t, "dapr-placement-dev")
+	})
+
+	t.Run("DaprPlacementContainerRunning_Development", func(t *testing.T) {
+		validateDaprPlacementContainerRunning(t, "dapr-placement-dev", "daprio/dapr:1.12.0", []string{"50005"})
+	})
+
+	t.Run("DaprPlacementContainerHealthy_Development", func(t *testing.T) {
+		validateDaprPlacementContainerHealthy(t, "dapr-placement-dev")
+	})
+}
+
+// validateDaprPlacementContainerExists checks if dapr placement container exists
+func validateDaprPlacementContainerExists(t *testing.T, name string) {
+	cmd := exec.Command("podman", "ps", "-a", "--filter", "name="+name, "--format", "{{.Names}}")
+	output, err := cmd.Output()
+	if err != nil {
+		t.Fatalf("Failed to check for dapr placement container %s: %v", name, err)
+	}
+
+	containerNames := strings.TrimSpace(string(output))
+	assert.Contains(t, containerNames, name, "Dapr placement container %s should exist", name)
+}
+
+// validateDaprPlacementContainerRunning checks if dapr placement container is running with correct image and ports
+func validateDaprPlacementContainerRunning(t *testing.T, name, expectedImage string, expectedPorts []string) {
+	cmd := exec.Command("podman", "ps", "--filter", "name="+name, "--format", "{{.Names}}\t{{.Image}}\t{{.Ports}}")
+	output, err := cmd.Output()
+	if err != nil {
+		t.Fatalf("Failed to check dapr placement container %s status: %v", name, err)
+	}
+
+	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
+	if len(lines) == 0 || lines[0] == "" {
+		t.Fatalf("Dapr placement container %s is not running", name)
+	}
+
+	parts := strings.Split(lines[0], "\t")
+	if len(parts) < 3 {
+		t.Fatalf("Unexpected dapr placement container %s output format", name)
+	}
+
+	containerName := parts[0]
+	containerImage := parts[1]
+	containerPorts := parts[2]
+
+	assert.Equal(t, name, containerName, "Container name should match")
+	assert.Equal(t, expectedImage, containerImage, "Container should use correct dapr image")
+	
+	for _, port := range expectedPorts {
+		assert.Contains(t, containerPorts, port, "Container should expose port %s", port)
+	}
+}
+
+// validateDaprPlacementContainerHealthy checks if dapr placement container is healthy
+func validateDaprPlacementContainerHealthy(t *testing.T, name string) {
+	cmd := exec.Command("podman", "ps", "--filter", "name="+name, "--format", "{{.Status}}")
+	output, err := cmd.Output()
+	if err != nil {
+		t.Fatalf("Failed to check dapr placement container %s health: %v", name, err)
+	}
+
+	status := strings.TrimSpace(string(output))
+	assert.NotEmpty(t, status, "Dapr placement container %s should have status", name)
+	assert.Contains(t, strings.ToLower(status), "up", "Dapr placement container %s should be running (Up status)", name)
+}
 
 // TestDaprComponent_DevelopmentEnvironment tests dapr component for development environment
 func TestDaprComponent_DevelopmentEnvironment(t *testing.T) {

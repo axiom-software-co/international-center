@@ -32,15 +32,15 @@ func (b *ImageBuilder) BuildServiceImage(serviceName, serviceType string) (strin
 
 	switch serviceType {
 	case "inquiries":
-		dockerfilePath = filepath.Join(b.baseDir, "backend", "cmd", "inquiries", serviceName, "Dockerfile")
+		dockerfilePath = filepath.Join(b.baseDir, "cicd", "containers", "inquiries", serviceName, "Dockerfile")
 		contextPath = filepath.Join(b.baseDir, "backend")
 		imageTag = fmt.Sprintf("backend/%s:latest", serviceName)
 	case "content":
-		dockerfilePath = filepath.Join(b.baseDir, "backend", "cmd", "content", serviceName, "Dockerfile")
+		dockerfilePath = filepath.Join(b.baseDir, "cicd", "containers", "content", serviceName, "Dockerfile")
 		contextPath = filepath.Join(b.baseDir, "backend")
 		imageTag = fmt.Sprintf("backend/%s:latest", serviceName)
 	case "notifications":
-		dockerfilePath = filepath.Join(b.baseDir, "backend", "cmd", "notifications", serviceName, "Dockerfile")
+		dockerfilePath = filepath.Join(b.baseDir, "cicd", "containers", "notifications", serviceName, "Dockerfile")
 		contextPath = filepath.Join(b.baseDir, "backend")
 		imageTag = fmt.Sprintf("backend/%s:latest", serviceName)
 	default:
@@ -63,7 +63,7 @@ func (b *ImageBuilder) BuildServiceImage(serviceName, serviceType string) (strin
 
 // BuildGatewayImage builds a Docker image for a gateway service
 func (b *ImageBuilder) BuildGatewayImage(gatewayName string) (string, error) {
-	dockerfilePath := filepath.Join(b.baseDir, "backend", "cmd", "gateways", gatewayName, "Dockerfile")
+	dockerfilePath := filepath.Join(b.baseDir, "cicd", "containers", "gateways", gatewayName, "Dockerfile")
 	contextPath := filepath.Join(b.baseDir, "backend")
 	imageTag := fmt.Sprintf("backend/%s-gateway:latest", gatewayName)
 
@@ -83,7 +83,7 @@ func (b *ImageBuilder) BuildGatewayImage(gatewayName string) (string, error) {
 
 // BuildWebsiteImage builds a Docker image for the website
 func (b *ImageBuilder) BuildWebsiteImage() (string, error) {
-	dockerfilePath := filepath.Join(b.baseDir, "website", "Dockerfile")
+	dockerfilePath := filepath.Join(b.baseDir, "cicd", "containers", "website", "Dockerfile")
 	contextPath := filepath.Join(b.baseDir, "website")
 	imageTag := "website:latest"
 

@@ -33,53 +33,34 @@ func DeployObservability(ctx *pulumi.Context, cfg *config.Config, environment st
 	}
 }
 
-// deployDevelopmentObservability deploys local Grafana stack for development
+// deployDevelopmentObservability deploys consolidated otel-lgtm stack for development
 func deployDevelopmentObservability(ctx *pulumi.Context, cfg *config.Config) (*ObservabilityOutputs, error) {
-	// Create Grafana container
-	grafanaContainer, err := local.NewCommand(ctx, "grafana-container", &local.CommandArgs{
-		Create: pulumi.String("podman run -d --name grafana-dev -p 3000:3000 -e GF_SECURITY_ADMIN_PASSWORD=admin grafana/grafana:latest"),
-		Delete: pulumi.String("podman stop grafana-dev && podman rm grafana-dev"),
+	// Create single consolidated observability container using otel-lgtm
+	// This replaces the previous multi-container approach (Grafana, Prometheus, Loki)
+	// with a single container that provides all observability components
+	otelLgtmContainer, err := local.NewCommand(ctx, "otel-lgtm-container", &local.CommandArgs{
+		Create: pulumi.String("podman run -d --name otel-lgtm-dev -p 3000:3000 -p 9090:9090 -p 3100:3100 -p 4317:4317 -p 4318:4318 grafana/otel-lgtm:latest"),
+		Delete: pulumi.String("podman stop otel-lgtm-dev && podman rm otel-lgtm-dev"),
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to create Grafana container: %w", err)
+		return nil, fmt.Errorf("failed to create otel-lgtm container: %w", err)
 	}
 
-	// Create Prometheus container
-	prometheusContainer, err := local.NewCommand(ctx, "prometheus-container", &local.CommandArgs{
-		Create: pulumi.String("podman run -d --name prometheus-dev -p 9091:9090 prom/prometheus:latest"),
-		Delete: pulumi.String("podman stop prometheus-dev && podman rm prometheus-dev"),
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to create Prometheus container: %w", err)
-	}
-
-	// Create Loki container
-	lokiContainer, err := local.NewCommand(ctx, "loki-container", &local.CommandArgs{
-		Create: pulumi.String("podman run -d --name loki-dev -p 3100:3100 grafana/loki:latest -config.file=/etc/loki/local-config.yaml"),
-		Delete: pulumi.String("podman stop loki-dev && podman rm loki-dev"),
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to create Loki container: %w", err)
-	}
-
-	stackType := pulumi.String("podman_containers").ToStringOutput()
-	grafanaURL := pulumi.String("http://127.0.0.1:3000").ToStringOutput()
-	prometheusURL := pulumi.String("http://127.0.0.1:9091").ToStringOutput()
-	lokiURL := pulumi.String("http://127.0.0.1:3100").ToStringOutput()
+	stackType := pulumi.String("otel_lgtm_container").ToStringOutput()
 	retentionDays := pulumi.Int(7).ToIntOutput()
 	auditLogging := pulumi.Bool(true).ToBoolOutput()
 	alertingEnabled := pulumi.Bool(true).ToBoolOutput()
 
-	// Add dependency on container creation
-	grafanaURL = pulumi.All(grafanaContainer.Stdout).ApplyT(func(args []interface{}) string {
+	// Add dependency on container creation and configure URLs
+	grafanaURL := pulumi.All(otelLgtmContainer.Stdout).ApplyT(func(args []interface{}) string {
 		return "http://127.0.0.1:3000"
 	}).(pulumi.StringOutput)
 
-	prometheusURL = pulumi.All(prometheusContainer.Stdout).ApplyT(func(args []interface{}) string {
-		return "http://127.0.0.1:9091"
+	prometheusURL := pulumi.All(otelLgtmContainer.Stdout).ApplyT(func(args []interface{}) string {
+		return "http://127.0.0.1:9090"
 	}).(pulumi.StringOutput)
 
-	lokiURL = pulumi.All(lokiContainer.Stdout).ApplyT(func(args []interface{}) string {
+	lokiURL := pulumi.All(otelLgtmContainer.Stdout).ApplyT(func(args []interface{}) string {
 		return "http://127.0.0.1:3100"
 	}).(pulumi.StringOutput)
 

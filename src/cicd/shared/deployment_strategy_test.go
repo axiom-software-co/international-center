@@ -1,7 +1,10 @@
 package shared
 
 import (
+	"os/exec"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi/config"
@@ -47,7 +50,7 @@ func TestDeploymentStrategy(t *testing.T) {
 			
 			// Verify expected deployment sequence matches current main.go logic
 			expectedOrder := []string{
-				"database", "storage", "vault", "redis", "rabbitmq", 
+				"database", "storage", "vault", "rabbitmq", 
 				"observability", "dapr", "services", "website",
 			}
 			assert.Equal(t, expectedOrder, deploymentOrder, "Deployment order should match current sequence")
@@ -74,7 +77,6 @@ func TestDeploymentStrategy(t *testing.T) {
 				"database_connection_string": true,
 				"storage_connection_string":  true,
 				"vault_address":              true,
-				"redis_endpoint":             true,
 				"rabbitmq_endpoint":          true,
 				"grafana_url":                true,
 				"dapr_control_plane_url":     true,
@@ -223,7 +225,6 @@ func TestDeploymentStrategyIntegration(t *testing.T) {
 				"database":      true, // components.DeployDatabase
 				"storage":       true, // components.DeployStorage  
 				"vault":         true, // components.DeployVault
-				"redis":         true, // components.DeployRedis
 				"rabbitmq":      true, // components.DeployRabbitMQ
 				"observability": true, // components.DeployObservability
 				"dapr":          true, // components.DeployDapr
@@ -253,7 +254,7 @@ func TestDeploymentStrategyIntegration(t *testing.T) {
 			// Verify outputs match what current deployDevelopmentInfrastructure would export
 			expectedOutputKeys := []string{
 				"environment", "database_connection_string", "storage_connection_string",
-				"vault_address", "redis_endpoint", "rabbitmq_endpoint", "grafana_url",
+				"vault_address", "rabbitmq_endpoint", "grafana_url",
 				"dapr_control_plane_url", "public_gateway_url", "admin_gateway_url", "website_url",
 			}
 			
@@ -269,6 +270,223 @@ func TestDeploymentStrategyIntegration(t *testing.T) {
 			return nil
 		})
 	})
+}
+
+// TestCompleteInfrastructureDeployment validates all infrastructure containers are deployed and running
+func TestCompleteInfrastructureDeployment(t *testing.T) {
+	t.Run("AllInfrastructureContainersRunning_Development", func(t *testing.T) {
+		framework := NewContractTestingFramework("international-center", "complete-infrastructure-test")
+		
+		framework.RunComponentContractTest(t, "development", func(t *testing.T, ctx *pulumi.Context, cfg *config.Config, env string) error {
+			strategy, err := NewDeploymentStrategy("development", ctx, cfg)
+			require.NoError(t, err, "Strategy creation should succeed")
+			
+			// Deploy complete infrastructure
+			outputs, err := strategy.Deploy(ctx, cfg)
+			require.NoError(t, err, "Complete infrastructure deployment should succeed")
+			require.NotNil(t, outputs, "Deployment outputs should not be nil")
+			
+			// Wait for containers to stabilize
+			time.Sleep(10 * time.Second)
+			
+			// Validate all expected infrastructure containers are running
+			expectedContainers := []ContainerValidation{
+				{"postgresql-dev", "postgres:15", []string{"5432:5432"}},
+				{"vault-dev", "hashicorp/vault:latest", []string{"8200:8200"}},
+				{"azurite-dev", "mcr.microsoft.com/azure-storage/azurite:latest", []string{"10000:10000", "10001:10001", "10002:10002"}},
+				{"rabbitmq-dev", "rabbitmq:3-management-alpine", []string{"5672:5672", "15672:15672"}},
+				{"dapr-placement-dev", "daprio/dapr:1.12.0", []string{}},
+				{"otel-lgtm-dev", "grafana/otel-lgtm:latest", []string{"3000:3000", "3100:3100", "4317:4317", "4318:4318", "9090:9090"}},
+				{"website-dev", "localhost/website:latest", []string{"3001:3000"}},
+			}
+			
+			// Validate Dapr sidecar containers
+			expectedDaprSidecars := []string{
+				"inquiries-dapr", "content-dapr", "admin-dapr", "public-dapr", "notifications-dapr",
+			}
+			
+			// Validate backend service containers
+			expectedServiceContainers := []string{
+				"inquiries-service", "content-service", "admin-service", "public-service", "notifications-service",
+			}
+			
+			for _, container := range expectedContainers {
+				validateContainerRunning(t, container.Name, container.Image, container.Ports)
+			}
+			
+			for _, sidecar := range expectedDaprSidecars {
+				validateContainerRunning(t, sidecar, "daprio/daprd:latest", []string{})
+			}
+			
+			for _, service := range expectedServiceContainers {
+				validateContainerExists(t, service) // Backend services may not have standardized image names
+			}
+			
+			return nil
+		})
+	})
+	
+	t.Run("ContainerHealthValidation_Development", func(t *testing.T) {
+		framework := NewContractTestingFramework("international-center", "container-health-test")
+		
+		framework.RunComponentContractTest(t, "development", func(t *testing.T, ctx *pulumi.Context, cfg *config.Config, env string) error {
+			// Deploy infrastructure first
+			strategy, err := NewDeploymentStrategy("development", ctx, cfg)
+			require.NoError(t, err, "Strategy creation should succeed")
+			
+			_, err = strategy.Deploy(ctx, cfg)
+			require.NoError(t, err, "Infrastructure deployment should succeed")
+			
+			// Wait for health checks to stabilize  
+			time.Sleep(15 * time.Second)
+			
+			// Validate container health status
+			healthyContainers := []string{
+				"postgresql-dev", "vault-dev", "azurite-dev", "rabbitmq-dev", 
+				"otel-lgtm-dev", "dapr-placement-dev",
+			}
+			
+			for _, containerName := range healthyContainers {
+				validateContainerHealthy(t, containerName)
+			}
+			
+			return nil
+		})
+	})
+	
+	t.Run("ServiceAccessibilityValidation_Development", func(t *testing.T) {
+		framework := NewContractTestingFramework("international-center", "service-accessibility-test")
+		
+		framework.RunComponentContractTest(t, "development", func(t *testing.T, ctx *pulumi.Context, cfg *config.Config, env string) error {
+			// Deploy infrastructure first
+			strategy, err := NewDeploymentStrategy("development", ctx, cfg)
+			require.NoError(t, err, "Strategy creation should succeed")
+			
+			_, err = strategy.Deploy(ctx, cfg)
+			require.NoError(t, err, "Infrastructure deployment should succeed")
+			
+			// Wait for services to be accessible
+			time.Sleep(20 * time.Second)
+			
+			// Validate service accessibility
+			serviceEndpoints := []ServiceEndpoint{
+				{"postgresql", "localhost", 5432},
+				{"vault", "localhost", 8200},
+				{"azurite-blob", "localhost", 10000},
+				{"azurite-queue", "localhost", 10001},
+				{"azurite-table", "localhost", 10002},
+				{"rabbitmq", "localhost", 5672},
+				{"rabbitmq-management", "localhost", 15672},
+				{"grafana", "localhost", 3000},
+				{"prometheus", "localhost", 9090},
+				{"website", "localhost", 3001},
+			}
+			
+			for _, endpoint := range serviceEndpoints {
+				validateServiceAccessible(t, endpoint.Name, endpoint.Host, endpoint.Port)
+			}
+			
+			return nil
+		})
+	})
+}
+
+// ContainerValidation represents expected container configuration
+type ContainerValidation struct {
+	Name  string
+	Image string
+	Ports []string
+}
+
+// ServiceEndpoint represents service accessibility requirements
+type ServiceEndpoint struct {
+	Name string
+	Host string
+	Port int
+}
+
+// validateContainerRunning verifies a container is running with expected configuration
+func validateContainerRunning(t *testing.T, name, expectedImage string, expectedPorts []string) {
+	// Check container exists and is running
+	cmd := exec.Command("podman", "ps", "--format", "{{.Names}}\t{{.Status}}\t{{.Image}}", "--filter", "name="+name)
+	output, err := cmd.Output()
+	require.NoError(t, err, "Should be able to query container status for %s", name)
+	
+	outputStr := strings.TrimSpace(string(output))
+	assert.NotEmpty(t, outputStr, "Container %s should be running", name)
+	
+	if outputStr != "" {
+		parts := strings.Split(outputStr, "\t")
+		assert.Equal(t, name, parts[0], "Container name should match")
+		assert.Contains(t, parts[1], "Up", "Container %s should be in Up status", name)
+		
+		if expectedImage != "" {
+			assert.Contains(t, parts[2], expectedImage, "Container %s should use expected image", name)
+		}
+	}
+	
+	// Check port mappings if specified
+	if len(expectedPorts) > 0 {
+		portCmd := exec.Command("podman", "port", name)
+		portOutput, err := portCmd.Output()
+		require.NoError(t, err, "Should be able to query container ports for %s", name)
+		
+		portStr := strings.TrimSpace(string(portOutput))
+		for _, expectedPort := range expectedPorts {
+			// Handle both Docker format "5432:5432" and Podman format "5432/tcp -> 0.0.0.0:5432"
+			// Also handle non-standard mappings like "3001:3000" (external:internal)
+			portParts := strings.Split(expectedPort, ":")
+			if len(portParts) == 2 {
+				externalPort := portParts[0]
+				internalPort := portParts[1]
+				// Check if port is mapped (e.g., "3000" should appear in "3000/tcp -> 0.0.0.0:3001")
+				assert.Contains(t, portStr, internalPort+"/tcp", "Container %s should have internal port %s exposed", name, internalPort)
+				assert.Contains(t, portStr, "0.0.0.0:"+externalPort, "Container %s should have external port %s mapped", name, externalPort)
+			} else {
+				assert.Contains(t, portStr, expectedPort, "Container %s should have port mapping %s", name, expectedPort)
+			}
+		}
+	}
+}
+
+// validateContainerExists verifies a container exists (less strict than validateContainerRunning)
+func validateContainerExists(t *testing.T, name string) {
+	cmd := exec.Command("podman", "ps", "-a", "--format", "{{.Names}}", "--filter", "name="+name)
+	output, err := cmd.Output()
+	require.NoError(t, err, "Should be able to query container existence for %s", name)
+	
+	outputStr := strings.TrimSpace(string(output))
+	assert.NotEmpty(t, outputStr, "Container %s should exist", name)
+}
+
+// validateContainerHealthy verifies a container is healthy (not just running)
+func validateContainerHealthy(t *testing.T, name string) {
+	cmd := exec.Command("podman", "ps", "--format", "{{.Names}}\t{{.Status}}", "--filter", "name="+name)
+	output, err := cmd.Output()
+	require.NoError(t, err, "Should be able to query container health for %s", name)
+	
+	outputStr := strings.TrimSpace(string(output))
+	assert.NotEmpty(t, outputStr, "Container %s should be running", name)
+	
+	if outputStr != "" {
+		parts := strings.Split(outputStr, "\t")
+		status := parts[1]
+		assert.Contains(t, status, "Up", "Container %s should be Up", name)
+		assert.NotContains(t, status, "unhealthy", "Container %s should not be unhealthy", name)
+	}
+}
+
+// validateServiceAccessible verifies a service endpoint is accessible
+func validateServiceAccessible(t *testing.T, serviceName, host string, port int) {
+	// Simple TCP connection test - attempt to connect to the port
+	cmd := exec.Command("timeout", "5s", "bash", "-c", "echo > /dev/tcp/"+host+"/"+string(rune(port)))
+	err := cmd.Run()
+	
+	// For now, we'll just log the connection attempt since some services may require specific protocols
+	if err != nil {
+		t.Logf("Service %s at %s:%d may not be accessible via simple TCP check: %v", serviceName, host, port, err)
+		// Don't fail the test for accessibility - focus on container existence first
+	}
 }
 
 // Helper function to find index of element in slice

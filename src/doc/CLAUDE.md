@@ -15,7 +15,7 @@
 
 - IMPORTANT AXIOM RULE TO FOLLOW : use 'export PULUMI_CONFIG_PASSPHRASE="development" && pulumi destroy' to teardown the development environment , instead on killing individual processes
 
-- note : stop using the term 'medical-grade' ( this is implicit and there is no need to mention it in the naming system )
+- note : stop using the term 'medical-grade' ( this is implicit and there is no need to mention it in the naming system ) ( do not use 'kill shell' ) 
 
 - note : do not work with github actions for now
 
@@ -101,7 +101,7 @@ GRAFANA_CLOUD_ACCESS_POLICY_TOKEN="glc_eyJvIjoiMTA3Nzk3NSIsIm4iOiJwdWx1bWktcG9sa
 
 
 
-# website
+# public website
 
 - public api gateway for dynamic data
 
@@ -121,6 +121,15 @@ GRAFANA_CLOUD_ACCESS_POLICY_TOKEN="glc_eyJvIjoiMTA3Nzk3NSIsIm4iOiJwdWx1bWktcG9sa
 
 - do not use react
 - do not do UI design testing
+
+
+
+# worflow plaform
+
+- n8n ( https://hub.docker.com/r/n8nio/n8n ) 
+
+- the worflow platform will be used in the future to 
+
 
 ## testing
 
@@ -224,7 +233,7 @@ GRAFANA_CLOUD_ACCESS_POLICY_TOKEN="glc_eyJvIjoiMTA3Nzk3NSIsIm4iOiJwdWx1bWktcG9sa
 
 ## managed stateful resources
 
-- pub/sub and authenticated sessions : upstash redis hosted for production ( redis container for local development ) 
+- pub/sub and authenticated sessions : CloudAMQP rabbitmq hosted for production ( rabbitmq container for local development ) 
 - secret store : hashicorp vault cloud hosted for production ( hashicorp vault and vault data containers for local development )
 
 - relational database ( includes configuration store and state store and identity storage and services storage ) : azure manged postgre hosted for production ( postgre container for local development ) 

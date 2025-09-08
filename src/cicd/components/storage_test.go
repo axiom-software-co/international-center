@@ -1,6 +1,8 @@
 package components
 
 import (
+	"os/exec"
+	"strings"
 	"testing"
 
 	"github.com/pulumi/pulumi/sdk/v3/go/common/resource"
@@ -8,6 +10,76 @@ import (
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi/config"
 	"github.com/stretchr/testify/assert"
 )
+
+// TestAzuriteContainerDeployment_Development validates that azurite-dev container is deployed and running
+func TestAzuriteContainerDeployment_Development(t *testing.T) {
+	t.Run("AzuriteContainerExists_Development", func(t *testing.T) {
+		validateAzuriteContainerExists(t, "azurite-dev")
+	})
+
+	t.Run("AzuriteContainerRunning_Development", func(t *testing.T) {
+		validateAzuriteContainerRunning(t, "azurite-dev", "mcr.microsoft.com/azure-storage/azurite", []string{"10000", "10001", "10002"})
+	})
+
+	t.Run("AzuriteContainerHealthy_Development", func(t *testing.T) {
+		validateAzuriteContainerHealthy(t, "azurite-dev")
+	})
+}
+
+// validateAzuriteContainerExists checks if azurite container exists
+func validateAzuriteContainerExists(t *testing.T, name string) {
+	cmd := exec.Command("podman", "ps", "-a", "--filter", "name="+name, "--format", "{{.Names}}")
+	output, err := cmd.Output()
+	if err != nil {
+		t.Fatalf("Failed to check for azurite container %s: %v", name, err)
+	}
+
+	containerNames := strings.TrimSpace(string(output))
+	assert.Contains(t, containerNames, name, "Azurite container %s should exist", name)
+}
+
+// validateAzuriteContainerRunning checks if azurite container is running with correct image and ports
+func validateAzuriteContainerRunning(t *testing.T, name, expectedImage string, expectedPorts []string) {
+	cmd := exec.Command("podman", "ps", "--filter", "name="+name, "--format", "{{.Names}}\t{{.Image}}\t{{.Ports}}")
+	output, err := cmd.Output()
+	if err != nil {
+		t.Fatalf("Failed to check azurite container %s status: %v", name, err)
+	}
+
+	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
+	if len(lines) == 0 || lines[0] == "" {
+		t.Fatalf("Azurite container %s is not running", name)
+	}
+
+	parts := strings.Split(lines[0], "\t")
+	if len(parts) < 3 {
+		t.Fatalf("Unexpected azurite container %s output format", name)
+	}
+
+	containerName := parts[0]
+	containerImage := parts[1]
+	containerPorts := parts[2]
+
+	assert.Equal(t, name, containerName, "Container name should match")
+	assert.Equal(t, expectedImage, containerImage, "Container should use correct azurite image")
+	
+	for _, port := range expectedPorts {
+		assert.Contains(t, containerPorts, port, "Container should expose port %s", port)
+	}
+}
+
+// validateAzuriteContainerHealthy checks if azurite container is healthy
+func validateAzuriteContainerHealthy(t *testing.T, name string) {
+	cmd := exec.Command("podman", "ps", "--filter", "name="+name, "--format", "{{.Status}}")
+	output, err := cmd.Output()
+	if err != nil {
+		t.Fatalf("Failed to check azurite container %s health: %v", name, err)
+	}
+
+	status := strings.TrimSpace(string(output))
+	assert.NotEmpty(t, status, "Azurite container %s should have status", name)
+	assert.Contains(t, strings.ToLower(status), "up", "Azurite container %s should be running (Up status)", name)
+}
 
 // TestStorageComponent_DevelopmentEnvironment tests storage component for development environment
 func TestStorageComponent_DevelopmentEnvironment(t *testing.T) {

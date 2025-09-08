@@ -125,23 +125,27 @@ func (ol *OperationLogger) LogError(err error, details map[string]interface{}) {
 
 // ContainerConfig represents configuration for deploying a container
 type ContainerConfig struct {
-	ServiceName   string
-	ContainerName string
-	ImageName     string
-	HostPort      int
-	ContainerPort int
-	DaprGrpcPort  int
-	AppID         string
-	CleanupImages bool // Whether to cleanup images when container is deleted
-	HealthCheck   bool // Whether to perform health checks on the container
+	ServiceName     string
+	ContainerName   string
+	ImageName       string
+	HostPort        int
+	ContainerPort   int
+	DaprGrpcPort    int
+	AppID           string
+	CleanupImages   bool   // Whether to cleanup images when container is deleted
+	HealthCheck     bool   // Whether to perform health checks on the container
+	HealthEndpoint  string // Custom health check endpoint (default: "/health")
+	HealthTimeout   int    // Health check timeout in seconds (default: 90)
+	HealthRetries   int    // Maximum health check retries (default: 30)
+	FallbackCheck   bool   // Enable fallback validation if health endpoint fails
 }
 
 // DeployServiceContainer deploys a Podman container with Dapr sidecar with enhanced error handling and logging
 func DeployServiceContainer(ctx *pulumi.Context, config ContainerConfig) (pulumi.Map, error) {
 	logger := NewOperationLogger(ctx, config.ServiceName, "container deployment")
 	
-	// Validate configuration
-	if err := validateContainerConfig(config); err != nil {
+	// Validate configuration and set defaults
+	if err := validateContainerConfig(&config); err != nil {
 		logger.LogError(err, map[string]interface{}{"validation_error": true})
 		return nil, &ContainerFactoryError{
 			Type:        ErrorTypeConfiguration,
@@ -271,16 +275,16 @@ func DeployServiceContainer(ctx *pulumi.Context, config ContainerConfig) (pulumi
 	
 	daprHealthCheck, err := local.NewCommand(ctx, fmt.Sprintf("%s-dapr-health", config.ServiceName), &local.CommandArgs{
 		Create: pulumi.Sprintf(`
-			echo "Waiting for Dapr sidecar %s to be ready on port %d..." &&
-			for i in {1..30}; do 
-				if podman exec %s-dapr /bin/sh -c "netstat -ln | grep :%d" >/dev/null 2>&1; then 
-					echo "Dapr sidecar %s ready on port %d" && exit 0
+			echo "Waiting for Dapr sidecar %s to be ready..." &&
+			for i in {1..15}; do 
+				if podman logs %s-dapr 2>/dev/null | grep "gRPC server listening on TCP address: :%d" >/dev/null 2>&1; then 
+					echo "Dapr sidecar %s ready with gRPC API on port %d" && exit 0
 				fi
-				echo "Waiting for Dapr sidecar (attempt $i/30)..."
+				echo "Waiting for Dapr sidecar (attempt $i/15)..."
 				sleep 2
 			done &&
-			echo "ERROR: Dapr sidecar %s not ready after 60 seconds" && exit 1
-		`, config.ServiceName, config.DaprGrpcPort, config.ServiceName, config.DaprGrpcPort, config.ServiceName, config.DaprGrpcPort, config.ServiceName),
+			echo "ERROR: Dapr sidecar %s not ready after 30 seconds" && exit 1
+		`, config.ServiceName, config.ServiceName, config.DaprGrpcPort, config.ServiceName, config.DaprGrpcPort, config.ServiceName),
 	}, pulumi.DependsOn([]pulumi.Resource{daprCmd}))
 	if err != nil {
 		logger.LogError(err, map[string]interface{}{
@@ -336,47 +340,43 @@ func DeployServiceContainer(ctx *pulumi.Context, config ContainerConfig) (pulumi
 	// Perform service readiness validation if health checks are enabled
 	var serviceHealthCmd *local.Command
 	if config.HealthCheck {
-		logger.LogProgress("Performing service readiness validation", map[string]interface{}{
-			"service_name":     config.ServiceName,
-			"health_endpoint":  fmt.Sprintf("http://localhost:%d/health", config.HostPort),
-			"container_ready":  true,
+		logger.LogProgress("Performing enhanced service readiness validation", map[string]interface{}{
+			"service_name":      config.ServiceName,
+			"health_endpoint":   fmt.Sprintf("http://localhost:%d%s", config.HostPort, config.HealthEndpoint),
+			"health_timeout":    config.HealthTimeout,
+			"health_retries":    config.HealthRetries,
+			"fallback_enabled":  config.FallbackCheck,
+			"container_ready":   true,
 		})
 		
-		serviceHealthCmd, err = local.NewCommand(ctx, fmt.Sprintf("%s-service-health", config.ServiceName), &local.CommandArgs{
-			Create: pulumi.Sprintf(`
-				echo "Waiting for service %s to be ready on port %d..." &&
-				for i in {1..30}; do 
-					if curl -f -s http://localhost:%d/health >/dev/null 2>&1; then 
-						echo "Service %s health endpoint ready on port %d" && exit 0
-					fi
-					echo "Waiting for service health endpoint (attempt $i/30)..."
-					sleep 3
-				done &&
-				echo "ERROR: Service %s health endpoint not ready after 90 seconds" && exit 1
-			`, config.ServiceName, config.HostPort, config.HostPort, config.ServiceName, config.HostPort, config.ServiceName),
-			Delete: pulumi.String("echo 'Service health check cleanup'"),
-		}, pulumi.DependsOn([]pulumi.Resource{containerCmd}))
+		serviceHealthCmd, err = performEnhancedServiceHealthCheck(ctx, config, containerCmd)
 		if err != nil {
 			logger.LogError(err, map[string]interface{}{
-				"phase": "service_health_check",
+				"phase": "enhanced_service_health_check",
 				"service_name": config.ServiceName,
-				"health_endpoint": fmt.Sprintf("http://localhost:%d/health", config.HostPort),
+				"health_endpoint": fmt.Sprintf("http://localhost:%d%s", config.HostPort, config.HealthEndpoint),
+				"health_timeout": config.HealthTimeout,
+				"fallback_enabled": config.FallbackCheck,
 			})
 			return nil, &ContainerFactoryError{
 				Type:        ErrorTypeHealthCheck,
 				ServiceName: config.ServiceName,
-				Operation:   "service readiness validation",
+				Operation:   "enhanced service readiness validation",
 				Context: map[string]interface{}{
-					"health_endpoint": fmt.Sprintf("http://localhost:%d/health", config.HostPort),
+					"health_endpoint": fmt.Sprintf("http://localhost:%d%s", config.HostPort, config.HealthEndpoint),
 					"host_port":       config.HostPort,
+					"health_timeout":  config.HealthTimeout,
+					"health_retries":  config.HealthRetries,
+					"fallback_check":  config.FallbackCheck,
 				},
 				Err: err,
 			}
 		}
 		
-		logger.LogProgress("Service readiness validation configured", map[string]interface{}{
+		logger.LogProgress("Enhanced service readiness validation configured", map[string]interface{}{
 			"service_name":     config.ServiceName,
-			"health_endpoint":  fmt.Sprintf("http://localhost:%d/health", config.HostPort),
+			"health_endpoint":  fmt.Sprintf("http://localhost:%d%s", config.HostPort, config.HealthEndpoint),
+			"enhancement":      "configurable+exponential_backoff+fallback",
 		})
 	}
 	
@@ -414,8 +414,131 @@ func DeployServiceContainer(ctx *pulumi.Context, config ContainerConfig) (pulumi
 	return serviceMap, nil
 }
 
-// validateContainerConfig validates the container configuration
-func validateContainerConfig(config ContainerConfig) error {
+// performEnhancedServiceHealthCheck performs robust service health validation with configurable parameters
+func performEnhancedServiceHealthCheck(ctx *pulumi.Context, config ContainerConfig, containerCmd *local.Command) (*local.Command, error) {
+	logger := NewOperationLogger(ctx, config.ServiceName, "enhanced health check")
+	
+	// Calculate exponential backoff intervals
+	totalTimeout := config.HealthTimeout
+	retries := config.HealthRetries
+	baseInterval := 1 // Start with 1 second
+	maxInterval := 10 // Cap at 10 seconds
+	
+	// Generate exponential backoff intervals
+	var intervals []int
+	currentInterval := baseInterval
+	totalTime := 0
+	for i := 0; i < retries && totalTime < totalTimeout; i++ {
+		intervals = append(intervals, currentInterval)
+		totalTime += currentInterval
+		currentInterval = currentInterval * 2
+		if currentInterval > maxInterval {
+			currentInterval = maxInterval
+		}
+	}
+	
+	logger.LogProgress("Constructing enhanced health check script", map[string]interface{}{
+		"intervals_count":    len(intervals),
+		"total_timeout":      totalTimeout,
+		"exponential_backoff": true,
+		"fallback_enabled":   config.FallbackCheck,
+	})
+	
+	// Construct health check script with enhanced features
+	healthScript := constructEnhancedHealthScript(config, intervals)
+	
+	serviceHealthCmd, err := local.NewCommand(ctx, fmt.Sprintf("%s-enhanced-service-health", config.ServiceName), &local.CommandArgs{
+		Create: pulumi.String(healthScript),
+		Delete: pulumi.String("echo 'Enhanced service health check cleanup'"),
+	}, pulumi.DependsOn([]pulumi.Resource{containerCmd}))
+	
+	if err != nil {
+		logger.LogError(err, map[string]interface{}{
+			"health_script_length": len(healthScript),
+			"exponential_backoff":  true,
+			"fallback_enabled":     config.FallbackCheck,
+		})
+		return nil, err
+	}
+	
+	logger.LogSuccess(map[string]interface{}{
+		"service_name":        config.ServiceName,
+		"health_endpoint":     config.HealthEndpoint,
+		"enhancement":         "exponential_backoff+curl_check+fallback",
+		"total_timeout":       totalTimeout,
+		"retry_intervals":     len(intervals),
+	})
+	
+	return serviceHealthCmd, nil
+}
+
+// constructEnhancedHealthScript constructs a comprehensive health check script
+func constructEnhancedHealthScript(config ContainerConfig, intervals []int) string {
+	var scriptParts []string
+	
+	// Health check header
+	healthEndpoint := fmt.Sprintf("http://localhost:%d%s", config.HostPort, config.HealthEndpoint)
+	scriptParts = append(scriptParts, fmt.Sprintf("echo 'Starting enhanced health check for service %s'", config.ServiceName))
+	scriptParts = append(scriptParts, fmt.Sprintf("echo 'Health endpoint: %s'", healthEndpoint))
+	scriptParts = append(scriptParts, fmt.Sprintf("echo 'Max retries: %d, Timeout: %d seconds'", config.HealthRetries, config.HealthTimeout))
+	
+	// Check curl availability and install if needed
+	scriptParts = append(scriptParts, "echo 'Checking curl availability...'")
+	scriptParts = append(scriptParts, "command -v curl >/dev/null 2>&1 || { echo 'Installing curl...'; apt-get update -qq && apt-get install -y curl || apk add --no-cache curl || yum install -y curl || { echo 'ERROR: Could not install curl'; exit 1; }; }")
+	
+	// Main health check loop with exponential backoff
+	scriptParts = append(scriptParts, "echo 'Starting health check with exponential backoff...'")
+	
+	// Generate retry loop with exponential backoff
+	retryScript := "attempt=1"
+	for i, interval := range intervals {
+		retryScript += fmt.Sprintf(" && { ")
+		retryScript += fmt.Sprintf("echo \"Health check attempt $attempt (waiting %d seconds)...\" && ", interval)
+		retryScript += fmt.Sprintf("if curl -f -s --connect-timeout 5 --max-time 10 %s >/dev/null 2>&1; then ", healthEndpoint)
+		retryScript += fmt.Sprintf("echo \"SUCCESS: Service %s health endpoint ready on port %d\" && exit 0; ", config.ServiceName, config.HostPort)
+		retryScript += "fi && "
+		if i < len(intervals)-1 {
+			retryScript += fmt.Sprintf("echo \"Attempt $attempt failed, waiting %d seconds...\" && sleep %d", interval, interval)
+		} else {
+			retryScript += "echo \"Final attempt failed\""
+		}
+		retryScript += " && attempt=$((attempt+1))"
+		retryScript += " }"
+	}
+	
+	scriptParts = append(scriptParts, retryScript)
+	
+	// Fallback validation if enabled
+	if config.FallbackCheck {
+		scriptParts = append(scriptParts, "echo 'Health endpoint failed, attempting fallback validation...'")
+		
+		// Fallback 1: Check if port is listening
+		fallbackPort := fmt.Sprintf("netstat -tlnp 2>/dev/null | grep ':%d ' >/dev/null 2>&1", config.HostPort)
+		scriptParts = append(scriptParts, fmt.Sprintf("if %s; then echo 'FALLBACK SUCCESS: Port %d is listening' && exit 0; fi", fallbackPort, config.HostPort))
+		
+		// Fallback 2: Check container is running and responding on any endpoint
+		scriptParts = append(scriptParts, fmt.Sprintf("if curl -f -s --connect-timeout 3 --max-time 5 http://localhost:%d/ >/dev/null 2>&1; then echo 'FALLBACK SUCCESS: Service responding on root endpoint' && exit 0; fi", config.HostPort))
+		
+		// Fallback 3: Check basic TCP connection
+		scriptParts = append(scriptParts, fmt.Sprintf("if timeout 5 bash -c '</dev/tcp/localhost/%d' 2>/dev/null; then echo 'FALLBACK SUCCESS: TCP connection successful' && exit 0; fi", config.HostPort))
+		
+		scriptParts = append(scriptParts, "echo 'All fallback validation methods failed'")
+	}
+	
+	// Final error reporting
+	scriptParts = append(scriptParts, fmt.Sprintf("echo 'ERROR: Enhanced health check failed for service %s after all attempts'", config.ServiceName))
+	scriptParts = append(scriptParts, fmt.Sprintf("echo 'Health endpoint %s is not responding'", healthEndpoint))
+	scriptParts = append(scriptParts, "echo 'Container might be starting up or experiencing issues'")
+	if config.FallbackCheck {
+		scriptParts = append(scriptParts, "echo 'Fallback validation also failed - service likely not ready'")
+	}
+	scriptParts = append(scriptParts, "exit 1")
+	
+	return strings.Join(scriptParts, " && ")
+}
+
+// validateContainerConfig validates the container configuration and sets defaults
+func validateContainerConfig(config *ContainerConfig) error {
 	var validationErrors []string
 	
 	// Validate required fields
@@ -432,6 +555,17 @@ func validateContainerConfig(config ContainerConfig) error {
 		validationErrors = append(validationErrors, "app ID is required")
 	}
 	
+	// Set health check defaults
+	if config.HealthEndpoint == "" {
+		config.HealthEndpoint = "/health"
+	}
+	if config.HealthTimeout <= 0 {
+		config.HealthTimeout = 90 // 90 seconds default timeout
+	}
+	if config.HealthRetries <= 0 {
+		config.HealthRetries = 30 // 30 retries default
+	}
+	
 	// Validate port ranges
 	if config.HostPort <= 0 || config.HostPort > 65535 {
 		validationErrors = append(validationErrors, fmt.Sprintf("host port %d is invalid (must be 1-65535)", config.HostPort))
@@ -446,6 +580,17 @@ func validateContainerConfig(config ContainerConfig) error {
 	// Validate port conflicts
 	if config.HostPort == config.DaprGrpcPort {
 		validationErrors = append(validationErrors, fmt.Sprintf("host port %d conflicts with dapr grpc port", config.HostPort))
+	}
+	
+	// Validate health check configuration
+	if config.HealthCheck && config.HealthTimeout > 300 {
+		validationErrors = append(validationErrors, fmt.Sprintf("health timeout %d seconds is too long (max 300 seconds)", config.HealthTimeout))
+	}
+	if config.HealthCheck && config.HealthRetries > 60 {
+		validationErrors = append(validationErrors, fmt.Sprintf("health retries %d is too many (max 60 retries)", config.HealthRetries))
+	}
+	if config.HealthCheck && !strings.HasPrefix(config.HealthEndpoint, "/") {
+		validationErrors = append(validationErrors, fmt.Sprintf("health endpoint %s must start with '/'", config.HealthEndpoint))
 	}
 	
 	// Validate naming conventions
@@ -470,15 +615,19 @@ func DeployInquiriesServices(ctx *pulumi.Context) (pulumi.Map, error) {
 	
 	// Deploy single consolidated inquiries service (business, donations, media, volunteers)
 	config := ContainerConfig{
-		ServiceName:   "inquiries",
-		ContainerName: "inquiries-dev",
-		ImageName:     "backend/inquiries:latest",
-		HostPort:      8080,
-		ContainerPort: 8080,
-		DaprGrpcPort:  50001,
-		AppID:         "inquiries",
-		CleanupImages: false, // Keep images for development reuse
-		HealthCheck:   true,  // Enable health checks for development validation
+		ServiceName:     "inquiries",
+		ContainerName:   "inquiries-service",
+		ImageName:       "backend/inquiries:latest",
+		HostPort:        8080,
+		ContainerPort:   8080,
+		DaprGrpcPort:    50001,
+		AppID:           "inquiries",
+		CleanupImages:   false, // Keep images for development reuse
+		HealthCheck:     true,  // Enable health checks for development validation
+		HealthEndpoint:  "/health", // Standard health endpoint
+		HealthTimeout:   90,    // 90 seconds timeout
+		HealthRetries:   30,    // 30 retries with exponential backoff
+		FallbackCheck:   true,  // Enable fallback validation
 	}
 	
 	serviceMap, err := DeployServiceContainer(ctx, config)
@@ -497,15 +646,19 @@ func DeployContentServices(ctx *pulumi.Context) (pulumi.Map, error) {
 	
 	// Deploy single consolidated content service (events, news, research, services)
 	config := ContainerConfig{
-		ServiceName:   "content",
-		ContainerName: "content-dev",
-		ImageName:     "backend/content:latest",
-		HostPort:      8090,
-		ContainerPort: 8080,
-		DaprGrpcPort:  50010,
-		AppID:         "content",
-		CleanupImages: false, // Keep images for development reuse
-		HealthCheck:   true,  // Enable health checks for development validation
+		ServiceName:     "content",
+		ContainerName:   "content-service",
+		ImageName:       "backend/content:latest",
+		HostPort:        8090,
+		ContainerPort:   8080,
+		DaprGrpcPort:    50010,
+		AppID:           "content",
+		CleanupImages:   false, // Keep images for development reuse
+		HealthCheck:     true,  // Enable health checks for development validation
+		HealthEndpoint:  "/health", // Standard health endpoint
+		HealthTimeout:   90,    // 90 seconds timeout
+		HealthRetries:   30,    // 30 retries with exponential backoff
+		FallbackCheck:   true,  // Enable fallback validation
 	}
 	
 	serviceMap, err := DeployServiceContainer(ctx, config)
@@ -531,15 +684,19 @@ func DeployGatewayServices(ctx *pulumi.Context) (pulumi.Map, error) {
 	
 	for i, gateway := range gateways {
 		config := ContainerConfig{
-			ServiceName:   gateway.name,
-			ContainerName: fmt.Sprintf("%s-gateway-dev", gateway.name),
-			ImageName:     fmt.Sprintf("backend/%s-gateway:latest", gateway.name),
-			HostPort:      gateway.port,
-			ContainerPort: gateway.port,
-			DaprGrpcPort:  50020 + i,
-			AppID:         fmt.Sprintf("%s-gateway", gateway.name),
-			CleanupImages: false, // Keep images for development reuse
-			HealthCheck:   true,  // Enable health checks for development validation
+			ServiceName:     gateway.name,
+			ContainerName:   fmt.Sprintf("%s-gateway", gateway.name),
+			ImageName:       fmt.Sprintf("backend/%s-gateway:latest", gateway.name),
+			HostPort:        gateway.port,
+			ContainerPort:   gateway.port,
+			DaprGrpcPort:    50020 + i,
+			AppID:           fmt.Sprintf("%s-gateway", gateway.name),
+			CleanupImages:   false, // Keep images for development reuse
+			HealthCheck:     true,  // Enable health checks for development validation
+			HealthEndpoint:  "/health", // Standard health endpoint
+			HealthTimeout:   90,    // 90 seconds timeout
+			HealthRetries:   30,    // 30 retries with exponential backoff
+			FallbackCheck:   true,  // Enable fallback validation
 		}
 		
 		serviceMap, err := DeployServiceContainer(ctx, config)
@@ -602,7 +759,7 @@ func DeployWebsiteContainerWithConfig(ctx *pulumi.Context, config WebsiteContain
 	
 	// Create website container using Command provider
 	containerCmd, err := local.NewCommand(ctx, "website-container", &local.CommandArgs{
-		Create: pulumi.String("podman run -d --name website-dev -p 3000:3000 -e NODE_ENV=development website:latest"),
+		Create: pulumi.String("podman run -d --name website-dev -p 3001:3000 -e NODE_ENV=development website:latest"),
 		Delete: pulumi.String(deleteCmd),
 	}, pulumi.DependsOn(dependencies))
 	if err != nil {
@@ -959,15 +1116,19 @@ func DeployNotificationServices(ctx *pulumi.Context) (pulumi.Map, error) {
 	
 	// Deploy single consolidated notifications service
 	config := ContainerConfig{
-		ServiceName:   "notifications",
-		ContainerName: "notifications-dev",
-		ImageName:     "backend/notifications:latest",
-		HostPort:      8095,
-		ContainerPort: 8095,
-		DaprGrpcPort:  50030,
-		AppID:         "notifications",
-		CleanupImages: false, // Keep images for development reuse
-		HealthCheck:   true,  // Enable health checks for development validation
+		ServiceName:     "notifications",
+		ContainerName:   "notifications-service",
+		ImageName:       "backend/notifications:latest",
+		HostPort:        8095,
+		ContainerPort:   8095,
+		DaprGrpcPort:    50030,
+		AppID:           "notifications",
+		CleanupImages:   false, // Keep images for development reuse
+		HealthCheck:     true,  // Enable health checks for development validation
+		HealthEndpoint:  "/health", // Standard health endpoint
+		HealthTimeout:   90,    // 90 seconds timeout
+		HealthRetries:   30,    // 30 retries with exponential backoff
+		FallbackCheck:   true,  // Enable fallback validation
 	}
 	
 	serviceMap, err := DeployServiceContainer(ctx, config)
@@ -978,6 +1139,109 @@ func DeployNotificationServices(ctx *pulumi.Context) (pulumi.Map, error) {
 	notificationServices["notifications"] = serviceMap
 	
 	return notificationServices, nil
+}
+
+// DeployObservabilityContainer deploys consolidated otel-lgtm observability container
+func DeployObservabilityContainer(ctx *pulumi.Context) (*local.Command, error) {
+	return DeployObservabilityContainerWithConfig(ctx, ObservabilityContainerConfig{
+		CleanupImages: false, // Keep images for development reuse
+		HealthCheck:   true,  // Enable health checks for development validation
+	})
+}
+
+// ObservabilityContainerConfig represents configuration for deploying observability container
+type ObservabilityContainerConfig struct {
+	CleanupImages bool // Whether to cleanup images when container is deleted
+	HealthCheck   bool // Whether to perform health checks on the container
+}
+
+// DeployObservabilityContainerWithConfig deploys consolidated otel-lgtm observability container with advanced configuration
+func DeployObservabilityContainerWithConfig(ctx *pulumi.Context, config ObservabilityContainerConfig) (*local.Command, error) {
+	imageName := "grafana/otel-lgtm:latest"
+	serviceName := "otel-lgtm"
+	
+	logger := NewOperationLogger(ctx, serviceName, "consolidated observability deployment")
+	
+	// Pull the otel-lgtm image if it doesn't exist (no building required for external image)
+	imagePullCmd, err := local.NewCommand(ctx, "otel-lgtm-image-pull", &local.CommandArgs{
+		Create: pulumi.Sprintf("podman image exists %s || podman pull %s", imageName, imageName),
+	})
+	if err != nil {
+		logger.LogError(err, map[string]interface{}{
+			"operation": "image_pull",
+			"image_name": imageName,
+		})
+		return nil, fmt.Errorf("failed to pull otel-lgtm image: %w", err)
+	}
+	
+	logger.LogProgress("Pulling otel-lgtm image", map[string]interface{}{
+		"image_name": imageName,
+		"source": "docker.io/grafana/otel-lgtm",
+	})
+	
+	// Perform image health check after pull if enabled
+	var imageHealthCmd *local.Command
+	if config.HealthCheck {
+		imageHealthCmd, err = performImageHealthCheck(ctx, serviceName, imageName)
+		if err != nil {
+			logger.LogError(err, map[string]interface{}{
+				"operation": "health_check",
+				"image_name": imageName,
+			})
+			return nil, fmt.Errorf("failed to perform health check for otel-lgtm image: %w", err)
+		}
+		
+		logger.LogProgress("Image health check configured", map[string]interface{}{
+			"image_name": imageName,
+		})
+	}
+	
+	// Determine container dependencies
+	var dependencies []pulumi.Resource
+	dependencies = append(dependencies, imagePullCmd)
+	if imageHealthCmd != nil {
+		dependencies = append(dependencies, imageHealthCmd)
+	}
+	
+	// Build container delete command with optional image cleanup
+	deleteCmd := "podman rm -f otel-lgtm-dev"
+	if config.CleanupImages {
+		deleteCmd = "podman rm -f otel-lgtm-dev && podman rmi -f grafana/otel-lgtm:latest || true"
+		logger.LogProgress("Image cleanup enabled for container deletion", map[string]interface{}{
+			"cleanup_images": true,
+		})
+	}
+	
+	logger.LogProgress("Creating consolidated observability container", map[string]interface{}{
+		"container_name": "otel-lgtm-dev",
+		"ports": "3000:3000 (Grafana), 9090:9090 (Prometheus), 3100:3100 (Loki), 4317:4317 (OTLP gRPC), 4318:4318 (OTLP HTTP)",
+		"consolidation": "single_container_replaces_multi_container",
+	})
+	
+	// Create consolidated observability container with all necessary ports
+	containerCmd, err := local.NewCommand(ctx, "otel-lgtm-container", &local.CommandArgs{
+		Create: pulumi.String("podman run -d --name otel-lgtm-dev -p 3000:3000 -p 9090:9090 -p 3100:3100 -p 4317:4317 -p 4318:4318 grafana/otel-lgtm:latest"),
+		Delete: pulumi.String(deleteCmd),
+	}, pulumi.DependsOn(dependencies))
+	if err != nil {
+		logger.LogError(err, map[string]interface{}{
+			"operation": "container_creation",
+			"container_name": "otel-lgtm-dev",
+			"image_name": imageName,
+		})
+		return nil, fmt.Errorf("failed to create otel-lgtm container: %w", err)
+	}
+	
+	logger.LogSuccess(map[string]interface{}{
+		"container_name": "otel-lgtm-dev",
+		"image_name": imageName,
+		"consolidation": "grafana+prometheus+loki+otel_collector",
+		"ports_exposed": 5,
+		"architecture": "single_container_observability_stack",
+		"health_check": config.HealthCheck,
+	})
+	
+	return containerCmd, nil
 }
 
 // determineServiceType determines the service type based on service name

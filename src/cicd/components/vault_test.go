@@ -1,6 +1,8 @@
 package components
 
 import (
+	"os/exec"
+	"strings"
 	"testing"
 
 	"github.com/pulumi/pulumi/sdk/v3/go/common/resource"
@@ -8,6 +10,76 @@ import (
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi/config"
 	"github.com/stretchr/testify/assert"
 )
+
+// TestVaultContainerDeployment_Development validates that vault-dev container is deployed and running
+func TestVaultContainerDeployment_Development(t *testing.T) {
+	t.Run("VaultContainerExists_Development", func(t *testing.T) {
+		validateVaultContainerExists(t, "vault-dev")
+	})
+
+	t.Run("VaultContainerRunning_Development", func(t *testing.T) {
+		validateVaultContainerRunning(t, "vault-dev", "hashicorp/vault:latest", []string{"8200"})
+	})
+
+	t.Run("VaultContainerHealthy_Development", func(t *testing.T) {
+		validateVaultContainerHealthy(t, "vault-dev")
+	})
+}
+
+// validateVaultContainerExists checks if vault container exists
+func validateVaultContainerExists(t *testing.T, name string) {
+	cmd := exec.Command("podman", "ps", "-a", "--filter", "name="+name, "--format", "{{.Names}}")
+	output, err := cmd.Output()
+	if err != nil {
+		t.Fatalf("Failed to check for vault container %s: %v", name, err)
+	}
+
+	containerNames := strings.TrimSpace(string(output))
+	assert.Contains(t, containerNames, name, "Vault container %s should exist", name)
+}
+
+// validateVaultContainerRunning checks if vault container is running with correct image and ports
+func validateVaultContainerRunning(t *testing.T, name, expectedImage string, expectedPorts []string) {
+	cmd := exec.Command("podman", "ps", "--filter", "name="+name, "--format", "{{.Names}}\t{{.Image}}\t{{.Ports}}")
+	output, err := cmd.Output()
+	if err != nil {
+		t.Fatalf("Failed to check vault container %s status: %v", name, err)
+	}
+
+	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
+	if len(lines) == 0 || lines[0] == "" {
+		t.Fatalf("Vault container %s is not running", name)
+	}
+
+	parts := strings.Split(lines[0], "\t")
+	if len(parts) < 3 {
+		t.Fatalf("Unexpected vault container %s output format", name)
+	}
+
+	containerName := parts[0]
+	containerImage := parts[1]
+	containerPorts := parts[2]
+
+	assert.Equal(t, name, containerName, "Container name should match")
+	assert.Equal(t, expectedImage, containerImage, "Container should use correct vault image")
+	
+	for _, port := range expectedPorts {
+		assert.Contains(t, containerPorts, port, "Container should expose port %s", port)
+	}
+}
+
+// validateVaultContainerHealthy checks if vault container is healthy
+func validateVaultContainerHealthy(t *testing.T, name string) {
+	cmd := exec.Command("podman", "ps", "--filter", "name="+name, "--format", "{{.Status}}")
+	output, err := cmd.Output()
+	if err != nil {
+		t.Fatalf("Failed to check vault container %s health: %v", name, err)
+	}
+
+	status := strings.TrimSpace(string(output))
+	assert.NotEmpty(t, status, "Vault container %s should have status", name)
+	assert.Contains(t, strings.ToLower(status), "up", "Vault container %s should be running (Up status)", name)
+}
 
 // TestVaultComponent_DevelopmentEnvironment tests vault component for development environment
 func TestVaultComponent_DevelopmentEnvironment(t *testing.T) {
