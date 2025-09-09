@@ -1,0 +1,491 @@
+MediaInquiryRequest:
+  type: object
+  properties:
+    full_name:
+      type: string
+      maxLength: 255
+      description: Inquirer's full name
+    email:
+      type: string
+      format: email
+      maxLength: 255
+      description: Inquirer's email address
+    phone:
+      type: string
+      nullable: true
+      maxLength: 50
+      description: Inquirer's phone number
+    organization:
+      type: string
+      maxLength: 255
+      description: Media organization or outlet
+    title:
+      type: string
+      nullable: true
+      maxLength: 255
+      description: Job title or position
+    inquiry_type:
+      type: string
+      enum: [interview_request, press_release, fact_checking, background_information, image_request, other]
+      description: Type of media inquiry
+    subject:
+      type: string
+      maxLength: 500
+      description: Inquiry subject or topic
+    message:
+      type: string
+      maxLength: 5000
+      description: Detailed inquiry message
+    deadline:
+      type: string
+      format: date-time
+      nullable: true
+      description: Response deadline if applicable
+    preferred_contact_method:
+      type: string
+      enum: [email, phone, both]
+      description: Preferred contact method
+    best_contact_times:
+      type: string
+      nullable: true
+      maxLength: 255
+      description: Best times to contact
+  required:
+    - full_name
+    - email
+    - organization
+    - inquiry_type
+    - subject
+    - message
+    - preferred_contact_method
+
+BusinessInquiryRequest:
+  type: object
+  properties:
+    full_name:
+      type: string
+      maxLength: 255
+      description: Inquirer's full name
+    email:
+      type: string
+      format: email
+      maxLength: 255
+      description: Inquirer's email address
+    phone:
+      type: string
+      nullable: true
+      maxLength: 50
+      description: Inquirer's phone number
+    company_name:
+      type: string
+      maxLength: 255
+      description: Company or organization name
+    title:
+      type: string
+      nullable: true
+      maxLength: 255
+      description: Job title or position
+    industry:
+      type: string
+      nullable: true
+      maxLength: 255
+      description: Industry or sector
+    company_size:
+      type: string
+      enum: [startup, small, medium, large, enterprise]
+      nullable: true
+      description: Company size category
+    inquiry_type:
+      type: string
+      enum: [partnership, collaboration, vendor_services, research_collaboration, consulting, sponsorship, other]
+      description: Type of business inquiry
+    subject:
+      type: string
+      maxLength: 500
+      description: Inquiry subject
+    message:
+      type: string
+      maxLength: 5000
+      description: Detailed inquiry message
+    budget_range:
+      type: string
+      enum: [under_10k, 10k_50k, 50k_100k, 100k_500k, over_500k, not_applicable]
+      nullable: true
+      description: Budget range if applicable
+    timeline:
+      type: string
+      enum: [immediate, within_month, within_quarter, within_year, flexible]
+      nullable: true
+      description: Project timeline
+    preferred_contact_method:
+      type: string
+      enum: [email, phone, both]
+      description: Preferred contact method
+    best_contact_times:
+      type: string
+      nullable: true
+      maxLength: 255
+      description: Best times to contact
+  required:
+    - full_name
+    - email
+    - company_name
+    - inquiry_type
+    - subject
+    - message
+    - preferred_contact_method
+
+DonationInquiryRequest:
+  type: object
+  properties:
+    donor_type:
+      type: string
+      enum: [individual, corporation, foundation, estate]
+      description: Type of donor
+    full_name:
+      type: string
+      maxLength: 255
+      description: Donor's full name
+    email:
+      type: string
+      format: email
+      maxLength: 255
+      description: Donor's email address
+    phone:
+      type: string
+      nullable: true
+      maxLength: 50
+      description: Donor's phone number
+    organization:
+      type: string
+      nullable: true
+      maxLength: 255
+      description: Organization name if applicable
+    title:
+      type: string
+      nullable: true
+      maxLength: 255
+      description: Title or position
+    mailing_address:
+      type: object
+      nullable: true
+      properties:
+        street_address:
+          type: string
+        city:
+          type: string
+        state:
+          type: string
+        postal_code:
+          type: string
+        country:
+          type: string
+          default: "United States"
+      required:
+        - street_address
+        - city
+        - state
+        - postal_code
+      description: Mailing address for tax receipts
+    donation_type:
+      type: string
+      enum: [one_time, recurring, planned_giving, memorial, tribute, corporate_matching]
+      description: Type of donation
+    donation_amount:
+      type: object
+      nullable: true
+      properties:
+        amount:
+          type: number
+          minimum: 1
+        currency:
+          type: string
+          default: "USD"
+        frequency:
+          type: string
+          enum: [monthly, quarterly, annually]
+          nullable: true
+      description: Donation amount details
+    donation_purpose:
+      type: string
+      enum: [general_fund, research, equipment, facility, scholarship, program_specific, other]
+      description: Intended use of donation
+    program_specification:
+      type: string
+      nullable: true
+      maxLength: 255
+      description: Specific program if program_specific selected
+    in_honor_of:
+      type: object
+      nullable: true
+      properties:
+        honoree_name:
+          type: string
+        relationship:
+          type: string
+          nullable: true
+        notify_family:
+          type: boolean
+        family_contact:
+          type: object
+          nullable: true
+          properties:
+            name:
+              type: string
+            address:
+              type: object
+              properties:
+                street_address:
+                  type: string
+                city:
+                  type: string
+                state:
+                  type: string
+                postal_code:
+                  type: string
+                country:
+                  type: string
+                  default: "United States"
+              required:
+                - street_address
+                - city
+                - state
+                - postal_code
+          required:
+            - name
+            - address
+      required:
+        - honoree_name
+      description: Memorial or tribute information
+    tax_receipt_required:
+      type: boolean
+      description: Whether tax receipt is needed
+    anonymous_donation:
+      type: boolean
+      description: Whether donation should be anonymous
+    communication_preferences:
+      type: object
+      properties:
+        newsletter:
+          type: boolean
+        updates:
+          type: boolean
+        events:
+          type: boolean
+        fundraising:
+          type: boolean
+      required:
+        - newsletter
+        - updates
+        - events
+        - fundraising
+      description: Communication preferences
+    additional_notes:
+      type: string
+      nullable: true
+      maxLength: 2000
+      description: Additional notes or questions
+    preferred_contact_method:
+      type: string
+      enum: [email, phone, mail, both]
+      description: Preferred contact method
+  required:
+    - donor_type
+    - full_name
+    - email
+    - donation_type
+    - donation_purpose
+    - tax_receipt_required
+    - anonymous_donation
+    - communication_preferences
+    - preferred_contact_method
+
+VolunteerInquiryRequest:
+  type: object
+  properties:
+    full_name:
+      type: string
+      maxLength: 255
+      description: Volunteer's full name
+    email:
+      type: string
+      format: email
+      maxLength: 255
+      description: Volunteer's email address
+    phone:
+      type: string
+      nullable: true
+      maxLength: 50
+      description: Volunteer's phone number
+    address:
+      type: object
+      nullable: true
+      properties:
+        street_address:
+          type: string
+        city:
+          type: string
+        state:
+          type: string
+        postal_code:
+          type: string
+        country:
+          type: string
+          default: "United States"
+      required:
+        - city
+        - state
+      description: Volunteer's address
+    date_of_birth:
+      type: string
+      format: date
+      nullable: true
+      description: Date of birth (for age verification)
+    emergency_contact:
+      type: object
+      properties:
+        name:
+          type: string
+        relationship:
+          type: string
+        phone:
+          type: string
+        email:
+          type: string
+          format: email
+          nullable: true
+      required:
+        - name
+        - relationship
+        - phone
+      description: Emergency contact information
+    volunteer_interests:
+      type: array
+      items:
+        type: string
+        enum: [patient_care, administrative, research, fundraising, events, education, maintenance, transportation, social_services, other]
+      minItems: 1
+      description: Areas of volunteer interest
+    availability:
+      type: object
+      properties:
+        days_of_week:
+          type: array
+          items:
+            type: string
+            enum: [monday, tuesday, wednesday, thursday, friday, saturday, sunday]
+          minItems: 1
+        time_slots:
+          type: array
+          items:
+            type: string
+            enum: [early_morning, morning, afternoon, evening, night]
+          minItems: 1
+        hours_per_week:
+          type: string
+          enum: [1_5, 6_10, 11_20, 21_40, over_40]
+        duration_commitment:
+          type: string
+          enum: [short_term, long_term, ongoing, project_based]
+      required:
+        - days_of_week
+        - time_slots
+        - hours_per_week
+        - duration_commitment
+      description: Volunteer availability
+    experience:
+      type: object
+      properties:
+        relevant_experience:
+          type: string
+          nullable: true
+          maxLength: 2000
+        previous_volunteer_work:
+          type: string
+          nullable: true
+          maxLength: 2000
+        special_skills:
+          type: array
+          items:
+            type: string
+        languages:
+          type: array
+          items:
+            type: string
+        certifications:
+          type: array
+          items:
+            type: string
+      description: Volunteer experience and qualifications
+    background_check_consent:
+      type: boolean
+      description: Consent to background check
+    health_requirements:
+      type: object
+      properties:
+        physical_limitations:
+          type: string
+          nullable: true
+          maxLength: 1000
+        medical_conditions:
+          type: string
+          nullable: true
+          maxLength: 1000
+        immunizations_current:
+          type: boolean
+          nullable: true
+        tb_test_current:
+          type: boolean
+          nullable: true
+      description: Health-related information
+    references:
+      type: array
+      items:
+        type: object
+        properties:
+          name:
+            type: string
+          relationship:
+            type: string
+          phone:
+            type: string
+          email:
+            type: string
+            format: email
+            nullable: true
+          known_duration:
+            type: string
+            nullable: true
+        required:
+          - name
+          - relationship
+          - phone
+      maxItems: 3
+      description: Personal references
+    motivation:
+      type: string
+      maxLength: 2000
+      description: Motivation for volunteering
+    additional_notes:
+      type: string
+      nullable: true
+      maxLength: 2000
+      description: Additional notes or questions
+    preferred_contact_method:
+      type: string
+      enum: [email, phone, both]
+      description: Preferred contact method
+    best_contact_times:
+      type: string
+      nullable: true
+      maxLength: 255
+      description: Best times to contact
+  required:
+    - full_name
+    - email
+    - emergency_contact
+    - volunteer_interests
+    - availability
+    - background_check_consent
+    - motivation
+    - preferred_contact_method

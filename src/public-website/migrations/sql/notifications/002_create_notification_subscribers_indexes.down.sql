@@ -1,0 +1,8 @@
+-- Drop notification_subscribers indexes
+DROP INDEX IF EXISTS idx_notification_subscribers_status;
+DROP INDEX IF EXISTS idx_notification_subscribers_email;
+DROP INDEX IF EXISTS idx_notification_subscribers_event_types;
+DROP INDEX IF EXISTS idx_notification_subscribers_priority_threshold;
+DROP INDEX IF EXISTS idx_notification_subscribers_notification_methods;
+DROP INDEX IF EXISTS idx_notification_subscribers_schedule;
+DROP INDEX IF EXISTS idx_notification_subscribers_created_at;

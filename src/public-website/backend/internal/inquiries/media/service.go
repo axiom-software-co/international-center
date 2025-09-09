@@ -314,19 +314,6 @@ func (s *MediaService) AdminSetPriority(ctx context.Context, inquiryID string, p
 	return inquiry, nil
 }
 
-// AdminListInquiries lists media inquiries with filters (admin only)
-func (s *MediaService) AdminListInquiries(ctx context.Context, filters InquiryFilters, userID string) ([]*MediaInquiry, error) {
-	if !IsAdminUser(userID) {
-		return nil, domain.NewUnauthorizedError("admin privileges required to list media inquiries")
-	}
-
-	inquiries, err := s.repository.ListInquiries(ctx, filters)
-	if err != nil {
-		return nil, domain.NewInternalError("failed to list media inquiries", err)
-	}
-
-	return inquiries, nil
-}
 
 // AdminGetInquiry retrieves a specific media inquiry (admin only)
 func (s *MediaService) AdminGetInquiry(ctx context.Context, inquiryID string, userID string) (*MediaInquiry, error) {

@@ -1,0 +1,36 @@
+{
+  "name": "@international-center/typescript-clients",
+  "version": "1.0.0",
+  "description": "TypeScript client generation from OpenAPI specifications",
+  "type": "module",
+  "scripts": {
+    "generate": "npm run generate:public && npm run generate:admin && npm run install:clients",
+    "generate:public": "openapi-generator-cli generate -i ../../openapi/public-api.yaml -g typescript-fetch -o ./generated/public --additional-properties=typescriptThreePlus=true,supportsES6=true,npmName=@international-center/public-api-client,npmVersion=1.0.0",
+    "generate:admin": "openapi-generator-cli generate -i ../go-server/bundled-admin-api.yaml -g typescript-fetch -o ./generated/admin --additional-properties=typescriptThreePlus=true,supportsES6=true,npmName=@international-center/admin-api-client,npmVersion=1.0.0",
+    "install:clients": "./install-clients.sh",
+    "build": "npm run generate && npm run build:types",
+    "build:types": "tsc --build",
+    "clean": "rm -rf generated dist",
+    "lint": "eslint . --ext .ts,.js",
+    "lint:fix": "eslint . --ext .ts,.js --fix",
+    "validate": "npm run validate:public && npm run validate:admin",
+    "validate:public": "swagger-codegen-cli validate -i ../../openapi/public-api.yaml",
+    "validate:admin": "swagger-codegen-cli validate -i ../../openapi/admin-api.yaml"
+  },
+  "dependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  },
+  "devDependencies": {
+    "@openapitools/openapi-generator-cli": "^2.7.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "eslint": "^8.0.0",
+    "swagger-codegen-cli": "^2.2.3"
+  },
+  "files": [
+    "generated/",
+    "dist/",
+    "src/"
+  ]
+}

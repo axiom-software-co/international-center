@@ -1,0 +1,419 @@
+Event:
+  type: object
+  properties:
+    event_id:
+      type: string
+      format: uuid
+      description: Unique event identifier
+    title:
+      type: string
+      maxLength: 255
+      description: Event title
+    description:
+      type: string
+      description: Event description
+    slug:
+      type: string
+      maxLength: 255
+      description: URL-friendly event identifier
+    category_id:
+      type: string
+      format: uuid
+      description: Event category ID
+    category:
+      $ref: '#/EventCategory'
+      description: Event category details
+    image_url:
+      type: string
+      format: uri
+      nullable: true
+      maxLength: 500
+      description: Event image URL
+    event_type:
+      type: string
+      enum: [conference, workshop, seminar, webinar, training, networking, fundraising, community]
+      description: Type of event
+    start_datetime:
+      type: string
+      format: date-time
+      description: Event start date and time
+    end_datetime:
+      type: string
+      format: date-time
+      nullable: true
+      description: Event end date and time
+    timezone:
+      type: string
+      default: "UTC"
+      description: Event timezone
+    location:
+      type: object
+      nullable: true
+      properties:
+        venue_name:
+          type: string
+        address:
+          type: object
+          properties:
+            street_address:
+              type: string
+            city:
+              type: string
+            state:
+              type: string
+            postal_code:
+              type: string
+            country:
+              type: string
+          required:
+            - city
+        room:
+          type: string
+          nullable: true
+        special_instructions:
+          type: string
+          nullable: true
+      required:
+        - venue_name
+        - address
+      description: Event location details
+    virtual_meeting_info:
+      type: object
+      nullable: true
+      properties:
+        platform:
+          type: string
+        meeting_url:
+          type: string
+          format: uri
+        meeting_id:
+          type: string
+        passcode:
+          type: string
+          nullable: true
+        dial_in_numbers:
+          type: array
+          items:
+            type: string
+      description: Virtual meeting information
+    registration_required:
+      type: boolean
+      description: Whether registration is required
+    registration_deadline:
+      type: string
+      format: date-time
+      nullable: true
+      description: Registration deadline
+    max_capacity:
+      type: integer
+      minimum: 1
+      nullable: true
+      description: Maximum event capacity
+    current_registrations:
+      type: integer
+      minimum: 0
+      description: Current number of registrations
+    registration_status:
+      type: string
+      enum: [open, closed, full, cancelled]
+      description: Registration status
+    cost:
+      type: object
+      nullable: true
+      properties:
+        amount:
+          type: number
+          minimum: 0
+        currency:
+          type: string
+          default: "USD"
+        description:
+          type: string
+          nullable: true
+      description: Event cost information
+    organizer:
+      type: object
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+          nullable: true
+        department:
+          type: string
+          nullable: true
+      required:
+        - name
+        - email
+      description: Event organizer information
+    speakers:
+      type: array
+      items:
+        type: object
+        properties:
+          name:
+            type: string
+          title:
+            type: string
+            nullable: true
+          bio:
+            type: string
+            nullable: true
+          image_url:
+            type: string
+            format: uri
+            nullable: true
+        required:
+          - name
+      description: Event speakers
+    agenda:
+      type: array
+      items:
+        type: object
+        properties:
+          start_time:
+            type: string
+          end_time:
+            type: string
+            nullable: true
+          title:
+            type: string
+          description:
+            type: string
+            nullable: true
+          speaker:
+            type: string
+            nullable: true
+        required:
+          - start_time
+          - title
+      description: Event agenda
+    prerequisites:
+      type: array
+      items:
+        type: string
+      description: Event prerequisites
+    materials:
+      type: array
+      items:
+        type: object
+        properties:
+          title:
+            type: string
+          url:
+            type: string
+            format: uri
+          description:
+            type: string
+            nullable: true
+        required:
+          - title
+          - url
+      description: Event materials
+    tags:
+      type: array
+      items:
+        type: string
+      description: Event tags
+    publishing_status:
+      type: string
+      enum: [draft, published, archived, cancelled]
+      description: Event publishing status
+    created_on:
+      type: string
+      format: date-time
+      description: Event creation timestamp
+    modified_on:
+      type: string
+      format: date-time
+      nullable: true
+      description: Last modification timestamp
+    created_by:
+      type: string
+      nullable: true
+      maxLength: 255
+      description: Event creator
+    modified_by:
+      type: string
+      nullable: true
+      maxLength: 255
+      description: Last modifier
+  required:
+    - event_id
+    - title
+    - description
+    - slug
+    - category_id
+    - event_type
+    - start_datetime
+    - timezone
+    - registration_required
+    - current_registrations
+    - registration_status
+    - organizer
+    - publishing_status
+    - created_on
+
+EventCategory:
+  type: object
+  properties:
+    category_id:
+      type: string
+      format: uuid
+      description: Unique category identifier
+    name:
+      type: string
+      maxLength: 255
+      description: Category name
+    slug:
+      type: string
+      maxLength: 255
+      description: URL-friendly category identifier
+    description:
+      type: string
+      nullable: true
+      description: Category description
+    color:
+      type: string
+      nullable: true
+      pattern: "^#[0-9A-Fa-f]{6}$"
+      description: Category display color (hex)
+    icon:
+      type: string
+      nullable: true
+      description: Category icon identifier
+    is_default_unassigned:
+      type: boolean
+      description: Whether this is the default category for unassigned events
+    created_on:
+      type: string
+      format: date-time
+      description: Category creation timestamp
+    modified_on:
+      type: string
+      format: date-time
+      nullable: true
+      description: Last modification timestamp
+    created_by:
+      type: string
+      nullable: true
+      maxLength: 255
+      description: Category creator
+    modified_by:
+      type: string
+      nullable: true
+      maxLength: 255
+      description: Last modifier
+  required:
+    - category_id
+    - name
+    - slug
+    - is_default_unassigned
+    - created_on
+
+EventRegistration:
+  type: object
+  properties:
+    registration_id:
+      type: string
+      format: uuid
+      description: Unique registration identifier
+    event_id:
+      type: string
+      format: uuid
+      description: Event identifier
+    registrant_name:
+      type: string
+      maxLength: 255
+      description: Registrant full name
+    registrant_email:
+      type: string
+      format: email
+      maxLength: 255
+      description: Registrant email address
+    registrant_phone:
+      type: string
+      nullable: true
+      maxLength: 50
+      description: Registrant phone number
+    organization:
+      type: string
+      nullable: true
+      maxLength: 255
+      description: Registrant organization
+    title:
+      type: string
+      nullable: true
+      maxLength: 255
+      description: Registrant job title
+    dietary_restrictions:
+      type: string
+      nullable: true
+      description: Dietary restrictions or special needs
+    additional_notes:
+      type: string
+      nullable: true
+      description: Additional notes or questions
+    registration_status:
+      type: string
+      enum: [registered, cancelled, attended, no_show]
+      description: Registration status
+    registered_on:
+      type: string
+      format: date-time
+      description: Registration timestamp
+    confirmation_sent:
+      type: boolean
+      description: Whether confirmation was sent
+  required:
+    - registration_id
+    - event_id
+    - registrant_name
+    - registrant_email
+    - registration_status
+    - registered_on
+    - confirmation_sent
+
+EventRegistrationRequest:
+  type: object
+  properties:
+    registrant_name:
+      type: string
+      maxLength: 255
+      description: Registrant full name
+    registrant_email:
+      type: string
+      format: email
+      maxLength: 255
+      description: Registrant email address
+    registrant_phone:
+      type: string
+      nullable: true
+      maxLength: 50
+      description: Registrant phone number
+    organization:
+      type: string
+      nullable: true
+      maxLength: 255
+      description: Registrant organization
+    title:
+      type: string
+      nullable: true
+      maxLength: 255
+      description: Registrant job title
+    dietary_restrictions:
+      type: string
+      nullable: true
+      maxLength: 1000
+      description: Dietary restrictions or special needs
+    additional_notes:
+      type: string
+      nullable: true
+      maxLength: 1000
+      description: Additional notes or questions
+  required:
+    - registrant_name
+    - registrant_email

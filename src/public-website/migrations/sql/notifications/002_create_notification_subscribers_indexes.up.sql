@@ -1,0 +1,8 @@
+-- Create performance indexes for notification_subscribers matching TABLES-INTERNAL-NOTIFICATIONS-SUBSCRIBERS.md specification
+CREATE INDEX idx_notification_subscribers_status ON notification_subscribers(status) WHERE NOT is_deleted;
+CREATE INDEX idx_notification_subscribers_email ON notification_subscribers(email) WHERE NOT is_deleted;
+CREATE INDEX idx_notification_subscribers_event_types ON notification_subscribers USING GIN(event_types) WHERE NOT is_deleted;
+CREATE INDEX idx_notification_subscribers_priority_threshold ON notification_subscribers(priority_threshold) WHERE NOT is_deleted;
+CREATE INDEX idx_notification_subscribers_notification_methods ON notification_subscribers USING GIN(notification_methods) WHERE NOT is_deleted;
+CREATE INDEX idx_notification_subscribers_schedule ON notification_subscribers(notification_schedule) WHERE NOT is_deleted;
+CREATE INDEX idx_notification_subscribers_created_at ON notification_subscribers(created_at) WHERE NOT is_deleted;

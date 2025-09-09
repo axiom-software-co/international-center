@@ -213,17 +213,9 @@ func (h *MediaHandler) ListInquiries(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Call service method
-	inquiries, err := h.service.AdminListInquiries(ctx, filters, userID)
-	if err != nil {
-		h.handleError(w, r, err)
-		return
-	}
-
-	// Return inquiries
-	h.writeJSONResponse(w, http.StatusOK, map[string]interface{}{
-		"inquiries":      inquiries,
-		"count":          len(inquiries),
+	// Legacy handler - functionality moved to contract-compliant handlers
+	h.writeJSONResponse(w, http.StatusNotImplemented, map[string]interface{}{
+		"message": "This endpoint has been migrated to contract-compliant handlers",
 		"correlation_id": correlationCtx.CorrelationID,
 	})
 }

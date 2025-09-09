@@ -1,0 +1,35 @@
+ErrorResponse:
+  description: Error response
+  content:
+    application/json:
+      schema:
+        type: object
+        properties:
+          error:
+            type: object
+            properties:
+              code:
+                type: string
+                description: Error code identifier
+              message:
+                type: string
+                description: Human-readable error message
+              details:
+                type: object
+                description: Additional error details
+                nullable: true
+              correlation_id:
+                type: string
+                format: uuid
+                description: Request correlation ID for tracking
+              timestamp:
+                type: string
+                format: date-time
+                description: Error timestamp
+            required:
+              - code
+              - message
+              - correlation_id
+              - timestamp
+        required:
+          - error

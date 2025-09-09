@@ -1,0 +1,21 @@
+name: international-center-infrastructure
+runtime: go
+description: Infrastructure deployment for International Center - manages infrastructure, platform, services and websites
+main: ./cmd/deploy
+
+config:
+  international-center-infrastructure:environment:
+    description: "Target deployment environment (development, staging, production)"
+    default: development
+  international-center-infrastructure:database:
+    description: "Database connection configuration"
+    default: "postgresql://postgres:5432/international_center_dev"
+  international-center-infrastructure:deployment_strategy:
+    description: "Deployment strategy (aggressive, conservative, blue_green)"
+    default: aggressive
+  international-center-infrastructure:timeout_minutes:
+    description: "Deployment timeout in minutes"
+    default: 30
+  international-center-infrastructure:require_approval:
+    description: "Whether deployment requires approval"
+    default: false

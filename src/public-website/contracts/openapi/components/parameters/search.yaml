@@ -1,0 +1,29 @@
+SearchParam:
+  name: search
+  in: query
+  description: Search query string for full-text search
+  required: false
+  schema:
+    type: string
+    minLength: 1
+    maxLength: 255
+  example: "cancer research"
+
+SortParam:
+  name: sort
+  in: query
+  description: Sort field and direction (format: field:direction)
+  required: false
+  schema:
+    type: string
+    pattern: '^[a-zA-Z_][a-zA-Z0-9_]*:(asc|desc)$'
+  examples:
+    created_on_desc:
+      value: "created_on:desc"
+      description: "Sort by creation date, newest first"
+    title_asc:
+      value: "title:asc"
+      description: "Sort by title, A-Z"
+    publication_date_desc:
+      value: "publication_date:desc"
+      description: "Sort by publication date, newest first"

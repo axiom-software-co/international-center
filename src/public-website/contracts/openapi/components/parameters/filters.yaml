@@ -1,0 +1,79 @@
+CategoryIdParam:
+  name: category_id
+  in: query
+  description: Filter by category ID
+  required: false
+  schema:
+    type: string
+    format: uuid
+  example: "123e4567-e89b-12d3-a456-426614174000"
+
+StatusParam:
+  name: status
+  in: query
+  description: Filter by publishing status
+  required: false
+  schema:
+    type: string
+    enum: [draft, published, archived]
+  example: "published"
+
+TypeParam:
+  name: type
+  in: query
+  description: Filter by item type
+  required: false
+  schema:
+    type: string
+  examples:
+    news_type:
+      value: "announcement"
+      description: "Filter news by type"
+    research_type:
+      value: "clinical_study"
+      description: "Filter research by type"
+    service_type:
+      value: "consultation"
+      description: "Filter services by type"
+
+DateRangeStartParam:
+  name: date_from
+  in: query
+  description: Filter items from this date (inclusive)
+  required: false
+  schema:
+    type: string
+    format: date
+  example: "2024-01-01"
+
+DateRangeEndParam:
+  name: date_to
+  in: query
+  description: Filter items to this date (inclusive)
+  required: false
+  schema:
+    type: string
+    format: date
+  example: "2024-12-31"
+
+TagsParam:
+  name: tags
+  in: query
+  description: Filter by tags (comma-separated)
+  required: false
+  style: form
+  explode: false
+  schema:
+    type: array
+    items:
+      type: string
+  example: ["research", "clinical-trial", "oncology"]
+
+FeaturedParam:
+  name: featured
+  in: query
+  description: Filter by featured status
+  required: false
+  schema:
+    type: boolean
+  example: true

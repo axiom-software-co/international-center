@@ -1,0 +1,161 @@
+Service:
+  type: object
+  properties:
+    service_id:
+      type: string
+      format: uuid
+      description: Unique service identifier
+    title:
+      type: string
+      maxLength: 255
+      description: Service title
+    description:
+      type: string
+      description: Service description
+    slug:
+      type: string
+      maxLength: 255
+      description: URL-friendly service identifier
+    category_id:
+      type: string
+      format: uuid
+      description: Service category ID
+    category:
+      $ref: '#/ServiceCategory'
+      description: Service category details
+    image_url:
+      type: string
+      format: uri
+      nullable: true
+      maxLength: 500
+      description: Service image URL
+    service_type:
+      type: string
+      enum: [consultation, treatment, procedure, diagnostic, therapy, rehabilitation, prevention]
+      description: Type of service offered
+    duration_minutes:
+      type: integer
+      minimum: 0
+      nullable: true
+      description: Typical service duration in minutes
+    price_range:
+      type: string
+      nullable: true
+      description: Price range information
+    availability_status:
+      type: string
+      enum: [available, limited, unavailable, appointment_only]
+      description: Current availability status
+    prerequisites:
+      type: array
+      items:
+        type: string
+      description: Service prerequisites or requirements
+    target_conditions:
+      type: array
+      items:
+        type: string
+      description: Medical conditions this service addresses
+    insurance_accepted:
+      type: boolean
+      description: Whether insurance is accepted
+    telehealth_available:
+      type: boolean
+      description: Whether telehealth option is available
+    location_details:
+      type: object
+      nullable: true
+      properties:
+        building:
+          type: string
+        floor:
+          type: string
+        room:
+          type: string
+        special_instructions:
+          type: string
+      description: Location details for service delivery
+    contact_info:
+      type: object
+      nullable: true
+      properties:
+        phone:
+          type: string
+        email:
+          type: string
+          format: email
+        extension:
+          type: string
+      description: Service-specific contact information
+    publishing_status:
+      type: string
+      enum: [draft, published, archived]
+      description: Service publishing status
+    created_on:
+      type: string
+      format: date-time
+      description: Service creation timestamp
+    modified_on:
+      type: string
+      format: date-time
+      nullable: true
+      description: Last modification timestamp
+  required:
+    - service_id
+    - title
+    - description
+    - slug
+    - category_id
+    - service_type
+    - availability_status
+    - insurance_accepted
+    - telehealth_available
+    - publishing_status
+    - created_on
+
+ServiceCategory:
+  type: object
+  properties:
+    category_id:
+      type: string
+      format: uuid
+      description: Unique category identifier
+    name:
+      type: string
+      maxLength: 255
+      description: Category name
+    slug:
+      type: string
+      maxLength: 255
+      description: URL-friendly category identifier
+    description:
+      type: string
+      nullable: true
+      description: Category description
+    icon:
+      type: string
+      nullable: true
+      description: Category icon identifier
+    sort_order:
+      type: integer
+      minimum: 0
+      description: Display sort order
+    is_default_unassigned:
+      type: boolean
+      description: Whether this is the default category for unassigned services
+    created_on:
+      type: string
+      format: date-time
+      description: Category creation timestamp
+    modified_on:
+      type: string
+      format: date-time
+      nullable: true
+      description: Last modification timestamp
+  required:
+    - category_id
+    - name
+    - slug
+    - sort_order
+    - is_default_unassigned
+    - created_on

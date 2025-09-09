@@ -1,0 +1,13 @@
+package: models
+generate:
+  models: true
+  embedded-spec: false
+output: generated/public/models/types.go
+output-options:
+  skip-fmt: false
+  skip-prune: false
+compatibility:
+  always-prefix-enum-values: true
+import-mapping:
+  time: time.Time
+  uuid: github.com/google/uuid.UUID

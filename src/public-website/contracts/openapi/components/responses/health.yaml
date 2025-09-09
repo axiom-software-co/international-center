@@ -1,0 +1,56 @@
+HealthResponse:
+  description: Health check response
+  content:
+    application/json:
+      schema:
+        type: object
+        properties:
+          status:
+            type: string
+            enum: [healthy, unhealthy]
+          timestamp:
+            type: string
+            format: date-time
+          version:
+            type: string
+          checks:
+            type: object
+            properties:
+              database:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [up, down]
+                  response_time_ms:
+                    type: number
+                  error:
+                    type: string
+                    nullable: true
+              dapr:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [up, down]
+                  response_time_ms:
+                    type: number
+                  error:
+                    type: string
+                    nullable: true
+              vault:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [up, down]
+                  response_time_ms:
+                    type: number
+                  error:
+                    type: string
+                    nullable: true
+        required:
+          - status
+          - timestamp
+          - version
+          - checks

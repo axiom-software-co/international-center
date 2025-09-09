@@ -1,0 +1,10 @@
+---
+import Layout from '../layouts/Layout.astro';
+import DashboardPlaceholder from '../components/DashboardPlaceholder.vue';
+---
+
+<Layout title="Admin Portal - Dashboard">
+  <main class="container mx-auto p-6">
+    <DashboardPlaceholder client:load />
+  </main>
+</Layout>

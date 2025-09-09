@@ -1,0 +1,2442 @@
+openapi: 3.0.3
+info:
+  title: International Center Admin API
+  description: Administrative API for International Center content management system
+  version: 1.0.0
+  contact:
+    name: International Center API Team
+servers:
+  - url: https://admin-api.axiomcloud.dev/api/v1
+    description: Production admin server
+  - url: http://localhost:4001/api/v1
+    description: Development admin server
+
+security:
+  - bearerAuth: []
+  - apiKeyAuth: []
+
+paths:
+  # Health endpoints
+  /health:
+    get:
+      summary: Admin API health check
+      operationId: getAdminHealth
+      security: []
+      tags:
+        - Health
+      responses:
+        '200':
+          $ref: '#/components/responses/HealthResponse'
+        '503':
+          $ref: '#/components/responses/ErrorResponse'
+
+  # Authentication endpoints
+  /auth/login:
+    post:
+      summary: Admin user login
+      operationId: adminLogin
+      security: []
+      tags:
+        - Authentication
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  format: password
+                remember_me:
+                  type: boolean
+                  default: false
+              required:
+                - email
+                - password
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  access_token:
+                    type: string
+                  refresh_token:
+                    type: string
+                  expires_in:
+                    type: integer
+                  token_type:
+                    type: string
+                    default: "Bearer"
+                  user:
+                    $ref: '#/components/schemas/AdminUser'
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /auth/refresh:
+    post:
+      summary: Refresh access token
+      operationId: refreshToken
+      security: []
+      tags:
+        - Authentication
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                refresh_token:
+                  type: string
+              required:
+                - refresh_token
+      responses:
+        '200':
+          description: Token refreshed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  access_token:
+                    type: string
+                  expires_in:
+                    type: integer
+                  token_type:
+                    type: string
+                    default: "Bearer"
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /auth/logout:
+    post:
+      summary: Admin user logout
+      operationId: adminLogout
+      tags:
+        - Authentication
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessResponse'
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
+
+  # User management endpoints
+  /users:
+    get:
+      summary: Get all admin users
+      operationId: getAdminUsers
+      tags:
+        - User Management
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - $ref: '#/components/parameters/SearchParam'
+        - name: role
+          in: query
+          schema:
+            type: string
+            enum: [admin, editor, moderator, viewer]
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [active, inactive, suspended]
+      responses:
+        '200':
+          description: List of admin users
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AdminUser'
+                  pagination:
+                    $ref: '#/components/schemas/PaginationInfo'
+        '403':
+          $ref: '#/components/responses/ErrorResponse'
+
+    post:
+      summary: Create new admin user
+      operationId: createAdminUser
+      tags:
+        - User Management
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAdminUserRequest'
+      responses:
+        '201':
+          $ref: '#/components/responses/CreatedResponse'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '403':
+          $ref: '#/components/responses/ErrorResponse'
+        '409':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /users/{id}:
+    get:
+      summary: Get admin user by ID
+      operationId: getAdminUserById
+      tags:
+        - User Management
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Admin user details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/AdminUser'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+        '403':
+          $ref: '#/components/responses/ErrorResponse'
+
+    put:
+      summary: Update admin user
+      operationId: updateAdminUser
+      tags:
+        - User Management
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateAdminUserRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/UpdatedResponse'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '403':
+          $ref: '#/components/responses/ErrorResponse'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+    delete:
+      summary: Delete admin user
+      operationId: deleteAdminUser
+      tags:
+        - User Management
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          $ref: '#/components/responses/DeletedResponse'
+        '403':
+          $ref: '#/components/responses/ErrorResponse'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+  # News management endpoints
+  /news:
+    get:
+      summary: Get all news articles (admin)
+      operationId: getNewsAdmin
+      tags:
+        - News Management
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - $ref: '#/components/parameters/SearchParam'
+        - $ref: '#/components/parameters/StatusParam'
+        - $ref: '#/components/parameters/CategoryIdParam'
+      responses:
+        '200':
+          description: List of news articles
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/NewsArticle'
+                  pagination:
+                    $ref: '#/components/schemas/PaginationInfo'
+
+    post:
+      summary: Create new news article
+      operationId: createNewsArticle
+      tags:
+        - News Management
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateNewsArticleRequest'
+      responses:
+        '201':
+          $ref: '#/components/responses/CreatedResponse'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '403':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /news/{id}:
+    get:
+      summary: Get news article by ID (admin)
+      operationId: getNewsArticleByIdAdmin
+      tags:
+        - News Management
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: News article details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/NewsArticle'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+    put:
+      summary: Update news article
+      operationId: updateNewsArticle
+      tags:
+        - News Management
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateNewsArticleRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/UpdatedResponse'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '403':
+          $ref: '#/components/responses/ErrorResponse'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+    delete:
+      summary: Delete news article
+      operationId: deleteNewsArticle
+      tags:
+        - News Management
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          $ref: '#/components/responses/DeletedResponse'
+        '403':
+          $ref: '#/components/responses/ErrorResponse'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /news/{id}/publish:
+    post:
+      summary: Publish news article
+      operationId: publishNewsArticle
+      tags:
+        - News Management
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessResponse'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '403':
+          $ref: '#/components/responses/ErrorResponse'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /news/{id}/unpublish:
+    post:
+      summary: Unpublish news article
+      operationId: unpublishNewsArticle
+      tags:
+        - News Management
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessResponse'
+        '403':
+          $ref: '#/components/responses/ErrorResponse'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+  # News categories management
+  /news/categories:
+    get:
+      summary: Get all news categories (admin)
+      operationId: getNewsCategoriesAdmin
+      tags:
+        - News Management
+      responses:
+        '200':
+          description: News categories
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/NewsCategory'
+
+    post:
+      summary: Create news category
+      operationId: createNewsCategory
+      tags:
+        - News Management
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateNewsCategoryRequest'
+      responses:
+        '201':
+          $ref: '#/components/responses/CreatedResponse'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '403':
+          $ref: '#/components/responses/ErrorResponse'
+
+  # Research management endpoints (similar pattern to news)
+  /research:
+    get:
+      summary: Get all research publications (admin)
+      operationId: getResearchAdmin
+      tags:
+        - Research Management
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - $ref: '#/components/parameters/SearchParam'
+        - $ref: '#/components/parameters/StatusParam'
+        - $ref: '#/components/parameters/CategoryIdParam'
+      responses:
+        '200':
+          description: List of research publications
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ResearchPublication'
+                  pagination:
+                    $ref: '#/components/schemas/PaginationInfo'
+
+    post:
+      summary: Create new research publication
+      operationId: createResearchPublication
+      tags:
+        - Research Management
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateResearchPublicationRequest'
+      responses:
+        '201':
+          $ref: '#/components/responses/CreatedResponse'
+
+  # Services management endpoints
+  /services:
+    get:
+      summary: Get all services (admin)
+      operationId: getServicesAdmin
+      tags:
+        - Services Management
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - $ref: '#/components/parameters/SearchParam'
+        - $ref: '#/components/parameters/StatusParam'
+        - $ref: '#/components/parameters/CategoryIdParam'
+      responses:
+        '200':
+          description: List of services
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Service'
+                  pagination:
+                    $ref: '#/components/schemas/PaginationInfo'
+
+    post:
+      summary: Create new service
+      operationId: createService
+      tags:
+        - Services Management
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateServiceRequest'
+      responses:
+        '201':
+          $ref: '#/components/responses/CreatedResponse'
+
+  # Events management endpoints
+  /events:
+    get:
+      summary: Get all events (admin)
+      operationId: getEventsAdmin
+      tags:
+        - Events Management
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - $ref: '#/components/parameters/SearchParam'
+        - $ref: '#/components/parameters/StatusParam'
+        - $ref: '#/components/parameters/CategoryIdParam'
+      responses:
+        '200':
+          description: List of events
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Event'
+                  pagination:
+                    $ref: '#/components/schemas/PaginationInfo'
+
+    post:
+      summary: Create new event
+      operationId: createEvent
+      tags:
+        - Events Management
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateEventRequest'
+      responses:
+        '201':
+          $ref: '#/components/responses/CreatedResponse'
+
+  # Inquiries management endpoints
+  /inquiries:
+    get:
+      summary: Get all inquiries
+      operationId: getInquiries
+      tags:
+        - Inquiries Management
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - $ref: '#/components/parameters/SearchParam'
+        - name: inquiry_type
+          in: query
+          schema:
+            type: string
+            enum: [media, business, donation, volunteer]
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, in_progress, completed, closed]
+      responses:
+        '200':
+          description: List of inquiries
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Inquiry'
+                  pagination:
+                    $ref: '#/components/schemas/PaginationInfo'
+
+  /inquiries/{id}:
+    get:
+      summary: Get inquiry by ID
+      operationId: getInquiryById
+      tags:
+        - Inquiries Management
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Inquiry details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Inquiry'
+
+    put:
+      summary: Update inquiry status
+      operationId: updateInquiryStatus
+      tags:
+        - Inquiries Management
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  enum: [pending, in_progress, completed, closed]
+                notes:
+                  type: string
+                  nullable: true
+                assigned_to:
+                  type: string
+                  format: uuid
+                  nullable: true
+              required:
+                - status
+      responses:
+        '200':
+          $ref: '#/components/responses/UpdatedResponse'
+
+  # Analytics endpoints
+  /analytics/dashboard:
+    get:
+      summary: Get admin dashboard analytics
+      operationId: getDashboardAnalytics
+      tags:
+        - Analytics
+      parameters:
+        - name: period
+          in: query
+          schema:
+            type: string
+            enum: [day, week, month, quarter, year]
+            default: month
+      responses:
+        '200':
+          description: Dashboard analytics data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/DashboardAnalytics'
+
+  # System endpoints
+  /system/settings:
+    get:
+      summary: Get system settings
+      operationId: getSystemSettings
+      tags:
+        - System Management
+      responses:
+        '200':
+          description: System settings
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/SystemSettings'
+
+    put:
+      summary: Update system settings
+      operationId: updateSystemSettings
+      tags:
+        - System Management
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateSystemSettingsRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/UpdatedResponse'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    
+    apiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+
+  parameters:
+    PageParam:
+      description: Page number for pagination (1-based)
+      example: 1
+      in: query
+      name: page
+      required: false
+      schema:
+          default: 1
+          minimum: 1
+          type: integer
+    
+    LimitParam:
+      description: Number of items per page
+      example: 20
+      in: query
+      name: limit
+      required: false
+      schema:
+          default: 20
+          maximum: 100
+          minimum: 1
+          type: integer
+    
+    SearchParam:
+      name: search
+      in: query
+      description: Search query string for full-text search
+      required: false
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 255
+      example: "cancer research"
+    
+    StatusParam:
+      description: Filter by publishing status
+      example: published
+      in: query
+      name: status
+      required: false
+      schema:
+          enum:
+              - draft
+              - published
+              - archived
+          type: string
+    
+    CategoryIdParam:
+      description: Filter by category ID
+      example: 123e4567-e89b-12d3-a456-426614174000
+      in: query
+      name: category_id
+      required: false
+      schema:
+          format: uuid
+          type: string
+
+  schemas:
+    # Common schemas
+    PaginationInfo:
+      properties:
+          current_page:
+              type: integer
+          has_next:
+              type: boolean
+          has_previous:
+              type: boolean
+          items_per_page:
+              type: integer
+          total_items:
+              type: integer
+          total_pages:
+              type: integer
+      required:
+          - current_page
+          - total_pages
+          - total_items
+          - items_per_page
+          - has_next
+          - has_previous
+      type: object
+
+    # Reference existing domain schemas
+    Service:
+      properties:
+          availability_status:
+              description: Current availability status
+              enum:
+                  - available
+                  - limited
+                  - unavailable
+                  - appointment_only
+              type: string
+          category:
+              $ref: '#/components/schemas/ServiceCategory'
+              description: Service category details
+          category_id:
+              description: Service category ID
+              format: uuid
+              type: string
+          contact_info:
+              description: Service-specific contact information
+              nullable: true
+              properties:
+                  email:
+                      format: email
+                      type: string
+                  extension:
+                      type: string
+                  phone:
+                      type: string
+              type: object
+          created_on:
+              description: Service creation timestamp
+              format: date-time
+              type: string
+          description:
+              description: Service description
+              type: string
+          duration_minutes:
+              description: Typical service duration in minutes
+              minimum: 0
+              nullable: true
+              type: integer
+          image_url:
+              description: Service image URL
+              format: uri
+              maxLength: 500
+              nullable: true
+              type: string
+          insurance_accepted:
+              description: Whether insurance is accepted
+              type: boolean
+          location_details:
+              description: Location details for service delivery
+              nullable: true
+              properties:
+                  building:
+                      type: string
+                  floor:
+                      type: string
+                  room:
+                      type: string
+                  special_instructions:
+                      type: string
+              type: object
+          modified_on:
+              description: Last modification timestamp
+              format: date-time
+              nullable: true
+              type: string
+          prerequisites:
+              description: Service prerequisites or requirements
+              items:
+                  type: string
+              type: array
+          price_range:
+              description: Price range information
+              nullable: true
+              type: string
+          publishing_status:
+              description: Service publishing status
+              enum:
+                  - draft
+                  - published
+                  - archived
+              type: string
+          service_id:
+              description: Unique service identifier
+              format: uuid
+              type: string
+          service_type:
+              description: Type of service offered
+              enum:
+                  - consultation
+                  - treatment
+                  - procedure
+                  - diagnostic
+                  - therapy
+                  - rehabilitation
+                  - prevention
+              type: string
+          slug:
+              description: URL-friendly service identifier
+              maxLength: 255
+              type: string
+          target_conditions:
+              description: Medical conditions this service addresses
+              items:
+                  type: string
+              type: array
+          telehealth_available:
+              description: Whether telehealth option is available
+              type: boolean
+          title:
+              description: Service title
+              maxLength: 255
+              type: string
+      required:
+          - service_id
+          - title
+          - description
+          - slug
+          - category_id
+          - service_type
+          - availability_status
+          - insurance_accepted
+          - telehealth_available
+          - publishing_status
+          - created_on
+      type: object
+
+    NewsArticle:
+      properties:
+          author_name:
+              description: Article author name
+              maxLength: 255
+              nullable: true
+              type: string
+          category:
+              $ref: '#/components/schemas/NewsCategory'
+              description: News category details
+          category_id:
+              description: News category ID
+              format: uuid
+              type: string
+          content:
+              description: Full news article content
+              nullable: true
+              type: string
+          created_by:
+              description: Article creator
+              maxLength: 255
+              nullable: true
+              type: string
+          created_on:
+              description: Article creation timestamp
+              format: date-time
+              type: string
+          external_source:
+              description: External source if applicable
+              maxLength: 255
+              nullable: true
+              type: string
+          external_url:
+              description: External URL if applicable
+              format: uri
+              maxLength: 500
+              nullable: true
+              type: string
+          image_url:
+              description: Article image URL
+              format: uri
+              maxLength: 500
+              nullable: true
+              type: string
+          modified_by:
+              description: Last modifier
+              maxLength: 255
+              nullable: true
+              type: string
+          modified_on:
+              description: Last modification timestamp
+              format: date-time
+              nullable: true
+              type: string
+          news_id:
+              description: Unique news article identifier
+              format: uuid
+              type: string
+          news_type:
+              description: Type of news article
+              enum:
+                  - announcement
+                  - press_release
+                  - event
+                  - update
+                  - alert
+                  - feature
+              type: string
+          priority_level:
+              description: Article priority level
+              enum:
+                  - low
+                  - normal
+                  - high
+                  - urgent
+              type: string
+          publication_timestamp:
+              description: Article publication timestamp
+              format: date-time
+              type: string
+          publishing_status:
+              description: Article publishing status
+              enum:
+                  - draft
+                  - published
+                  - archived
+              type: string
+          slug:
+              description: URL-friendly article identifier
+              maxLength: 255
+              type: string
+          summary:
+              description: News article summary
+              type: string
+          tags:
+              description: Article tags
+              items:
+                  type: string
+              type: array
+          title:
+              description: News article title
+              maxLength: 255
+              type: string
+      required:
+          - news_id
+          - title
+          - summary
+          - slug
+          - category_id
+          - publication_timestamp
+          - publishing_status
+          - news_type
+          - priority_level
+          - created_on
+      type: object
+
+    ServiceCategory:
+      type: object
+      properties:
+        category_id:
+          type: string
+          format: uuid
+          description: Unique category identifier
+        name:
+          type: string
+          maxLength: 255
+          description: Category name
+        slug:
+          type: string
+          maxLength: 255
+          description: URL-friendly category identifier
+        description:
+          type: string
+          nullable: true
+          description: Category description
+        icon:
+          type: string
+          nullable: true
+          description: Category icon identifier
+        sort_order:
+          type: integer
+          minimum: 0
+          description: Display sort order
+        is_default_unassigned:
+          type: boolean
+          description: Whether this is the default category for unassigned services
+        created_on:
+          type: string
+          format: date-time
+          description: Category creation timestamp
+        modified_on:
+          type: string
+          format: date-time
+          nullable: true
+          description: Last modification timestamp
+      required:
+        - category_id
+        - name
+        - slug
+        - sort_order
+        - is_default_unassigned
+        - created_on
+
+    ResearchCategory:
+      type: object
+      properties:
+        category_id:
+          type: string
+          format: uuid
+          description: Unique category identifier
+        name:
+          type: string
+          maxLength: 255
+          description: Category name
+        slug:
+          type: string
+          maxLength: 255
+          description: URL-friendly category identifier
+        description:
+          type: string
+          nullable: true
+          description: Category description
+        research_focus_area:
+          type: string
+          nullable: true
+          description: Primary research focus area
+        is_default_unassigned:
+          type: boolean
+          description: Whether this is the default category for unassigned publications
+        created_on:
+          type: string
+          format: date-time
+          description: Category creation timestamp
+        modified_on:
+          type: string
+          format: date-time
+          nullable: true
+          description: Last modification timestamp
+        created_by:
+          type: string
+          nullable: true
+          maxLength: 255
+          description: Category creator
+        modified_by:
+          type: string
+          nullable: true
+          maxLength: 255
+          description: Last modifier
+      required:
+        - category_id
+        - name
+        - slug
+        - is_default_unassigned
+        - created_on
+
+    EventCategory:
+      type: object
+      properties:
+        category_id:
+          type: string
+          format: uuid
+          description: Unique category identifier
+        name:
+          type: string
+          maxLength: 255
+          description: Category name
+        slug:
+          type: string
+          maxLength: 255
+          description: URL-friendly category identifier
+        description:
+          type: string
+          nullable: true
+          description: Category description
+        color:
+          type: string
+          nullable: true
+          pattern: "^#[0-9A-Fa-f]{6}$"
+          description: Category display color (hex)
+        icon:
+          type: string
+          nullable: true
+          description: Category icon identifier
+        is_default_unassigned:
+          type: boolean
+          description: Whether this is the default category for unassigned events
+        created_on:
+          type: string
+          format: date-time
+          description: Category creation timestamp
+        modified_on:
+          type: string
+          format: date-time
+          nullable: true
+          description: Last modification timestamp
+        created_by:
+          type: string
+          nullable: true
+          maxLength: 255
+          description: Category creator
+        modified_by:
+          type: string
+          nullable: true
+          maxLength: 255
+          description: Last modifier
+      required:
+        - category_id
+        - name
+        - slug
+        - is_default_unassigned
+        - created_on
+
+    NewsCategory:
+      properties:
+          category_id:
+              description: Unique category identifier
+              format: uuid
+              type: string
+          created_by:
+              description: Category creator
+              maxLength: 255
+              nullable: true
+              type: string
+          created_on:
+              description: Category creation timestamp
+              format: date-time
+              type: string
+          description:
+              description: Category description
+              nullable: true
+              type: string
+          is_default_unassigned:
+              description: Whether this is the default category for unassigned articles
+              type: boolean
+          modified_by:
+              description: Last modifier
+              maxLength: 255
+              nullable: true
+              type: string
+          modified_on:
+              description: Last modification timestamp
+              format: date-time
+              nullable: true
+              type: string
+          name:
+              description: Category name
+              maxLength: 255
+              type: string
+          slug:
+              description: URL-friendly category identifier
+              maxLength: 255
+              type: string
+      required:
+          - category_id
+          - name
+          - slug
+          - is_default_unassigned
+          - created_on
+      type: object
+
+    ResearchPublication:
+      properties:
+          abstract:
+              description: Research abstract or summary
+              type: string
+          authors:
+              description: Research authors
+              items:
+                  properties:
+                      affiliation:
+                          nullable: true
+                          type: string
+                      email:
+                          format: email
+                          nullable: true
+                          type: string
+                      name:
+                          type: string
+                  required:
+                      - name
+                  type: object
+              type: array
+          category:
+              $ref: '#/components/schemas/ResearchCategory'
+              description: Research category details
+          category_id:
+              description: Research category ID
+              format: uuid
+              type: string
+          citation_count:
+              description: Number of citations
+              minimum: 0
+              type: integer
+          created_by:
+              description: Publication creator
+              maxLength: 255
+              nullable: true
+              type: string
+          created_on:
+              description: Publication creation timestamp
+              format: date-time
+              type: string
+          doi:
+              description: Digital Object Identifier
+              maxLength: 255
+              nullable: true
+              type: string
+          download_count:
+              description: Number of downloads
+              minimum: 0
+              type: integer
+          ethical_approval:
+              description: Ethical approval information
+              nullable: true
+              properties:
+                  approval_date:
+                      format: date
+                      type: string
+                  approval_number:
+                      type: string
+                  committee_name:
+                      type: string
+              type: object
+          external_url:
+              description: External publication URL
+              format: uri
+              maxLength: 500
+              nullable: true
+              type: string
+          full_content:
+              description: Full research content
+              nullable: true
+              type: string
+          funding_sources:
+              description: Research funding sources
+              items:
+                  type: string
+              type: array
+          isbn:
+              description: ISBN for books
+              maxLength: 20
+              nullable: true
+              type: string
+          journal_name:
+              description: Journal or publication venue
+              maxLength: 255
+              nullable: true
+              type: string
+          keywords:
+              description: Research keywords
+              items:
+                  type: string
+              type: array
+          modified_by:
+              description: Last modifier
+              maxLength: 255
+              nullable: true
+              type: string
+          modified_on:
+              description: Last modification timestamp
+              format: date-time
+              nullable: true
+              type: string
+          pdf_url:
+              description: PDF file URL
+              format: uri
+              maxLength: 500
+              nullable: true
+              type: string
+          publication_date:
+              description: Publication date
+              format: date
+              type: string
+          publishing_status:
+              description: Publication status
+              enum:
+                  - draft
+                  - published
+                  - archived
+              type: string
+          research_id:
+              description: Unique research publication identifier
+              format: uuid
+              type: string
+          research_type:
+              description: Type of research publication
+              enum:
+                  - clinical_study
+                  - observational_study
+                  - review
+                  - case_study
+                  - meta_analysis
+                  - guideline
+                  - white_paper
+              type: string
+          slug:
+              description: URL-friendly publication identifier
+              maxLength: 255
+              type: string
+          study_status:
+              description: Research study status
+              enum:
+                  - planned
+                  - ongoing
+                  - completed
+                  - published
+                  - archived
+              type: string
+          title:
+              description: Research publication title
+              maxLength: 255
+              type: string
+      required:
+          - research_id
+          - title
+          - abstract
+          - slug
+          - category_id
+          - authors
+          - publication_date
+          - research_type
+          - study_status
+          - citation_count
+          - download_count
+          - publishing_status
+          - created_on
+      type: object
+
+    Event:
+      properties:
+          agenda:
+              description: Event agenda
+              items:
+                  properties:
+                      description:
+                          nullable: true
+                          type: string
+                      end_time:
+                          nullable: true
+                          type: string
+                      speaker:
+                          nullable: true
+                          type: string
+                      start_time:
+                          type: string
+                      title:
+                          type: string
+                  required:
+                      - start_time
+                      - title
+                  type: object
+              type: array
+          category:
+              $ref: '#/components/schemas/EventCategory'
+              description: Event category details
+          category_id:
+              description: Event category ID
+              format: uuid
+              type: string
+          cost:
+              description: Event cost information
+              nullable: true
+              properties:
+                  amount:
+                      minimum: 0
+                      type: number
+                  currency:
+                      default: USD
+                      type: string
+                  description:
+                      nullable: true
+                      type: string
+              type: object
+          created_by:
+              description: Event creator
+              maxLength: 255
+              nullable: true
+              type: string
+          created_on:
+              description: Event creation timestamp
+              format: date-time
+              type: string
+          current_registrations:
+              description: Current number of registrations
+              minimum: 0
+              type: integer
+          description:
+              description: Event description
+              type: string
+          end_datetime:
+              description: Event end date and time
+              format: date-time
+              nullable: true
+              type: string
+          event_id:
+              description: Unique event identifier
+              format: uuid
+              type: string
+          event_type:
+              description: Type of event
+              enum:
+                  - conference
+                  - workshop
+                  - seminar
+                  - webinar
+                  - training
+                  - networking
+                  - fundraising
+                  - community
+              type: string
+          image_url:
+              description: Event image URL
+              format: uri
+              maxLength: 500
+              nullable: true
+              type: string
+          location:
+              description: Event location details
+              nullable: true
+              properties:
+                  address:
+                      properties:
+                          city:
+                              type: string
+                          country:
+                              type: string
+                          postal_code:
+                              type: string
+                          state:
+                              type: string
+                          street_address:
+                              type: string
+                      required:
+                          - city
+                      type: object
+                  room:
+                      nullable: true
+                      type: string
+                  special_instructions:
+                      nullable: true
+                      type: string
+                  venue_name:
+                      type: string
+              required:
+                  - venue_name
+                  - address
+              type: object
+          materials:
+              description: Event materials
+              items:
+                  properties:
+                      description:
+                          nullable: true
+                          type: string
+                      title:
+                          type: string
+                      url:
+                          format: uri
+                          type: string
+                  required:
+                      - title
+                      - url
+                  type: object
+              type: array
+          max_capacity:
+              description: Maximum event capacity
+              minimum: 1
+              nullable: true
+              type: integer
+          modified_by:
+              description: Last modifier
+              maxLength: 255
+              nullable: true
+              type: string
+          modified_on:
+              description: Last modification timestamp
+              format: date-time
+              nullable: true
+              type: string
+          organizer:
+              description: Event organizer information
+              properties:
+                  department:
+                      nullable: true
+                      type: string
+                  email:
+                      format: email
+                      type: string
+                  name:
+                      type: string
+                  phone:
+                      nullable: true
+                      type: string
+              required:
+                  - name
+                  - email
+              type: object
+          prerequisites:
+              description: Event prerequisites
+              items:
+                  type: string
+              type: array
+          publishing_status:
+              description: Event publishing status
+              enum:
+                  - draft
+                  - published
+                  - archived
+                  - cancelled
+              type: string
+          registration_deadline:
+              description: Registration deadline
+              format: date-time
+              nullable: true
+              type: string
+          registration_required:
+              description: Whether registration is required
+              type: boolean
+          registration_status:
+              description: Registration status
+              enum:
+                  - open
+                  - closed
+                  - full
+                  - cancelled
+              type: string
+          slug:
+              description: URL-friendly event identifier
+              maxLength: 255
+              type: string
+          speakers:
+              description: Event speakers
+              items:
+                  properties:
+                      bio:
+                          nullable: true
+                          type: string
+                      image_url:
+                          format: uri
+                          nullable: true
+                          type: string
+                      name:
+                          type: string
+                      title:
+                          nullable: true
+                          type: string
+                  required:
+                      - name
+                  type: object
+              type: array
+          start_datetime:
+              description: Event start date and time
+              format: date-time
+              type: string
+          tags:
+              description: Event tags
+              items:
+                  type: string
+              type: array
+          timezone:
+              default: UTC
+              description: Event timezone
+              type: string
+          title:
+              description: Event title
+              maxLength: 255
+              type: string
+          virtual_meeting_info:
+              description: Virtual meeting information
+              nullable: true
+              properties:
+                  dial_in_numbers:
+                      items:
+                          type: string
+                      type: array
+                  meeting_id:
+                      type: string
+                  meeting_url:
+                      format: uri
+                      type: string
+                  passcode:
+                      nullable: true
+                      type: string
+                  platform:
+                      type: string
+              type: object
+      required:
+          - event_id
+          - title
+          - description
+          - slug
+          - category_id
+          - event_type
+          - start_datetime
+          - timezone
+          - registration_required
+          - current_registrations
+          - registration_status
+          - organizer
+          - publishing_status
+          - created_on
+      type: object
+
+    # Admin-specific schemas
+    AdminUser:
+      type: object
+      properties:
+        user_id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        first_name:
+          type: string
+        last_name:
+          type: string
+        role:
+          type: string
+          enum: [admin, editor, moderator, viewer]
+        status:
+          type: string
+          enum: [active, inactive, suspended]
+        last_login:
+          type: string
+          format: date-time
+          nullable: true
+        created_on:
+          type: string
+          format: date-time
+        created_by:
+          type: string
+          format: uuid
+          nullable: true
+      required:
+        - user_id
+        - email
+        - first_name
+        - last_name
+        - role
+        - status
+        - created_on
+
+    CreateAdminUserRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        first_name:
+          type: string
+        last_name:
+          type: string
+        role:
+          type: string
+          enum: [admin, editor, moderator, viewer]
+        password:
+          type: string
+          format: password
+          minLength: 8
+      required:
+        - email
+        - first_name
+        - last_name
+        - role
+        - password
+
+    UpdateAdminUserRequest:
+      type: object
+      properties:
+        first_name:
+          type: string
+        last_name:
+          type: string
+        role:
+          type: string
+          enum: [admin, editor, moderator, viewer]
+        status:
+          type: string
+          enum: [active, inactive, suspended]
+
+    CreateNewsArticleRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          maxLength: 255
+        summary:
+          type: string
+        content:
+          type: string
+          nullable: true
+        category_id:
+          type: string
+          format: uuid
+        image_url:
+          type: string
+          format: uri
+          nullable: true
+        author_name:
+          type: string
+          nullable: true
+        news_type:
+          type: string
+          enum: [announcement, press_release, event, update, alert, feature]
+        priority_level:
+          type: string
+          enum: [low, normal, high, urgent]
+          default: normal
+        tags:
+          type: array
+          items:
+            type: string
+        publishing_status:
+          type: string
+          enum: [draft, published, archived]
+          default: draft
+      required:
+        - title
+        - summary
+        - category_id
+        - news_type
+
+    UpdateNewsArticleRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          maxLength: 255
+        summary:
+          type: string
+        content:
+          type: string
+          nullable: true
+        category_id:
+          type: string
+          format: uuid
+        image_url:
+          type: string
+          format: uri
+          nullable: true
+        author_name:
+          type: string
+          nullable: true
+        news_type:
+          type: string
+          enum: [announcement, press_release, event, update, alert, feature]
+        priority_level:
+          type: string
+          enum: [low, normal, high, urgent]
+        tags:
+          type: array
+          items:
+            type: string
+        publishing_status:
+          type: string
+          enum: [draft, published, archived]
+
+    CreateNewsCategoryRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 255
+        description:
+          type: string
+          nullable: true
+      required:
+        - name
+
+    CreateResearchPublicationRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          maxLength: 255
+        abstract:
+          type: string
+        category_id:
+          type: string
+          format: uuid
+        authors:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+              affiliation:
+                type: string
+                nullable: true
+              email:
+                type: string
+                format: email
+                nullable: true
+            required:
+              - name
+        research_type:
+          type: string
+          enum: [clinical_study, observational_study, review, case_study, meta_analysis, guideline, white_paper]
+        study_status:
+          type: string
+          enum: [planned, ongoing, completed, published, archived]
+        keywords:
+          type: array
+          items:
+            type: string
+      required:
+        - title
+        - abstract
+        - category_id
+        - authors
+        - research_type
+        - study_status
+
+    CreateServiceRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          maxLength: 255
+        description:
+          type: string
+        category_id:
+          type: string
+          format: uuid
+        service_type:
+          type: string
+          enum: [consultation, treatment, procedure, diagnostic, therapy, rehabilitation, prevention]
+        duration_minutes:
+          type: integer
+          minimum: 0
+          nullable: true
+        price_range:
+          type: string
+          nullable: true
+        availability_status:
+          type: string
+          enum: [available, limited, unavailable, appointment_only]
+        insurance_accepted:
+          type: boolean
+        telehealth_available:
+          type: boolean
+      required:
+        - title
+        - description
+        - category_id
+        - service_type
+        - availability_status
+        - insurance_accepted
+        - telehealth_available
+
+    CreateEventRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          maxLength: 255
+        description:
+          type: string
+        category_id:
+          type: string
+          format: uuid
+        event_type:
+          type: string
+          enum: [conference, workshop, seminar, webinar, training, networking, fundraising, community]
+        start_datetime:
+          type: string
+          format: date-time
+        end_datetime:
+          type: string
+          format: date-time
+          nullable: true
+        registration_required:
+          type: boolean
+        max_capacity:
+          type: integer
+          minimum: 1
+          nullable: true
+        organizer:
+          type: object
+          properties:
+            name:
+              type: string
+            email:
+              type: string
+              format: email
+            phone:
+              type: string
+              nullable: true
+          required:
+            - name
+            - email
+      required:
+        - title
+        - description
+        - category_id
+        - event_type
+        - start_datetime
+        - registration_required
+        - organizer
+
+    Inquiry:
+      type: object
+      properties:
+        inquiry_id:
+          type: string
+          format: uuid
+        inquiry_type:
+          type: string
+          enum: [media, business, donation, volunteer]
+        status:
+          type: string
+          enum: [pending, in_progress, completed, closed]
+        submitter_name:
+          type: string
+        submitter_email:
+          type: string
+          format: email
+        subject:
+          type: string
+        message:
+          type: string
+        submitted_on:
+          type: string
+          format: date-time
+        assigned_to:
+          type: string
+          format: uuid
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+        last_updated:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+        - inquiry_id
+        - inquiry_type
+        - status
+        - submitter_name
+        - submitter_email
+        - subject
+        - message
+        - submitted_on
+
+    DashboardAnalytics:
+      type: object
+      properties:
+        content_stats:
+          type: object
+          properties:
+            total_news:
+              type: integer
+            total_research:
+              type: integer
+            total_services:
+              type: integer
+            total_events:
+              type: integer
+            published_this_month:
+              type: integer
+        inquiry_stats:
+          type: object
+          properties:
+            total_inquiries:
+              type: integer
+            pending_inquiries:
+              type: integer
+            completed_this_month:
+              type: integer
+        user_stats:
+          type: object
+          properties:
+            total_admin_users:
+              type: integer
+            active_sessions:
+              type: integer
+        system_stats:
+          type: object
+          properties:
+            uptime:
+              type: string
+            last_backup:
+              type: string
+              format: date-time
+              nullable: true
+      required:
+        - content_stats
+        - inquiry_stats
+        - user_stats
+        - system_stats
+
+    SystemSettings:
+      type: object
+      properties:
+        site_settings:
+          type: object
+          properties:
+            site_name:
+              type: string
+            site_description:
+              type: string
+            contact_email:
+              type: string
+              format: email
+            maintenance_mode:
+              type: boolean
+        notification_settings:
+          type: object
+          properties:
+            email_notifications:
+              type: boolean
+            sms_notifications:
+              type: boolean
+            slack_notifications:
+              type: boolean
+        security_settings:
+          type: object
+          properties:
+            session_timeout_minutes:
+              type: integer
+            max_login_attempts:
+              type: integer
+            password_expiry_days:
+              type: integer
+      required:
+        - site_settings
+        - notification_settings
+        - security_settings
+
+    UpdateSystemSettingsRequest:
+      type: object
+      properties:
+        site_settings:
+          type: object
+          properties:
+            site_name:
+              type: string
+            site_description:
+              type: string
+            contact_email:
+              type: string
+              format: email
+            maintenance_mode:
+              type: boolean
+        notification_settings:
+          type: object
+          properties:
+            email_notifications:
+              type: boolean
+            sms_notifications:
+              type: boolean
+            slack_notifications:
+              type: boolean
+        security_settings:
+          type: object
+          properties:
+            session_timeout_minutes:
+              type: integer
+            max_login_attempts:
+              type: integer
+            password_expiry_days:
+              type: integer
+
+  responses:
+    HealthResponse:
+      content:
+          application/json:
+              schema:
+                  properties:
+                      checks:
+                          properties:
+                              dapr:
+                                  properties:
+                                      error:
+                                          nullable: true
+                                          type: string
+                                      response_time_ms:
+                                          type: number
+                                      status:
+                                          enum:
+                                              - up
+                                              - down
+                                          type: string
+                                  type: object
+                              database:
+                                  properties:
+                                      error:
+                                          nullable: true
+                                          type: string
+                                      response_time_ms:
+                                          type: number
+                                      status:
+                                          enum:
+                                              - up
+                                              - down
+                                          type: string
+                                  type: object
+                              vault:
+                                  properties:
+                                      error:
+                                          nullable: true
+                                          type: string
+                                      response_time_ms:
+                                          type: number
+                                      status:
+                                          enum:
+                                              - up
+                                              - down
+                                          type: string
+                                  type: object
+                          type: object
+                      status:
+                          enum:
+                              - healthy
+                              - unhealthy
+                          type: string
+                      timestamp:
+                          format: date-time
+                          type: string
+                      version:
+                          type: string
+                  required:
+                      - status
+                      - timestamp
+                      - version
+                      - checks
+                  type: object
+      description: Health check response
+
+    SuccessResponse:
+      content:
+          application/json:
+              schema:
+                  properties:
+                      correlation_id:
+                          description: Request correlation ID for tracking
+                          format: uuid
+                          type: string
+                      message:
+                          description: Success message
+                          type: string
+                      success:
+                          default: true
+                          type: boolean
+                      timestamp:
+                          description: Response timestamp
+                          format: date-time
+                          type: string
+                  required:
+                      - success
+                      - message
+                      - timestamp
+                      - correlation_id
+                  type: object
+      description: Generic success response
+
+    CreatedResponse:
+      content:
+          application/json:
+              schema:
+                  properties:
+                      correlation_id:
+                          description: Request correlation ID for tracking
+                          format: uuid
+                          type: string
+                      data:
+                          description: Created resource data
+                          type: object
+                      message:
+                          default: Resource created successfully
+                          type: string
+                      success:
+                          default: true
+                          type: boolean
+                      timestamp:
+                          description: Response timestamp
+                          format: date-time
+                          type: string
+                  required:
+                      - success
+                      - message
+                      - data
+                      - timestamp
+                      - correlation_id
+                  type: object
+      description: Resource created successfully
+
+    UpdatedResponse:
+      content:
+          application/json:
+              schema:
+                  properties:
+                      correlation_id:
+                          description: Request correlation ID for tracking
+                          format: uuid
+                          type: string
+                      data:
+                          description: Updated resource data
+                          type: object
+                      message:
+                          default: Resource updated successfully
+                          type: string
+                      success:
+                          default: true
+                          type: boolean
+                      timestamp:
+                          description: Response timestamp
+                          format: date-time
+                          type: string
+                  required:
+                      - success
+                      - message
+                      - data
+                      - timestamp
+                      - correlation_id
+                  type: object
+      description: Resource updated successfully
+
+    DeletedResponse:
+      content:
+          application/json:
+              schema:
+                  properties:
+                      correlation_id:
+                          description: Request correlation ID for tracking
+                          format: uuid
+                          type: string
+                      message:
+                          default: Resource deleted successfully
+                          type: string
+                      success:
+                          default: true
+                          type: boolean
+                      timestamp:
+                          description: Response timestamp
+                          format: date-time
+                          type: string
+                  required:
+                      - success
+                      - message
+                      - timestamp
+                      - correlation_id
+                  type: object
+      description: Resource deleted successfully
+
+    ErrorResponse:
+      content:
+          application/json:
+              schema:
+                  properties:
+                      error:
+                          properties:
+                              code:
+                                  description: Error code identifier
+                                  type: string
+                              correlation_id:
+                                  description: Request correlation ID for tracking
+                                  format: uuid
+                                  type: string
+                              details:
+                                  description: Additional error details
+                                  nullable: true
+                                  type: object
+                              message:
+                                  description: Human-readable error message
+                                  type: string
+                              timestamp:
+                                  description: Error timestamp
+                                  format: date-time
+                                  type: string
+                          required:
+                              - code
+                              - message
+                              - correlation_id
+                              - timestamp
+                          type: object
+                  required:
+                      - error
+                  type: object
+      description: Error response
+
+tags:
+  - name: Health
+    description: Health and readiness endpoints
+  - name: Authentication
+    description: Admin authentication and authorization
+  - name: User Management
+    description: Admin user management
+  - name: News Management
+    description: News article and category management
+  - name: Research Management
+    description: Research publication management
+  - name: Services Management
+    description: Service and category management
+  - name: Events Management
+    description: Event management and registrations
+  - name: Inquiries Management
+    description: Inquiry management and processing
+  - name: Analytics
+    description: Admin dashboard analytics
+  - name: System Management
+    description: System configuration and settings

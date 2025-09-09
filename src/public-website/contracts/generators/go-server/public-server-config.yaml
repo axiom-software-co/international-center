@@ -1,0 +1,13 @@
+package: handlers
+generate:
+  gorilla-server: true
+  embedded-spec: false
+output: generated/public/handlers/server.go
+output-options:
+  skip-fmt: false
+  skip-prune: false
+compatibility:
+  always-prefix-enum-values: true
+import-mapping:
+  time: time.Time
+  uuid: github.com/google/uuid.UUID

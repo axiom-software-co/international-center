@@ -1,0 +1,204 @@
+ResearchPublication:
+  type: object
+  properties:
+    research_id:
+      type: string
+      format: uuid
+      description: Unique research publication identifier
+    title:
+      type: string
+      maxLength: 255
+      description: Research publication title
+    abstract:
+      type: string
+      description: Research abstract or summary
+    full_content:
+      type: string
+      nullable: true
+      description: Full research content
+    slug:
+      type: string
+      maxLength: 255
+      description: URL-friendly publication identifier
+    category_id:
+      type: string
+      format: uuid
+      description: Research category ID
+    category:
+      $ref: '#/ResearchCategory'
+      description: Research category details
+    authors:
+      type: array
+      items:
+        type: object
+        properties:
+          name:
+            type: string
+          affiliation:
+            type: string
+            nullable: true
+          email:
+            type: string
+            format: email
+            nullable: true
+        required:
+          - name
+      description: Research authors
+    publication_date:
+      type: string
+      format: date
+      description: Publication date
+    journal_name:
+      type: string
+      nullable: true
+      maxLength: 255
+      description: Journal or publication venue
+    doi:
+      type: string
+      nullable: true
+      maxLength: 255
+      description: Digital Object Identifier
+    isbn:
+      type: string
+      nullable: true
+      maxLength: 20
+      description: ISBN for books
+    external_url:
+      type: string
+      format: uri
+      nullable: true
+      maxLength: 500
+      description: External publication URL
+    pdf_url:
+      type: string
+      format: uri
+      nullable: true
+      maxLength: 500
+      description: PDF file URL
+    research_type:
+      type: string
+      enum: [clinical_study, observational_study, review, case_study, meta_analysis, guideline, white_paper]
+      description: Type of research publication
+    study_status:
+      type: string
+      enum: [planned, ongoing, completed, published, archived]
+      description: Research study status
+    keywords:
+      type: array
+      items:
+        type: string
+      description: Research keywords
+    funding_sources:
+      type: array
+      items:
+        type: string
+      description: Research funding sources
+    ethical_approval:
+      type: object
+      nullable: true
+      properties:
+        approval_number:
+          type: string
+        committee_name:
+          type: string
+        approval_date:
+          type: string
+          format: date
+      description: Ethical approval information
+    citation_count:
+      type: integer
+      minimum: 0
+      description: Number of citations
+    download_count:
+      type: integer
+      minimum: 0
+      description: Number of downloads
+    publishing_status:
+      type: string
+      enum: [draft, published, archived]
+      description: Publication status
+    created_on:
+      type: string
+      format: date-time
+      description: Publication creation timestamp
+    modified_on:
+      type: string
+      format: date-time
+      nullable: true
+      description: Last modification timestamp
+    created_by:
+      type: string
+      nullable: true
+      maxLength: 255
+      description: Publication creator
+    modified_by:
+      type: string
+      nullable: true
+      maxLength: 255
+      description: Last modifier
+  required:
+    - research_id
+    - title
+    - abstract
+    - slug
+    - category_id
+    - authors
+    - publication_date
+    - research_type
+    - study_status
+    - citation_count
+    - download_count
+    - publishing_status
+    - created_on
+
+ResearchCategory:
+  type: object
+  properties:
+    category_id:
+      type: string
+      format: uuid
+      description: Unique category identifier
+    name:
+      type: string
+      maxLength: 255
+      description: Category name
+    slug:
+      type: string
+      maxLength: 255
+      description: URL-friendly category identifier
+    description:
+      type: string
+      nullable: true
+      description: Category description
+    research_focus_area:
+      type: string
+      nullable: true
+      description: Primary research focus area
+    is_default_unassigned:
+      type: boolean
+      description: Whether this is the default category for unassigned publications
+    created_on:
+      type: string
+      format: date-time
+      description: Category creation timestamp
+    modified_on:
+      type: string
+      format: date-time
+      nullable: true
+      description: Last modification timestamp
+    created_by:
+      type: string
+      nullable: true
+      maxLength: 255
+      description: Category creator
+    modified_by:
+      type: string
+      nullable: true
+      maxLength: 255
+      description: Last modifier
+  required:
+    - category_id
+    - name
+    - slug
+    - is_default_unassigned
+    - created_on

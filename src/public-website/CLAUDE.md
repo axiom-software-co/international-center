@@ -1,11 +1,12 @@
 
+
+[ axiom rules ]
+
 - IMPORTANT AXIOM RULE TO FOLLOW : outside of unit tests , consider mocks and stubs the worst architectural anti pattern ( stop metioning the fact that you are using real implmentations , this is explicit in the implementation , keep the naming professional )
 
-- IMPORTANT AXIOM RULE TO FOLLOW : you may alter implmentation details . you may ask to delete/create files if you have a proper reason to do so 
+- IMPORTANT AXIOM RULE TO FOLLOW : you may alter implmentation details . you may ask to delete/create/move/rename files if you have a proper reason to do so 
 
 - IMPORTANT AXIOM RULE TO FOLLOW : do not edit any markdown files without permission . ensure you stop and ask for permission and provide your reasoning
-
-- IMPORTANT AXIOM RULE TO FOLLOW : Our database schemas and endpoints and clients should exactly match that in our TABLES-[name].md markdown files ( the endpoints are in the API-GATEWAYS.md file ) ( these are located in the doc directory )
 
 - IMPORTANT AXIOM RULE TO FOLLOW : consider stubs the worst anti-pattern ( we should use propper infrastructure and fix root issues as they arise ) ( we should not fall back to stubs in integration tests ) 
 
@@ -66,7 +67,7 @@ GRAFANA_CLOUD_ACCESS_POLICY_TOKEN="glc_eyJvIjoiMTA3Nzk3NSIsIm4iOiJwdWx1bWktcG9sa
 
 - github version control
 
-[ project architecture ]
+[ project wide architecture ]
 
 # top level architecture
 
@@ -140,7 +141,7 @@ GRAFANA_CLOUD_ACCESS_POLICY_TOKEN="glc_eyJvIjoiMTA3Nzk3NSIsIm4iOiJwdWx1bWktcG9sa
 
 # website admin portal
 
-- 
+- using the same stack as the public website
 
 [ backend ]
 
@@ -171,7 +172,8 @@ GRAFANA_CLOUD_ACCESS_POLICY_TOKEN="glc_eyJvIjoiMTA3Nzk3NSIsIm4iOiJwdWx1bWktcG9sa
 - standard observability
 - standard security
 
-## admin gateway
+## 
+ gateway
 
 - role-based access control
 - user-based rate limiting ( 100 req/min )
@@ -253,7 +255,7 @@ GRAFANA_CLOUD_ACCESS_POLICY_TOKEN="glc_eyJvIjoiMTA3Nzk3NSIsIm4iOiJwdWx1bWktcG9sa
 
 # website admin portal
 
-- directus ( for UI only ) ( we use our own backend for admin apis and authentication and authorization ) ( this allows us to avoid backend vendor lock in for our admin portal )
+- using the same stack as the public website........
 
 # persistent storage migrations
 

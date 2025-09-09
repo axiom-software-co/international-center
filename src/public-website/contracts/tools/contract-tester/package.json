@@ -1,0 +1,36 @@
+{
+  "name": "@international-center/contract-tester",
+  "version": "1.0.0",
+  "description": "Contract testing framework for OpenAPI specifications",
+  "type": "module",
+  "scripts": {
+    "test": "npm run test:public && npm run test:admin",
+    "test:public": "vitest run tests/public --config vitest.config.ts",
+    "test:admin": "vitest run tests/admin --config vitest.config.ts",
+    "test:watch": "vitest watch --config vitest.config.ts",
+    "test:contracts": "npm run validate:specs && npm run test:compliance",
+    "test:compliance": "dredd ../../openapi/public-api.yaml http://localhost:4000 && dredd ../../openapi/admin-api.yaml http://localhost:4001",
+    "validate:specs": "swagger-codegen-cli validate -i ../../openapi/public-api.yaml && swagger-codegen-cli validate -i ../../openapi/admin-api.yaml",
+    "mock:public": "prism mock ../../openapi/public-api.yaml --port 4002",
+    "mock:admin": "prism mock ../../openapi/admin-api.yaml --port 4003",
+    "lint": "eslint . --ext .ts,.js",
+    "lint:fix": "eslint . --ext .ts,.js --fix",
+    "coverage": "vitest run --coverage"
+  },
+  "dependencies": {
+    "@types/node": "^20.0.0",
+    "axios": "^1.6.0",
+    "typescript": "^5.0.0"
+  },
+  "devDependencies": {
+    "@stoplight/prism-cli": "^5.6.0",
+    "@vitest/coverage-v8": "^1.0.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "dredd": "^14.1.0",
+    "eslint": "^8.0.0",
+    "happy-dom": "^13.0.0",
+    "swagger-codegen-cli": "^3.0.0",
+    "vitest": "^1.0.0"
+  }
+}

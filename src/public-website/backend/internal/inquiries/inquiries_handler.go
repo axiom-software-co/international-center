@@ -9,15 +9,18 @@ import (
 	"github.com/axiom-software-co/international-center/src/backend/internal/inquiries/media"
 	"github.com/axiom-software-co/international-center/src/backend/internal/inquiries/volunteers"
 	"github.com/axiom-software-co/international-center/src/backend/internal/shared/dapr"
+	"github.com/axiom-software-co/international-center/src/backend/internal/shared/middleware"
 	"github.com/gorilla/mux"
 )
 
 // InquiriesHandler consolidates all inquiries domain handlers
 type InquiriesHandler struct {
-	businessHandler   *business.BusinessHandler
-	donationsHandler  *donations.DonationsHandler
-	mediaHandler      *media.MediaHandler
-	volunteersHandler *volunteers.VolunteerHandler
+	businessHandler       *business.BusinessHandler
+	donationsHandler      *donations.DonationsHandler
+	mediaHandler          *media.MediaHandler
+	volunteersHandler     *volunteers.VolunteerHandler
+	contractCompliantServer *ContractCompliantServer
+	mediaService          *media.MediaService
 }
 
 // NewInquiriesHandler creates a new consolidated inquiries handler
@@ -51,21 +54,53 @@ func NewInquiriesHandler(client *dapr.Client) (*InquiriesHandler, error) {
 	volunteersService := volunteers.NewVolunteerService(volunteersRepository)
 	volunteersHandler := volunteers.NewVolunteerHandler(volunteersService)
 
+	// Initialize contract-compliant server for API contract enforcement
+	contractCompliantServer := NewContractCompliantServer(mediaService)
+
 	return &InquiriesHandler{
-		businessHandler:   businessHandler,
-		donationsHandler:  donationsHandler,
-		mediaHandler:      mediaHandler,
-		volunteersHandler: volunteersHandler,
+		businessHandler:       businessHandler,
+		donationsHandler:      donationsHandler,
+		mediaHandler:          mediaHandler,
+		volunteersHandler:     volunteersHandler,
+		contractCompliantServer: contractCompliantServer,
+		mediaService:          mediaService,
 	}, nil
 }
 
 // RegisterRoutes registers all inquiries domain routes with the router
 func (h *InquiriesHandler) RegisterRoutes(router *mux.Router) {
-	// Register routes for each domain
+	// Apply contract validation middleware to admin routes
+	adminRouter := router.PathPrefix("/admin/api/v1").Subrouter()
+	adminMiddleware := middleware.AdminAPIMiddleware()
+	adminMiddleware.Apply(adminRouter)
+	
+	// Register contract-compliant routes for admin inquiries API
+	h.registerContractCompliantRoutes(adminRouter)
+	
+	// Apply validation middleware to public routes
+	publicRouter := router.PathPrefix("/api/v1").Subrouter()
+	publicMiddleware := middleware.PublicAPIMiddleware()
+	publicMiddleware.Apply(publicRouter)
+	
+	// Register legacy routes (to be migrated to contract-compliant approach)
+	h.registerLegacyRoutes(router)
+}
+
+// registerContractCompliantRoutes registers routes using generated interfaces
+func (h *InquiriesHandler) registerContractCompliantRoutes(adminRouter *mux.Router) {
+	// Register contract-compliant inquiry routes
+	RegisterContractRoutes(adminRouter, h.mediaService)
+}
+
+// registerLegacyRoutes registers existing domain-specific routes for backward compatibility
+func (h *InquiriesHandler) registerLegacyRoutes(router *mux.Router) {
+	// Legacy routes for gradual migration - these will be replaced with contract-compliant versions
 	h.businessHandler.RegisterRoutes(router)
 	h.donationsHandler.RegisterRoutes(router)
-	h.mediaHandler.RegisterRoutes(router)
 	h.volunteersHandler.RegisterRoutes(router)
+	
+	// Note: mediaHandler routes are now handled by contract-compliant server
+	// h.mediaHandler.RegisterRoutes(router) - commented out as replaced by contract routes
 }
 
 // HealthCheck performs health check across all inquiries domains

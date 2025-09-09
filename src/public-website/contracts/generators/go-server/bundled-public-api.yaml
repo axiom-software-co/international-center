@@ -1,0 +1,2796 @@
+openapi: 3.0.3
+info:
+  title: International Center Public API
+  description: Public API for International Center website content and inquiries
+  version: 1.0.0
+  contact:
+    name: International Center API Team
+servers:
+  - url: https://api.axiomcloud.dev/api/v1
+    description: Production server
+  - url: http://localhost:4000/api/v1
+    description: Development server
+
+security: []
+
+paths:
+  # Health endpoints
+  /health:
+    get:
+      summary: Health check endpoint
+      operationId: getHealth
+      tags:
+        - Health
+      responses:
+        '200':
+          $ref: '#/components/responses/HealthResponse'
+        '503':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /health/ready:
+    get:
+      summary: Readiness check endpoint
+      operationId: getHealthReady
+      tags:
+        - Health
+      responses:
+        '200':
+          $ref: '#/components/responses/HealthResponse'
+        '503':
+          $ref: '#/components/responses/ErrorResponse'
+
+  # Services domain endpoints
+  /services:
+    get:
+      summary: Get all services
+      operationId: getServices
+      tags:
+        - Services
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - $ref: '#/components/parameters/SearchParam'
+      responses:
+        '200':
+          description: List of services
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Service'
+                  pagination:
+                    $ref: '#/components/schemas/PaginationInfo'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /services/{id}:
+    get:
+      summary: Get service by ID
+      operationId: getServiceById
+      tags:
+        - Services
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Service details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Service'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /services/slug/{slug}:
+    get:
+      summary: Get service by slug
+      operationId: getServiceBySlug
+      tags:
+        - Services
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Service details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Service'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /services/featured:
+    get:
+      summary: Get featured services
+      operationId: getFeaturedServices
+      tags:
+        - Services
+      responses:
+        '200':
+          description: Featured services
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Service'
+        '500':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /services/categories:
+    get:
+      summary: Get service categories
+      operationId: getServiceCategories
+      tags:
+        - Services
+      responses:
+        '200':
+          description: Service categories
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ServiceCategory'
+        '500':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /services/categories/{id}/services:
+    get:
+      summary: Get services by category
+      operationId: getServicesByCategory
+      tags:
+        - Services
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+      responses:
+        '200':
+          description: Services in category
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Service'
+                  pagination:
+                    $ref: '#/components/schemas/PaginationInfo'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /services/search:
+    get:
+      summary: Search services
+      operationId: searchServices
+      tags:
+        - Services
+      parameters:
+        - $ref: '#/components/parameters/SearchParam'
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Service'
+                  pagination:
+                    $ref: '#/components/schemas/PaginationInfo'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/ErrorResponse'
+
+  # News domain endpoints
+  /news:
+    get:
+      summary: Get all news articles
+      operationId: getNews
+      tags:
+        - News
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - $ref: '#/components/parameters/SearchParam'
+      responses:
+        '200':
+          description: List of news articles
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/NewsArticle'
+                  pagination:
+                    $ref: '#/components/schemas/PaginationInfo'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /news/{id}:
+    get:
+      summary: Get news article by ID
+      operationId: getNewsById
+      tags:
+        - News
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: News article details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/NewsArticle'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /news/slug/{slug}:
+    get:
+      summary: Get news article by slug
+      operationId: getNewsBySlug
+      tags:
+        - News
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: News article details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/NewsArticle'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /news/featured:
+    get:
+      summary: Get featured news articles
+      operationId: getFeaturedNews
+      tags:
+        - News
+      responses:
+        '200':
+          description: Featured news articles
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/NewsArticle'
+        '500':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /news/categories:
+    get:
+      summary: Get news categories
+      operationId: getNewsCategories
+      tags:
+        - News
+      responses:
+        '200':
+          description: News categories
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/NewsCategory'
+        '500':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /news/categories/{id}/news:
+    get:
+      summary: Get news articles by category
+      operationId: getNewsByCategory
+      tags:
+        - News
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+      responses:
+        '200':
+          description: News articles in category
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/NewsArticle'
+                  pagination:
+                    $ref: '#/components/schemas/PaginationInfo'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /news/search:
+    get:
+      summary: Search news articles
+      operationId: searchNews
+      tags:
+        - News
+      parameters:
+        - $ref: '#/components/parameters/SearchParam'
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/NewsArticle'
+                  pagination:
+                    $ref: '#/components/schemas/PaginationInfo'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/ErrorResponse'
+
+  # Research domain endpoints
+  /research:
+    get:
+      summary: Get all research publications
+      operationId: getResearch
+      tags:
+        - Research
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - $ref: '#/components/parameters/SearchParam'
+      responses:
+        '200':
+          description: List of research publications
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ResearchPublication'
+                  pagination:
+                    $ref: '#/components/schemas/PaginationInfo'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /research/{id}:
+    get:
+      summary: Get research publication by ID
+      operationId: getResearchById
+      tags:
+        - Research
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Research publication details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ResearchPublication'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /research/slug/{slug}:
+    get:
+      summary: Get research publication by slug
+      operationId: getResearchBySlug
+      tags:
+        - Research
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Research publication details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ResearchPublication'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /research/featured:
+    get:
+      summary: Get featured research publications
+      operationId: getFeaturedResearch
+      tags:
+        - Research
+      responses:
+        '200':
+          description: Featured research publications
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ResearchPublication'
+        '500':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /research/categories:
+    get:
+      summary: Get research categories
+      operationId: getResearchCategories
+      tags:
+        - Research
+      responses:
+        '200':
+          description: Research categories
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ResearchCategory'
+        '500':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /research/categories/{id}/research:
+    get:
+      summary: Get research publications by category
+      operationId: getResearchByCategory
+      tags:
+        - Research
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+      responses:
+        '200':
+          description: Research publications in category
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ResearchPublication'
+                  pagination:
+                    $ref: '#/components/schemas/PaginationInfo'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /research/search:
+    get:
+      summary: Search research publications
+      operationId: searchResearch
+      tags:
+        - Research
+      parameters:
+        - $ref: '#/components/parameters/SearchParam'
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ResearchPublication'
+                  pagination:
+                    $ref: '#/components/schemas/PaginationInfo'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /research/{id}/report:
+    get:
+      summary: Get research report file
+      operationId: getResearchReport
+      tags:
+        - Research
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Research report file
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/ErrorResponse'
+
+  # Events domain endpoints
+  /events:
+    get:
+      summary: Get all events
+      operationId: getEvents
+      tags:
+        - Events
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - $ref: '#/components/parameters/SearchParam'
+      responses:
+        '200':
+          description: List of events
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Event'
+                  pagination:
+                    $ref: '#/components/schemas/PaginationInfo'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /events/{id}:
+    get:
+      summary: Get event by ID
+      operationId: getEventById
+      tags:
+        - Events
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Event details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Event'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /events/slug/{slug}:
+    get:
+      summary: Get event by slug
+      operationId: getEventBySlug
+      tags:
+        - Events
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Event details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Event'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /events/featured:
+    get:
+      summary: Get featured events
+      operationId: getFeaturedEvents
+      tags:
+        - Events
+      responses:
+        '200':
+          description: Featured events
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Event'
+        '500':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /events/categories:
+    get:
+      summary: Get event categories
+      operationId: getEventCategories
+      tags:
+        - Events
+      responses:
+        '200':
+          description: Event categories
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/EventCategory'
+        '500':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /events/categories/{id}/events:
+    get:
+      summary: Get events by category
+      operationId: getEventsByCategory
+      tags:
+        - Events
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+      responses:
+        '200':
+          description: Events in category
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Event'
+                  pagination:
+                    $ref: '#/components/schemas/PaginationInfo'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /events/search:
+    get:
+      summary: Search events
+      operationId: searchEvents
+      tags:
+        - Events
+      parameters:
+        - $ref: '#/components/parameters/SearchParam'
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Event'
+                  pagination:
+                    $ref: '#/components/schemas/PaginationInfo'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /events/{id}/register:
+    post:
+      summary: Register for event
+      operationId: registerForEvent
+      tags:
+        - Events
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EventRegistrationRequest'
+      responses:
+        '201':
+          description: Registration successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/EventRegistration'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '409':
+          $ref: '#/components/responses/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /events/{id}/registrations:
+    get:
+      summary: Get event registration count
+      operationId: getEventRegistrations
+      tags:
+        - Events
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Registration information
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      total_registrations:
+                        type: integer
+                      available_spots:
+                        type: integer
+                        nullable: true
+                      registration_status:
+                        type: string
+                        enum: [open, closed, full, cancelled]
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/ErrorResponse'
+
+  # Inquiries form submission endpoints
+  /inquiries/media:
+    post:
+      summary: Submit media inquiry
+      operationId: submitMediaInquiry
+      tags:
+        - Inquiries
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MediaInquiryRequest'
+      responses:
+        '201':
+          description: Inquiry submitted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      inquiry_id:
+                        type: string
+                        format: uuid
+                      submitted_at:
+                        type: string
+                        format: date-time
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /inquiries/business:
+    post:
+      summary: Submit business inquiry
+      operationId: submitBusinessInquiry
+      tags:
+        - Inquiries
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BusinessInquiryRequest'
+      responses:
+        '201':
+          description: Inquiry submitted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      inquiry_id:
+                        type: string
+                        format: uuid
+                      submitted_at:
+                        type: string
+                        format: date-time
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /inquiries/donations:
+    post:
+      summary: Submit donation inquiry
+      operationId: submitDonationInquiry
+      tags:
+        - Inquiries
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DonationInquiryRequest'
+      responses:
+        '201':
+          description: Inquiry submitted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      inquiry_id:
+                        type: string
+                        format: uuid
+                      submitted_at:
+                        type: string
+                        format: date-time
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /inquiries/volunteers:
+    post:
+      summary: Submit volunteer inquiry
+      operationId: submitVolunteerInquiry
+      tags:
+        - Inquiries
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VolunteerInquiryRequest'
+      responses:
+        '201':
+          description: Inquiry submitted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      inquiry_id:
+                        type: string
+                        format: uuid
+                      submitted_at:
+                        type: string
+                        format: date-time
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/ErrorResponse'
+
+components:
+  parameters:
+    PageParam:
+      name: page
+      in: query
+      description: Page number for pagination
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+
+    LimitParam:
+      name: limit
+      in: query
+      description: Number of items per page
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+
+    SearchParam:
+      name: search
+      in: query
+      description: Search query string
+      required: false
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 255
+
+  schemas:
+    # Common schemas
+    PaginationInfo:
+      type: object
+      properties:
+        current_page:
+          type: integer
+        total_pages:
+          type: integer
+        total_items:
+          type: integer
+        items_per_page:
+          type: integer
+        has_next:
+          type: boolean
+        has_previous:
+          type: boolean
+      required:
+        - current_page
+        - total_pages
+        - total_items
+        - items_per_page
+        - has_next
+        - has_previous
+
+    # Placeholder schemas - will be replaced with component references
+    Service:
+      properties:
+          availability_status:
+              description: Current availability status
+              enum:
+                  - available
+                  - limited
+                  - unavailable
+                  - appointment_only
+              type: string
+          category:
+              $ref: '#/components/schemas/ServiceCategory'
+              description: Service category details
+          category_id:
+              description: Service category ID
+              format: uuid
+              type: string
+          contact_info:
+              description: Service-specific contact information
+              nullable: true
+              properties:
+                  email:
+                      format: email
+                      type: string
+                  extension:
+                      type: string
+                  phone:
+                      type: string
+              type: object
+          created_on:
+              description: Service creation timestamp
+              format: date-time
+              type: string
+          description:
+              description: Service description
+              type: string
+          duration_minutes:
+              description: Typical service duration in minutes
+              minimum: 0
+              nullable: true
+              type: integer
+          image_url:
+              description: Service image URL
+              format: uri
+              maxLength: 500
+              nullable: true
+              type: string
+          insurance_accepted:
+              description: Whether insurance is accepted
+              type: boolean
+          location_details:
+              description: Location details for service delivery
+              nullable: true
+              properties:
+                  building:
+                      type: string
+                  floor:
+                      type: string
+                  room:
+                      type: string
+                  special_instructions:
+                      type: string
+              type: object
+          modified_on:
+              description: Last modification timestamp
+              format: date-time
+              nullable: true
+              type: string
+          prerequisites:
+              description: Service prerequisites or requirements
+              items:
+                  type: string
+              type: array
+          price_range:
+              description: Price range information
+              nullable: true
+              type: string
+          publishing_status:
+              description: Service publishing status
+              enum:
+                  - draft
+                  - published
+                  - archived
+              type: string
+          service_id:
+              description: Unique service identifier
+              format: uuid
+              type: string
+          service_type:
+              description: Type of service offered
+              enum:
+                  - consultation
+                  - treatment
+                  - procedure
+                  - diagnostic
+                  - therapy
+                  - rehabilitation
+                  - prevention
+              type: string
+          slug:
+              description: URL-friendly service identifier
+              maxLength: 255
+              type: string
+          target_conditions:
+              description: Medical conditions this service addresses
+              items:
+                  type: string
+              type: array
+          telehealth_available:
+              description: Whether telehealth option is available
+              type: boolean
+          title:
+              description: Service title
+              maxLength: 255
+              type: string
+      required:
+          - service_id
+          - title
+          - description
+          - slug
+          - category_id
+          - service_type
+          - availability_status
+          - insurance_accepted
+          - telehealth_available
+          - publishing_status
+          - created_on
+      type: object
+
+    ServiceCategory:
+      properties:
+          category_id:
+              description: Unique category identifier
+              format: uuid
+              type: string
+          created_on:
+              description: Category creation timestamp
+              format: date-time
+              type: string
+          description:
+              description: Category description
+              nullable: true
+              type: string
+          icon:
+              description: Category icon identifier
+              nullable: true
+              type: string
+          is_default_unassigned:
+              description: Whether this is the default category for unassigned services
+              type: boolean
+          modified_on:
+              description: Last modification timestamp
+              format: date-time
+              nullable: true
+              type: string
+          name:
+              description: Category name
+              maxLength: 255
+              type: string
+          slug:
+              description: URL-friendly category identifier
+              maxLength: 255
+              type: string
+          sort_order:
+              description: Display sort order
+              minimum: 0
+              type: integer
+      required:
+          - category_id
+          - name
+          - slug
+          - sort_order
+          - is_default_unassigned
+          - created_on
+      type: object
+
+    NewsArticle:
+      properties:
+          author_name:
+              description: Article author name
+              maxLength: 255
+              nullable: true
+              type: string
+          category:
+              $ref: '#/components/schemas/NewsCategory'
+              description: News category details
+          category_id:
+              description: News category ID
+              format: uuid
+              type: string
+          content:
+              description: Full news article content
+              nullable: true
+              type: string
+          created_by:
+              description: Article creator
+              maxLength: 255
+              nullable: true
+              type: string
+          created_on:
+              description: Article creation timestamp
+              format: date-time
+              type: string
+          external_source:
+              description: External source if applicable
+              maxLength: 255
+              nullable: true
+              type: string
+          external_url:
+              description: External URL if applicable
+              format: uri
+              maxLength: 500
+              nullable: true
+              type: string
+          image_url:
+              description: Article image URL
+              format: uri
+              maxLength: 500
+              nullable: true
+              type: string
+          modified_by:
+              description: Last modifier
+              maxLength: 255
+              nullable: true
+              type: string
+          modified_on:
+              description: Last modification timestamp
+              format: date-time
+              nullable: true
+              type: string
+          news_id:
+              description: Unique news article identifier
+              format: uuid
+              type: string
+          news_type:
+              description: Type of news article
+              enum:
+                  - announcement
+                  - press_release
+                  - event
+                  - update
+                  - alert
+                  - feature
+              type: string
+          priority_level:
+              description: Article priority level
+              enum:
+                  - low
+                  - normal
+                  - high
+                  - urgent
+              type: string
+          publication_timestamp:
+              description: Article publication timestamp
+              format: date-time
+              type: string
+          publishing_status:
+              description: Article publishing status
+              enum:
+                  - draft
+                  - published
+                  - archived
+              type: string
+          slug:
+              description: URL-friendly article identifier
+              maxLength: 255
+              type: string
+          summary:
+              description: News article summary
+              type: string
+          tags:
+              description: Article tags
+              items:
+                  type: string
+              type: array
+          title:
+              description: News article title
+              maxLength: 255
+              type: string
+      required:
+          - news_id
+          - title
+          - summary
+          - slug
+          - category_id
+          - publication_timestamp
+          - publishing_status
+          - news_type
+          - priority_level
+          - created_on
+      type: object
+
+    NewsCategory:
+      properties:
+          category_id:
+              description: Unique category identifier
+              format: uuid
+              type: string
+          created_by:
+              description: Category creator
+              maxLength: 255
+              nullable: true
+              type: string
+          created_on:
+              description: Category creation timestamp
+              format: date-time
+              type: string
+          description:
+              description: Category description
+              nullable: true
+              type: string
+          is_default_unassigned:
+              description: Whether this is the default category for unassigned articles
+              type: boolean
+          modified_by:
+              description: Last modifier
+              maxLength: 255
+              nullable: true
+              type: string
+          modified_on:
+              description: Last modification timestamp
+              format: date-time
+              nullable: true
+              type: string
+          name:
+              description: Category name
+              maxLength: 255
+              type: string
+          slug:
+              description: URL-friendly category identifier
+              maxLength: 255
+              type: string
+      required:
+          - category_id
+          - name
+          - slug
+          - is_default_unassigned
+          - created_on
+      type: object
+
+    ResearchPublication:
+      properties:
+          abstract:
+              description: Research abstract or summary
+              type: string
+          authors:
+              description: Research authors
+              items:
+                  properties:
+                      affiliation:
+                          nullable: true
+                          type: string
+                      email:
+                          format: email
+                          nullable: true
+                          type: string
+                      name:
+                          type: string
+                  required:
+                      - name
+                  type: object
+              type: array
+          category:
+              $ref: '#/components/schemas/ResearchCategory'
+              description: Research category details
+          category_id:
+              description: Research category ID
+              format: uuid
+              type: string
+          citation_count:
+              description: Number of citations
+              minimum: 0
+              type: integer
+          created_by:
+              description: Publication creator
+              maxLength: 255
+              nullable: true
+              type: string
+          created_on:
+              description: Publication creation timestamp
+              format: date-time
+              type: string
+          doi:
+              description: Digital Object Identifier
+              maxLength: 255
+              nullable: true
+              type: string
+          download_count:
+              description: Number of downloads
+              minimum: 0
+              type: integer
+          ethical_approval:
+              description: Ethical approval information
+              nullable: true
+              properties:
+                  approval_date:
+                      format: date
+                      type: string
+                  approval_number:
+                      type: string
+                  committee_name:
+                      type: string
+              type: object
+          external_url:
+              description: External publication URL
+              format: uri
+              maxLength: 500
+              nullable: true
+              type: string
+          full_content:
+              description: Full research content
+              nullable: true
+              type: string
+          funding_sources:
+              description: Research funding sources
+              items:
+                  type: string
+              type: array
+          isbn:
+              description: ISBN for books
+              maxLength: 20
+              nullable: true
+              type: string
+          journal_name:
+              description: Journal or publication venue
+              maxLength: 255
+              nullable: true
+              type: string
+          keywords:
+              description: Research keywords
+              items:
+                  type: string
+              type: array
+          modified_by:
+              description: Last modifier
+              maxLength: 255
+              nullable: true
+              type: string
+          modified_on:
+              description: Last modification timestamp
+              format: date-time
+              nullable: true
+              type: string
+          pdf_url:
+              description: PDF file URL
+              format: uri
+              maxLength: 500
+              nullable: true
+              type: string
+          publication_date:
+              description: Publication date
+              format: date
+              type: string
+          publishing_status:
+              description: Publication status
+              enum:
+                  - draft
+                  - published
+                  - archived
+              type: string
+          research_id:
+              description: Unique research publication identifier
+              format: uuid
+              type: string
+          research_type:
+              description: Type of research publication
+              enum:
+                  - clinical_study
+                  - observational_study
+                  - review
+                  - case_study
+                  - meta_analysis
+                  - guideline
+                  - white_paper
+              type: string
+          slug:
+              description: URL-friendly publication identifier
+              maxLength: 255
+              type: string
+          study_status:
+              description: Research study status
+              enum:
+                  - planned
+                  - ongoing
+                  - completed
+                  - published
+                  - archived
+              type: string
+          title:
+              description: Research publication title
+              maxLength: 255
+              type: string
+      required:
+          - research_id
+          - title
+          - abstract
+          - slug
+          - category_id
+          - authors
+          - publication_date
+          - research_type
+          - study_status
+          - citation_count
+          - download_count
+          - publishing_status
+          - created_on
+      type: object
+
+    ResearchCategory:
+      properties:
+          category_id:
+              description: Unique category identifier
+              format: uuid
+              type: string
+          created_by:
+              description: Category creator
+              maxLength: 255
+              nullable: true
+              type: string
+          created_on:
+              description: Category creation timestamp
+              format: date-time
+              type: string
+          description:
+              description: Category description
+              nullable: true
+              type: string
+          is_default_unassigned:
+              description: Whether this is the default category for unassigned publications
+              type: boolean
+          modified_by:
+              description: Last modifier
+              maxLength: 255
+              nullable: true
+              type: string
+          modified_on:
+              description: Last modification timestamp
+              format: date-time
+              nullable: true
+              type: string
+          name:
+              description: Category name
+              maxLength: 255
+              type: string
+          research_focus_area:
+              description: Primary research focus area
+              nullable: true
+              type: string
+          slug:
+              description: URL-friendly category identifier
+              maxLength: 255
+              type: string
+      required:
+          - category_id
+          - name
+          - slug
+          - is_default_unassigned
+          - created_on
+      type: object
+
+    Event:
+      properties:
+          agenda:
+              description: Event agenda
+              items:
+                  properties:
+                      description:
+                          nullable: true
+                          type: string
+                      end_time:
+                          nullable: true
+                          type: string
+                      speaker:
+                          nullable: true
+                          type: string
+                      start_time:
+                          type: string
+                      title:
+                          type: string
+                  required:
+                      - start_time
+                      - title
+                  type: object
+              type: array
+          category:
+              $ref: '#/components/schemas/EventCategory'
+              description: Event category details
+          category_id:
+              description: Event category ID
+              format: uuid
+              type: string
+          cost:
+              description: Event cost information
+              nullable: true
+              properties:
+                  amount:
+                      minimum: 0
+                      type: number
+                  currency:
+                      default: USD
+                      type: string
+                  description:
+                      nullable: true
+                      type: string
+              type: object
+          created_by:
+              description: Event creator
+              maxLength: 255
+              nullable: true
+              type: string
+          created_on:
+              description: Event creation timestamp
+              format: date-time
+              type: string
+          current_registrations:
+              description: Current number of registrations
+              minimum: 0
+              type: integer
+          description:
+              description: Event description
+              type: string
+          end_datetime:
+              description: Event end date and time
+              format: date-time
+              nullable: true
+              type: string
+          event_id:
+              description: Unique event identifier
+              format: uuid
+              type: string
+          event_type:
+              description: Type of event
+              enum:
+                  - conference
+                  - workshop
+                  - seminar
+                  - webinar
+                  - training
+                  - networking
+                  - fundraising
+                  - community
+              type: string
+          image_url:
+              description: Event image URL
+              format: uri
+              maxLength: 500
+              nullable: true
+              type: string
+          location:
+              description: Event location details
+              nullable: true
+              properties:
+                  address:
+                      properties:
+                          city:
+                              type: string
+                          country:
+                              type: string
+                          postal_code:
+                              type: string
+                          state:
+                              type: string
+                          street_address:
+                              type: string
+                      required:
+                          - city
+                      type: object
+                  room:
+                      nullable: true
+                      type: string
+                  special_instructions:
+                      nullable: true
+                      type: string
+                  venue_name:
+                      type: string
+              required:
+                  - venue_name
+                  - address
+              type: object
+          materials:
+              description: Event materials
+              items:
+                  properties:
+                      description:
+                          nullable: true
+                          type: string
+                      title:
+                          type: string
+                      url:
+                          format: uri
+                          type: string
+                  required:
+                      - title
+                      - url
+                  type: object
+              type: array
+          max_capacity:
+              description: Maximum event capacity
+              minimum: 1
+              nullable: true
+              type: integer
+          modified_by:
+              description: Last modifier
+              maxLength: 255
+              nullable: true
+              type: string
+          modified_on:
+              description: Last modification timestamp
+              format: date-time
+              nullable: true
+              type: string
+          organizer:
+              description: Event organizer information
+              properties:
+                  department:
+                      nullable: true
+                      type: string
+                  email:
+                      format: email
+                      type: string
+                  name:
+                      type: string
+                  phone:
+                      nullable: true
+                      type: string
+              required:
+                  - name
+                  - email
+              type: object
+          prerequisites:
+              description: Event prerequisites
+              items:
+                  type: string
+              type: array
+          publishing_status:
+              description: Event publishing status
+              enum:
+                  - draft
+                  - published
+                  - archived
+                  - cancelled
+              type: string
+          registration_deadline:
+              description: Registration deadline
+              format: date-time
+              nullable: true
+              type: string
+          registration_required:
+              description: Whether registration is required
+              type: boolean
+          registration_status:
+              description: Registration status
+              enum:
+                  - open
+                  - closed
+                  - full
+                  - cancelled
+              type: string
+          slug:
+              description: URL-friendly event identifier
+              maxLength: 255
+              type: string
+          speakers:
+              description: Event speakers
+              items:
+                  properties:
+                      bio:
+                          nullable: true
+                          type: string
+                      image_url:
+                          format: uri
+                          nullable: true
+                          type: string
+                      name:
+                          type: string
+                      title:
+                          nullable: true
+                          type: string
+                  required:
+                      - name
+                  type: object
+              type: array
+          start_datetime:
+              description: Event start date and time
+              format: date-time
+              type: string
+          tags:
+              description: Event tags
+              items:
+                  type: string
+              type: array
+          timezone:
+              default: UTC
+              description: Event timezone
+              type: string
+          title:
+              description: Event title
+              maxLength: 255
+              type: string
+          virtual_meeting_info:
+              description: Virtual meeting information
+              nullable: true
+              properties:
+                  dial_in_numbers:
+                      items:
+                          type: string
+                      type: array
+                  meeting_id:
+                      type: string
+                  meeting_url:
+                      format: uri
+                      type: string
+                  passcode:
+                      nullable: true
+                      type: string
+                  platform:
+                      type: string
+              type: object
+      required:
+          - event_id
+          - title
+          - description
+          - slug
+          - category_id
+          - event_type
+          - start_datetime
+          - timezone
+          - registration_required
+          - current_registrations
+          - registration_status
+          - organizer
+          - publishing_status
+          - created_on
+      type: object
+
+    EventCategory:
+      properties:
+          category_id:
+              description: Unique category identifier
+              format: uuid
+              type: string
+          color:
+              description: Category display color (hex)
+              nullable: true
+              pattern: ^#[0-9A-Fa-f]{6}$
+              type: string
+          created_by:
+              description: Category creator
+              maxLength: 255
+              nullable: true
+              type: string
+          created_on:
+              description: Category creation timestamp
+              format: date-time
+              type: string
+          description:
+              description: Category description
+              nullable: true
+              type: string
+          icon:
+              description: Category icon identifier
+              nullable: true
+              type: string
+          is_default_unassigned:
+              description: Whether this is the default category for unassigned events
+              type: boolean
+          modified_by:
+              description: Last modifier
+              maxLength: 255
+              nullable: true
+              type: string
+          modified_on:
+              description: Last modification timestamp
+              format: date-time
+              nullable: true
+              type: string
+          name:
+              description: Category name
+              maxLength: 255
+              type: string
+          slug:
+              description: URL-friendly category identifier
+              maxLength: 255
+              type: string
+      required:
+          - category_id
+          - name
+          - slug
+          - is_default_unassigned
+          - created_on
+      type: object
+
+    EventRegistration:
+      properties:
+          additional_notes:
+              description: Additional notes or questions
+              nullable: true
+              type: string
+          confirmation_sent:
+              description: Whether confirmation was sent
+              type: boolean
+          dietary_restrictions:
+              description: Dietary restrictions or special needs
+              nullable: true
+              type: string
+          event_id:
+              description: Event identifier
+              format: uuid
+              type: string
+          organization:
+              description: Registrant organization
+              maxLength: 255
+              nullable: true
+              type: string
+          registered_on:
+              description: Registration timestamp
+              format: date-time
+              type: string
+          registrant_email:
+              description: Registrant email address
+              format: email
+              maxLength: 255
+              type: string
+          registrant_name:
+              description: Registrant full name
+              maxLength: 255
+              type: string
+          registrant_phone:
+              description: Registrant phone number
+              maxLength: 50
+              nullable: true
+              type: string
+          registration_id:
+              description: Unique registration identifier
+              format: uuid
+              type: string
+          registration_status:
+              description: Registration status
+              enum:
+                  - registered
+                  - cancelled
+                  - attended
+                  - no_show
+              type: string
+          title:
+              description: Registrant job title
+              maxLength: 255
+              nullable: true
+              type: string
+      required:
+          - registration_id
+          - event_id
+          - registrant_name
+          - registrant_email
+          - registration_status
+          - registered_on
+          - confirmation_sent
+      type: object
+
+    EventRegistrationRequest:
+      properties:
+          additional_notes:
+              description: Additional notes or questions
+              maxLength: 1000
+              nullable: true
+              type: string
+          dietary_restrictions:
+              description: Dietary restrictions or special needs
+              maxLength: 1000
+              nullable: true
+              type: string
+          organization:
+              description: Registrant organization
+              maxLength: 255
+              nullable: true
+              type: string
+          registrant_email:
+              description: Registrant email address
+              format: email
+              maxLength: 255
+              type: string
+          registrant_name:
+              description: Registrant full name
+              maxLength: 255
+              type: string
+          registrant_phone:
+              description: Registrant phone number
+              maxLength: 50
+              nullable: true
+              type: string
+          title:
+              description: Registrant job title
+              maxLength: 255
+              nullable: true
+              type: string
+      required:
+          - registrant_name
+          - registrant_email
+      type: object
+
+    MediaInquiryRequest:
+      properties:
+          best_contact_times:
+              description: Best times to contact
+              maxLength: 255
+              nullable: true
+              type: string
+          deadline:
+              description: Response deadline if applicable
+              format: date-time
+              nullable: true
+              type: string
+          email:
+              description: Inquirer's email address
+              format: email
+              maxLength: 255
+              type: string
+          full_name:
+              description: Inquirer's full name
+              maxLength: 255
+              type: string
+          inquiry_type:
+              description: Type of media inquiry
+              enum:
+                  - interview_request
+                  - press_release
+                  - fact_checking
+                  - background_information
+                  - image_request
+                  - other
+              type: string
+          message:
+              description: Detailed inquiry message
+              maxLength: 5000
+              type: string
+          organization:
+              description: Media organization or outlet
+              maxLength: 255
+              type: string
+          phone:
+              description: Inquirer's phone number
+              maxLength: 50
+              nullable: true
+              type: string
+          preferred_contact_method:
+              description: Preferred contact method
+              enum:
+                  - email
+                  - phone
+                  - both
+              type: string
+          subject:
+              description: Inquiry subject or topic
+              maxLength: 500
+              type: string
+          title:
+              description: Job title or position
+              maxLength: 255
+              nullable: true
+              type: string
+      required:
+          - full_name
+          - email
+          - organization
+          - inquiry_type
+          - subject
+          - message
+          - preferred_contact_method
+      type: object
+
+    BusinessInquiryRequest:
+      properties:
+          best_contact_times:
+              description: Best times to contact
+              maxLength: 255
+              nullable: true
+              type: string
+          budget_range:
+              description: Budget range if applicable
+              enum:
+                  - under_10k
+                  - 10k_50k
+                  - 50k_100k
+                  - 100k_500k
+                  - over_500k
+                  - not_applicable
+              nullable: true
+              type: string
+          company_name:
+              description: Company or organization name
+              maxLength: 255
+              type: string
+          company_size:
+              description: Company size category
+              enum:
+                  - startup
+                  - small
+                  - medium
+                  - large
+                  - enterprise
+              nullable: true
+              type: string
+          email:
+              description: Inquirer's email address
+              format: email
+              maxLength: 255
+              type: string
+          full_name:
+              description: Inquirer's full name
+              maxLength: 255
+              type: string
+          industry:
+              description: Industry or sector
+              maxLength: 255
+              nullable: true
+              type: string
+          inquiry_type:
+              description: Type of business inquiry
+              enum:
+                  - partnership
+                  - collaboration
+                  - vendor_services
+                  - research_collaboration
+                  - consulting
+                  - sponsorship
+                  - other
+              type: string
+          message:
+              description: Detailed inquiry message
+              maxLength: 5000
+              type: string
+          phone:
+              description: Inquirer's phone number
+              maxLength: 50
+              nullable: true
+              type: string
+          preferred_contact_method:
+              description: Preferred contact method
+              enum:
+                  - email
+                  - phone
+                  - both
+              type: string
+          subject:
+              description: Inquiry subject
+              maxLength: 500
+              type: string
+          timeline:
+              description: Project timeline
+              enum:
+                  - immediate
+                  - within_month
+                  - within_quarter
+                  - within_year
+                  - flexible
+              nullable: true
+              type: string
+          title:
+              description: Job title or position
+              maxLength: 255
+              nullable: true
+              type: string
+      required:
+          - full_name
+          - email
+          - company_name
+          - inquiry_type
+          - subject
+          - message
+          - preferred_contact_method
+      type: object
+
+    DonationInquiryRequest:
+      properties:
+          additional_notes:
+              description: Additional notes or questions
+              maxLength: 2000
+              nullable: true
+              type: string
+          anonymous_donation:
+              description: Whether donation should be anonymous
+              type: boolean
+          communication_preferences:
+              description: Communication preferences
+              properties:
+                  events:
+                      type: boolean
+                  fundraising:
+                      type: boolean
+                  newsletter:
+                      type: boolean
+                  updates:
+                      type: boolean
+              required:
+                  - newsletter
+                  - updates
+                  - events
+                  - fundraising
+              type: object
+          donation_amount:
+              description: Donation amount details
+              nullable: true
+              properties:
+                  amount:
+                      minimum: 1
+                      type: number
+                  currency:
+                      default: USD
+                      type: string
+                  frequency:
+                      enum:
+                          - monthly
+                          - quarterly
+                          - annually
+                      nullable: true
+                      type: string
+              type: object
+          donation_purpose:
+              description: Intended use of donation
+              enum:
+                  - general_fund
+                  - research
+                  - equipment
+                  - facility
+                  - scholarship
+                  - program_specific
+                  - other
+              type: string
+          donation_type:
+              description: Type of donation
+              enum:
+                  - one_time
+                  - recurring
+                  - planned_giving
+                  - memorial
+                  - tribute
+                  - corporate_matching
+              type: string
+          donor_type:
+              description: Type of donor
+              enum:
+                  - individual
+                  - corporation
+                  - foundation
+                  - estate
+              type: string
+          email:
+              description: Donor's email address
+              format: email
+              maxLength: 255
+              type: string
+          full_name:
+              description: Donor's full name
+              maxLength: 255
+              type: string
+          in_honor_of:
+              description: Memorial or tribute information
+              nullable: true
+              properties:
+                  family_contact:
+                      nullable: true
+                      properties:
+                          address:
+                              properties:
+                                  city:
+                                      type: string
+                                  country:
+                                      default: United States
+                                      type: string
+                                  postal_code:
+                                      type: string
+                                  state:
+                                      type: string
+                                  street_address:
+                                      type: string
+                              required:
+                                  - street_address
+                                  - city
+                                  - state
+                                  - postal_code
+                              type: object
+                          name:
+                              type: string
+                      required:
+                          - name
+                          - address
+                      type: object
+                  honoree_name:
+                      type: string
+                  notify_family:
+                      type: boolean
+                  relationship:
+                      nullable: true
+                      type: string
+              required:
+                  - honoree_name
+              type: object
+          mailing_address:
+              description: Mailing address for tax receipts
+              nullable: true
+              properties:
+                  city:
+                      type: string
+                  country:
+                      default: United States
+                      type: string
+                  postal_code:
+                      type: string
+                  state:
+                      type: string
+                  street_address:
+                      type: string
+              required:
+                  - street_address
+                  - city
+                  - state
+                  - postal_code
+              type: object
+          organization:
+              description: Organization name if applicable
+              maxLength: 255
+              nullable: true
+              type: string
+          phone:
+              description: Donor's phone number
+              maxLength: 50
+              nullable: true
+              type: string
+          preferred_contact_method:
+              description: Preferred contact method
+              enum:
+                  - email
+                  - phone
+                  - mail
+                  - both
+              type: string
+          program_specification:
+              description: Specific program if program_specific selected
+              maxLength: 255
+              nullable: true
+              type: string
+          tax_receipt_required:
+              description: Whether tax receipt is needed
+              type: boolean
+          title:
+              description: Title or position
+              maxLength: 255
+              nullable: true
+              type: string
+      required:
+          - donor_type
+          - full_name
+          - email
+          - donation_type
+          - donation_purpose
+          - tax_receipt_required
+          - anonymous_donation
+          - communication_preferences
+          - preferred_contact_method
+      type: object
+
+    VolunteerInquiryRequest:
+      properties:
+          additional_notes:
+              description: Additional notes or questions
+              maxLength: 2000
+              nullable: true
+              type: string
+          address:
+              description: Volunteer's address
+              nullable: true
+              properties:
+                  city:
+                      type: string
+                  country:
+                      default: United States
+                      type: string
+                  postal_code:
+                      type: string
+                  state:
+                      type: string
+                  street_address:
+                      type: string
+              required:
+                  - city
+                  - state
+              type: object
+          availability:
+              description: Volunteer availability
+              properties:
+                  days_of_week:
+                      items:
+                          enum:
+                              - monday
+                              - tuesday
+                              - wednesday
+                              - thursday
+                              - friday
+                              - saturday
+                              - sunday
+                          type: string
+                      minItems: 1
+                      type: array
+                  duration_commitment:
+                      enum:
+                          - short_term
+                          - long_term
+                          - ongoing
+                          - project_based
+                      type: string
+                  hours_per_week:
+                      enum:
+                          - 15
+                          - 610
+                          - 1120
+                          - 2140
+                          - over_40
+                      type: string
+                  time_slots:
+                      items:
+                          enum:
+                              - early_morning
+                              - morning
+                              - afternoon
+                              - evening
+                              - night
+                          type: string
+                      minItems: 1
+                      type: array
+              required:
+                  - days_of_week
+                  - time_slots
+                  - hours_per_week
+                  - duration_commitment
+              type: object
+          background_check_consent:
+              description: Consent to background check
+              type: boolean
+          best_contact_times:
+              description: Best times to contact
+              maxLength: 255
+              nullable: true
+              type: string
+          date_of_birth:
+              description: Date of birth (for age verification)
+              format: date
+              nullable: true
+              type: string
+          email:
+              description: Volunteer's email address
+              format: email
+              maxLength: 255
+              type: string
+          emergency_contact:
+              description: Emergency contact information
+              properties:
+                  email:
+                      format: email
+                      nullable: true
+                      type: string
+                  name:
+                      type: string
+                  phone:
+                      type: string
+                  relationship:
+                      type: string
+              required:
+                  - name
+                  - relationship
+                  - phone
+              type: object
+          experience:
+              description: Volunteer experience and qualifications
+              properties:
+                  certifications:
+                      items:
+                          type: string
+                      type: array
+                  languages:
+                      items:
+                          type: string
+                      type: array
+                  previous_volunteer_work:
+                      maxLength: 2000
+                      nullable: true
+                      type: string
+                  relevant_experience:
+                      maxLength: 2000
+                      nullable: true
+                      type: string
+                  special_skills:
+                      items:
+                          type: string
+                      type: array
+              type: object
+          full_name:
+              description: Volunteer's full name
+              maxLength: 255
+              type: string
+          health_requirements:
+              description: Health-related information
+              properties:
+                  immunizations_current:
+                      nullable: true
+                      type: boolean
+                  medical_conditions:
+                      maxLength: 1000
+                      nullable: true
+                      type: string
+                  physical_limitations:
+                      maxLength: 1000
+                      nullable: true
+                      type: string
+                  tb_test_current:
+                      nullable: true
+                      type: boolean
+              type: object
+          motivation:
+              description: Motivation for volunteering
+              maxLength: 2000
+              type: string
+          phone:
+              description: Volunteer's phone number
+              maxLength: 50
+              nullable: true
+              type: string
+          preferred_contact_method:
+              description: Preferred contact method
+              enum:
+                  - email
+                  - phone
+                  - both
+              type: string
+          references:
+              description: Personal references
+              items:
+                  properties:
+                      email:
+                          format: email
+                          nullable: true
+                          type: string
+                      known_duration:
+                          nullable: true
+                          type: string
+                      name:
+                          type: string
+                      phone:
+                          type: string
+                      relationship:
+                          type: string
+                  required:
+                      - name
+                      - relationship
+                      - phone
+                  type: object
+              maxItems: 3
+              type: array
+          volunteer_interests:
+              description: Areas of volunteer interest
+              items:
+                  enum:
+                      - patient_care
+                      - administrative
+                      - research
+                      - fundraising
+                      - events
+                      - education
+                      - maintenance
+                      - transportation
+                      - social_services
+                      - other
+                  type: string
+              minItems: 1
+              type: array
+      required:
+          - full_name
+          - email
+          - emergency_contact
+          - volunteer_interests
+          - availability
+          - background_check_consent
+          - motivation
+          - preferred_contact_method
+      type: object
+
+  responses:
+    HealthResponse:
+      content:
+          application/json:
+              schema:
+                  properties:
+                      checks:
+                          properties:
+                              dapr:
+                                  properties:
+                                      error:
+                                          nullable: true
+                                          type: string
+                                      response_time_ms:
+                                          type: number
+                                      status:
+                                          enum:
+                                              - up
+                                              - down
+                                          type: string
+                                  type: object
+                              database:
+                                  properties:
+                                      error:
+                                          nullable: true
+                                          type: string
+                                      response_time_ms:
+                                          type: number
+                                      status:
+                                          enum:
+                                              - up
+                                              - down
+                                          type: string
+                                  type: object
+                              vault:
+                                  properties:
+                                      error:
+                                          nullable: true
+                                          type: string
+                                      response_time_ms:
+                                          type: number
+                                      status:
+                                          enum:
+                                              - up
+                                              - down
+                                          type: string
+                                  type: object
+                          type: object
+                      status:
+                          enum:
+                              - healthy
+                              - unhealthy
+                          type: string
+                      timestamp:
+                          format: date-time
+                          type: string
+                      version:
+                          type: string
+                  required:
+                      - status
+                      - timestamp
+                      - version
+                      - checks
+                  type: object
+      description: Health check response
+
+    ErrorResponse:
+      content:
+          application/json:
+              schema:
+                  properties:
+                      error:
+                          properties:
+                              code:
+                                  description: Error code identifier
+                                  type: string
+                              correlation_id:
+                                  description: Request correlation ID for tracking
+                                  format: uuid
+                                  type: string
+                              details:
+                                  description: Additional error details
+                                  nullable: true
+                                  type: object
+                              message:
+                                  description: Human-readable error message
+                                  type: string
+                              timestamp:
+                                  description: Error timestamp
+                                  format: date-time
+                                  type: string
+                          required:
+                              - code
+                              - message
+                              - correlation_id
+                              - timestamp
+                          type: object
+                  required:
+                      - error
+                  type: object
+      description: Error response
+
+tags:
+  - name: Health
+    description: Health and readiness endpoints
+  - name: Services
+    description: Service offerings and categories
+  - name: News
+    description: News articles and categories
+  - name: Research
+    description: Research publications and categories
+  - name: Events
+    description: Events and registrations
+  - name: Inquiries
+    description: Form submissions and inquiries

@@ -1,0 +1,115 @@
+SuccessResponse:
+  description: Generic success response
+  content:
+    application/json:
+      schema:
+        type: object
+        properties:
+          success:
+            type: boolean
+            default: true
+          message:
+            type: string
+            description: Success message
+          timestamp:
+            type: string
+            format: date-time
+            description: Response timestamp
+          correlation_id:
+            type: string
+            format: uuid
+            description: Request correlation ID for tracking
+        required:
+          - success
+          - message
+          - timestamp
+          - correlation_id
+
+CreatedResponse:
+  description: Resource created successfully
+  content:
+    application/json:
+      schema:
+        type: object
+        properties:
+          success:
+            type: boolean
+            default: true
+          message:
+            type: string
+            default: "Resource created successfully"
+          data:
+            type: object
+            description: Created resource data
+          timestamp:
+            type: string
+            format: date-time
+            description: Response timestamp
+          correlation_id:
+            type: string
+            format: uuid
+            description: Request correlation ID for tracking
+        required:
+          - success
+          - message
+          - data
+          - timestamp
+          - correlation_id
+
+UpdatedResponse:
+  description: Resource updated successfully
+  content:
+    application/json:
+      schema:
+        type: object
+        properties:
+          success:
+            type: boolean
+            default: true
+          message:
+            type: string
+            default: "Resource updated successfully"
+          data:
+            type: object
+            description: Updated resource data
+          timestamp:
+            type: string
+            format: date-time
+            description: Response timestamp
+          correlation_id:
+            type: string
+            format: uuid
+            description: Request correlation ID for tracking
+        required:
+          - success
+          - message
+          - data
+          - timestamp
+          - correlation_id
+
+DeletedResponse:
+  description: Resource deleted successfully
+  content:
+    application/json:
+      schema:
+        type: object
+        properties:
+          success:
+            type: boolean
+            default: true
+          message:
+            type: string
+            default: "Resource deleted successfully"
+          timestamp:
+            type: string
+            format: date-time
+            description: Response timestamp
+          correlation_id:
+            type: string
+            format: uuid
+            description: Request correlation ID for tracking
+        required:
+          - success
+          - message
+          - timestamp
+          - correlation_id

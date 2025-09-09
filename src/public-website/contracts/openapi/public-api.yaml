@@ -1,0 +1,1158 @@
+openapi: 3.1.0
+info:
+  title: International Center Public API
+  description: Public API for International Center website content and inquiries
+  version: 1.0.0
+  contact:
+    name: International Center API Team
+servers:
+  - url: https://api.axiomcloud.dev/api/v1
+    description: Production server
+  - url: http://localhost:4000/api/v1
+    description: Development server
+
+security: []
+
+paths:
+  # Health endpoints
+  /health:
+    get:
+      summary: Health check endpoint
+      operationId: getHealth
+      tags:
+        - Health
+      responses:
+        '200':
+          $ref: '#/components/responses/HealthResponse'
+        '503':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /health/ready:
+    get:
+      summary: Readiness check endpoint
+      operationId: getHealthReady
+      tags:
+        - Health
+      responses:
+        '200':
+          $ref: '#/components/responses/HealthResponse'
+        '503':
+          $ref: '#/components/responses/ErrorResponse'
+
+  # Services domain endpoints
+  /services:
+    get:
+      summary: Get all services
+      operationId: getServices
+      tags:
+        - Services
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - $ref: '#/components/parameters/SearchParam'
+      responses:
+        '200':
+          description: List of services
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Service'
+                  pagination:
+                    $ref: '#/components/schemas/PaginationInfo'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /services/{id}:
+    get:
+      summary: Get service by ID
+      operationId: getServiceById
+      tags:
+        - Services
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Service details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Service'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /services/slug/{slug}:
+    get:
+      summary: Get service by slug
+      operationId: getServiceBySlug
+      tags:
+        - Services
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Service details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Service'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /services/featured:
+    get:
+      summary: Get featured services
+      operationId: getFeaturedServices
+      tags:
+        - Services
+      responses:
+        '200':
+          description: Featured services
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Service'
+        '500':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /services/categories:
+    get:
+      summary: Get service categories
+      operationId: getServiceCategories
+      tags:
+        - Services
+      responses:
+        '200':
+          description: Service categories
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ServiceCategory'
+        '500':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /services/categories/{id}/services:
+    get:
+      summary: Get services by category
+      operationId: getServicesByCategory
+      tags:
+        - Services
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+      responses:
+        '200':
+          description: Services in category
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Service'
+                  pagination:
+                    $ref: '#/components/schemas/PaginationInfo'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /services/search:
+    get:
+      summary: Search services
+      operationId: searchServices
+      tags:
+        - Services
+      parameters:
+        - $ref: '#/components/parameters/SearchParam'
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Service'
+                  pagination:
+                    $ref: '#/components/schemas/PaginationInfo'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/ErrorResponse'
+
+  # News domain endpoints
+  /news:
+    get:
+      summary: Get all news articles
+      operationId: getNews
+      tags:
+        - News
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - $ref: '#/components/parameters/SearchParam'
+      responses:
+        '200':
+          description: List of news articles
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/NewsArticle'
+                  pagination:
+                    $ref: '#/components/schemas/PaginationInfo'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /news/{id}:
+    get:
+      summary: Get news article by ID
+      operationId: getNewsById
+      tags:
+        - News
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: News article details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/NewsArticle'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /news/slug/{slug}:
+    get:
+      summary: Get news article by slug
+      operationId: getNewsBySlug
+      tags:
+        - News
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: News article details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/NewsArticle'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /news/featured:
+    get:
+      summary: Get featured news articles
+      operationId: getFeaturedNews
+      tags:
+        - News
+      responses:
+        '200':
+          description: Featured news articles
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/NewsArticle'
+        '500':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /news/categories:
+    get:
+      summary: Get news categories
+      operationId: getNewsCategories
+      tags:
+        - News
+      responses:
+        '200':
+          description: News categories
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/NewsCategory'
+        '500':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /news/categories/{id}/news:
+    get:
+      summary: Get news articles by category
+      operationId: getNewsByCategory
+      tags:
+        - News
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+      responses:
+        '200':
+          description: News articles in category
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/NewsArticle'
+                  pagination:
+                    $ref: '#/components/schemas/PaginationInfo'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /news/search:
+    get:
+      summary: Search news articles
+      operationId: searchNews
+      tags:
+        - News
+      parameters:
+        - $ref: '#/components/parameters/SearchParam'
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/NewsArticle'
+                  pagination:
+                    $ref: '#/components/schemas/PaginationInfo'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/ErrorResponse'
+
+  # Research domain endpoints
+  /research:
+    get:
+      summary: Get all research publications
+      operationId: getResearch
+      tags:
+        - Research
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - $ref: '#/components/parameters/SearchParam'
+      responses:
+        '200':
+          description: List of research publications
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ResearchPublication'
+                  pagination:
+                    $ref: '#/components/schemas/PaginationInfo'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /research/{id}:
+    get:
+      summary: Get research publication by ID
+      operationId: getResearchById
+      tags:
+        - Research
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Research publication details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ResearchPublication'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /research/slug/{slug}:
+    get:
+      summary: Get research publication by slug
+      operationId: getResearchBySlug
+      tags:
+        - Research
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Research publication details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ResearchPublication'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /research/featured:
+    get:
+      summary: Get featured research publications
+      operationId: getFeaturedResearch
+      tags:
+        - Research
+      responses:
+        '200':
+          description: Featured research publications
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ResearchPublication'
+        '500':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /research/categories:
+    get:
+      summary: Get research categories
+      operationId: getResearchCategories
+      tags:
+        - Research
+      responses:
+        '200':
+          description: Research categories
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ResearchCategory'
+        '500':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /research/categories/{id}/research:
+    get:
+      summary: Get research publications by category
+      operationId: getResearchByCategory
+      tags:
+        - Research
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+      responses:
+        '200':
+          description: Research publications in category
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ResearchPublication'
+                  pagination:
+                    $ref: '#/components/schemas/PaginationInfo'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /research/search:
+    get:
+      summary: Search research publications
+      operationId: searchResearch
+      tags:
+        - Research
+      parameters:
+        - $ref: '#/components/parameters/SearchParam'
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ResearchPublication'
+                  pagination:
+                    $ref: '#/components/schemas/PaginationInfo'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /research/{id}/report:
+    get:
+      summary: Get research report file
+      operationId: getResearchReport
+      tags:
+        - Research
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Research report file
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/ErrorResponse'
+
+  # Events domain endpoints
+  /events:
+    get:
+      summary: Get all events
+      operationId: getEvents
+      tags:
+        - Events
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - $ref: '#/components/parameters/SearchParam'
+      responses:
+        '200':
+          description: List of events
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Event'
+                  pagination:
+                    $ref: '#/components/schemas/PaginationInfo'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /events/{id}:
+    get:
+      summary: Get event by ID
+      operationId: getEventById
+      tags:
+        - Events
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Event details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Event'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /events/slug/{slug}:
+    get:
+      summary: Get event by slug
+      operationId: getEventBySlug
+      tags:
+        - Events
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Event details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Event'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /events/featured:
+    get:
+      summary: Get featured events
+      operationId: getFeaturedEvents
+      tags:
+        - Events
+      responses:
+        '200':
+          description: Featured events
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Event'
+        '500':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /events/categories:
+    get:
+      summary: Get event categories
+      operationId: getEventCategories
+      tags:
+        - Events
+      responses:
+        '200':
+          description: Event categories
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/EventCategory'
+        '500':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /events/categories/{id}/events:
+    get:
+      summary: Get events by category
+      operationId: getEventsByCategory
+      tags:
+        - Events
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+      responses:
+        '200':
+          description: Events in category
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Event'
+                  pagination:
+                    $ref: '#/components/schemas/PaginationInfo'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /events/search:
+    get:
+      summary: Search events
+      operationId: searchEvents
+      tags:
+        - Events
+      parameters:
+        - $ref: '#/components/parameters/SearchParam'
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Event'
+                  pagination:
+                    $ref: '#/components/schemas/PaginationInfo'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /events/{id}/register:
+    post:
+      summary: Register for event
+      operationId: registerForEvent
+      tags:
+        - Events
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EventRegistrationRequest'
+      responses:
+        '201':
+          description: Registration successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/EventRegistration'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '409':
+          $ref: '#/components/responses/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /events/{id}/registrations:
+    get:
+      summary: Get event registration count
+      operationId: getEventRegistrations
+      tags:
+        - Events
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Registration information
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      total_registrations:
+                        type: integer
+                      available_spots:
+                        type: integer
+                        nullable: true
+                      registration_status:
+                        type: string
+                        enum: [open, closed, full, cancelled]
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/ErrorResponse'
+
+  # Inquiries form submission endpoints
+  /inquiries/media:
+    post:
+      summary: Submit media inquiry
+      operationId: submitMediaInquiry
+      tags:
+        - Inquiries
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MediaInquiryRequest'
+      responses:
+        '201':
+          description: Inquiry submitted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      inquiry_id:
+                        type: string
+                        format: uuid
+                      submitted_at:
+                        type: string
+                        format: date-time
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /inquiries/business:
+    post:
+      summary: Submit business inquiry
+      operationId: submitBusinessInquiry
+      tags:
+        - Inquiries
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BusinessInquiryRequest'
+      responses:
+        '201':
+          description: Inquiry submitted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      inquiry_id:
+                        type: string
+                        format: uuid
+                      submitted_at:
+                        type: string
+                        format: date-time
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /inquiries/donations:
+    post:
+      summary: Submit donation inquiry
+      operationId: submitDonationInquiry
+      tags:
+        - Inquiries
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DonationInquiryRequest'
+      responses:
+        '201':
+          description: Inquiry submitted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      inquiry_id:
+                        type: string
+                        format: uuid
+                      submitted_at:
+                        type: string
+                        format: date-time
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /inquiries/volunteers:
+    post:
+      summary: Submit volunteer inquiry
+      operationId: submitVolunteerInquiry
+      tags:
+        - Inquiries
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VolunteerInquiryRequest'
+      responses:
+        '201':
+          description: Inquiry submitted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      inquiry_id:
+                        type: string
+                        format: uuid
+                      submitted_at:
+                        type: string
+                        format: date-time
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/ErrorResponse'
+
+components:
+  parameters:
+    PageParam:
+      name: page
+      in: query
+      description: Page number for pagination
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+
+    LimitParam:
+      name: limit
+      in: query
+      description: Number of items per page
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+
+    SearchParam:
+      name: search
+      in: query
+      description: Search query string
+      required: false
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 255
+
+  schemas:
+    # Common schemas
+    PaginationInfo:
+      type: object
+      properties:
+        current_page:
+          type: integer
+        total_pages:
+          type: integer
+        total_items:
+          type: integer
+        items_per_page:
+          type: integer
+        has_next:
+          type: boolean
+        has_previous:
+          type: boolean
+      required:
+        - current_page
+        - total_pages
+        - total_items
+        - items_per_page
+        - has_next
+        - has_previous
+
+    # Placeholder schemas - will be replaced with component references
+    Service:
+      $ref: './components/schemas/services.yaml#/Service'
+
+    ServiceCategory:
+      $ref: './components/schemas/services.yaml#/ServiceCategory'
+
+    NewsArticle:
+      $ref: './components/schemas/news.yaml#/NewsArticle'
+
+    NewsCategory:
+      $ref: './components/schemas/news.yaml#/NewsCategory'
+
+    ResearchPublication:
+      $ref: './components/schemas/research.yaml#/ResearchPublication'
+
+    ResearchCategory:
+      $ref: './components/schemas/research.yaml#/ResearchCategory'
+
+    Event:
+      $ref: './components/schemas/events.yaml#/Event'
+
+    EventCategory:
+      $ref: './components/schemas/events.yaml#/EventCategory'
+
+    EventRegistration:
+      $ref: './components/schemas/events.yaml#/EventRegistration'
+
+    EventRegistrationRequest:
+      $ref: './components/schemas/events.yaml#/EventRegistrationRequest'
+
+    MediaInquiryRequest:
+      $ref: './components/schemas/inquiries.yaml#/MediaInquiryRequest'
+
+    BusinessInquiryRequest:
+      $ref: './components/schemas/inquiries.yaml#/BusinessInquiryRequest'
+
+    DonationInquiryRequest:
+      $ref: './components/schemas/inquiries.yaml#/DonationInquiryRequest'
+
+    VolunteerInquiryRequest:
+      $ref: './components/schemas/inquiries.yaml#/VolunteerInquiryRequest'
+
+  responses:
+    HealthResponse:
+      $ref: './components/responses/health.yaml#/HealthResponse'
+
+    ErrorResponse:
+      $ref: './components/responses/errors.yaml#/ErrorResponse'
+
+tags:
+  - name: Health
+    description: Health and readiness endpoints
+  - name: Services
+    description: Service offerings and categories
+  - name: News
+    description: News articles and categories
+  - name: Research
+    description: Research publications and categories
+  - name: Events
+    description: Events and registrations
+  - name: Inquiries
+    description: Form submissions and inquiries

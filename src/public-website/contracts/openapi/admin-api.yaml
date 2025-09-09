@@ -1,0 +1,1304 @@
+openapi: 3.1.0
+info:
+  title: International Center Admin API
+  description: Administrative API for International Center content management system
+  version: 1.0.0
+  contact:
+    name: International Center API Team
+servers:
+  - url: https://admin-api.axiomcloud.dev/api/v1
+    description: Production admin server
+  - url: http://localhost:4001/api/v1
+    description: Development admin server
+
+security:
+  - bearerAuth: []
+  - apiKeyAuth: []
+
+paths:
+  # Health endpoints
+  /health:
+    get:
+      summary: Admin API health check
+      operationId: getAdminHealth
+      security: []
+      tags:
+        - Health
+      responses:
+        '200':
+          $ref: '#/components/responses/HealthResponse'
+        '503':
+          $ref: '#/components/responses/ErrorResponse'
+
+  # Authentication endpoints
+  /auth/login:
+    post:
+      summary: Admin user login
+      operationId: adminLogin
+      security: []
+      tags:
+        - Authentication
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  format: password
+                remember_me:
+                  type: boolean
+                  default: false
+              required:
+                - email
+                - password
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  access_token:
+                    type: string
+                  refresh_token:
+                    type: string
+                  expires_in:
+                    type: integer
+                  token_type:
+                    type: string
+                    default: "Bearer"
+                  user:
+                    $ref: '#/components/schemas/AdminUser'
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /auth/refresh:
+    post:
+      summary: Refresh access token
+      operationId: refreshToken
+      security: []
+      tags:
+        - Authentication
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                refresh_token:
+                  type: string
+              required:
+                - refresh_token
+      responses:
+        '200':
+          description: Token refreshed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  access_token:
+                    type: string
+                  expires_in:
+                    type: integer
+                  token_type:
+                    type: string
+                    default: "Bearer"
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /auth/logout:
+    post:
+      summary: Admin user logout
+      operationId: adminLogout
+      tags:
+        - Authentication
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessResponse'
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
+
+  # User management endpoints
+  /users:
+    get:
+      summary: Get all admin users
+      operationId: getAdminUsers
+      tags:
+        - User Management
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - $ref: '#/components/parameters/SearchParam'
+        - name: role
+          in: query
+          schema:
+            type: string
+            enum: [admin, editor, moderator, viewer]
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [active, inactive, suspended]
+      responses:
+        '200':
+          description: List of admin users
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AdminUser'
+                  pagination:
+                    $ref: '#/components/schemas/PaginationInfo'
+        '403':
+          $ref: '#/components/responses/ErrorResponse'
+
+    post:
+      summary: Create new admin user
+      operationId: createAdminUser
+      tags:
+        - User Management
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAdminUserRequest'
+      responses:
+        '201':
+          $ref: '#/components/responses/CreatedResponse'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '403':
+          $ref: '#/components/responses/ErrorResponse'
+        '409':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /users/{id}:
+    get:
+      summary: Get admin user by ID
+      operationId: getAdminUserById
+      tags:
+        - User Management
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Admin user details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/AdminUser'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+        '403':
+          $ref: '#/components/responses/ErrorResponse'
+
+    put:
+      summary: Update admin user
+      operationId: updateAdminUser
+      tags:
+        - User Management
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateAdminUserRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/UpdatedResponse'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '403':
+          $ref: '#/components/responses/ErrorResponse'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+    delete:
+      summary: Delete admin user
+      operationId: deleteAdminUser
+      tags:
+        - User Management
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          $ref: '#/components/responses/DeletedResponse'
+        '403':
+          $ref: '#/components/responses/ErrorResponse'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+  # News management endpoints
+  /news:
+    get:
+      summary: Get all news articles (admin)
+      operationId: getNewsAdmin
+      tags:
+        - News Management
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - $ref: '#/components/parameters/SearchParam'
+        - $ref: '#/components/parameters/StatusParam'
+        - $ref: '#/components/parameters/CategoryIdParam'
+      responses:
+        '200':
+          description: List of news articles
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/NewsArticle'
+                  pagination:
+                    $ref: '#/components/schemas/PaginationInfo'
+
+    post:
+      summary: Create new news article
+      operationId: createNewsArticle
+      tags:
+        - News Management
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateNewsArticleRequest'
+      responses:
+        '201':
+          $ref: '#/components/responses/CreatedResponse'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '403':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /news/{id}:
+    get:
+      summary: Get news article by ID (admin)
+      operationId: getNewsArticleByIdAdmin
+      tags:
+        - News Management
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: News article details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/NewsArticle'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+    put:
+      summary: Update news article
+      operationId: updateNewsArticle
+      tags:
+        - News Management
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateNewsArticleRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/UpdatedResponse'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '403':
+          $ref: '#/components/responses/ErrorResponse'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+    delete:
+      summary: Delete news article
+      operationId: deleteNewsArticle
+      tags:
+        - News Management
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          $ref: '#/components/responses/DeletedResponse'
+        '403':
+          $ref: '#/components/responses/ErrorResponse'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /news/{id}/publish:
+    post:
+      summary: Publish news article
+      operationId: publishNewsArticle
+      tags:
+        - News Management
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessResponse'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '403':
+          $ref: '#/components/responses/ErrorResponse'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /news/{id}/unpublish:
+    post:
+      summary: Unpublish news article
+      operationId: unpublishNewsArticle
+      tags:
+        - News Management
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessResponse'
+        '403':
+          $ref: '#/components/responses/ErrorResponse'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+  # News categories management
+  /news/categories:
+    get:
+      summary: Get all news categories (admin)
+      operationId: getNewsCategoriesAdmin
+      tags:
+        - News Management
+      responses:
+        '200':
+          description: News categories
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/NewsCategory'
+
+    post:
+      summary: Create news category
+      operationId: createNewsCategory
+      tags:
+        - News Management
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateNewsCategoryRequest'
+      responses:
+        '201':
+          $ref: '#/components/responses/CreatedResponse'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '403':
+          $ref: '#/components/responses/ErrorResponse'
+
+  # Research management endpoints (similar pattern to news)
+  /research:
+    get:
+      summary: Get all research publications (admin)
+      operationId: getResearchAdmin
+      tags:
+        - Research Management
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - $ref: '#/components/parameters/SearchParam'
+        - $ref: '#/components/parameters/StatusParam'
+        - $ref: '#/components/parameters/CategoryIdParam'
+      responses:
+        '200':
+          description: List of research publications
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ResearchPublication'
+                  pagination:
+                    $ref: '#/components/schemas/PaginationInfo'
+
+    post:
+      summary: Create new research publication
+      operationId: createResearchPublication
+      tags:
+        - Research Management
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateResearchPublicationRequest'
+      responses:
+        '201':
+          $ref: '#/components/responses/CreatedResponse'
+
+  # Services management endpoints
+  /services:
+    get:
+      summary: Get all services (admin)
+      operationId: getServicesAdmin
+      tags:
+        - Services Management
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - $ref: '#/components/parameters/SearchParam'
+        - $ref: '#/components/parameters/StatusParam'
+        - $ref: '#/components/parameters/CategoryIdParam'
+      responses:
+        '200':
+          description: List of services
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Service'
+                  pagination:
+                    $ref: '#/components/schemas/PaginationInfo'
+
+    post:
+      summary: Create new service
+      operationId: createService
+      tags:
+        - Services Management
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateServiceRequest'
+      responses:
+        '201':
+          $ref: '#/components/responses/CreatedResponse'
+
+  # Events management endpoints
+  /events:
+    get:
+      summary: Get all events (admin)
+      operationId: getEventsAdmin
+      tags:
+        - Events Management
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - $ref: '#/components/parameters/SearchParam'
+        - $ref: '#/components/parameters/StatusParam'
+        - $ref: '#/components/parameters/CategoryIdParam'
+      responses:
+        '200':
+          description: List of events
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Event'
+                  pagination:
+                    $ref: '#/components/schemas/PaginationInfo'
+
+    post:
+      summary: Create new event
+      operationId: createEvent
+      tags:
+        - Events Management
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateEventRequest'
+      responses:
+        '201':
+          $ref: '#/components/responses/CreatedResponse'
+
+  # Inquiries management endpoints
+  /inquiries:
+    get:
+      summary: Get all inquiries
+      operationId: getInquiries
+      tags:
+        - Inquiries Management
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - $ref: '#/components/parameters/SearchParam'
+        - name: inquiry_type
+          in: query
+          schema:
+            type: string
+            enum: [media, business, donation, volunteer]
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, in_progress, completed, closed]
+      responses:
+        '200':
+          description: List of inquiries
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Inquiry'
+                  pagination:
+                    $ref: '#/components/schemas/PaginationInfo'
+
+  /inquiries/{id}:
+    get:
+      summary: Get inquiry by ID
+      operationId: getInquiryById
+      tags:
+        - Inquiries Management
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Inquiry details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Inquiry'
+
+    put:
+      summary: Update inquiry status
+      operationId: updateInquiryStatus
+      tags:
+        - Inquiries Management
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  enum: [pending, in_progress, completed, closed]
+                notes:
+                  type: string
+                  nullable: true
+                assigned_to:
+                  type: string
+                  format: uuid
+                  nullable: true
+              required:
+                - status
+      responses:
+        '200':
+          $ref: '#/components/responses/UpdatedResponse'
+
+  # Analytics endpoints
+  /analytics/dashboard:
+    get:
+      summary: Get admin dashboard analytics
+      operationId: getDashboardAnalytics
+      tags:
+        - Analytics
+      parameters:
+        - name: period
+          in: query
+          schema:
+            type: string
+            enum: [day, week, month, quarter, year]
+            default: month
+      responses:
+        '200':
+          description: Dashboard analytics data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/DashboardAnalytics'
+
+  # System endpoints
+  /system/settings:
+    get:
+      summary: Get system settings
+      operationId: getSystemSettings
+      tags:
+        - System Management
+      responses:
+        '200':
+          description: System settings
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/SystemSettings'
+
+    put:
+      summary: Update system settings
+      operationId: updateSystemSettings
+      tags:
+        - System Management
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateSystemSettingsRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/UpdatedResponse'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    
+    apiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+
+  parameters:
+    PageParam:
+      $ref: './components/parameters/pagination.yaml#/PageParam'
+    
+    LimitParam:
+      $ref: './components/parameters/pagination.yaml#/LimitParam'
+    
+    SearchParam:
+      $ref: './components/parameters/search.yaml#/SearchParam'
+    
+    StatusParam:
+      $ref: './components/parameters/filters.yaml#/StatusParam'
+    
+    CategoryIdParam:
+      $ref: './components/parameters/filters.yaml#/CategoryIdParam'
+
+  schemas:
+    # Common schemas
+    PaginationInfo:
+      $ref: './public-api.yaml#/components/schemas/PaginationInfo'
+
+    # Reference existing domain schemas
+    Service:
+      $ref: './components/schemas/services.yaml#/Service'
+
+    NewsArticle:
+      $ref: './components/schemas/news.yaml#/NewsArticle'
+
+    NewsCategory:
+      $ref: './components/schemas/news.yaml#/NewsCategory'
+
+    ResearchPublication:
+      $ref: './components/schemas/research.yaml#/ResearchPublication'
+
+    Event:
+      $ref: './components/schemas/events.yaml#/Event'
+
+    # Admin-specific schemas
+    AdminUser:
+      type: object
+      properties:
+        user_id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        first_name:
+          type: string
+        last_name:
+          type: string
+        role:
+          type: string
+          enum: [admin, editor, moderator, viewer]
+        status:
+          type: string
+          enum: [active, inactive, suspended]
+        last_login:
+          type: string
+          format: date-time
+          nullable: true
+        created_on:
+          type: string
+          format: date-time
+        created_by:
+          type: string
+          format: uuid
+          nullable: true
+      required:
+        - user_id
+        - email
+        - first_name
+        - last_name
+        - role
+        - status
+        - created_on
+
+    CreateAdminUserRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        first_name:
+          type: string
+        last_name:
+          type: string
+        role:
+          type: string
+          enum: [admin, editor, moderator, viewer]
+        password:
+          type: string
+          format: password
+          minLength: 8
+      required:
+        - email
+        - first_name
+        - last_name
+        - role
+        - password
+
+    UpdateAdminUserRequest:
+      type: object
+      properties:
+        first_name:
+          type: string
+        last_name:
+          type: string
+        role:
+          type: string
+          enum: [admin, editor, moderator, viewer]
+        status:
+          type: string
+          enum: [active, inactive, suspended]
+
+    CreateNewsArticleRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          maxLength: 255
+        summary:
+          type: string
+        content:
+          type: string
+          nullable: true
+        category_id:
+          type: string
+          format: uuid
+        image_url:
+          type: string
+          format: uri
+          nullable: true
+        author_name:
+          type: string
+          nullable: true
+        news_type:
+          type: string
+          enum: [announcement, press_release, event, update, alert, feature]
+        priority_level:
+          type: string
+          enum: [low, normal, high, urgent]
+          default: normal
+        tags:
+          type: array
+          items:
+            type: string
+        publishing_status:
+          type: string
+          enum: [draft, published, archived]
+          default: draft
+      required:
+        - title
+        - summary
+        - category_id
+        - news_type
+
+    UpdateNewsArticleRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          maxLength: 255
+        summary:
+          type: string
+        content:
+          type: string
+          nullable: true
+        category_id:
+          type: string
+          format: uuid
+        image_url:
+          type: string
+          format: uri
+          nullable: true
+        author_name:
+          type: string
+          nullable: true
+        news_type:
+          type: string
+          enum: [announcement, press_release, event, update, alert, feature]
+        priority_level:
+          type: string
+          enum: [low, normal, high, urgent]
+        tags:
+          type: array
+          items:
+            type: string
+        publishing_status:
+          type: string
+          enum: [draft, published, archived]
+
+    CreateNewsCategoryRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 255
+        description:
+          type: string
+          nullable: true
+      required:
+        - name
+
+    CreateResearchPublicationRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          maxLength: 255
+        abstract:
+          type: string
+        category_id:
+          type: string
+          format: uuid
+        authors:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+              affiliation:
+                type: string
+                nullable: true
+              email:
+                type: string
+                format: email
+                nullable: true
+            required:
+              - name
+        research_type:
+          type: string
+          enum: [clinical_study, observational_study, review, case_study, meta_analysis, guideline, white_paper]
+        study_status:
+          type: string
+          enum: [planned, ongoing, completed, published, archived]
+        keywords:
+          type: array
+          items:
+            type: string
+      required:
+        - title
+        - abstract
+        - category_id
+        - authors
+        - research_type
+        - study_status
+
+    CreateServiceRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          maxLength: 255
+        description:
+          type: string
+        category_id:
+          type: string
+          format: uuid
+        service_type:
+          type: string
+          enum: [consultation, treatment, procedure, diagnostic, therapy, rehabilitation, prevention]
+        duration_minutes:
+          type: integer
+          minimum: 0
+          nullable: true
+        price_range:
+          type: string
+          nullable: true
+        availability_status:
+          type: string
+          enum: [available, limited, unavailable, appointment_only]
+        insurance_accepted:
+          type: boolean
+        telehealth_available:
+          type: boolean
+      required:
+        - title
+        - description
+        - category_id
+        - service_type
+        - availability_status
+        - insurance_accepted
+        - telehealth_available
+
+    CreateEventRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          maxLength: 255
+        description:
+          type: string
+        category_id:
+          type: string
+          format: uuid
+        event_type:
+          type: string
+          enum: [conference, workshop, seminar, webinar, training, networking, fundraising, community]
+        start_datetime:
+          type: string
+          format: date-time
+        end_datetime:
+          type: string
+          format: date-time
+          nullable: true
+        registration_required:
+          type: boolean
+        max_capacity:
+          type: integer
+          minimum: 1
+          nullable: true
+        organizer:
+          type: object
+          properties:
+            name:
+              type: string
+            email:
+              type: string
+              format: email
+            phone:
+              type: string
+              nullable: true
+          required:
+            - name
+            - email
+      required:
+        - title
+        - description
+        - category_id
+        - event_type
+        - start_datetime
+        - registration_required
+        - organizer
+
+    Inquiry:
+      type: object
+      properties:
+        inquiry_id:
+          type: string
+          format: uuid
+        inquiry_type:
+          type: string
+          enum: [media, business, donation, volunteer]
+        status:
+          type: string
+          enum: [pending, in_progress, completed, closed]
+        submitter_name:
+          type: string
+        submitter_email:
+          type: string
+          format: email
+        subject:
+          type: string
+        message:
+          type: string
+        submitted_on:
+          type: string
+          format: date-time
+        assigned_to:
+          type: string
+          format: uuid
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+        last_updated:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+        - inquiry_id
+        - inquiry_type
+        - status
+        - submitter_name
+        - submitter_email
+        - subject
+        - message
+        - submitted_on
+
+    DashboardAnalytics:
+      type: object
+      properties:
+        content_stats:
+          type: object
+          properties:
+            total_news:
+              type: integer
+            total_research:
+              type: integer
+            total_services:
+              type: integer
+            total_events:
+              type: integer
+            published_this_month:
+              type: integer
+        inquiry_stats:
+          type: object
+          properties:
+            total_inquiries:
+              type: integer
+            pending_inquiries:
+              type: integer
+            completed_this_month:
+              type: integer
+        user_stats:
+          type: object
+          properties:
+            total_admin_users:
+              type: integer
+            active_sessions:
+              type: integer
+        system_stats:
+          type: object
+          properties:
+            uptime:
+              type: string
+            last_backup:
+              type: string
+              format: date-time
+              nullable: true
+      required:
+        - content_stats
+        - inquiry_stats
+        - user_stats
+        - system_stats
+
+    SystemSettings:
+      type: object
+      properties:
+        site_settings:
+          type: object
+          properties:
+            site_name:
+              type: string
+            site_description:
+              type: string
+            contact_email:
+              type: string
+              format: email
+            maintenance_mode:
+              type: boolean
+        notification_settings:
+          type: object
+          properties:
+            email_notifications:
+              type: boolean
+            sms_notifications:
+              type: boolean
+            slack_notifications:
+              type: boolean
+        security_settings:
+          type: object
+          properties:
+            session_timeout_minutes:
+              type: integer
+            max_login_attempts:
+              type: integer
+            password_expiry_days:
+              type: integer
+      required:
+        - site_settings
+        - notification_settings
+        - security_settings
+
+    UpdateSystemSettingsRequest:
+      type: object
+      properties:
+        site_settings:
+          type: object
+          properties:
+            site_name:
+              type: string
+            site_description:
+              type: string
+            contact_email:
+              type: string
+              format: email
+            maintenance_mode:
+              type: boolean
+        notification_settings:
+          type: object
+          properties:
+            email_notifications:
+              type: boolean
+            sms_notifications:
+              type: boolean
+            slack_notifications:
+              type: boolean
+        security_settings:
+          type: object
+          properties:
+            session_timeout_minutes:
+              type: integer
+            max_login_attempts:
+              type: integer
+            password_expiry_days:
+              type: integer
+
+  responses:
+    HealthResponse:
+      $ref: './components/responses/health.yaml#/HealthResponse'
+
+    SuccessResponse:
+      $ref: './components/responses/success.yaml#/SuccessResponse'
+
+    CreatedResponse:
+      $ref: './components/responses/success.yaml#/CreatedResponse'
+
+    UpdatedResponse:
+      $ref: './components/responses/success.yaml#/UpdatedResponse'
+
+    DeletedResponse:
+      $ref: './components/responses/success.yaml#/DeletedResponse'
+
+    ErrorResponse:
+      $ref: './components/responses/errors.yaml#/ErrorResponse'
+
+tags:
+  - name: Health
+    description: Health and readiness endpoints
+  - name: Authentication
+    description: Admin authentication and authorization
+  - name: User Management
+    description: Admin user management
+  - name: News Management
+    description: News article and category management
+  - name: Research Management
+    description: Research publication management
+  - name: Services Management
+    description: Service and category management
+  - name: Events Management
+    description: Event management and registrations
+  - name: Inquiries Management
+    description: Inquiry management and processing
+  - name: Analytics
+    description: Admin dashboard analytics
+  - name: System Management
+    description: System configuration and settings

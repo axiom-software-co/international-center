@@ -1,0 +1,150 @@
+NewsArticle:
+  type: object
+  properties:
+    news_id:
+      type: string
+      format: uuid
+      description: Unique news article identifier
+    title:
+      type: string
+      maxLength: 255
+      description: News article title
+    summary:
+      type: string
+      description: News article summary
+    content:
+      type: string
+      nullable: true
+      description: Full news article content
+    slug:
+      type: string
+      maxLength: 255
+      description: URL-friendly article identifier
+    category_id:
+      type: string
+      format: uuid
+      description: News category ID
+    category:
+      $ref: '#/NewsCategory'
+      description: News category details
+    image_url:
+      type: string
+      format: uri
+      nullable: true
+      maxLength: 500
+      description: Article image URL
+    author_name:
+      type: string
+      nullable: true
+      maxLength: 255
+      description: Article author name
+    publication_timestamp:
+      type: string
+      format: date-time
+      description: Article publication timestamp
+    external_source:
+      type: string
+      nullable: true
+      maxLength: 255
+      description: External source if applicable
+    external_url:
+      type: string
+      format: uri
+      nullable: true
+      maxLength: 500
+      description: External URL if applicable
+    publishing_status:
+      type: string
+      enum: [draft, published, archived]
+      description: Article publishing status
+    tags:
+      type: array
+      items:
+        type: string
+      description: Article tags
+    news_type:
+      type: string
+      enum: [announcement, press_release, event, update, alert, feature]
+      description: Type of news article
+    priority_level:
+      type: string
+      enum: [low, normal, high, urgent]
+      description: Article priority level
+    created_on:
+      type: string
+      format: date-time
+      description: Article creation timestamp
+    modified_on:
+      type: string
+      format: date-time
+      nullable: true
+      description: Last modification timestamp
+    created_by:
+      type: string
+      nullable: true
+      maxLength: 255
+      description: Article creator
+    modified_by:
+      type: string
+      nullable: true
+      maxLength: 255
+      description: Last modifier
+  required:
+    - news_id
+    - title
+    - summary
+    - slug
+    - category_id
+    - publication_timestamp
+    - publishing_status
+    - news_type
+    - priority_level
+    - created_on
+
+NewsCategory:
+  type: object
+  properties:
+    category_id:
+      type: string
+      format: uuid
+      description: Unique category identifier
+    name:
+      type: string
+      maxLength: 255
+      description: Category name
+    slug:
+      type: string
+      maxLength: 255
+      description: URL-friendly category identifier
+    description:
+      type: string
+      nullable: true
+      description: Category description
+    is_default_unassigned:
+      type: boolean
+      description: Whether this is the default category for unassigned articles
+    created_on:
+      type: string
+      format: date-time
+      description: Category creation timestamp
+    modified_on:
+      type: string
+      format: date-time
+      nullable: true
+      description: Last modification timestamp
+    created_by:
+      type: string
+      nullable: true
+      maxLength: 255
+      description: Category creator
+    modified_by:
+      type: string
+      nullable: true
+      maxLength: 255
+      description: Last modifier
+  required:
+    - category_id
+    - name
+    - slug
+    - is_default_unassigned
+    - created_on
