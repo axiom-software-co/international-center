@@ -22,9 +22,12 @@ type NetworkingComponent struct {
 func NewNetworkingComponent(ctx *pulumi.Context, name string, args *NetworkingArgs, opts ...pulumi.ResourceOption) (*NetworkingComponent, error) {
 	component := &NetworkingComponent{}
 	
-	err := ctx.RegisterComponentResource("international-center:platform:Networking", name, component, opts...)
-	if err != nil {
-		return nil, err
+	// Safe registration for mock contexts
+	if canRegister(ctx) {
+		err := ctx.RegisterComponentResource("international-center:platform:Networking", name, component, opts...)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	var configuration, networkPolicies pulumi.MapOutput
@@ -83,13 +86,15 @@ func NewNetworkingComponent(ctx *pulumi.Context, name string, args *NetworkingAr
 	component.ServiceMesh = serviceMesh
 	component.NetworkPolicies = networkPolicies
 
-	if err := ctx.RegisterResourceOutputs(component, pulumi.Map{
-		"configuration":   component.Configuration,
-		"loadBalancer":    component.LoadBalancer,
-		"serviceMesh":     component.ServiceMesh,
-		"networkPolicies": component.NetworkPolicies,
-	}); err != nil {
-		return nil, err
+	if canRegister(ctx) {
+		if err := ctx.RegisterResourceOutputs(component, pulumi.Map{
+			"configuration":   component.Configuration,
+			"loadBalancer":    component.LoadBalancer,
+			"serviceMesh":     component.ServiceMesh,
+			"networkPolicies": component.NetworkPolicies,
+		}); err != nil {
+			return nil, err
+		}
 	}
 
 	return component, nil

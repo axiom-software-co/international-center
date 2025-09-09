@@ -1,0 +1,91 @@
+---
+import InformationPage from '../components/InformationPage.astro';
+import { getLegalPageBySlug } from '../data/legal';
+
+const legalData = getLegalPageBySlug('terms-of-service');
+if (!legalData) {
+  throw new Error('Legal page data not found');
+}
+---
+
+<InformationPage
+  title={legalData.title}
+  description={legalData.description}
+  heroTitle="Terms of Service"
+  heroDescription="Terms of service and conditions for receiving regenerative medicine treatments at International Center"
+>
+            <p>
+              These Terms of Service govern your relationship with International Center and the regenerative medicine services we provide. By scheduling or receiving treatment, you agree to these terms.
+            </p>
+
+            <h2>Medical Services</h2>
+            <p>International Center provides mobile and clinic-based regenerative medicine services including but not limited to:</p>
+            <ul>
+              <li>Platelet-Rich Plasma (PRP) therapy</li>
+              <li>Exosome treatments</li>
+              <li>Peptide therapy consultations</li>
+              <li>IV nutritional therapy</li>
+              <li>Joint pain management</li>
+              <li>Wellness screenings and assessments</li>
+            </ul>
+
+            <h2>Patient Responsibilities</h2>
+            <p>As a patient, you agree to:</p>
+            <ul>
+              <li>Provide accurate and complete medical history information</li>
+              <li>Follow all pre- and post-treatment instructions</li>
+              <li>Attend scheduled appointments or provide adequate notice for cancellations</li>
+              <li>Pay for services according to our payment policies</li>
+              <li>Communicate any concerns or complications promptly</li>
+            </ul>
+
+            <h2>Treatment Expectations</h2>
+            <p>You understand that:</p>
+            <ul>
+              <li>Results may vary and are not guaranteed</li>
+              <li>Multiple treatments may be necessary</li>
+              <li>Some treatments are considered elective or experimental</li>
+              <li>Insurance coverage may be limited or unavailable</li>
+              <li>Recovery times vary by individual and treatment type</li>
+            </ul>
+
+            <h2>Informed Consent</h2>
+            <p>Before treatment, you will receive detailed information about:</p>
+            <ul>
+              <li>The nature and purpose of proposed treatments</li>
+              <li>Potential risks, benefits, and alternatives</li>
+              <li>Expected outcomes and recovery process</li>
+              <li>Post-treatment care requirements</li>
+            </ul>
+
+            <h2>Cancellation and Refund Policy</h2>
+            <p>
+              Cancellations must be made at least 24 hours in advance. Late cancellations or no-shows may result in charges. Refund policies vary by service type and will be explained prior to treatment.
+            </p>
+
+            <h2>Limitation of Liability</h2>
+            <p>
+              Our liability is limited to the cost of services provided. We are not responsible for indirect, consequential, or punitive damages arising from treatment.
+            </p>
+
+            <h2>Dispute Resolution</h2>
+            <p>
+              Any disputes will be resolved through binding arbitration in accordance with Florida state laws. You retain the right to file complaints with appropriate medical boards.
+            </p>
+
+            <blockquote class="border-l-4 border-blue-600 pl-6 italic bg-blue-50 p-4 rounded-sm">
+              <p class="font-semibold">Questions About These Terms?</p>
+              <p>
+                If you have questions about our terms of service, please contact us:
+              </p>
+              <p>
+                <strong>International Center</strong><br>
+                Email: info@internationalcenter.com<br>
+                Phone: (561) 555-5555
+              </p>
+            </blockquote>
+
+            <p class="font-semibold">
+              By receiving treatment from International Center, you acknowledge that you have read, understood, and agree to be bound by these Terms of Service.
+            </p>
+</InformationPage>

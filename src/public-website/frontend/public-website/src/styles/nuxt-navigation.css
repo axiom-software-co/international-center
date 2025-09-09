@@ -1,0 +1,482 @@
+/* Nuxt.com Style Navigation */
+.nuxt-nav {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: rgba(255, 255, 255, 0.01);
+  backdrop-filter: blur(12px) saturate(150%);
+  -webkit-backdrop-filter: blur(12px) saturate(150%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.nuxt-nav.scrolled {
+  background: rgba(255, 255, 255, 0.02);
+  backdrop-filter: blur(16px) saturate(160%);
+  -webkit-backdrop-filter: blur(16px) saturate(160%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.nuxt-nav-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 4rem;
+}
+
+.nuxt-nav-logo {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 700;
+  font-size: 1.25rem;
+  color: #000;
+  text-decoration: none;
+  transition: opacity 0.2s ease;
+}
+
+.nuxt-nav-logo:hover {
+  opacity: 0.8;
+}
+
+.nuxt-nav-logo-icon {
+  width: 2rem;
+  height: 2rem;
+  background: #00dc82;
+  border-radius: 0.375rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 1.125rem;
+}
+
+.nuxt-nav-links {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.nuxt-nav-link {
+  position: relative;
+  padding: 0.5rem 0.75rem;
+  color: #374151;
+  text-decoration: none;
+  font-weight: 500;
+  font-size: 0.875rem;
+  border-radius: 0.375rem;
+  transition: all 0.2s ease;
+}
+
+.nuxt-nav-link:hover {
+  color: #1f2937;
+  background: rgba(59, 130, 246, 0.08);
+}
+
+.nuxt-nav-link.active {
+  color: #000;
+  background: rgba(0, 0, 0, 0.08);
+}
+
+/* Dropdown Navigation */
+.nuxt-nav-dropdown {
+  position: relative;
+}
+
+.nuxt-nav-dropdown-trigger {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.5rem 0.75rem;
+  color: #374151;
+  text-decoration: none;
+  font-weight: 500;
+  font-size: 0.875rem;
+  border-radius: 0.375rem;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.nuxt-nav-dropdown-trigger:hover {
+  color: #1f2937;
+  background: rgba(59, 130, 246, 0.08);
+}
+
+.nuxt-nav-dropdown-icon {
+  width: 1rem;
+  height: 1rem;
+  transition: transform 0.2s ease;
+}
+
+.nuxt-nav-dropdown.open .nuxt-nav-dropdown-icon {
+  transform: rotate(180deg);
+}
+
+.nuxt-nav-dropdown.open .nuxt-nav-dropdown-trigger {
+  color: #1f2937;
+  background: rgba(59, 130, 246, 0.08);
+}
+
+.nuxt-nav-dropdown-content {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  left: 0;
+  min-width: 18rem;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(16px) saturate(150%);
+  -webkit-backdrop-filter: blur(16px) saturate(150%);
+  border-radius: 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-10px) scale(0.95);
+  transition:
+    opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+    visibility 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+    transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 1000;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* Dropdown arrow */
+.nuxt-nav-dropdown-content::before {
+  content: '';
+  position: absolute;
+  top: -6px;
+  left: 1rem;
+  width: 12px;
+  height: 12px;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(16px) saturate(150%);
+  -webkit-backdrop-filter: blur(16px) saturate(150%);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-right: none;
+  border-bottom: none;
+  transform: rotate(45deg);
+  z-index: -1;
+}
+
+.nuxt-nav-dropdown.open .nuxt-nav-dropdown-content {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0) scale(1);
+  pointer-events: auto;
+}
+
+.nuxt-nav-dropdown-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.875rem 1rem;
+  color: #374151;
+  text-decoration: none;
+  transition: all 0.15s ease;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+  position: relative;
+}
+
+.nuxt-nav-dropdown-item:last-child {
+  border-bottom: none;
+}
+
+.nuxt-nav-dropdown-item:hover {
+  background: rgba(59, 130, 246, 0.06);
+  color: #1f2937;
+  transform: translateX(2px);
+}
+
+.nuxt-nav-dropdown-item-icon {
+  width: 1.25rem;
+  height: 1.25rem;
+  color: #6b7280;
+  margin-top: 0.125rem;
+  transition: all 0.15s ease;
+}
+
+.nuxt-nav-dropdown-item:hover .nuxt-nav-dropdown-item-icon {
+  color: #3b82f6;
+  transform: scale(1.05);
+}
+
+.nuxt-nav-dropdown-item-content {
+  flex: 1;
+}
+
+.nuxt-nav-dropdown-item-title {
+  font-weight: 600;
+  font-size: 0.875rem;
+  line-height: 1.25;
+  margin-bottom: 0.25rem;
+  color: #111827;
+  transition: color 0.15s ease;
+}
+
+.nuxt-nav-dropdown-item-description {
+  font-size: 0.75rem;
+  color: #6b7280;
+  line-height: 1.4;
+}
+
+/* Action Buttons */
+.nuxt-nav-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.nuxt-nav-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  font-weight: 500;
+  font-size: 0.875rem;
+  border-radius: 0.375rem;
+  text-decoration: none;
+  transition: all 0.2s ease;
+  border: 1px solid transparent;
+  cursor: pointer;
+}
+
+.nuxt-nav-btn-outline {
+  color: #374151;
+  border-color: rgba(0, 0, 0, 0.1);
+  background: white;
+}
+
+.nuxt-nav-btn-outline:hover {
+  color: #000;
+  border-color: rgba(0, 0, 0, 0.2);
+  background: rgba(0, 0, 0, 0.02);
+}
+
+.nuxt-nav-btn-primary {
+  color: white;
+  background: #00dc82;
+  border: none;
+}
+
+.nuxt-nav-btn-primary:hover {
+  background: #00c474;
+}
+
+/* Mobile Navigation */
+.nuxt-nav-mobile-toggle {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  color: #374151;
+  background: none;
+  border: none;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.nuxt-nav-mobile-toggle:hover {
+  color: #000;
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.nuxt-nav-mobile-menu {
+  position: fixed;
+  top: 4rem;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(16px) saturate(150%);
+  -webkit-backdrop-filter: blur(16px) saturate(150%);
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 40;
+  overflow-y: auto;
+}
+
+.nuxt-nav-mobile-menu.open {
+  opacity: 1;
+  visibility: visible;
+}
+
+.nuxt-nav-mobile-content {
+  padding: 1.5rem;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.nuxt-nav-mobile-links {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 2rem;
+}
+
+.nuxt-nav-mobile-link {
+  padding: 0.75rem 1rem;
+  color: #374151;
+  text-decoration: none;
+  font-weight: 500;
+  border-radius: 0.375rem;
+  transition: all 0.2s ease;
+}
+
+.nuxt-nav-mobile-link:hover {
+  color: #1f2937;
+  background: rgba(59, 130, 246, 0.08);
+}
+
+.nuxt-nav-mobile-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .nuxt-nav-links {
+    display: none;
+  }
+
+  .nuxt-nav-actions {
+    display: none;
+  }
+
+  .nuxt-nav-mobile-toggle {
+    display: flex;
+  }
+
+  .nuxt-nav-dropdown-content {
+    position: static;
+    width: 100%;
+    margin-top: 0.5rem;
+    background: rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(12px) saturate(150%);
+    -webkit-backdrop-filter: blur(12px) saturate(150%);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 0.5rem;
+    transform: none;
+  }
+
+  .nuxt-nav-dropdown-content::before {
+    display: none;
+  }
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .nuxt-nav {
+    background: rgba(17, 24, 39, 0.1);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .nuxt-nav.scrolled {
+    background: rgba(17, 24, 39, 0.2);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+  }
+
+  .nuxt-nav-logo {
+    color: #f9fafb;
+  }
+
+  .nuxt-nav-link {
+    color: #d1d5db;
+  }
+
+  .nuxt-nav-link:hover {
+    color: #f9fafb;
+    background: rgba(255, 255, 255, 0.1);
+  }
+
+  .nuxt-nav-dropdown-content {
+    background: rgba(31, 41, 55, 0.95);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .nuxt-nav-dropdown-item {
+    color: #d1d5db;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .nuxt-nav-dropdown-item:hover {
+    background: rgba(255, 255, 255, 0.05);
+    color: #f9fafb;
+  }
+
+  .nuxt-nav-btn-outline {
+    color: #d1d5db;
+    border-color: rgba(255, 255, 255, 0.2);
+    background: rgba(31, 41, 55, 0.8);
+  }
+
+  .nuxt-nav-btn-outline:hover {
+    color: #f9fafb;
+    border-color: rgba(255, 255, 255, 0.3);
+    background: rgba(255, 255, 255, 0.1);
+  }
+
+  .nuxt-nav-mobile-menu {
+    background: rgba(17, 24, 39, 0.95);
+  }
+
+  .nuxt-nav-mobile-link {
+    color: #d1d5db;
+  }
+
+  .nuxt-nav-mobile-link:hover {
+    color: #f9fafb;
+    background: rgba(255, 255, 255, 0.1);
+  }
+}
+
+/* Fallback for browsers without backdrop-filter support */
+@supports not (backdrop-filter: blur()) {
+  .nuxt-nav {
+    background: rgba(255, 255, 255, 0.95);
+  }
+
+  .nuxt-nav.scrolled {
+    background: rgba(255, 255, 255, 0.98);
+  }
+
+  .nuxt-nav-dropdown-content {
+    background: rgba(255, 255, 255, 0.98);
+  }
+
+  .nuxt-nav-mobile-menu {
+    background: rgba(255, 255, 255, 0.95);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .nuxt-nav {
+      background: rgba(17, 24, 39, 0.95);
+    }
+
+    .nuxt-nav.scrolled {
+      background: rgba(17, 24, 39, 0.98);
+    }
+
+    .nuxt-nav-dropdown-content {
+      background: rgba(31, 41, 55, 0.98);
+    }
+
+    .nuxt-nav-mobile-menu {
+      background: rgba(17, 24, 39, 0.95);
+    }
+  }
+}

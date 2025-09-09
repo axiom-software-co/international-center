@@ -1,0 +1,24 @@
+{
+  "name": "International Center for Regenerative Medicine",
+  "short_name": "International Center",
+  "description": "Advanced regenerative medicine solutions for a healthier tomorrow. Mobile PRP therapy, exosome treatments, and personalized regenerative care throughout South Florida.",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    },
+    {
+      "src": "/apple-touch-icon.svg",
+      "sizes": "180x180",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "theme_color": "#2563eb",
+  "background_color": "#ffffff",
+  "display": "standalone",
+  "start_url": "/",
+  "scope": "/",
+  "orientation": "portrait-primary"
+}

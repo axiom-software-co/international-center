@@ -22,9 +22,12 @@ type DaprComponent struct {
 func NewDaprComponent(ctx *pulumi.Context, name string, args *DaprArgs, opts ...pulumi.ResourceOption) (*DaprComponent, error) {
 	component := &DaprComponent{}
 	
-	err := ctx.RegisterComponentResource("international-center:platform:Dapr", name, component, opts...)
-	if err != nil {
-		return nil, err
+	// Safe registration for mock contexts
+	if canRegister(ctx) {
+		err := ctx.RegisterComponentResource("international-center:platform:Dapr", name, component, opts...)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	var controlPlaneURL, placementService, healthEndpoint pulumi.StringOutput
@@ -55,14 +58,17 @@ func NewDaprComponent(ctx *pulumi.Context, name string, args *DaprArgs, opts ...
 	component.SidecarEnabled = sidecarEnabled
 	component.HealthEndpoint = healthEndpoint
 
-	if err := ctx.RegisterResourceOutputs(component, pulumi.Map{
-		"controlPlaneURL":  component.ControlPlaneURL,
-		"placementService": component.PlacementService,
-		"sidecarEnabled":   component.SidecarEnabled,
-		"healthEndpoint":   component.HealthEndpoint,
-	}); err != nil {
-		return nil, err
+	if canRegister(ctx) {
+		if err := ctx.RegisterResourceOutputs(component, pulumi.Map{
+			"controlPlaneURL":  component.ControlPlaneURL,
+			"placementService": component.PlacementService,
+			"sidecarEnabled":   component.SidecarEnabled,
+			"healthEndpoint":   component.HealthEndpoint,
+		}); err != nil {
+			return nil, err
+		}
 	}
 
 	return component, nil
 }
+

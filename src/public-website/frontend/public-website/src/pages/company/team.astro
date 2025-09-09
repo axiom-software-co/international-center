@@ -1,0 +1,39 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import TeamProfiles from '../../components/TeamProfiles.vue';
+import SupportTeam from '../../components/SupportTeam.vue';
+import PageHero from '../../components/PageHero.astro';
+---
+
+<Layout
+  title="Our Team - International Center | Board-Certified Physicians"
+  description="Meet our board-certified physicians and healthcare professionals dedicated to excellence in regenerative medicine throughout South Florida."
+>
+  <main>
+    <!-- Hero Section -->
+    <PageHero
+      title="Our Team"
+      description="Board-certified physicians and healthcare professionals committed to excellence in regenerative medicine"
+      showBottomMargin={true}
+    />
+
+    <!-- Leadership Team -->
+    <section class="py-8">
+      <div class="container">
+        <div class="text-center mb-12">
+          <h2 class="text-3xl font-semibold lg:text-5xl">Meet Our Physicians</h2>
+        </div>
+
+        <!-- Leadership team photos - load when visible -->
+        <TeamProfiles client:visible class="mb-12" />
+
+        <div class="text-center mb-12">
+          <h3 class="text-2xl font-semibold">Our Support Team</h3>
+        </div>
+
+        <!-- Support team - load when visible (below fold) -->
+        <SupportTeam client:visible />
+      </div>
+    </section>
+  </main>
+</Layout>

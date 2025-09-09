@@ -1,0 +1,70 @@
+---
+import NavigationMenu from '../components/NavigationMenu.vue';
+import Footer from '../components/Footer.vue';
+import HoverClassesReference from '../components/HoverClassesReference.astro';
+
+export interface Props {
+  title: string;
+  description?: string;
+}
+
+const {
+  title,
+  description = 'Advanced regenerative medicine solutions for a healthier tomorrow. Mobile PRP therapy, exosome treatments, and personalized regenerative care throughout South Florida.',
+} = Astro.props;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="description" content={description} />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+    />
+    <!-- Favicon - 2025 Minimal Approach with Cache Busting -->
+    <link rel="icon" href="/favicon.ico?v=4" sizes="32x32" />
+    <link rel="icon" href="/icon-simple.svg?v=4" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.svg?v=4" />
+    <link rel="manifest" href="/site.webmanifest" />
+    <meta name="generator" content={Astro.generator} />
+    <title>{title}</title>
+
+    <!-- Algolia Search Verification -->
+    <meta name="algolia-site-verification" content="04278B71DB9637E9" />
+
+    <!-- Additional SEO meta tags -->
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="/og-image.svg" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content="/og-image.svg" />
+
+    <!-- Medical/Healthcare specific meta tags -->
+    <meta name="robots" content="index, follow" />
+    <meta name="theme-color" content="#2563eb" />
+    <meta name="msapplication-TileColor" content="#2563eb" />
+
+    <!-- iOS Safari specific meta tags -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="International Center" />
+    <meta name="format-detection" content="telephone=no" />
+  </head>
+  <body>
+    <NavigationMenu client:load />
+    <main class="pt-16 md:pt-32">
+      <slot />
+    </main>
+    <Footer client:idle />
+    <HoverClassesReference />
+  </body>
+</html>
+
+<style is:global>
+  @import '../styles/globals.css';
+</style>

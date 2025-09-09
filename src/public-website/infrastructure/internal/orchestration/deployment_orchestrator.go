@@ -6,7 +6,7 @@ import (
 	"log"
 	"time"
 
-	"github.com/axiom-software-co/international-center/src/cicd/internal/builders"
+	"github.com/axiom-software-co/international-center/src/public-website/infrastructure/internal/builders"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi/config"
 )
@@ -28,7 +28,7 @@ const (
 	StrategyConservativeWithExtensiveValidation DeploymentStrategy = "conservative_with_extensive_validation"
 )
 
-type EnvironmentConfig struct {
+type DeploymentEnvironmentConfig struct {
 	Environment        string
 	DeploymentStrategy DeploymentStrategy
 	TimeoutMinutes     int
@@ -37,7 +37,7 @@ type EnvironmentConfig struct {
 }
 
 type DeploymentConfiguration struct {
-	Environment EnvironmentConfig
+	Environment DeploymentEnvironmentConfig
 	Timeouts    map[DeploymentPhase]time.Duration
 }
 
@@ -75,13 +75,14 @@ func NewDeploymentOrchestrator(ctx *pulumi.Context, environment string) *Deploym
 
 func buildDeploymentConfiguration(cfg *config.Config, environment string) *DeploymentConfiguration {
 	// Read environment-specific configuration from Pulumi config
-	infraCfg := cfg.GetObject("infrastructure")
+	var infraCfg map[string]interface{}
+	err := cfg.GetObject("infrastructure", &infraCfg)
 	deploymentStrategy := StrategyAggressive // default
 	timeoutMinutes := 15 // default
 	concurrentOps := 10 // default
 	requireApproval := false // default
 	
-	if infraCfg != nil {
+	if err == nil && infraCfg != nil {
 		if strategyStr, ok := infraCfg["deployment_strategy"].(string); ok {
 			deploymentStrategy = DeploymentStrategy(strategyStr)
 		}
@@ -104,7 +105,7 @@ func buildDeploymentConfiguration(cfg *config.Config, environment string) *Deplo
 	timeouts := buildTimeouts(environment, deploymentStrategy, timeoutMinutes)
 	
 	return &DeploymentConfiguration{
-		Environment: EnvironmentConfig{
+		Environment: DeploymentEnvironmentConfig{
 			Environment:        environment,
 			DeploymentStrategy: deploymentStrategy,
 			TimeoutMinutes:     timeoutMinutes,
@@ -301,7 +302,7 @@ func (do *DeploymentOrchestrator) executePhase(phase DeploymentPhase, infraOutpu
 		case PhaseInfrastructure:
 			result.Outputs, err = do.deployInfrastructure()
 		case PhasePlatform:
-			result.Outputs, err = do.deployPlatform()
+			result.Outputs, err = do.deployPlatform(infraOutputs)
 		case PhaseServices:
 			result.Outputs, err = do.deployServices(infraOutputs, platformOutputs)
 		case PhaseWebsite:
@@ -332,30 +333,29 @@ func (do *DeploymentOrchestrator) deployInfrastructure() (pulumi.Map, error) {
 	}
 
 	return pulumi.Map{
-		"database_connection_string": infrastructureComponent.DatabaseConnectionString,
-		"storage_connection_string":  infrastructureComponent.StorageConnectionString,
-		"vault_address":             infrastructureComponent.VaultAddress,
-		"rabbitmq_endpoint":         infrastructureComponent.RabbitMQEndpoint,
-		"grafana_url":               infrastructureComponent.GrafanaURL,
+		"database_connection_string": infrastructureComponent.DatabaseEndpoint,
+		"storage_connection_string":  infrastructureComponent.StorageEndpoint,
+		"vault_address":             infrastructureComponent.VaultEndpoint,
+		"rabbitmq_endpoint":         infrastructureComponent.MessagingEndpoint,
+		"grafana_url":               infrastructureComponent.ObservabilityEndpoint,
 		"health_check_enabled":      infrastructureComponent.HealthCheckEnabled,
 		"security_policies":         infrastructureComponent.SecurityPolicies,
 		"audit_logging":            infrastructureComponent.AuditLogging,
 	}, nil
 }
 
-func (do *DeploymentOrchestrator) deployPlatform() (pulumi.Map, error) {
-	platformComponent, err := do.builder.BuildPlatform()
+func (do *DeploymentOrchestrator) deployPlatform(infraOutputs pulumi.Map) (pulumi.Map, error) {
+	platformComponent, err := do.builder.BuildPlatform(infraOutputs)
 	if err != nil {
 		return nil, fmt.Errorf("platform deployment failed: %w", err)
 	}
 
 	return pulumi.Map{
-		"dapr_control_plane_url":     platformComponent.DaprControlPlaneURL,
-		"dapr_placement_service":     platformComponent.DaprPlacementService,
-		"container_orchestrator":     platformComponent.ContainerOrchestrator,
+		"dapr_control_plane_url":     platformComponent.DaprEndpoint,
+		"container_orchestrator":     platformComponent.OrchestrationEndpoint,
 		"service_mesh_enabled":       platformComponent.ServiceMeshEnabled,
-		"networking_configuration":   platformComponent.NetworkingConfiguration,
-		"security_policies":          platformComponent.SecurityPolicies,
+		"networking_configuration":   platformComponent.NetworkingConfig,
+		"security_policies":          platformComponent.SecurityConfig,
 		"health_check_enabled":       platformComponent.HealthCheckEnabled,
 	}, nil
 }

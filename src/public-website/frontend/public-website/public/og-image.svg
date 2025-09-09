@@ -1,0 +1,37 @@
+<svg width="1200" height="630" viewBox="0 0 1200 630" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- White background -->
+  <rect width="1200" height="630" fill="#FFFFFF"/>
+  
+  <!-- Properly centered logo and text group -->
+  <g transform="translate(600, 315)">
+    <!-- Center everything around this point -->
+    <g transform="translate(-375, -45)">
+      <!-- Company logo positioned and sized for optimal alignment -->
+      <svg x="0" y="0" width="100" height="100" viewBox="0 0 286 326" xmlns="http://www.w3.org/2000/svg">
+        <path d="M266.006 -9.15527e-05C277.052 -9.15527e-05 286.006 8.95421 286.006 19.9999C286.006 63.3016 262.147 96.1501 235.27 120.882C208.842 145.199 175.696 164.877 154.286 179.512C133.026 194.044 104.6 210.659 80.1709 232.959C68.9387 243.212 59.5065 253.86 52.6094 265H233.995C241.496 277.403 245.806 290.607 245.997 305H40.0098C40.0049 305.333 40 305.666 40 306C40 317.046 31.0457 326 20 326C8.95431 326 0 317.046 0 306C3.61802e-05 262.353 25.8692 228.368 53.2041 203.416C80.3999 178.591 113.474 158.957 131.714 146.489C148.121 135.274 166.244 124.141 183.51 111.5H102.705C95.0362 105.785 87.4268 99.6644 80.1709 93.0409C76.0176 89.2496 72.1106 85.404 68.4863 81.4999H218.233C235.492 62.9951 246.006 43.0175 246.006 19.9999C246.006 8.95421 254.96 -9.15527e-05 266.006 -9.15527e-05Z" fill="#2563EB" fill-opacity="0.75"/>
+        <path d="M198.562 176.105C211.057 184.88 223.797 194.561 235.27 205.118C262.147 229.85 286.006 262.698 286.006 306C286.006 317.046 277.052 326 266.006 326C254.96 326 246.006 317.046 246.006 306C246.006 282.982 235.492 263.005 218.233 244.5H68.4863C72.1106 240.596 76.0176 236.75 80.1709 232.959C87.4272 226.335 95.0379 220.215 102.707 214.5H183.514C176.716 209.523 169.785 204.78 162.878 200.174L198.562 176.105ZM20 0C31.0457 0 40 8.95431 40 20C40 20.3338 40.0049 20.6671 40.0098 21H245.997C245.806 35.393 241.496 48.5969 233.995 61H52.6094C59.5065 72.1396 68.9387 82.7879 80.1709 93.041C100.482 111.581 123.555 126.194 142.976 138.945C139.155 141.468 135.391 143.976 131.714 146.489C125.025 151.062 116.341 156.598 106.683 163.001C90.0062 151.944 70.4265 138.305 53.2041 122.584C25.8692 97.6318 3.61802e-05 63.6471 0 20C0 8.95431 8.95431 0 20 0Z" fill="#2563EB"/>
+      </svg>
+      
+      <!-- Company name and tagline properly aligned with logo -->
+      <g transform="translate(130, 20)">
+        <!-- Main company name -->
+        <text x="0" y="20" font-family="system-ui, -apple-system, sans-serif" font-size="72" font-weight="700" fill="#1F2937" dominant-baseline="middle">
+          International Center
+        </text>
+        <!-- Tagline -->
+        <text x="0" y="70" font-family="system-ui, -apple-system, sans-serif" font-size="32" font-weight="500" fill="#6B7280" letter-spacing="0.05em" dominant-baseline="middle">
+          for Regenerative Medicine
+        </text>
+      </g>
+    </g>
+  </g>
+  
+  <!-- Subtle gradient border for professional look -->
+  <defs>
+    <linearGradient id="borderGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#E5E7EB;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#D1D5DB;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  <rect x="20" y="20" width="1160" height="590" fill="none" stroke="url(#borderGradient)" stroke-width="2" rx="16"/>
+</svg>

@@ -22,9 +22,12 @@ type SecurityComponent struct {
 func NewSecurityComponent(ctx *pulumi.Context, name string, args *SecurityArgs, opts ...pulumi.ResourceOption) (*SecurityComponent, error) {
 	component := &SecurityComponent{}
 	
-	err := ctx.RegisterComponentResource("international-center:platform:Security", name, component, opts...)
-	if err != nil {
-		return nil, err
+	// Safe registration for mock contexts
+	if canRegister(ctx) {
+		err := ctx.RegisterComponentResource("international-center:platform:Security", name, component, opts...)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	var policies, authenticationConfig, tlsConfig pulumi.MapOutput
@@ -37,6 +40,9 @@ func NewSecurityComponent(ctx *pulumi.Context, name string, args *SecurityArgs, 
 			"network_policies":       pulumi.Bool(false),
 			"service_account_tokens": pulumi.Bool(true),
 			"resource_quotas":        pulumi.Bool(false),
+			"authentication_enabled": pulumi.Bool(true),
+			"authorization_enabled":  pulumi.Bool(false),
+			"audit_logging_enabled":  pulumi.Bool(false),
 		}.ToMapOutput()
 		authenticationConfig = pulumi.Map{
 			"enabled":       pulumi.Bool(true),
@@ -57,6 +63,9 @@ func NewSecurityComponent(ctx *pulumi.Context, name string, args *SecurityArgs, 
 			"network_policies":       pulumi.Bool(true),
 			"service_account_tokens": pulumi.Bool(true),
 			"resource_quotas":        pulumi.Bool(true),
+			"authentication_enabled": pulumi.Bool(true),
+			"authorization_enabled":  pulumi.Bool(true),
+			"audit_logging_enabled":  pulumi.Bool(true),
 		}.ToMapOutput()
 		authenticationConfig = pulumi.Map{
 			"enabled":       pulumi.Bool(true),
@@ -77,6 +86,9 @@ func NewSecurityComponent(ctx *pulumi.Context, name string, args *SecurityArgs, 
 			"network_policies":       pulumi.Bool(true),
 			"service_account_tokens": pulumi.Bool(true),
 			"resource_quotas":        pulumi.Bool(true),
+			"authentication_enabled": pulumi.Bool(true),
+			"authorization_enabled":  pulumi.Bool(true),
+			"audit_logging_enabled":  pulumi.Bool(true),
 		}.ToMapOutput()
 		authenticationConfig = pulumi.Map{
 			"enabled":       pulumi.Bool(true),
@@ -100,13 +112,15 @@ func NewSecurityComponent(ctx *pulumi.Context, name string, args *SecurityArgs, 
 	component.TLSConfig = tlsConfig
 	component.AuditLogging = auditLogging
 
-	if err := ctx.RegisterResourceOutputs(component, pulumi.Map{
-		"policies":             component.Policies,
-		"authenticationConfig": component.AuthenticationConfig,
-		"tlsConfig":            component.TLSConfig,
-		"auditLogging":         component.AuditLogging,
-	}); err != nil {
-		return nil, err
+	if canRegister(ctx) {
+		if err := ctx.RegisterResourceOutputs(component, pulumi.Map{
+			"policies":             component.Policies,
+			"authenticationConfig": component.AuthenticationConfig,
+			"tlsConfig":            component.TLSConfig,
+			"auditLogging":         component.AuditLogging,
+		}); err != nil {
+			return nil, err
+		}
 	}
 
 	return component, nil

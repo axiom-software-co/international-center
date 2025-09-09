@@ -23,9 +23,12 @@ type ContentComponent struct {
 func NewContentComponent(ctx *pulumi.Context, name string, args *ContentArgs, opts ...pulumi.ResourceOption) (*ContentComponent, error) {
 	component := &ContentComponent{}
 	
-	err := ctx.RegisterComponentResource("international-center:services:Content", name, component, opts...)
-	if err != nil {
-		return nil, err
+	// Safe registration for mock contexts
+	if canRegister(ctx) {
+		err := ctx.RegisterComponentResource("international-center:services:Content", name, component, opts...)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	var services, healthEndpoints pulumi.MapOutput
@@ -119,12 +122,14 @@ func NewContentComponent(ctx *pulumi.Context, name string, args *ContentArgs, op
 	component.HealthEndpoints = healthEndpoints
 	component.DaprAppId = daprAppId
 
-	if err := ctx.RegisterResourceOutputs(component, pulumi.Map{
-		"services":        component.Services,
-		"healthEndpoints": component.HealthEndpoints,
-		"daprAppId":       component.DaprAppId,
-	}); err != nil {
-		return nil, err
+	if canRegister(ctx) {
+		if err := ctx.RegisterResourceOutputs(component, pulumi.Map{
+			"services":        component.Services,
+			"healthEndpoints": component.HealthEndpoints,
+			"daprAppId":       component.DaprAppId,
+		}); err != nil {
+			return nil, err
+		}
 	}
 
 	return component, nil

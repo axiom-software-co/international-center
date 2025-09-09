@@ -22,9 +22,12 @@ type MessagingComponent struct {
 func NewMessagingComponent(ctx *pulumi.Context, name string, args *MessagingArgs, opts ...pulumi.ResourceOption) (*MessagingComponent, error) {
 	component := &MessagingComponent{}
 	
-	err := ctx.RegisterComponentResource("international-center:infrastructure:Messaging", name, component, opts...)
-	if err != nil {
-		return nil, err
+	// Safe registration for mock contexts
+	if canRegister(ctx) {
+		err := ctx.RegisterComponentResource("international-center:infrastructure:Messaging", name, component, opts...)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	var endpoint, username, password, healthEndpoint pulumi.StringOutput
@@ -54,14 +57,17 @@ func NewMessagingComponent(ctx *pulumi.Context, name string, args *MessagingArgs
 	component.Password = password
 	component.HealthEndpoint = healthEndpoint
 
-	if err := ctx.RegisterResourceOutputs(component, pulumi.Map{
-		"endpoint":       component.Endpoint,
-		"username":       component.Username,
-		"password":       component.Password,
-		"healthEndpoint": component.HealthEndpoint,
-	}); err != nil {
-		return nil, err
+	if canRegister(ctx) {
+		if err := ctx.RegisterResourceOutputs(component, pulumi.Map{
+			"endpoint":       component.Endpoint,
+			"username":       component.Username,
+			"password":       component.Password,
+			"healthEndpoint": component.HealthEndpoint,
+		}); err != nil {
+			return nil, err
+		}
 	}
 
 	return component, nil
 }
+

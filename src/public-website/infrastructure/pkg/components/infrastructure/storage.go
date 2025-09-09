@@ -21,9 +21,12 @@ type StorageComponent struct {
 func NewStorageComponent(ctx *pulumi.Context, name string, args *StorageArgs, opts ...pulumi.ResourceOption) (*StorageComponent, error) {
 	component := &StorageComponent{}
 	
-	err := ctx.RegisterComponentResource("international-center:infrastructure:Storage", name, component, opts...)
-	if err != nil {
-		return nil, err
+	// Safe registration for mock contexts
+	if canRegister(ctx) {
+		err := ctx.RegisterComponentResource("international-center:infrastructure:Storage", name, component, opts...)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	var connectionString, containerName, healthEndpoint pulumi.StringOutput
@@ -49,13 +52,16 @@ func NewStorageComponent(ctx *pulumi.Context, name string, args *StorageArgs, op
 	component.ContainerName = containerName
 	component.HealthEndpoint = healthEndpoint
 
-	if err := ctx.RegisterResourceOutputs(component, pulumi.Map{
-		"connectionString": component.ConnectionString,
-		"containerName":    component.ContainerName,
-		"healthEndpoint":   component.HealthEndpoint,
-	}); err != nil {
-		return nil, err
+	if canRegister(ctx) {
+		if err := ctx.RegisterResourceOutputs(component, pulumi.Map{
+			"connectionString": component.ConnectionString,
+			"containerName":    component.ContainerName,
+			"healthEndpoint":   component.HealthEndpoint,
+		}); err != nil {
+			return nil, err
+		}
 	}
 
 	return component, nil
 }
+

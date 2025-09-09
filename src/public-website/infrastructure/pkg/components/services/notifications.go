@@ -23,9 +23,12 @@ type NotificationComponent struct {
 func NewNotificationComponent(ctx *pulumi.Context, name string, args *NotificationArgs, opts ...pulumi.ResourceOption) (*NotificationComponent, error) {
 	component := &NotificationComponent{}
 	
-	err := ctx.RegisterComponentResource("international-center:services:Notification", name, component, opts...)
-	if err != nil {
-		return nil, err
+	// Safe registration for mock contexts
+	if canRegister(ctx) {
+		err := ctx.RegisterComponentResource("international-center:services:Notification", name, component, opts...)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	var services, healthEndpoints pulumi.MapOutput
@@ -106,12 +109,14 @@ func NewNotificationComponent(ctx *pulumi.Context, name string, args *Notificati
 	component.HealthEndpoints = healthEndpoints
 	component.DaprAppId = daprAppId
 
-	if err := ctx.RegisterResourceOutputs(component, pulumi.Map{
-		"services":        component.Services,
-		"healthEndpoints": component.HealthEndpoints,
-		"daprAppId":       component.DaprAppId,
-	}); err != nil {
-		return nil, err
+	if canRegister(ctx) {
+		if err := ctx.RegisterResourceOutputs(component, pulumi.Map{
+			"services":        component.Services,
+			"healthEndpoints": component.HealthEndpoints,
+			"daprAppId":       component.DaprAppId,
+		}); err != nil {
+			return nil, err
+		}
 	}
 
 	return component, nil

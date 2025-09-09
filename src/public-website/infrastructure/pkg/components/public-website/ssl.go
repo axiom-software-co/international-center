@@ -22,9 +22,12 @@ type SSLComponent struct {
 func NewSSLComponent(ctx *pulumi.Context, name string, args *SSLArgs, opts ...pulumi.ResourceOption) (*SSLComponent, error) {
 	component := &SSLComponent{}
 	
-	err := ctx.RegisterComponentResource("international-center:website:SSL", name, component, opts...)
-	if err != nil {
-		return nil, err
+	// Safe registration for mock contexts
+	if canRegister(ctx) {
+		err := ctx.RegisterComponentResource("international-center:website:SSL", name, component, opts...)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	var certificateSource pulumi.StringOutput
@@ -95,13 +98,15 @@ func NewSSLComponent(ctx *pulumi.Context, name string, args *SSLArgs, opts ...pu
 	component.CertificateSettings = certificateSettings
 	component.SecurityHeaders = securityHeaders
 
-	if err := ctx.RegisterResourceOutputs(component, pulumi.Map{
-		"certificateSource":   component.CertificateSource,
-		"sslEnabled":          component.SSLEnabled,
-		"certificateSettings": component.CertificateSettings,
-		"securityHeaders":     component.SecurityHeaders,
-	}); err != nil {
-		return nil, err
+	if canRegister(ctx) {
+		if err := ctx.RegisterResourceOutputs(component, pulumi.Map{
+			"certificateSource":   component.CertificateSource,
+			"sslEnabled":          component.SSLEnabled,
+			"certificateSettings": component.CertificateSettings,
+			"securityHeaders":     component.SecurityHeaders,
+		}); err != nil {
+			return nil, err
+		}
 	}
 
 	return component, nil

@@ -21,9 +21,12 @@ type DatabaseComponent struct {
 func NewDatabaseComponent(ctx *pulumi.Context, name string, args *DatabaseArgs, opts ...pulumi.ResourceOption) (*DatabaseComponent, error) {
 	component := &DatabaseComponent{}
 	
-	err := ctx.RegisterComponentResource("international-center:infrastructure:Database", name, component, opts...)
-	if err != nil {
-		return nil, err
+	// Safe registration for mock contexts
+	if canRegister(ctx) {
+		err := ctx.RegisterComponentResource("international-center:infrastructure:Database", name, component, opts...)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	var connectionString, databaseName, healthEndpoint pulumi.StringOutput
@@ -49,13 +52,16 @@ func NewDatabaseComponent(ctx *pulumi.Context, name string, args *DatabaseArgs, 
 	component.DatabaseName = databaseName
 	component.HealthEndpoint = healthEndpoint
 
-	if err := ctx.RegisterResourceOutputs(component, pulumi.Map{
-		"connectionString": component.ConnectionString,
-		"databaseName":     component.DatabaseName,
-		"healthEndpoint":   component.HealthEndpoint,
-	}); err != nil {
-		return nil, err
+	if canRegister(ctx) {
+		if err := ctx.RegisterResourceOutputs(component, pulumi.Map{
+			"connectionString": component.ConnectionString,
+			"databaseName":     component.DatabaseName,
+			"healthEndpoint":   component.HealthEndpoint,
+		}); err != nil {
+			return nil, err
+		}
 	}
 
 	return component, nil
 }
+

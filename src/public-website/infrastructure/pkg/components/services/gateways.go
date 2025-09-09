@@ -24,9 +24,12 @@ type GatewayComponent struct {
 func NewGatewayComponent(ctx *pulumi.Context, name string, args *GatewayArgs, opts ...pulumi.ResourceOption) (*GatewayComponent, error) {
 	component := &GatewayComponent{}
 	
-	err := ctx.RegisterComponentResource("international-center:services:Gateway", name, component, opts...)
-	if err != nil {
-		return nil, err
+	// Safe registration for mock contexts
+	if canRegister(ctx) {
+		err := ctx.RegisterComponentResource("international-center:services:Gateway", name, component, opts...)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	var services, healthEndpoints pulumi.MapOutput
@@ -133,13 +136,15 @@ func NewGatewayComponent(ctx *pulumi.Context, name string, args *GatewayArgs, op
 	component.AdminGatewayURL = adminGatewayURL
 	component.HealthEndpoints = healthEndpoints
 
-	if err := ctx.RegisterResourceOutputs(component, pulumi.Map{
-		"services":         component.Services,
-		"publicGatewayURL": component.PublicGatewayURL,
-		"adminGatewayURL":  component.AdminGatewayURL,
-		"healthEndpoints":  component.HealthEndpoints,
-	}); err != nil {
-		return nil, err
+	if canRegister(ctx) {
+		if err := ctx.RegisterResourceOutputs(component, pulumi.Map{
+			"services":         component.Services,
+			"publicGatewayURL": component.PublicGatewayURL,
+			"adminGatewayURL":  component.AdminGatewayURL,
+			"healthEndpoints":  component.HealthEndpoints,
+		}); err != nil {
+			return nil, err
+		}
 	}
 
 	return component, nil

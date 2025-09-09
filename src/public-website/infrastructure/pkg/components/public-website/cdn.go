@@ -22,9 +22,12 @@ type CDNComponent struct {
 func NewCDNComponent(ctx *pulumi.Context, name string, args *CDNArgs, opts ...pulumi.ResourceOption) (*CDNComponent, error) {
 	component := &CDNComponent{}
 	
-	err := ctx.RegisterComponentResource("international-center:website:CDN", name, component, opts...)
-	if err != nil {
-		return nil, err
+	// Safe registration for mock contexts
+	if canRegister(ctx) {
+		err := ctx.RegisterComponentResource("international-center:website:CDN", name, component, opts...)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	var cdnEndpoint pulumi.StringOutput
@@ -93,13 +96,15 @@ func NewCDNComponent(ctx *pulumi.Context, name string, args *CDNArgs, opts ...pu
 	component.CompressionEnabled = compressionEnabled
 	component.EdgeLocations = edgeLocations
 
-	if err := ctx.RegisterResourceOutputs(component, pulumi.Map{
-		"cdnEndpoint":        component.CDNEndpoint,
-		"cacheConfiguration": component.CacheConfiguration,
-		"compressionEnabled": component.CompressionEnabled,
-		"edgeLocations":      component.EdgeLocations,
-	}); err != nil {
-		return nil, err
+	if canRegister(ctx) {
+		if err := ctx.RegisterResourceOutputs(component, pulumi.Map{
+			"cdnEndpoint":        component.CDNEndpoint,
+			"cacheConfiguration": component.CacheConfiguration,
+			"compressionEnabled": component.CompressionEnabled,
+			"edgeLocations":      component.EdgeLocations,
+		}); err != nil {
+			return nil, err
+		}
 	}
 
 	return component, nil

@@ -22,9 +22,12 @@ type ObservabilityComponent struct {
 func NewObservabilityComponent(ctx *pulumi.Context, name string, args *ObservabilityArgs, opts ...pulumi.ResourceOption) (*ObservabilityComponent, error) {
 	component := &ObservabilityComponent{}
 	
-	err := ctx.RegisterComponentResource("international-center:infrastructure:Observability", name, component, opts...)
-	if err != nil {
-		return nil, err
+	// Safe registration for mock contexts
+	if canRegister(ctx) {
+		err := ctx.RegisterComponentResource("international-center:infrastructure:Observability", name, component, opts...)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	var grafanaURL, prometheusURL, jaegerURL, healthEndpoint pulumi.StringOutput
@@ -54,14 +57,17 @@ func NewObservabilityComponent(ctx *pulumi.Context, name string, args *Observabi
 	component.JaegerURL = jaegerURL
 	component.HealthEndpoint = healthEndpoint
 
-	if err := ctx.RegisterResourceOutputs(component, pulumi.Map{
-		"grafanaURL":       component.GrafanaURL,
-		"prometheusURL":    component.PrometheusURL,
-		"jaegerURL":        component.JaegerURL,
-		"healthEndpoint":   component.HealthEndpoint,
-	}); err != nil {
-		return nil, err
+	if canRegister(ctx) {
+		if err := ctx.RegisterResourceOutputs(component, pulumi.Map{
+			"grafanaURL":       component.GrafanaURL,
+			"prometheusURL":    component.PrometheusURL,
+			"jaegerURL":        component.JaegerURL,
+			"healthEndpoint":   component.HealthEndpoint,
+		}); err != nil {
+			return nil, err
+		}
 	}
 
 	return component, nil
 }
+

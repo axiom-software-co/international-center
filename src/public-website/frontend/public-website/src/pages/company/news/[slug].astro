@@ -1,0 +1,58 @@
+---
+import Layout from '../../../layouts/Layout.astro';
+import DynamicNewsArticlePage from '../../../components/blocks/DynamicNewsArticlePage.vue';
+import { newsClient } from '../../../lib/clients';
+
+// Static path generation for news article pages
+export async function getStaticPaths() {
+  try {
+    // Using the singleton gRPC news client
+    
+    // Fetch all news articles during build time
+    const newsResponse = await newsClient.getNewsArticles({ 
+      pageSize: 100, // Get all news articles
+      status: 'published' 
+    });
+    
+    // Extract article slugs for static path generation
+    const articles = newsResponse?.data || [];
+    const paths = articles.map((article) => ({
+      params: { slug: article.slug },
+      props: { 
+        articleTitle: article.title,
+        articleDescription: article.excerpt || article.description 
+      }
+    }));
+    
+    console.log(`🏗️ [Build] Generated ${paths.length} news article pages`);
+    
+    return paths;
+  } catch (error) {
+    console.error('❌ [Build] Failed to fetch news articles for static paths:', error);
+    // Return empty array to prevent build failure
+    return [];
+  }
+}
+
+// Get the current page data
+const { slug } = Astro.params;
+const { articleTitle, articleDescription } = Astro.props;
+
+if (!slug) {
+  throw new Error('News article slug is required');
+}
+
+// Generate SEO-friendly metadata
+const finalTitle = articleTitle || 'News Article';
+const pageTitle = `${finalTitle} - International Center | Latest News`;
+const pageDescription = articleDescription || "Stay informed with the latest news and insights in regenerative medicine.";
+---
+
+<Layout
+  title={pageTitle}
+  description={pageDescription}
+>
+  <main>
+    <DynamicNewsArticlePage client:only="vue" />
+  </main>
+</Layout>

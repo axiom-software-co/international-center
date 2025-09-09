@@ -1,0 +1,131 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { Badge } from '../components/vue-ui/Badge.vue';
+import ServicesBackgroundLogo from '../components/ServicesBackgroundLogo.vue';
+import PageHero from '../components/PageHero.astro';
+
+// Company sections organized by category
+const companyCategories = [
+  {
+    title: 'Leadership & Team',
+    description: 'Meet our experienced medical professionals and leadership team',
+    items: [
+      {
+        name: 'About Our Team',
+        href: '/company/team',
+        description: 'Meet our board-certified physicians and medical team',
+        icon: '👨‍⚕️',
+      },
+      {
+        name: 'Credentials',
+        href: '/company/credentials',
+        description: 'Our certifications, accreditations, and professional memberships',
+        icon: '🏆',
+      },
+    ],
+  },
+  {
+    title: 'Careers & Contact',
+    description: 'Join our team or get in touch with our medical professionals',
+    items: [
+      {
+        name: 'Careers',
+        href: '/company/careers',
+        description: 'Join our team of healthcare professionals',
+        icon: '💼',
+      },
+      {
+        name: 'Contact Us',
+        href: '/company/contact',
+        description: 'Get in touch with our medical team',
+        icon: '📞',
+      },
+    ],
+  },
+  {
+    title: 'News & Research',
+    description: 'Stay informed with our latest developments and research',
+    items: [
+      {
+        name: 'News & Research',
+        href: '/company/news',
+        description: 'Latest news, research, and medical breakthroughs',
+        icon: '📰',
+      },
+    ],
+  },
+];
+---
+
+<Layout
+  title="Company - International Center | Leadership, Team & News"
+  description="Learn about International Center's leadership team, medical practitioners, credentials, careers, and latest news in regenerative medicine."
+>
+  <main>
+    <!-- Hero Section -->
+    <PageHero
+      title="Company"
+      description="Learn about our leadership team, medical expertise, and commitment to advancing regenerative medicine"
+      showBottomMargin={true}
+    />
+
+    <!-- Company Categories -->
+    <section class="py-8 lg:py-12">
+      <div class="container mx-auto px-4">
+        <div class="space-y-8 lg:space-y-12">
+          {
+            companyCategories.map(category => (
+              <div class="company-category bg-white dark:bg-gray-900 rounded border border-gray-200 dark:border-gray-700 p-4 lg:p-6">
+                <div class="mb-4 lg:mb-6">
+                  <h2 class="text-xl lg:text-2xl font-semibold text-gray-900 dark:text-white mb-2">
+                    {category.title}
+                  </h2>
+                  <p class="text-sm lg:text-base text-gray-600 dark:text-gray-300">
+                    {category.description}
+                  </p>
+                </div>
+
+                <div class="grid gap-4 md:gap-6 lg:gap-8 md:grid-cols-2 lg:grid-cols-3">
+                  {category.items.map(item => (
+                    <a
+                      href={item.href}
+                      class="block group company-card border border-gray-200 dark:border-gray-700 rounded overflow-hidden transition-all duration-200 bg-white dark:bg-gray-800 hover:shadow-lg hover:border-purple-300 dark:hover:border-purple-600"
+                    >
+                      <div class="p-4 lg:p-5 h-full flex flex-col">
+                        <div class="flex items-center gap-3 mb-3">
+                          <span class="text-2xl">{item.icon}</span>
+                          <h3 class="text-lg font-semibold text-gray-900 dark:text-white group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors">
+                            {item.name}
+                          </h3>
+                        </div>
+                        <p class="text-gray-600 dark:text-gray-300 text-sm flex-1">
+                          {item.description}
+                        </p>
+                        <div class="mt-4 flex items-center text-purple-600 dark:text-purple-400 text-sm font-medium">
+                          Learn more →
+                        </div>
+                      </div>
+                    </a>
+                  ))}
+                </div>
+              </div>
+            ))
+          }
+        </div>
+      </div>
+    </section>
+
+    <!-- Background Logo -->
+    <ServicesBackgroundLogo client:load />
+  </main>
+
+  <style>
+    .company-card {
+      transition: all 0.3s ease;
+    }
+
+    .company-card:hover {
+      transform: translateY(-2px);
+    }
+  </style>
+</Layout>

@@ -1,0 +1,73 @@
+/* Floating Contact Widget Styles */
+
+/* Ensure proper z-index stacking */
+.floating-contact-widget {
+  z-index: 9999;
+}
+
+/* Smooth animations for better UX */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 0.8;
+  }
+}
+
+/* Enhanced focus states for accessibility */
+.floating-contact-option:focus {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+/* Mobile optimizations */
+@media (max-width: 640px) {
+  .floating-contact-widget {
+    bottom: 1rem;
+    right: 1rem;
+  }
+
+  .floating-contact-option {
+    min-width: 180px;
+    font-size: 0.875rem;
+  }
+}
+
+/* Ensure widget doesn't interfere with other fixed elements */
+.floating-contact-widget {
+  pointer-events: none;
+}
+
+.floating-contact-widget > * {
+  pointer-events: auto;
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .floating-contact-widget button {
+    border: 2px solid currentColor;
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .floating-contact-widget * {
+    animation: none !important;
+    transition: none !important;
+  }
+}

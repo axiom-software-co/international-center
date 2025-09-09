@@ -5,8 +5,8 @@ import (
 	"log"
 	"os"
 
-	"github.com/axiom-software-co/international-center/src/cicd/internal/orchestration"
-	"github.com/axiom-software-co/international-center/src/cicd/internal/validation"
+	"github.com/axiom-software-co/international-center/src/public-website/infrastructure/internal/orchestration"
+	"github.com/axiom-software-co/international-center/src/public-website/infrastructure/internal/validation"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 )
 

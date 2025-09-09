@@ -1,0 +1,33 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { loadHeroServicesData } from '../lib/navigation-data';
+
+// Load hero services data during SSR
+const heroServicesData = await loadHeroServicesData();
+console.log('DEBUG HOME - Hero services data:', JSON.stringify(heroServicesData, null, 2));
+---
+
+<Layout title="Debug Home">
+  <main class="p-8">
+    <h1 class="text-2xl font-bold mb-4">Debug Home Page</h1>
+    <p>This page is for debugging the hero services data loading issue.</p>
+
+    <div class="mt-8">
+      <h2 class="text-xl font-semibold mb-4">Server-side loaded data:</h2>
+      <pre
+        class="bg-gray-100 p-4 rounded text-sm overflow-auto">
+{JSON.stringify(heroServicesData, null, 2)}
+      </pre>
+    </div>
+
+    <div class="mt-8">
+      <h2 class="text-xl font-semibold mb-4">Test Summary:</h2>
+      <ul class="list-disc list-inside">
+        <li>Primary Care Services: {heroServicesData.primaryCareServices.length} services</li>
+        <li>Regenerative Therapies: {heroServicesData.regenerativeTherapies.length} services</li>
+        <li>Primary Category Name: {heroServicesData.primaryCategoryName}</li>
+        <li>Secondary Category Name: {heroServicesData.secondaryCategoryName}</li>
+      </ul>
+    </div>
+  </main>
+</Layout>

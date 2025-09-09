@@ -21,9 +21,12 @@ type VaultComponent struct {
 func NewVaultComponent(ctx *pulumi.Context, name string, args *VaultArgs, opts ...pulumi.ResourceOption) (*VaultComponent, error) {
 	component := &VaultComponent{}
 	
-	err := ctx.RegisterComponentResource("international-center:infrastructure:Vault", name, component, opts...)
-	if err != nil {
-		return nil, err
+	// Safe registration for mock contexts
+	if canRegister(ctx) {
+		err := ctx.RegisterComponentResource("international-center:infrastructure:Vault", name, component, opts...)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	var vaultAddress, vaultToken, healthEndpoint pulumi.StringOutput
@@ -49,13 +52,16 @@ func NewVaultComponent(ctx *pulumi.Context, name string, args *VaultArgs, opts .
 	component.VaultToken = vaultToken
 	component.HealthEndpoint = healthEndpoint
 
-	if err := ctx.RegisterResourceOutputs(component, pulumi.Map{
-		"vaultAddress":   component.VaultAddress,
-		"vaultToken":     component.VaultToken,
-		"healthEndpoint": component.HealthEndpoint,
-	}); err != nil {
-		return nil, err
+	if canRegister(ctx) {
+		if err := ctx.RegisterResourceOutputs(component, pulumi.Map{
+			"vaultAddress":   component.VaultAddress,
+			"vaultToken":     component.VaultToken,
+			"healthEndpoint": component.HealthEndpoint,
+		}); err != nil {
+			return nil, err
+		}
 	}
 
 	return component, nil
 }
+

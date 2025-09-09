@@ -1,0 +1,23 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import PageHero from '../../components/PageHero.astro';
+import ContentHub from '../../components/blocks/ContentHub.vue';
+// Components now handle their own data loading via client:only
+
+---
+
+<Layout
+  title="News & Insights - International Center | Latest in Regenerative Medicine"
+  description="Stay informed with the latest news, research, and insights in regenerative medicine, sports recovery, wellness optimization, and healthcare innovation from International Center."
+>
+  <main>
+    <!-- Hero Section -->
+    <PageHero
+      title="News & Insights"
+      showBottomMargin={true}
+    />
+
+    <!-- News Hub with Client-Side Loading -->
+    <ContentHub contentType="news" client:only="vue" />
+  </main>
+</Layout>

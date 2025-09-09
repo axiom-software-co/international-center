@@ -1,0 +1,26 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import ContactForms from '../../components/ContactForms.vue';
+import PageHero from '../../components/PageHero.astro';
+---
+
+<Layout
+  title="Professional Contact - International Center | Media Relations & Business Partnerships"
+  description="Connect with International Center for business partnerships, media inquiries, regulatory matters, and professional collaboration in regenerative medicine. Licensed Florida medical practice."
+>
+  <main>
+    <!-- Hero Section -->
+    <PageHero
+      title="Professional Inquiries"
+      description="Business development, media relations, and professional collaboration in regenerative medicine"
+      showBottomMargin={true}
+    />
+
+    <!-- Contact Forms -->
+    <section class="py-8">
+      <div class="container">
+        <ContactForms client:load />
+      </div>
+    </section>
+  </main>
+</Layout>

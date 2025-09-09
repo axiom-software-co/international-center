@@ -3,8 +3,8 @@ runtime:
   name: go
 description: International Center Infrastructure as Code with component-first architecture
 main: ./cmd/deploy/
-backend:
-  url: azblob://pulumi-state-store
+# backend:
+#   url: azblob://pulumi-state-store
 template:
   config:
     backend:

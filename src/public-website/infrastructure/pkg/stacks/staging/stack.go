@@ -3,10 +3,10 @@ package staging
 import (
 	"log"
 
-	"github.com/axiom-software-co/international-center/src/cicd/pkg/components/infrastructure"
-	"github.com/axiom-software-co/international-center/src/cicd/pkg/components/platform"
-	"github.com/axiom-software-co/international-center/src/cicd/pkg/components/services"
-	"github.com/axiom-software-co/international-center/src/cicd/pkg/components/website"
+	"github.com/axiom-software-co/international-center/src/public-website/infrastructure/pkg/components/infrastructure"
+	"github.com/axiom-software-co/international-center/src/public-website/infrastructure/pkg/components/platform"
+	"github.com/axiom-software-co/international-center/src/public-website/infrastructure/pkg/components/services"
+	"github.com/axiom-software-co/international-center/src/public-website/infrastructure/pkg/components/public-website"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 )
 
@@ -26,6 +26,13 @@ func DeployStack(ctx *pulumi.Context) error {
 	log.Printf("Step 2: Deploying Platform Components")
 	platformComponent, err := platform.NewPlatformComponent(ctx, "platform", &platform.PlatformArgs{
 		Environment: "staging",
+		InfrastructureOutputs: pulumi.Map{
+			"database_endpoint": infrastructureComponent.DatabaseEndpoint,
+			"storage_endpoint":  infrastructureComponent.StorageEndpoint,
+			"vault_endpoint":    infrastructureComponent.VaultEndpoint,
+			"messaging_endpoint": infrastructureComponent.MessagingEndpoint,
+			"observability_endpoint": infrastructureComponent.ObservabilityEndpoint,
+		},
 	})
 	if err != nil {
 		return err
@@ -36,18 +43,17 @@ func DeployStack(ctx *pulumi.Context) error {
 	servicesComponent, err := services.NewServicesComponent(ctx, "services", &services.ServicesArgs{
 		Environment: "staging",
 		InfrastructureOutputs: pulumi.Map{
-			"database_connection_string": infrastructureComponent.DatabaseConnectionString,
-			"storage_connection_string":  infrastructureComponent.StorageConnectionString,
-			"vault_address":             infrastructureComponent.VaultAddress,
-			"rabbitmq_endpoint":         infrastructureComponent.RabbitMQEndpoint,
-			"grafana_url":               infrastructureComponent.GrafanaURL,
+			"database_connection_string": infrastructureComponent.DatabaseEndpoint,
+			"storage_connection_string":  infrastructureComponent.StorageEndpoint,
+			"vault_address":             infrastructureComponent.VaultEndpoint,
+			"rabbitmq_endpoint":         infrastructureComponent.MessagingEndpoint,
+			"grafana_url":               infrastructureComponent.ObservabilityEndpoint,
 		},
 		PlatformOutputs: pulumi.Map{
-			"dapr_control_plane_url":   platformComponent.DaprControlPlaneURL,
-			"dapr_placement_service":   platformComponent.DaprPlacementService,
-			"container_orchestrator":   platformComponent.ContainerOrchestrator,
+			"dapr_control_plane_url":   platformComponent.DaprEndpoint,
+			"container_orchestrator":   platformComponent.OrchestrationEndpoint,
 			"service_mesh_enabled":     platformComponent.ServiceMeshEnabled,
-			"networking_configuration": platformComponent.NetworkingConfiguration,
+			"networking_configuration": platformComponent.NetworkingConfig,
 		},
 	})
 	if err != nil {
@@ -59,12 +65,12 @@ func DeployStack(ctx *pulumi.Context) error {
 	websiteComponent, err := website.NewWebsiteComponent(ctx, "website", &website.WebsiteArgs{
 		Environment: "staging",
 		InfrastructureOutputs: pulumi.Map{
-			"database_connection_string": infrastructureComponent.DatabaseConnectionString,
-			"storage_connection_string":  infrastructureComponent.StorageConnectionString,
+			"database_connection_string": infrastructureComponent.DatabaseEndpoint,
+			"storage_connection_string":  infrastructureComponent.StorageEndpoint,
 		},
 		PlatformOutputs: pulumi.Map{
-			"dapr_control_plane_url": platformComponent.DaprControlPlaneURL,
-			"container_orchestrator": platformComponent.ContainerOrchestrator,
+			"dapr_control_plane_url": platformComponent.DaprEndpoint,
+			"container_orchestrator": platformComponent.OrchestrationEndpoint,
 		},
 		ServicesOutputs: pulumi.Map{
 			"public_gateway_url": servicesComponent.PublicGatewayURL,
@@ -81,16 +87,15 @@ func DeployStack(ctx *pulumi.Context) error {
 	ctx.Export("deployment_complete", pulumi.Bool(true))
 	
 	// Infrastructure Outputs
-	ctx.Export("database_connection_string", infrastructureComponent.DatabaseConnectionString)
-	ctx.Export("storage_connection_string", infrastructureComponent.StorageConnectionString)
-	ctx.Export("vault_address", infrastructureComponent.VaultAddress)
-	ctx.Export("rabbitmq_endpoint", infrastructureComponent.RabbitMQEndpoint)
-	ctx.Export("grafana_url", infrastructureComponent.GrafanaURL)
+	ctx.Export("database_connection_string", infrastructureComponent.DatabaseEndpoint)
+	ctx.Export("storage_connection_string", infrastructureComponent.StorageEndpoint)
+	ctx.Export("vault_address", infrastructureComponent.VaultEndpoint)
+	ctx.Export("rabbitmq_endpoint", infrastructureComponent.MessagingEndpoint)
+	ctx.Export("grafana_url", infrastructureComponent.ObservabilityEndpoint)
 	
 	// Platform Outputs
-	ctx.Export("dapr_control_plane_url", platformComponent.DaprControlPlaneURL)
-	ctx.Export("dapr_placement_service", platformComponent.DaprPlacementService)
-	ctx.Export("container_orchestrator", platformComponent.ContainerOrchestrator)
+	ctx.Export("dapr_control_plane_url", platformComponent.DaprEndpoint)
+	ctx.Export("container_orchestrator", platformComponent.OrchestrationEndpoint)
 	
 	// Services Outputs
 	ctx.Export("public_gateway_url", servicesComponent.PublicGatewayURL)

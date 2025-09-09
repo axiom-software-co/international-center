@@ -1,0 +1,166 @@
+/* Import glassmorphism styles */
+@import './glassmorphism.css';
+
+/* Import hover classes to ensure they are compiled */
+@import './hover-classes.css';
+
+/* Nuxt-style navigation is now implemented with Tailwind classes directly in component */
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer utilities {
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Line clamp utilities for text truncation */
+  .line-clamp-1 {
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 1;
+  }
+  .line-clamp-2 {
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+  .line-clamp-3 {
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+  }
+}
+
+@layer base {
+  :root {
+    --background: 0 0% 98%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 99%;
+    --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 99%;
+    --popover-foreground: 222.2 84% 4.9%;
+    --primary: 221.2 83.2% 53.3%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+    --muted: 210 40% 96%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 221.2 83.2% 53.3%;
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    --background: 0 0% 10%; /* #191919 */
+    --foreground: 0 0% 98%;
+    --card: 0 0% 13%; /* #202020 */
+    --card-foreground: 0 0% 98%;
+    --popover: 0 0% 13%; /* #202020 */
+    --popover-foreground: 0 0% 98%;
+    --primary: 142.1 76.2% 36.3%;
+    --primary-foreground: 355.7 100% 97.3%;
+    --secondary: 0 0% 17%; /* #2c2c2c */
+    --secondary-foreground: 0 0% 98%;
+    --muted: 0 0% 17%; /* #2c2c2c */
+    --muted-foreground: 0 0% 63.9%;
+    --accent: 0 0% 17%; /* #2c2c2c */
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 20%;
+    --input: 0 0% 17%; /* #2c2c2c */
+    --ring: 142.1 76.2% 36.3%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+
+  /* Prevent horizontal scrolling and viewport issues */
+  html,
+  body {
+    overflow-x: hidden;
+    width: 100%;
+    max-width: 100%;
+  }
+
+  /* Ensure all containers don't exceed viewport width */
+  * {
+    box-sizing: border-box;
+  }
+
+  /* Fix for Safari mobile viewport issues */
+  @supports (-webkit-touch-callout: none) {
+    body {
+      /* Safari-specific fixes */
+      -webkit-text-size-adjust: 100%;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* iOS Safari mobile menu viewport fixes */
+    .mobile-nav-container {
+      /* Use dynamic viewport height for iOS Safari */
+      max-height: calc(100dvh - 5rem) !important;
+    }
+
+    /* Fallback for browsers without dvh support */
+    @supports not (height: 100dvh) {
+      .mobile-nav-container {
+        max-height: calc(100vh - 8rem) !important; /* Extra padding for iOS */
+      }
+    }
+  }
+
+  /* iOS Safari safe area support */
+  @supports (padding: max(0px)) {
+    /* Ensure mobile navigation respects safe areas */
+    .mobile-nav-bottom-padding {
+      padding-bottom: max(1rem, env(safe-area-inset-bottom)) !important;
+    }
+  }
+
+  /* Prevent content from extending beyond viewport */
+  .container {
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
+  /* Allow overflow for navigation dropdowns */
+  nav .container {
+    overflow: visible;
+  }
+
+  /* Ensure images and media don't cause overflow */
+  img,
+  video,
+  canvas,
+  svg {
+    max-width: 100%;
+    height: auto;
+  }
+
+  /* Fix for fixed positioned elements on mobile */
+  .fixed {
+    width: 100%;
+    max-width: 100%;
+  }
+}

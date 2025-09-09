@@ -1,0 +1,89 @@
+---
+import Layout from '../layouts/Layout.astro';
+import Badge from '../components/vue-ui/Badge.vue';
+import Card from '../components/vue-ui/Card.vue';
+import CardContent from '../components/vue-ui/CardContent.vue';
+import CardDescription from '../components/vue-ui/CardDescription.vue';
+import CardHeader from '../components/vue-ui/CardHeader.vue';
+import CardTitle from '../components/vue-ui/CardTitle.vue';
+import PageHero from '../components/PageHero.astro';
+---
+
+<Layout
+  title="Page Not Found - International Center | Regenerative Medicine"
+  description="The page you're looking for isn't available yet. We're continuously expanding our regenerative medicine services and educational resources."
+>
+  <main>
+    <!-- Hero Section -->
+    <PageHero
+      title="Page Under Development"
+      description="The page you're looking for isn't available yet."
+      showBottomMargin={true}
+    />
+
+    <!-- Navigation Options -->
+    <section class="py-16 bg-white dark:bg-gray-900">
+      <div class="container mx-auto px-4">
+        <div class="text-center mb-12">
+          <h2 class="text-2xl font-semibold text-gray-900 dark:text-white mb-4">
+            Explore Our Available Resources
+          </h2>
+        </div>
+
+        <!-- Quick Navigation Grid -->
+        <div class="grid gap-6 md:grid-cols-2 lg:grid-cols-3 max-w-5xl mx-auto items-stretch">
+          <!-- Services -->
+          <a href="/services" class="block group no-underline">
+            <Card
+              class="rounded border border-border dark:border-border hover:border-blue-500 transition-colors duration-200 cursor-pointer bg-card dark:bg-card min-h-32 md:min-h-48 lg:min-h-44 h-full flex flex-col"
+            >
+              <CardHeader class="p-8 md:p-6 lg:p-8 flex-1">
+                <CardTitle class="text-xl group-hover:text-blue-500 transition-colors mb-3">
+                  Our Services
+                </CardTitle>
+                <CardDescription class="text-sm leading-relaxed">
+                  Explore comprehensive regenerative medicine treatments including PRP therapy,
+                  exosome treatments, and advanced IV nutritional therapy.
+                </CardDescription>
+              </CardHeader>
+            </Card>
+          </a>
+
+          <!-- About -->
+          <a href="/company/team" class="block group no-underline">
+            <Card
+              class="rounded border border-border dark:border-border hover:border-blue-500 transition-colors duration-200 cursor-pointer bg-card dark:bg-card min-h-32 md:min-h-48 lg:min-h-44 h-full flex flex-col"
+            >
+              <CardHeader class="p-8 md:p-6 lg:p-8 flex-1">
+                <CardTitle class="text-xl group-hover:text-blue-500 transition-colors mb-3">
+                  About Our Team
+                </CardTitle>
+                <CardDescription class="text-sm leading-relaxed">
+                  Meet our board-certified physicians and healthcare professionals who are committed
+                  to excellence in regenerative medicine.
+                </CardDescription>
+              </CardHeader>
+            </Card>
+          </a>
+
+          <!-- Contact Us -->
+          <a href="/company/contact" class="block group no-underline">
+            <Card
+              class="rounded border border-border dark:border-border hover:border-blue-500 transition-colors duration-200 cursor-pointer bg-card dark:bg-card min-h-32 md:min-h-48 lg:min-h-44 h-full flex flex-col"
+            >
+              <CardHeader class="p-8 md:p-6 lg:p-8 flex-1">
+                <CardTitle class="text-xl group-hover:text-blue-500 transition-colors mb-3">
+                  Contact Us
+                </CardTitle>
+                <CardDescription class="text-sm leading-relaxed">
+                  Get in touch with our team for professional inquiries, partnerships, and
+                  regenerative medicine consultations with our expert physicians.
+                </CardDescription>
+              </CardHeader>
+            </Card>
+          </a>
+        </div>
+      </div>
+    </section>
+  </main>
+</Layout>

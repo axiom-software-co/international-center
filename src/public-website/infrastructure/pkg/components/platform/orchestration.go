@@ -23,9 +23,12 @@ type OrchestrationComponent struct {
 func NewOrchestrationComponent(ctx *pulumi.Context, name string, args *OrchestrationArgs, opts ...pulumi.ResourceOption) (*OrchestrationComponent, error) {
 	component := &OrchestrationComponent{}
 	
-	err := ctx.RegisterComponentResource("international-center:platform:Orchestration", name, component, opts...)
-	if err != nil {
-		return nil, err
+	// Safe registration for mock contexts
+	if canRegister(ctx) {
+		err := ctx.RegisterComponentResource("international-center:platform:Orchestration", name, component, opts...)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	var orchestratorType, deploymentStrategy, scalingPolicy pulumi.StringOutput
@@ -87,14 +90,16 @@ func NewOrchestrationComponent(ctx *pulumi.Context, name string, args *Orchestra
 	component.ResourceLimits = resourceLimits
 	component.HealthCheckConfig = healthCheckConfig
 
-	if err := ctx.RegisterResourceOutputs(component, pulumi.Map{
-		"orchestratorType":   component.OrchestratorType,
-		"deploymentStrategy": component.DeploymentStrategy,
-		"scalingPolicy":      component.ScalingPolicy,
-		"resourceLimits":     component.ResourceLimits,
-		"healthCheckConfig":  component.HealthCheckConfig,
-	}); err != nil {
-		return nil, err
+	if canRegister(ctx) {
+		if err := ctx.RegisterResourceOutputs(component, pulumi.Map{
+			"orchestratorType":   component.OrchestratorType,
+			"deploymentStrategy": component.DeploymentStrategy,
+			"scalingPolicy":      component.ScalingPolicy,
+			"resourceLimits":     component.ResourceLimits,
+			"healthCheckConfig":  component.HealthCheckConfig,
+		}); err != nil {
+			return nil, err
+		}
 	}
 
 	return component, nil

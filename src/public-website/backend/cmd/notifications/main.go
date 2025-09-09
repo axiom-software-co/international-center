@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"log"
 	"log/slog"
 	"net/http"
@@ -173,7 +174,7 @@ func startHealthCheckServer(port int, service *notifications.NotificationRouterS
 	})
 
 	server := &http.Server{
-		Addr:         ":" + port,
+		Addr:         fmt.Sprintf(":%d", port),
 		Handler:      mux,
 		ReadTimeout:  15 * time.Second,
 		WriteTimeout: 15 * time.Second,
@@ -181,7 +182,7 @@ func startHealthCheckServer(port int, service *notifications.NotificationRouterS
 	}
 
 	go func() {
-		log.Printf("Health check server listening on port %s", port)
+		log.Printf("Health check server listening on port %d", port)
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Printf("Health check server error: %v", err)
 		}

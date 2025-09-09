@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"log"
 	"time"
+
+	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 )
 
 type EnvironmentHealthChecker struct {
@@ -298,10 +300,13 @@ func (ehr *EnvironmentHealthReport) GetHealthySummary() map[string]interface{} {
 	}
 }
 
-func convertToPulumiMap(outputs map[string]interface{}) map[string]interface{} {
+func convertToPulumiMap(outputs map[string]interface{}) pulumi.Map {
 	// Convert regular map to pulumi.Map compatible format
-	// In a real implementation, this would handle proper type conversion
-	return outputs
+	pulumiMap := make(pulumi.Map)
+	for key, value := range outputs {
+		pulumiMap[key] = pulumi.Any(value)
+	}
+	return pulumiMap
 }
 
 func containsComponent(outputKey, componentName string) bool {

@@ -1,0 +1,48 @@
+---
+import Layout from '../layouts/Layout.astro';
+import PageHero from './PageHero.astro';
+
+export interface Props {
+  // Page metadata
+  title: string;
+  description: string;
+  
+  // Hero section
+  heroTitle: string;
+  heroDescription: string;
+  
+  // Optional styling overrides
+  maxWidth?: string;
+}
+
+const { 
+  title, 
+  description, 
+  heroTitle, 
+  heroDescription, 
+  maxWidth = "max-w-4xl"
+} = Astro.props;
+---
+
+<Layout title={title} description={description}>
+  <main>
+    <!-- Hero Section -->
+    <PageHero
+      title={heroTitle}
+      description={heroDescription}
+      showBottomMargin={true}
+    />
+
+    <!-- Content Section -->
+    <section class="py-8 lg:py-12">
+      <div class="container">
+        <div class={`${maxWidth} mx-auto`}>
+          <!-- Main Content -->
+          <div class="prose prose-lg max-w-none">
+            <slot />
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+</Layout>

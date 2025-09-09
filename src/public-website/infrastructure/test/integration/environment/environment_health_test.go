@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/axiom-software-co/international-center/src/cicd/internal/validation"
+	"github.com/axiom-software-co/international-center/src/public-website/infrastructure/internal/validation"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

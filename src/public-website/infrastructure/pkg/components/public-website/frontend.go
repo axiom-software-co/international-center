@@ -23,9 +23,12 @@ type FrontendComponent struct {
 func NewFrontendComponent(ctx *pulumi.Context, name string, args *FrontendArgs, opts ...pulumi.ResourceOption) (*FrontendComponent, error) {
 	component := &FrontendComponent{}
 	
-	err := ctx.RegisterComponentResource("international-center:website:Frontend", name, component, opts...)
-	if err != nil {
-		return nil, err
+	// Safe registration for mock contexts
+	if canRegister(ctx) {
+		err := ctx.RegisterComponentResource("international-center:website:Frontend", name, component, opts...)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	var websiteURL, healthEndpoint pulumi.StringOutput
@@ -116,13 +119,15 @@ func NewFrontendComponent(ctx *pulumi.Context, name string, args *FrontendArgs, 
 	component.StaticAssets = staticAssets
 	component.HealthEndpoint = healthEndpoint
 
-	if err := ctx.RegisterResourceOutputs(component, pulumi.Map{
-		"websiteURL":      component.WebsiteURL,
-		"containerConfig": component.ContainerConfig,
-		"staticAssets":    component.StaticAssets,
-		"healthEndpoint":  component.HealthEndpoint,
-	}); err != nil {
-		return nil, err
+	if canRegister(ctx) {
+		if err := ctx.RegisterResourceOutputs(component, pulumi.Map{
+			"websiteURL":      component.WebsiteURL,
+			"containerConfig": component.ContainerConfig,
+			"staticAssets":    component.StaticAssets,
+			"healthEndpoint":  component.HealthEndpoint,
+		}); err != nil {
+			return nil, err
+		}
 	}
 
 	return component, nil
