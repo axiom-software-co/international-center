@@ -49,18 +49,64 @@ func (h *SimplifiedContractHandler) GetNewsAdmin(w http.ResponseWriter, r *http.
 		correlationCtx = domain.NewCorrelationContext()
 	}
 
+	// Extract user ID for service call
+	userID := r.Header.Get("X-User-ID")
+	if userID == "" {
+		h.writeErrorResponse(w, http.StatusUnauthorized, "User ID required", correlationCtx.CorrelationID)
+		return
+	}
+
+	// Use real news service to get actual data
+	newsData, err := h.newsService.GetAllNews(ctx, userID)
+	if err != nil {
+		h.writeErrorResponse(w, http.StatusInternalServerError, "Failed to fetch news articles", correlationCtx.CorrelationID)
+		return
+	}
+
+	// Convert domain news to contract-compliant format
+	contractNews := make([]admin.NewsArticle, len(newsData))
+	for i, news := range newsData {
+		contractNews[i] = h.convertNewsToContract(*news)
+	}
+
+	// Apply pagination
+	page := 1
+	limit := 20
+	if params.Page != nil {
+		page = int(*params.Page)
+	}
+	if params.Limit != nil {
+		limit = int(*params.Limit)
+	}
+
+	start := (page - 1) * limit
+	end := start + limit
+	if start > len(contractNews) {
+		start = len(contractNews)
+	}
+	if end > len(contractNews) {
+		end = len(contractNews)
+	}
+
+	paginatedNews := contractNews[start:end]
+	totalItems := len(contractNews)
+	totalPages := (totalItems + limit - 1) / limit
+	if totalPages == 0 {
+		totalPages = 1
+	}
+
 	response := struct {
 		Data       []admin.NewsArticle   `json:"data"`
 		Pagination admin.PaginationInfo `json:"pagination"`
 	}{
-		Data: []admin.NewsArticle{}, // Simplified - to be implemented with actual data
+		Data: paginatedNews,
 		Pagination: admin.PaginationInfo{
-			CurrentPage:  1,
-			TotalPages:   1,
-			TotalItems:   0,
-			ItemsPerPage: 20,
-			HasNext:      false,
-			HasPrevious:  false,
+			CurrentPage:  page,
+			TotalPages:   totalPages,
+			TotalItems:   totalItems,
+			ItemsPerPage: limit,
+			HasNext:      page < totalPages,
+			HasPrevious:  page > 1,
 		},
 	}
 
@@ -184,15 +230,36 @@ func (h *SimplifiedContractHandler) UnpublishNewsArticle(w http.ResponseWriter, 
 
 // GetNewsCategoriesAdmin implements GET /admin/api/v1/news/categories
 func (h *SimplifiedContractHandler) GetNewsCategoriesAdmin(w http.ResponseWriter, r *http.Request) {
-	correlationCtx := domain.FromContext(r.Context())
+	ctx := r.Context()
+	correlationCtx := domain.FromContext(ctx)
 	if correlationCtx == nil {
 		correlationCtx = domain.NewCorrelationContext()
+	}
+
+	// Extract user ID for service call
+	userID := r.Header.Get("X-User-ID")
+	if userID == "" {
+		h.writeErrorResponse(w, http.StatusUnauthorized, "User ID required", correlationCtx.CorrelationID)
+		return
+	}
+
+	// Use real news service to get actual categories
+	categoriesData, err := h.newsService.GetAllNewsCategories(ctx, userID)
+	if err != nil {
+		h.writeErrorResponse(w, http.StatusInternalServerError, "Failed to fetch news categories", correlationCtx.CorrelationID)
+		return
+	}
+
+	// Convert domain categories to contract-compliant format
+	contractCategories := make([]admin.NewsCategory, len(categoriesData))
+	for i, category := range categoriesData {
+		contractCategories[i] = h.convertNewsCategoryToContract(*category)
 	}
 
 	response := struct {
 		Data []admin.NewsCategory `json:"data"`
 	}{
-		Data: []admin.NewsCategory{}, // Empty for now - to be implemented
+		Data: contractCategories,
 	}
 
 	h.writeResponse(w, http.StatusOK, response, correlationCtx.CorrelationID)
@@ -415,6 +482,115 @@ func (h *SimplifiedContractHandler) writeResponse(w http.ResponseWriter, statusC
 	
 	if data != nil {
 		json.NewEncoder(w).Encode(data)
+	}
+}
+
+// writeErrorResponse writes a standardized error response
+func (h *SimplifiedContractHandler) writeErrorResponse(w http.ResponseWriter, statusCode int, message string, correlationID string) {
+	errorResponse := map[string]interface{}{
+		"error": map[string]interface{}{
+			"code":           "INTERNAL_ERROR",
+			"message":        message,
+			"correlation_id": correlationID,
+			"timestamp":      time.Now().UTC().Format(time.RFC3339),
+		},
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("X-Correlation-ID", correlationID)
+	w.WriteHeader(statusCode)
+	
+	json.NewEncoder(w).Encode(errorResponse)
+}
+
+// convertNewsToContract converts domain news to contract-compliant NewsArticle
+func (h *SimplifiedContractHandler) convertNewsToContract(news news.News) admin.NewsArticle {
+	newsUUID, _ := uuid.Parse(news.NewsID)
+	categoryUUID, _ := uuid.Parse(news.CategoryID)
+	
+	return admin.NewsArticle{
+		NewsId:               openapi_types.UUID(newsUUID),
+		Title:                news.Title,
+		Summary:              news.Summary,
+		Content:              &news.Content,
+		CategoryId:           openapi_types.UUID(categoryUUID),
+		AuthorName:           &news.AuthorName,
+		ImageUrl:             &news.ImageURL,
+		NewsType:             h.convertNewsType(news.NewsType),
+		PriorityLevel:        h.convertPriorityLevel(news.PriorityLevel),
+		PublishingStatus:     h.convertPublishingStatus(news.PublishingStatus),
+		PublicationTimestamp: news.PublicationTimestamp,
+		Tags:                 &news.Tags,
+		CreatedOn:            news.CreatedOn,
+		ModifiedOn:           news.ModifiedOn,
+		CreatedBy:            &news.CreatedBy,
+		ModifiedBy:           &news.ModifiedBy,
+		Slug:                 news.Slug,
+	}
+}
+
+// convertNewsCategoryToContract converts domain category to contract-compliant NewsCategory
+func (h *SimplifiedContractHandler) convertNewsCategoryToContract(category news.NewsCategory) admin.NewsCategory {
+	categoryUUID, _ := uuid.Parse(category.CategoryID)
+	
+	return admin.NewsCategory{
+		CategoryId:          openapi_types.UUID(categoryUUID),
+		Name:                category.Name,
+		Slug:                category.Slug,
+		Description:         &category.Description,
+		IsDefaultUnassigned: category.IsDefaultUnassigned,
+		CreatedOn:           category.CreatedOn,
+		ModifiedOn:          category.ModifiedOn,
+		CreatedBy:           &category.CreatedBy,
+		ModifiedBy:          &category.ModifiedBy,
+	}
+}
+
+// Helper methods for enum conversion
+func (h *SimplifiedContractHandler) convertNewsType(newsType news.NewsType) admin.NewsArticleNewsType {
+	switch newsType {
+	case news.NewsTypeAnnouncement:
+		return admin.NewsArticleNewsTypeAnnouncement
+	case news.NewsTypePressRelease:
+		return admin.NewsArticleNewsTypePressRelease
+	case news.NewsTypeEvent:
+		return admin.NewsArticleNewsTypeEvent
+	case news.NewsTypeUpdate:
+		return admin.NewsArticleNewsTypeUpdate
+	case news.NewsTypeAlert:
+		return admin.NewsArticleNewsTypeAlert
+	case news.NewsTypeFeature:
+		return admin.NewsArticleNewsTypeFeature
+	default:
+		return admin.NewsArticleNewsTypeAnnouncement
+	}
+}
+
+func (h *SimplifiedContractHandler) convertPriorityLevel(priority news.PriorityLevel) admin.NewsArticlePriorityLevel {
+	switch priority {
+	case news.PriorityLevelLow:
+		return admin.NewsArticlePriorityLevelLow
+	case news.PriorityLevelNormal:
+		return admin.NewsArticlePriorityLevelNormal
+	case news.PriorityLevelHigh:
+		return admin.NewsArticlePriorityLevelHigh
+	case news.PriorityLevelUrgent:
+		return admin.NewsArticlePriorityLevelUrgent
+	default:
+		return admin.NewsArticlePriorityLevelNormal
+	}
+}
+
+func (h *SimplifiedContractHandler) convertPublishingStatus(status news.PublishingStatus) admin.NewsArticlePublishingStatus {
+	switch status {
+	case news.PublishingStatusDraft:
+		return admin.NewsArticlePublishingStatusDraft
+	case news.PublishingStatusPublished:
+		return admin.NewsArticlePublishingStatusPublished
+	case news.PublishingStatusArchived:
+		return admin.NewsArticlePublishingStatusArchived
+	default:
+		return admin.NewsArticlePublishingStatusDraft
 	}
 }
 

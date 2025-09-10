@@ -3,6 +3,7 @@ package dapr
 import (
 	"context"
 	"fmt"
+	"log"
 	"sync"
 
 	"github.com/dapr/go-sdk/client"
@@ -38,10 +39,19 @@ func NewClient() (*Client, error) {
 				appID:       appID,
 			}
 		} else {
-			// In production mode, create real Dapr client
+			// In production mode, create real Dapr client with environment-aware configuration
 			var daprSDKClient client.Client
 			var clientErr error
-			daprSDKClient, clientErr = client.NewClient()
+			
+			// Get Dapr configuration from environment variables
+			daprHost := getEnv("DAPR_HOST", "localhost")
+			daprGRPCPort := getEnv("DAPR_GRPC_PORT", "50001")
+			
+			// Create Dapr client with environment-specific endpoint
+			daprGRPCEndpoint := daprHost + ":" + daprGRPCPort
+			log.Printf("dapr client initializing for: %s", daprGRPCEndpoint)
+			
+			daprSDKClient, clientErr = client.NewClientWithAddress(daprGRPCEndpoint)
 			if clientErr != nil {
 				err = fmt.Errorf("failed to create Dapr client: %w", clientErr)
 				return
@@ -112,5 +122,3 @@ func (c *Client) IsHealthy(ctx context.Context) bool {
 	err := c.HealthCheck(ctx)
 	return err == nil
 }
-
-

@@ -167,10 +167,12 @@ func (r *RuntimeOrchestrator) executePodmanContainers(ctx context.Context, plan 
 			return fmt.Errorf("failed to deploy container %s: %w", containerID, err)
 		}
 
-		// For standalone mode, services connect directly to Dapr control plane
-		// No individual sidecars needed in development environment
+		// Deploy Dapr sidecar for service containers with proper networking configuration
 		if r.isServiceContainer(containerID) && spec.DaprEnabled {
-			log.Printf("Service %s configured for standalone Dapr mode - connecting to control plane", containerID)
+			if err := r.deployServiceSidecar(ctx, containerID, spec); err != nil {
+				log.Printf("Warning: Failed to deploy Dapr sidecar for %s: %v", containerID, err)
+				// Continue with main container deployment even if sidecar fails
+			}
 		}
 
 		// Wait for container to be healthy before proceeding to next
@@ -475,6 +477,7 @@ func (r *RuntimeOrchestrator) buildServiceContainerSpec(containerID string, args
 				"DAPR_HOST":       "dapr-control-plane",
 				"DAPR_HTTP_PORT":  "3500",
 				"DAPR_GRPC_PORT":  "50001",
+				"DAPR_APP_ID":     "public-gateway",
 			}).
 			WithResourceLimits("0.5", "256m").
 			WithHealthEndpoint("http://localhost:9001/health").
@@ -489,6 +492,7 @@ func (r *RuntimeOrchestrator) buildServiceContainerSpec(containerID string, args
 				"DAPR_HOST":       "dapr-control-plane",
 				"DAPR_HTTP_PORT":  "3500",
 				"DAPR_GRPC_PORT":  "50001",
+				"DAPR_APP_ID":     "admin-gateway",
 			}).
 			WithResourceLimits("0.5", "256m").
 			WithHealthEndpoint("http://localhost:9000/health").
@@ -496,12 +500,13 @@ func (r *RuntimeOrchestrator) buildServiceContainerSpec(containerID string, args
 		return spec.Build()
 
 	case "content":
-		spec := NewContainerSpecBuilder(containerID, "localhost/backend/content:latest", 3001).
+		spec := NewContainerSpecBuilder(containerID, "localhost/backend/content:fixed", 3001).
 			WithEnvironment(map[string]string{
 				"SERVICE_TYPE":     "content",
 				"DAPR_HOST":       "dapr-control-plane",
 				"DAPR_HTTP_PORT":  "3500",
 				"DAPR_GRPC_PORT":  "50001",
+				"DAPR_APP_ID":     "content",
 			}).
 			WithResourceLimits("0.5", "512m").
 			WithHealthEndpoint("http://localhost:3001/health").
@@ -515,6 +520,7 @@ func (r *RuntimeOrchestrator) buildServiceContainerSpec(containerID string, args
 				"DAPR_HOST":       "dapr-control-plane",
 				"DAPR_HTTP_PORT":  "3500",
 				"DAPR_GRPC_PORT":  "50001",
+				"DAPR_APP_ID":     "inquiries",
 			}).
 			WithResourceLimits("0.5", "512m").
 			WithHealthEndpoint("http://localhost:3101/health").
@@ -528,6 +534,7 @@ func (r *RuntimeOrchestrator) buildServiceContainerSpec(containerID string, args
 				"DAPR_HOST":       "dapr-control-plane",
 				"DAPR_HTTP_PORT":  "3500",
 				"DAPR_GRPC_PORT":  "50001",
+				"DAPR_APP_ID":     "notifications",
 			}).
 			WithResourceLimits("0.5", "512m").
 			WithHealthEndpoint("http://localhost:3201/health").
@@ -571,3 +578,59 @@ func (r *RuntimeOrchestrator) isServiceContainer(containerID string) bool {
 	return false
 }
 
+// deployServiceSidecar deploys a properly configured Dapr sidecar for a service container
+func (r *RuntimeOrchestrator) deployServiceSidecar(ctx context.Context, serviceID string, serviceSpec *ContainerSpec) error {
+	sidecarName := serviceID + "-dapr"
+	
+	// Stop and remove existing sidecar if it exists
+	if err := r.PodmanProvider.StopContainer(ctx, sidecarName); err != nil {
+		log.Printf("Warning: Could not stop existing sidecar %s: %v", sidecarName, err)
+	}
+
+	// Calculate unique sidecar port based on service
+	baseSidecarPort := 50030
+	switch serviceID {
+	case "public-gateway":
+		baseSidecarPort = 50010
+	case "admin-gateway":
+		baseSidecarPort = 50020
+	case "content":
+		baseSidecarPort = 50030
+	case "inquiries":
+		baseSidecarPort = 50040
+	case "notifications":
+		baseSidecarPort = 50050
+	}
+
+	// Create sidecar specification with proper networking configuration
+	sidecarSpec := NewContainerSpecBuilder(sidecarName, "daprio/dapr:latest", baseSidecarPort).
+		WithCommand([]string{
+			"/daprd",
+			"--mode", "standalone",
+			"--app-id", serviceSpec.DaprAppID,
+			"--app-port", "8080", // All services listen on 8080 internally
+			"--app-channel-address", serviceID, // Use service container name for network address
+			"--dapr-http-port", "3500",
+			"--dapr-grpc-port", "50001", 
+			"--log-level", "info",
+		}).
+		WithResourceLimits("0.3", "128m")
+
+	sidecar, err := sidecarSpec.Build()
+	if err != nil {
+		return fmt.Errorf("failed to build sidecar specification: %w", err)
+	}
+
+	// Deploy the sidecar container
+	if err := r.PodmanProvider.DeployContainer(ctx, sidecar); err != nil {
+		return fmt.Errorf("failed to deploy sidecar container: %w", err)
+	}
+
+	// Update service container environment to point to its sidecar
+	serviceSpec.Environment["DAPR_HOST"] = sidecarName
+	serviceSpec.Environment["DAPR_HTTP_PORT"] = "3500"
+	serviceSpec.Environment["DAPR_GRPC_PORT"] = "50001"
+
+	log.Printf("Successfully deployed Dapr sidecar %s for service %s on port %d", sidecarName, serviceID, baseSidecarPort)
+	return nil
+}

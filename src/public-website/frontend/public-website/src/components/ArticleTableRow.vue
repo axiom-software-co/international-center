@@ -10,13 +10,13 @@
           <div
             class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
           >
-            {{ article.category.toUpperCase() }}
+            {{ getArticleCategory(article) }}
           </div>
 
           <!-- Title Row -->
           <div>
             <h3 class="font-semibold text-gray-900 dark:text-white line-clamp-2 transition-colors">
-              {{ article.title }}
+              {{ getArticleTitle(article) }}
             </h3>
           </div>
 
@@ -63,12 +63,14 @@ const formatDate = (dateString: string) => {
 };
 
 const articleUrl = computed(() => {
+  const slug = getArticleSlug(props.article);
+  
   if (props.dataType === 'news') {
-    return `/company/news/${props.article.slug}`;
+    return `/company/news/${slug}`;
   } else if (props.dataType === 'events') {
-    return `/community/events/${props.article.slug}`;
+    return `/community/events/${slug}`;
   } else {
-    return `/community/research/${props.article.slug}`;
+    return `/community/research/${slug}`;
   }
 });
 
@@ -76,7 +78,9 @@ const handleRowClick = () => {
   window.location.href = articleUrl.value;
 };
 
-const getArticleAuthor = (article: Article): string => {
+const getArticleAuthor = (article?: Article): string => {
+  if (!article) return 'International Center Team';
+  
   const author = (article as any).author;
   if (typeof author === 'string') {
     return author;
@@ -87,12 +91,44 @@ const getArticleAuthor = (article: Article): string => {
   return 'International Center Team';
 };
 
-const getArticleDate = (article: Article): string => {
+const getArticleDate = (article?: Article): string => {
+  if (!article) return '';
+  
   // For events, use event_date, for others use published_at
   if (props.dataType === 'events') {
     return (article as any).event_date || (article as any).published_at || '';
   }
   return (article as any).published_at || (article as any).publishedDate || '';
+};
+
+const getArticleCategory = (article?: Article): string => {
+  if (!article) return 'UNCATEGORIZED';
+  
+  // Handle contract-typed category
+  const category = (article as any).category;
+  if (typeof category === 'string') {
+    return category.toUpperCase();
+  }
+  if (typeof category === 'object' && category?.name) {
+    return category.name.toUpperCase();
+  }
+  
+  // Fallback based on data type
+  if (props.dataType === 'news') return 'NEWS';
+  if (props.dataType === 'events') return 'EVENTS';
+  if (props.dataType === 'research-articles') return 'RESEARCH';
+  
+  return 'CONTENT';
+};
+
+const getArticleTitle = (article?: Article): string => {
+  if (!article) return 'Untitled Article';
+  return (article as any).title || 'Untitled Article';
+};
+
+const getArticleSlug = (article?: Article): string => {
+  if (!article) return 'untitled';
+  return (article as any).slug || 'untitled';
 };
 </script>
 

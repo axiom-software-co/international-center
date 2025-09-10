@@ -210,6 +210,7 @@ func TestPlatformIntegration_ServiceMeshInfrastructure(t *testing.T) {
 	})
 }
 
+
 // validateEnvironmentPrerequisites ensures environment health before integration testing
 func validateEnvironmentPrerequisites(t *testing.T) {
 	// Check critical infrastructure components are running

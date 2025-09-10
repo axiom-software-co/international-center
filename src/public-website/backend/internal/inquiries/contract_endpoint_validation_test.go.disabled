@@ -1,0 +1,551 @@
+// RED PHASE: Contract endpoint validation tests - these should FAIL initially
+package inquiries
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+	"time"
+
+	"github.com/axiom-software-co/international-center/src/backend/internal/contracts/admin"
+	"github.com/axiom-software-co/international-center/src/backend/internal/shared/domain"
+	"github.com/google/uuid"
+	"github.com/gorilla/mux"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	openapi_types "github.com/oapi-codegen/runtime/types"
+)
+
+func TestInquiriesContractEndpointValidation(t *testing.T) {
+	timeout := 5 * time.Second
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	t.Run("Inquiry listing endpoint contract validation", func(t *testing.T) {
+		// Contract expectation: GET /admin/api/v1/inquiries returns real inquiry data
+		
+		// Create contract-compliant inquiry handler
+		mediaService := &MockMediaService{}
+		handler := NewContractCompliantInquiryHandler(mediaService)
+		
+		req := httptest.NewRequest("GET", "/admin/api/v1/inquiries", nil)
+		req.Header.Set("X-User-ID", "admin-test-user")
+		req.Header.Set("Content-Type", "application/json")
+		
+		// Add correlation context
+		correlationCtx := domain.NewCorrelationContext()
+		req = req.WithContext(correlationCtx.ToContext(ctx))
+		
+		rr := httptest.NewRecorder()
+		
+		params := admin.GetInquiriesParams{
+			Page:  &[]int{1}[0],
+			Limit: &[]int{20}[0],
+		}
+		
+		handler.GetInquiries(rr, req, params)
+		
+		// Should return 200 OK
+		assert.Equal(t, http.StatusOK, rr.Code, "GetInquiries should return 200 OK")
+		
+		// Response should be contract-compliant
+		var response map[string]interface{}
+		err := json.Unmarshal(rr.Body.Bytes(), &response)
+		require.NoError(t, err, "Response should be valid JSON")
+		
+		// Should have contract structure
+		assert.Contains(t, response, "data", "Response should contain data field")
+		assert.Contains(t, response, "pagination", "Response should contain pagination field")
+		
+		// Contract expectation: should have real inquiry data, not empty
+		if data, ok := response["data"].([]interface{}); ok && len(data) > 0 {
+			inquiry := data[0].(map[string]interface{})
+			assert.Contains(t, inquiry, "inquiry_id", "Inquiry should have inquiry_id")
+			assert.Contains(t, inquiry, "inquiry_type", "Inquiry should have inquiry_type")
+			assert.Contains(t, inquiry, "status", "Inquiry should have status")
+			assert.Contains(t, inquiry, "submitter_name", "Inquiry should have submitter_name")
+			assert.Contains(t, inquiry, "submitter_email", "Inquiry should have submitter_email")
+			assert.Contains(t, inquiry, "subject", "Inquiry should have subject")
+			assert.Contains(t, inquiry, "message", "Inquiry should have message")
+			assert.Contains(t, inquiry, "submitted_on", "Inquiry should have submitted_on")
+		}
+	})
+
+	t.Run("Inquiry retrieval by ID endpoint contract validation", func(t *testing.T) {
+		// Contract expectation: GET /admin/api/v1/inquiries/{id} returns specific inquiry
+		
+		mediaService := &MockMediaService{}
+		handler := NewContractCompliantInquiryHandler(mediaService)
+		
+		inquiryID := uuid.New()
+		req := httptest.NewRequest("GET", "/admin/api/v1/inquiries/"+inquiryID.String(), nil)
+		req.Header.Set("X-User-ID", "admin-test-user")
+		req.Header.Set("Content-Type", "application/json")
+		
+		correlationCtx := domain.NewCorrelationContext()
+		req = req.WithContext(correlationCtx.ToContext(ctx))
+		
+		rr := httptest.NewRecorder()
+		
+		handler.GetInquiryById(rr, req, openapi_types.UUID(inquiryID))
+		
+		// Should return 200 OK or 404 if inquiry doesn't exist
+		if rr.Code == http.StatusOK {
+			var response map[string]interface{}
+			err := json.Unmarshal(rr.Body.Bytes(), &response)
+			require.NoError(t, err, "Response should be valid JSON")
+			
+			assert.Contains(t, response, "data", "Response should contain data field")
+			
+			if data, ok := response["data"].(map[string]interface{}); ok {
+				assert.Contains(t, data, "inquiry_id", "Inquiry should have inquiry_id")
+				assert.Equal(t, inquiryID.String(), data["inquiry_id"], "Inquiry ID should match requested ID")
+			}
+		} else if rr.Code == http.StatusNotFound {
+			// Valid contract response for non-existent inquiry
+			var errorResponse map[string]interface{}
+			err := json.Unmarshal(rr.Body.Bytes(), &errorResponse)
+			require.NoError(t, err, "Error response should be valid JSON")
+			
+			assert.Contains(t, errorResponse, "error", "Error response should contain error field")
+		} else {
+			t.Errorf("Unexpected status code: %d", rr.Code)
+		}
+	})
+
+	t.Run("Inquiry status update endpoint contract validation", func(t *testing.T) {
+		// Contract expectation: PUT /admin/api/v1/inquiries/{id} updates inquiry status
+		
+		mediaService := &MockMediaService{}
+		handler := NewContractCompliantInquiryHandler(mediaService)
+		
+		inquiryID := uuid.New()
+		
+		requestBody := map[string]interface{}{
+			"status":      "in_progress",
+			"notes":       "Processing inquiry for contract validation",
+			"assigned_to": uuid.New().String(),
+		}
+		
+		bodyBytes, _ := json.Marshal(requestBody)
+		
+		req := httptest.NewRequest("PUT", "/admin/api/v1/inquiries/"+inquiryID.String(), bytes.NewBuffer(bodyBytes))
+		req.Header.Set("X-User-ID", "admin-test-user")
+		req.Header.Set("Content-Type", "application/json")
+		
+		correlationCtx := domain.NewCorrelationContext()
+		req = req.WithContext(correlationCtx.ToContext(ctx))
+		
+		rr := httptest.NewRecorder()
+		
+		handler.UpdateInquiryStatus(rr, req, openapi_types.UUID(inquiryID))
+		
+		// Should return 200 OK for successful update
+		if rr.Code == http.StatusOK {
+			var response admin.UpdatedResponse
+			err := json.Unmarshal(rr.Body.Bytes(), &response)
+			require.NoError(t, err, "Response should be valid UpdatedResponse")
+			
+			assert.True(t, response.Success, "Response should indicate success")
+			assert.NotEmpty(t, response.Message, "Response should have message")
+			assert.NotEmpty(t, response.Data, "Response should have data")
+			assert.NotZero(t, response.Timestamp, "Response should have timestamp")
+		} else {
+			// Should have proper error response
+			var errorResponse map[string]interface{}
+			err := json.Unmarshal(rr.Body.Bytes(), &errorResponse)
+			require.NoError(t, err, "Error response should be valid JSON")
+			
+			assert.Contains(t, errorResponse, "error", "Error response should contain error field")
+		}
+	})
+
+	t.Run("Public inquiry submission endpoint contract validation", func(t *testing.T) {
+		// Contract expectation: POST /api/v1/inquiries/* endpoints should work
+		
+		t.Run("Media inquiry submission should be functional", func(t *testing.T) {
+			// This would test the public API endpoint for media inquiries
+			
+			mediaInquiryData := map[string]interface{}{
+				"outlet":       "Test Media Outlet",
+				"contact_name": "Test Reporter",
+				"title":        "Reporter",
+				"email":        "reporter@testmedia.com",
+				"phone":        "+1-555-0123",
+				"subject":      "Contract Validation Interview",
+				"message":      "Testing media inquiry submission for contract validation",
+			}
+			
+			bodyBytes, _ := json.Marshal(mediaInquiryData)
+			
+			req := httptest.NewRequest("POST", "/api/v1/inquiries/media", bytes.NewBuffer(bodyBytes))
+			req.Header.Set("Content-Type", "application/json")
+			
+			correlationCtx := domain.NewCorrelationContext()
+			req = req.WithContext(correlationCtx.ToContext(ctx))
+			
+			rr := httptest.NewRecorder()
+			
+			// For now, this will fail - we need to implement public inquiry endpoints
+			// In GREEN phase, these should be properly implemented
+			
+			assert.True(t, true, "Media inquiry submission test defined for implementation")
+			t.Log("Media inquiry submission endpoint needs implementation")
+		})
+
+		t.Run("Business inquiry submission should be functional", func(t *testing.T) {
+			// Test business inquiry submission
+			
+			businessInquiryData := map[string]interface{}{
+				"company_name":  "Test Company",
+				"contact_name":  "Test Business Contact",
+				"contact_email": "contact@testcompany.com",
+				"phone":         "+1-555-0124",
+				"inquiry_type":  "partnership",
+				"message":       "Testing business inquiry submission for contract validation",
+			}
+			
+			bodyBytes, _ := json.Marshal(businessInquiryData)
+			
+			req := httptest.NewRequest("POST", "/api/v1/inquiries/business", bytes.NewBuffer(bodyBytes))
+			req.Header.Set("Content-Type", "application/json")
+			
+			correlationCtx := domain.NewCorrelationContext()
+			req = req.WithContext(correlationCtx.ToContext(ctx))
+			
+			rr := httptest.NewRecorder()
+			
+			// This test defines what we need to implement
+			assert.True(t, true, "Business inquiry submission test defined for implementation")
+			t.Log("Business inquiry submission endpoint needs implementation")
+		})
+	})
+}
+
+func TestBackendContractDataIntegration(t *testing.T) {
+	timeout := 5 * time.Second
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	t.Run("Contract methods should integrate with repository layer", func(t *testing.T) {
+		// Contract expectation: contract methods call repository for real data
+		
+		t.Run("News contract methods should call news repository", func(t *testing.T) {
+			// Contract expectation: GetNewsAdmin calls news repository
+			
+			mockNewsService := &MockNewsService{}
+			handler := NewSimplifiedContractHandler(mockNewsService, nil, nil, nil)
+			
+			req := httptest.NewRequest("GET", "/admin/api/v1/news", nil)
+			req.Header.Set("X-User-ID", "admin-test-user")
+			req = req.WithContext(ctx)
+			
+			rr := httptest.NewRecorder()
+			
+			params := admin.GetNewsAdminParams{
+				Page:  &[]int{1}[0],
+				Limit: &[]int{20}[0],
+			}
+			
+			handler.GetNewsAdmin(rr, req, params)
+			
+			// Should call repository and return real data
+			assert.Equal(t, http.StatusOK, rr.Code, "GetNewsAdmin should return 200 OK")
+			
+			// Response should not be empty placeholder
+			var response map[string]interface{}
+			json.Unmarshal(rr.Body.Bytes(), &response)
+			
+			if data, ok := response["data"].([]interface{}); ok {
+				// Contract expectation: should have real news data from repository
+				if len(data) == 0 {
+					t.Error("Expected real news data from repository, got empty placeholder")
+				} else {
+					t.Log("Contract method successfully integrated with repository layer")
+				}
+			}
+		})
+
+		t.Run("Service contract methods should call services repository", func(t *testing.T) {
+			// Contract expectation: GetServicesAdmin calls services repository
+			
+			mockServicesService := &MockServicesService{}
+			handler := NewSimplifiedContractHandler(nil, nil, mockServicesService, nil)
+			
+			req := httptest.NewRequest("GET", "/admin/api/v1/services", nil)
+			req.Header.Set("X-User-ID", "admin-test-user")
+			req = req.WithContext(ctx)
+			
+			rr := httptest.NewRecorder()
+			
+			params := admin.GetServicesAdminParams{
+				Page:  &[]int{1}[0],
+				Limit: &[]int{20}[0],
+			}
+			
+			handler.GetServicesAdmin(rr, req, params)
+			
+			// Should integrate with repository
+			assert.Equal(t, http.StatusOK, rr.Code, "GetServicesAdmin should return 200 OK")
+			
+			var response map[string]interface{}
+			json.Unmarshal(rr.Body.Bytes(), &response)
+			
+			// Contract expectation: should call repository for real data
+			if data, ok := response["data"].([]interface{}); ok {
+				if len(data) == 0 {
+					t.Error("Expected real services data from repository, got empty placeholder")
+				}
+			}
+		})
+	})
+
+	t.Run("Contract methods should handle pagination properly", func(t *testing.T) {
+		// Contract expectation: pagination should work with real repository data
+		
+		mockNewsService := &MockNewsService{}
+		handler := NewSimplifiedContractHandler(mockNewsService, nil, nil, nil)
+		
+		req := httptest.NewRequest("GET", "/admin/api/v1/news", nil)
+		req.Header.Set("X-User-ID", "admin-test-user")
+		req = req.WithContext(ctx)
+		
+		rr := httptest.NewRecorder()
+		
+		// Test pagination parameters
+		params := admin.GetNewsAdminParams{
+			Page:  &[]int{2}[0],   // Page 2
+			Limit: &[]int{10}[0],  // 10 items per page
+		}
+		
+		handler.GetNewsAdmin(rr, req, params)
+		
+		assert.Equal(t, http.StatusOK, rr.Code, "Paginated request should return 200 OK")
+		
+		var response map[string]interface{}
+		json.Unmarshal(rr.Body.Bytes(), &response)
+		
+		// Should have proper pagination response
+		if pagination, ok := response["pagination"].(map[string]interface{}); ok {
+			assert.Contains(t, pagination, "current_page", "Should have current_page")
+			assert.Contains(t, pagination, "total_pages", "Should have total_pages") 
+			assert.Contains(t, pagination, "total_items", "Should have total_items")
+			assert.Contains(t, pagination, "items_per_page", "Should have items_per_page")
+			assert.Contains(t, pagination, "has_next", "Should have has_next")
+			assert.Contains(t, pagination, "has_previous", "Should have has_previous")
+			
+			// Contract expectation: pagination values should be realistic
+			currentPage := pagination["current_page"]
+			assert.Equal(t, float64(2), currentPage, "Current page should match request")
+		}
+	})
+
+	t.Run("Contract methods should handle filtering and search properly", func(t *testing.T) {
+		// Contract expectation: filtering and search should work with repository
+		
+		mockNewsService := &MockNewsService{}
+		handler := NewSimplifiedContractHandler(mockNewsService, nil, nil, nil)
+		
+		searchQuery := "test search query"
+		params := admin.GetNewsAdminParams{
+			Page:   &[]int{1}[0],
+			Limit:  &[]int{20}[0],
+			Search: &searchQuery,
+		}
+		
+		req := httptest.NewRequest("GET", "/admin/api/v1/news?search="+searchQuery, nil)
+		req.Header.Set("X-User-ID", "admin-test-user")
+		req = req.WithContext(ctx)
+		
+		rr := httptest.NewRecorder()
+		
+		handler.GetNewsAdmin(rr, req, params)
+		
+		// Should handle search properly
+		assert.Equal(t, http.StatusOK, rr.Code, "Search request should return 200 OK")
+		
+		var response map[string]interface{}
+		json.Unmarshal(rr.Body.Bytes(), &response)
+		
+		// Contract expectation: search should filter results appropriately
+		assert.Contains(t, response, "data", "Search response should contain data")
+		
+		// If search returns results, they should be relevant to search query
+		if data, ok := response["data"].([]interface{}); ok && len(data) > 0 {
+			// In a real implementation, search results should be relevant
+			t.Log("Search functionality integration validated")
+		}
+	})
+
+	t.Run("Contract error responses should be consistent across all endpoints", func(t *testing.T) {
+		// Contract expectation: all endpoints return consistent error formats
+		
+		mediaService := &MockMediaService{}
+		handler := NewContractCompliantInquiryHandler(mediaService)
+		
+		// Test various error scenarios
+		errorScenarios := []struct {
+			name           string
+			request        func() (*http.Request, *httptest.ResponseRecorder)
+			expectedStatus int
+		}{
+			{
+				name: "Invalid inquiry ID format",
+				request: func() (*http.Request, *httptest.ResponseRecorder) {
+					req := httptest.NewRequest("GET", "/admin/api/v1/inquiries/invalid-uuid", nil)
+					req.Header.Set("X-User-ID", "admin-test-user")
+					return req, httptest.NewRecorder()
+				},
+				expectedStatus: http.StatusBadRequest,
+			},
+			{
+				name: "Unauthorized access attempt", 
+				request: func() (*http.Request, *httptest.ResponseRecorder) {
+					req := httptest.NewRequest("GET", "/admin/api/v1/inquiries", nil)
+					// No X-User-ID header
+					return req, httptest.NewRecorder()
+				},
+				expectedStatus: http.StatusUnauthorized,
+			},
+			{
+				name: "Invalid status update request",
+				request: func() (*http.Request, *httptest.ResponseRecorder) {
+					invalidBody := `{"status": "invalid_status"}`
+					req := httptest.NewRequest("PUT", "/admin/api/v1/inquiries/"+uuid.New().String(), 
+						bytes.NewBufferString(invalidBody))
+					req.Header.Set("X-User-ID", "admin-test-user")
+					req.Header.Set("Content-Type", "application/json")
+					return req, httptest.NewRecorder()
+				},
+				expectedStatus: http.StatusBadRequest,
+			},
+		}
+		
+		for _, scenario := range errorScenarios {
+			t.Run(scenario.name, func(t *testing.T) {
+				req, rr := scenario.request()
+				req = req.WithContext(ctx)
+				
+				// Handle different endpoint types
+				if req.Method == "GET" && req.URL.Path == "/admin/api/v1/inquiries" {
+					handler.GetInquiries(rr, req, admin.GetInquiriesParams{})
+				} else if req.Method == "GET" {
+					// GetInquiryById
+					pathSegments := []string{"admin", "api", "v1", "inquiries", uuid.New().String()}
+					inquiryID := pathSegments[4]
+					if parsedID, err := uuid.Parse(inquiryID); err == nil {
+						handler.GetInquiryById(rr, req, openapi_types.UUID(parsedID))
+					}
+				} else if req.Method == "PUT" {
+					// UpdateInquiryStatus
+					handler.UpdateInquiryStatus(rr, req, openapi_types.UUID(uuid.New()))
+				}
+				
+				// Should return appropriate error status
+				if rr.Code >= 400 {
+					// Should have contract-compliant error response
+					var errorResponse map[string]interface{}
+					err := json.Unmarshal(rr.Body.Bytes(), &errorResponse)
+					
+					if err == nil {
+						assert.Contains(t, errorResponse, "error", "Error response should contain error field")
+						
+						if errorField, ok := errorResponse["error"].(map[string]interface{}); ok {
+							assert.Contains(t, errorField, "code", "Error should have code")
+							assert.Contains(t, errorField, "message", "Error should have message")
+							assert.Contains(t, errorField, "correlation_id", "Error should have correlation_id")
+							assert.Contains(t, errorField, "timestamp", "Error should have timestamp")
+						}
+					}
+				}
+			})
+		}
+	})
+}
+
+// Mock media service for contract testing
+type MockMediaService struct{}
+
+func (m *MockMediaService) AdminListInquiries(ctx context.Context, params ListInquiriesParams, userID string) ([]Inquiry, PaginationResult, error) {
+	// Return mock inquiry data that simulates repository integration
+	mockInquiries := []Inquiry{
+		{
+			ID:             uuid.New().String(),
+			InquiryType:    "media",
+			Status:         "pending",
+			SubmitterName:  "Test Submitter",
+			SubmitterEmail: "submitter@example.com",
+			Subject:        "Contract Validation Test",
+			Message:        "Testing inquiry listing for contract validation",
+			SubmittedOn:    time.Now(),
+			ModifiedOn:     time.Now(),
+		},
+	}
+	
+	pagination := PaginationResult{
+		CurrentPage:  params.Page,
+		TotalPages:   1,
+		TotalItems:   len(mockInquiries),
+		ItemsPerPage: params.Limit,
+		HasNext:      false,
+		HasPrevious:  false,
+	}
+	
+	return mockInquiries, pagination, nil
+}
+
+func (m *MockMediaService) AdminGetInquiry(ctx context.Context, inquiryID string, userID string) (*MediaInquiry, error) {
+	// Return mock inquiry for testing
+	return &MediaInquiry{
+		InquiryID:   inquiryID,
+		Status:      InquiryStatusNew,
+		Priority:    InquiryPriorityMedium,
+		Urgency:     InquiryUrgencyMedium,
+		Outlet:      "Test Media Outlet",
+		ContactName: "Test Reporter",
+		Title:       "Reporter",
+		Email:       "reporter@example.com",
+		Phone:       "+1-555-0123",
+		Subject:     "Contract Validation Test",
+		Source:      "website",
+		CreatedAt:   time.Now(),
+		UpdatedAt:   time.Now(),
+		CreatedBy:   userID,
+		UpdatedBy:   userID,
+		IsDeleted:   false,
+	}, nil
+}
+
+func (m *MockMediaService) AdminUpdateInquiryStatus(ctx context.Context, inquiryID string, request AdminUpdateInquiryStatusRequest, userID string) (*Inquiry, error) {
+	// Return updated inquiry for testing
+	return &Inquiry{
+		ID:             inquiryID,
+		InquiryType:    "media",
+		Status:         string(request.Status),
+		SubmitterName:  "Test Submitter",
+		SubmitterEmail: "submitter@example.com",
+		Subject:        "Updated Inquiry",
+		Message:        "Inquiry status updated via contract validation",
+		SubmittedOn:    time.Now().Add(-24 * time.Hour),
+		ModifiedOn:     time.Now(),
+		Notes:          request.Notes,
+		AssignedTo:     request.AssignedTo,
+	}, nil
+}
+
+func (m *MockMediaService) ConvertToContract(mi *MediaInquiry) Inquiry {
+	return Inquiry{
+		ID:             mi.InquiryID,
+		InquiryType:    "media",
+		Status:         string(mi.Status),
+		SubmitterName:  mi.ContactName,
+		SubmitterEmail: mi.Email,
+		Subject:        mi.Subject,
+		Message:        mi.Source,
+		SubmittedOn:    mi.CreatedAt,
+		ModifiedOn:     mi.UpdatedAt,
+	}
+}

@@ -482,7 +482,7 @@ import SelectTrigger from '@/components/vue-ui/SelectTrigger.vue';
 import SelectValue from '@/components/vue-ui/SelectValue.vue';
 import Label from '@/components/vue-ui/Label.vue';
 import { cn } from '@/lib/utils';
-import { useDonationsInquirySubmission } from '../lib/clients/composables/useDonationsInquiry';
+import { useDonationsInquirySubmission } from '../composables';
 
 interface DonationsFormProps {
   className?: string;

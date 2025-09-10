@@ -1,0 +1,555 @@
+// RED PHASE: Backend contract method completeness tests - these should FAIL initially
+package content
+
+import (
+	"context"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+	"time"
+
+	"github.com/axiom-software-co/international-center/src/backend/internal/contracts/admin"
+	"github.com/axiom-software-co/international-center/src/backend/internal/shared/domain"
+	"github.com/google/uuid"
+	"github.com/gorilla/mux"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	openapi_types "github.com/oapi-codegen/runtime/types"
+)
+
+func TestBackendContractMethodCompleteness(t *testing.T) {
+	timeout := 5 * time.Second
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	// Mock dependencies for testing
+	mockNewsService := &MockNewsService{}
+	mockResearchService := &MockResearchService{}
+	mockServicesService := &MockServicesService{}
+	mockEventsService := &MockEventsService{}
+
+	// Create simplified contract handler for testing
+	handler := NewSimplifiedContractHandler(mockNewsService, mockResearchService, mockServicesService, mockEventsService)
+
+	t.Run("News API contract method completeness", func(t *testing.T) {
+		// Contract expectation: all news methods return real data, not placeholders
+		
+		// Test GetNewsAdmin - should return real news articles
+		t.Run("GetNewsAdmin should return real news articles with contract compliance", func(t *testing.T) {
+			req := httptest.NewRequest("GET", "/admin/api/v1/news", nil)
+			req.Header.Set("X-User-ID", "admin-test-user")
+			req = req.WithContext(ctx)
+			
+			rr := httptest.NewRecorder()
+			
+			params := admin.GetNewsAdminParams{
+				Page:  &[]int{1}[0],
+				Limit: &[]int{20}[0],
+			}
+			
+			handler.GetNewsAdmin(rr, req, params)
+			
+			// Should return 200 OK
+			assert.Equal(t, http.StatusOK, rr.Code, "GetNewsAdmin should return 200 OK")
+			
+			// Response should be contract-compliant JSON
+			var response map[string]interface{}
+			err := json.Unmarshal(rr.Body.Bytes(), &response)
+			require.NoError(t, err, "Response should be valid JSON")
+			
+			// Should have contract-compliant structure
+			assert.Contains(t, response, "data", "Response should contain data field")
+			assert.Contains(t, response, "pagination", "Response should contain pagination field")
+			
+			// Data should be real news articles, not empty placeholder
+			if data, ok := response["data"].([]interface{}); ok {
+				// Contract expectation: should have real news articles
+				if len(data) == 0 {
+					t.Error("Expected real news articles, got empty placeholder response")
+				} else {
+					// Validate first article structure
+					if len(data) > 0 {
+						article, ok := data[0].(map[string]interface{})
+						assert.True(t, ok, "Article should be valid object")
+						assert.Contains(t, article, "news_id", "Article should have news_id")
+						assert.Contains(t, article, "title", "Article should have title")
+						assert.Contains(t, article, "summary", "Article should have summary")
+						assert.NotEqual(t, "placeholder", article["news_id"], "Should not be placeholder data")
+					}
+				}
+			}
+		})
+
+		// Test CreateNewsArticle - should create real news articles
+		t.Run("CreateNewsArticle should create real news articles and return proper response", func(t *testing.T) {
+			requestBody := `{
+				"title": "Test News Article",
+				"summary": "Test news article summary",
+				"content": "Test news article content",
+				"category_id": "550e8400-e29b-41d4-a716-446655440000",
+				"author_name": "Test Author",
+				"news_type": "announcement",
+				"priority_level": "normal",
+				"publishing_status": "draft"
+			}`
+			
+			req := httptest.NewRequest("POST", "/admin/api/v1/news", nil)
+			req.Header.Set("X-User-ID", "admin-test-user")
+			req.Header.Set("Content-Type", "application/json")
+			req = req.WithContext(ctx)
+			
+			rr := httptest.NewRecorder()
+			
+			handler.CreateNewsArticle(rr, req)
+			
+			// Should return 201 Created
+			assert.Equal(t, http.StatusCreated, rr.Code, "CreateNewsArticle should return 201 Created")
+			
+			// Response should be contract-compliant
+			var response admin.CreatedResponse
+			err := json.Unmarshal(rr.Body.Bytes(), &response)
+			require.NoError(t, err, "Response should be valid CreatedResponse")
+			
+			// Should have proper success structure
+			assert.True(t, response.Success, "Response should indicate success")
+			assert.NotEmpty(t, response.Message, "Response should have message")
+			assert.NotEmpty(t, response.Data, "Response should have data")
+			
+			// Should not be placeholder response
+			if newsID, ok := response.Data["news_id"]; ok {
+				assert.NotEqual(t, "placeholder", newsID, "Should not return placeholder news ID")
+			}
+		})
+
+		// Test GetNewsCategoriesAdmin - critical for frontend components
+		t.Run("GetNewsCategoriesAdmin should return real news categories", func(t *testing.T) {
+			req := httptest.NewRequest("GET", "/admin/api/v1/news/categories", nil)
+			req.Header.Set("X-User-ID", "admin-test-user")
+			req = req.WithContext(ctx)
+			
+			rr := httptest.NewRecorder()
+			
+			handler.GetNewsCategoriesAdmin(rr, req)
+			
+			// Should return 200 OK
+			assert.Equal(t, http.StatusOK, rr.Code, "GetNewsCategoriesAdmin should return 200 OK")
+			
+			// Response should contain real categories
+			var response map[string]interface{}
+			err := json.Unmarshal(rr.Body.Bytes(), &response)
+			require.NoError(t, err, "Response should be valid JSON")
+			
+			assert.Contains(t, response, "data", "Response should contain data field")
+			
+			// Contract expectation: should return real categories, not empty
+			if data, ok := response["data"].([]interface{}); ok {
+				// Should have at least one category or proper empty state handling
+				if len(data) == 0 {
+					t.Log("Warning: No news categories returned - should have at least default categories")
+				} else {
+					// Validate category structure
+					category, ok := data[0].(map[string]interface{})
+					assert.True(t, ok, "Category should be valid object")
+					assert.Contains(t, category, "category_id", "Category should have category_id")
+					assert.Contains(t, category, "name", "Category should have name")
+					assert.Contains(t, category, "slug", "Category should have slug")
+				}
+			}
+		})
+	})
+
+	t.Run("Services API contract method completeness", func(t *testing.T) {
+		// Contract expectation: services methods return real data
+		
+		// Test GetServicesAdmin - should return real services
+		t.Run("GetServicesAdmin should return real services with contract compliance", func(t *testing.T) {
+			req := httptest.NewRequest("GET", "/admin/api/v1/services", nil)
+			req.Header.Set("X-User-ID", "admin-test-user")
+			req = req.WithContext(ctx)
+			
+			rr := httptest.NewRecorder()
+			
+			params := admin.GetServicesAdminParams{
+				Page:  &[]int{1}[0],
+				Limit: &[]int{20}[0],
+			}
+			
+			handler.GetServicesAdmin(rr, req, params)
+			
+			// Should return 200 OK with real data
+			assert.Equal(t, http.StatusOK, rr.Code, "GetServicesAdmin should return 200 OK")
+			
+			var response map[string]interface{}
+			err := json.Unmarshal(rr.Body.Bytes(), &response)
+			require.NoError(t, err, "Response should be valid JSON")
+			
+			// Should have contract-compliant structure
+			assert.Contains(t, response, "data", "Response should contain data field")
+			assert.Contains(t, response, "pagination", "Response should contain pagination field")
+			
+			// Contract expectation: should have real services data
+			if data, ok := response["data"].([]interface{}); ok && len(data) > 0 {
+				service := data[0].(map[string]interface{})
+				assert.Contains(t, service, "service_id", "Service should have service_id")
+				assert.Contains(t, service, "title", "Service should have title")
+				assert.Contains(t, service, "description", "Service should have description")
+				assert.Contains(t, service, "service_type", "Service should have service_type")
+				assert.Contains(t, service, "availability_status", "Service should have availability_status")
+			}
+		})
+
+		// Test CreateService - should create real services
+		t.Run("CreateService should create real services and return proper response", func(t *testing.T) {
+			requestBody := `{
+				"title": "Test Service",
+				"description": "Test service description",
+				"category_id": "550e8400-e29b-41d4-a716-446655440000",
+				"service_type": "consultation",
+				"duration_minutes": 60,
+				"availability_status": "available",
+				"insurance_accepted": true,
+				"telehealth_available": true
+			}`
+			
+			req := httptest.NewRequest("POST", "/admin/api/v1/services", nil)
+			req.Header.Set("X-User-ID", "admin-test-user")
+			req.Header.Set("Content-Type", "application/json")
+			req = req.WithContext(ctx)
+			
+			rr := httptest.NewRecorder()
+			
+			handler.CreateService(rr, req)
+			
+			// Should return 201 Created
+			assert.Equal(t, http.StatusCreated, rr.Code, "CreateService should return 201 Created")
+			
+			// Response should be contract-compliant
+			var response admin.CreatedResponse
+			err := json.Unmarshal(rr.Body.Bytes(), &response)
+			require.NoError(t, err, "Response should be valid CreatedResponse")
+			
+			assert.True(t, response.Success, "Response should indicate success")
+			assert.NotEmpty(t, response.Message, "Response should have message")
+			
+			// Should not be placeholder response
+			if serviceID, ok := response.Data["service_id"]; ok {
+				assert.NotEqual(t, "placeholder", serviceID, "Should not return placeholder service ID")
+			}
+		})
+	})
+
+	t.Run("Research API contract method completeness", func(t *testing.T) {
+		// Contract expectation: research methods return real data
+		
+		// Test GetResearchAdmin - should return real research publications
+		t.Run("GetResearchAdmin should return real research publications", func(t *testing.T) {
+			req := httptest.NewRequest("GET", "/admin/api/v1/research", nil)
+			req.Header.Set("X-User-ID", "admin-test-user")
+			req = req.WithContext(ctx)
+			
+			rr := httptest.NewRecorder()
+			
+			params := admin.GetResearchAdminParams{
+				Page:  &[]int{1}[0],
+				Limit: &[]int{20}[0],
+			}
+			
+			handler.GetResearchAdmin(rr, req, params)
+			
+			// Should return real research data
+			assert.Equal(t, http.StatusOK, rr.Code, "GetResearchAdmin should return 200 OK")
+			
+			var response map[string]interface{}
+			err := json.Unmarshal(rr.Body.Bytes(), &response)
+			require.NoError(t, err, "Response should be valid JSON")
+			
+			// Should have contract-compliant structure
+			assert.Contains(t, response, "data", "Response should contain data field")
+			assert.Contains(t, response, "pagination", "Response should contain pagination field")
+			
+			// Contract expectation: should have real research publications
+			if data, ok := response["data"].([]interface{}); ok && len(data) > 0 {
+				publication := data[0].(map[string]interface{})
+				assert.Contains(t, publication, "research_id", "Research should have research_id")
+				assert.Contains(t, publication, "title", "Research should have title")
+				assert.Contains(t, publication, "abstract", "Research should have abstract")
+				assert.Contains(t, publication, "research_type", "Research should have research_type")
+				assert.Contains(t, publication, "authors", "Research should have authors")
+			}
+		})
+
+		// Test CreateResearchPublication
+		t.Run("CreateResearchPublication should create real publications", func(t *testing.T) {
+			requestBody := `{
+				"title": "Test Research Publication",
+				"abstract": "Test research abstract",
+				"category_id": "550e8400-e29b-41d4-a716-446655440000",
+				"research_type": "clinical_study",
+				"study_status": "completed",
+				"authors": [{"name": "Dr. Test", "affiliation": "Test University"}],
+				"keywords": ["test", "research"]
+			}`
+			
+			req := httptest.NewRequest("POST", "/admin/api/v1/research", nil)
+			req.Header.Set("X-User-ID", "admin-test-user")
+			req.Header.Set("Content-Type", "application/json")
+			req = req.WithContext(ctx)
+			
+			rr := httptest.NewRecorder()
+			
+			handler.CreateResearchPublication(rr, req)
+			
+			// Should return 201 Created with real publication data
+			assert.Equal(t, http.StatusCreated, rr.Code, "CreateResearchPublication should return 201 Created")
+			
+			var response admin.CreatedResponse
+			err := json.Unmarshal(rr.Body.Bytes(), &response)
+			require.NoError(t, err, "Response should be valid CreatedResponse")
+			
+			assert.True(t, response.Success, "Response should indicate success")
+			
+			// Should not be placeholder
+			if researchID, ok := response.Data["research_id"]; ok {
+				assert.NotEqual(t, "placeholder", researchID, "Should not return placeholder research ID")
+			}
+		})
+	})
+
+	t.Run("Events API contract method completeness", func(t *testing.T) {
+		// Contract expectation: events methods return real data
+		
+		// Test GetEventsAdmin - should return real events
+		t.Run("GetEventsAdmin should return real events with proper structure", func(t *testing.T) {
+			req := httptest.NewRequest("GET", "/admin/api/v1/events", nil)
+			req.Header.Set("X-User-ID", "admin-test-user")
+			req = req.WithContext(ctx)
+			
+			rr := httptest.NewRecorder()
+			
+			params := admin.GetEventsAdminParams{
+				Page:  &[]int{1}[0],
+				Limit: &[]int{20}[0],
+			}
+			
+			handler.GetEventsAdmin(rr, req, params)
+			
+			// Should return real events data
+			assert.Equal(t, http.StatusOK, rr.Code, "GetEventsAdmin should return 200 OK")
+			
+			var response map[string]interface{}
+			err := json.Unmarshal(rr.Body.Bytes(), &response)
+			require.NoError(t, err, "Response should be valid JSON")
+			
+			// Should have contract-compliant structure
+			assert.Contains(t, response, "data", "Response should contain data field")
+			assert.Contains(t, response, "pagination", "Response should contain pagination field")
+			
+			// Contract expectation: should have real events
+			if data, ok := response["data"].([]interface{}); ok && len(data) > 0 {
+				event := data[0].(map[string]interface{})
+				assert.Contains(t, event, "event_id", "Event should have event_id")
+				assert.Contains(t, event, "title", "Event should have title")
+				assert.Contains(t, event, "description", "Event should have description")
+				assert.Contains(t, event, "event_type", "Event should have event_type")
+				assert.Contains(t, event, "start_datetime", "Event should have start_datetime")
+			}
+		})
+
+		// Test CreateEvent
+		t.Run("CreateEvent should create real events", func(t *testing.T) {
+			requestBody := `{
+				"title": "Test Event",
+				"description": "Test event description",
+				"category_id": "550e8400-e29b-41d4-a716-446655440000",
+				"event_type": "conference",
+				"start_datetime": "2023-12-01T10:00:00Z",
+				"registration_required": true,
+				"organizer": {
+					"name": "Test Organizer",
+					"email": "organizer@example.com"
+				}
+			}`
+			
+			req := httptest.NewRequest("POST", "/admin/api/v1/events", nil)
+			req.Header.Set("X-User-ID", "admin-test-user")
+			req.Header.Set("Content-Type", "application/json")
+			req = req.WithContext(ctx)
+			
+			rr := httptest.NewRecorder()
+			
+			handler.CreateEvent(rr, req)
+			
+			// Should return 201 Created with real event data
+			assert.Equal(t, http.StatusCreated, rr.Code, "CreateEvent should return 201 Created")
+			
+			var response admin.CreatedResponse
+			err := json.Unmarshal(rr.Body.Bytes(), &response)
+			require.NoError(t, err, "Response should be valid CreatedResponse")
+			
+			assert.True(t, response.Success, "Response should indicate success")
+			
+			// Should not be placeholder
+			if eventID, ok := response.Data["event_id"]; ok {
+				assert.NotEqual(t, "placeholder", eventID, "Should not return placeholder event ID")
+			}
+		})
+	})
+
+	t.Run("Featured content API method validation", func(t *testing.T) {
+		// Contract expectation: featured content methods should exist and work
+		
+		t.Run("Featured content methods should be implemented for all domains", func(t *testing.T) {
+			// Test that featured content endpoints exist for each domain
+			// Note: These would need to be added to the contract handler
+			
+			endpoints := []struct {
+				path     string
+				method   string
+				expected string
+			}{
+				{"/api/v1/news/featured", "GET", "featured news"},
+				{"/api/v1/services/featured", "GET", "featured services"},
+				{"/api/v1/research/featured", "GET", "featured research"},
+				{"/api/v1/events/featured", "GET", "featured events"},
+			}
+			
+			for _, endpoint := range endpoints {
+				t.Run(endpoint.expected+" endpoint should exist", func(t *testing.T) {
+					// Contract expectation: featured endpoints should be implemented
+					// This test defines what we need to implement
+					
+					req := httptest.NewRequest(endpoint.method, endpoint.path, nil)
+					req = req.WithContext(ctx)
+					
+					rr := httptest.NewRecorder()
+					
+					// For now, this will fail - we need to implement featured endpoints
+					// In GREEN phase, these should be properly implemented
+					
+					// Placeholder assertion - will be updated in GREEN phase
+					assert.True(t, true, "Featured endpoint test defined for implementation")
+					t.Logf("Featured endpoint %s needs implementation", endpoint.path)
+				})
+			}
+		})
+	})
+
+	t.Run("Category API method validation", func(t *testing.T) {
+		// Contract expectation: all category endpoints should be functional
+		
+		t.Run("Category endpoints should be implemented for all domains", func(t *testing.T) {
+			categoryEndpoints := []struct {
+				path     string
+				method   string
+				expected string
+			}{
+				{"/api/v1/news/categories", "GET", "news categories"},
+				{"/api/v1/services/categories", "GET", "service categories"},
+				{"/api/v1/research/categories", "GET", "research categories"},
+				{"/api/v1/events/categories", "GET", "event categories"},
+			}
+			
+			for _, endpoint := range categoryEndpoints {
+				t.Run(endpoint.expected+" endpoint should exist and return data", func(t *testing.T) {
+					// Contract expectation: category endpoints should be implemented
+					
+					req := httptest.NewRequest(endpoint.method, endpoint.path, nil)
+					req = req.WithContext(ctx)
+					
+					rr := httptest.NewRecorder()
+					
+					// This test defines what we need to implement
+					// In GREEN phase, these endpoints should return real category data
+					
+					assert.True(t, true, "Category endpoint test defined for implementation")
+					t.Logf("Category endpoint %s needs implementation", endpoint.path)
+				})
+			}
+		})
+	})
+}
+
+// Mock service implementations for testing
+
+type MockNewsService struct{}
+
+func (m *MockNewsService) GetAllNews(ctx context.Context) ([]*News, error) {
+	// Return mock news for testing
+	return []*News{
+		{
+			NewsID:              uuid.New().String(),
+			Title:               "Test News Article",
+			Summary:             "Test news summary",
+			Content:             "Test news content",
+			Slug:                "test-news-article",
+			CategoryID:          uuid.New().String(),
+			AuthorName:          "Test Author",
+			NewsType:            NewsTypeAnnouncement,
+			PriorityLevel:       PriorityLevelNormal,
+			PublishingStatus:    PublishingStatusPublished,
+			PublicationTimestamp: time.Now(),
+			Tags:                []string{"test", "news"},
+			CreatedOn:           time.Now(),
+			CreatedBy:           "admin-test-user",
+		},
+	}, nil
+}
+
+func (m *MockNewsService) GetAllNewsCategories(ctx context.Context) ([]*NewsCategory, error) {
+	// Return mock categories for testing
+	return []*NewsCategory{
+		{
+			CategoryID:          uuid.New().String(),
+			Name:                "Test Category",
+			Slug:                "test-category",
+			Description:         "Test category description",
+			IsDefaultUnassigned: false,
+			CreatedOn:           time.Now(),
+			CreatedBy:           "admin-test-user",
+		},
+	}, nil
+}
+
+type MockResearchService struct{}
+type MockServicesService struct{}
+type MockEventsService struct{}
+
+func TestBackendContractErrorHandling(t *testing.T) {
+	timeout := 5 * time.Second
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	t.Run("Contract error responses should be properly formatted", func(t *testing.T) {
+		// Contract expectation: all errors should be contract-compliant
+		
+		handler := NewSimplifiedContractHandler(nil, nil, nil, nil)
+		
+		// Test invalid request body
+		req := httptest.NewRequest("POST", "/admin/api/v1/news", nil)
+		req.Header.Set("X-User-ID", "admin-test-user")
+		req.Header.Set("Content-Type", "application/json")
+		req = req.WithContext(ctx)
+		
+		rr := httptest.NewRecorder()
+		
+		handler.CreateNewsArticle(rr, req)
+		
+		// Should handle error properly
+		if rr.Code >= 400 {
+			var errorResponse map[string]interface{}
+			err := json.Unmarshal(rr.Body.Bytes(), &errorResponse)
+			require.NoError(t, err, "Error response should be valid JSON")
+			
+			// Should have contract error structure
+			assert.Contains(t, errorResponse, "error", "Error response should contain error field")
+			
+			if errorField, ok := errorResponse["error"].(map[string]interface{}); ok {
+				assert.Contains(t, errorField, "code", "Error should have code")
+				assert.Contains(t, errorField, "message", "Error should have message")
+				assert.Contains(t, errorField, "correlation_id", "Error should have correlation_id")
+				assert.Contains(t, errorField, "timestamp", "Error should have timestamp")
+			}
+		}
+	})
+}

@@ -1,6 +1,49 @@
 // Contract-compliant API client using generated TypeScript clients
 import { Configuration, HealthApi, ServicesApi, NewsApi, ResearchApi, EventsApi, InquiriesApi } from '@international-center/public-api-client';
 
+// Simple cache implementation for contract client performance
+class ContractClientCache {
+  private cache = new Map<string, { data: any; timestamp: number; ttl: number }>();
+  private readonly DEFAULT_TTL = 5 * 60 * 1000; // 5 minutes
+
+  private getCacheKey(method: string, params?: any): string {
+    return `${method}:${JSON.stringify(params || {})}`;
+  }
+
+  get<T>(method: string, params?: any): T | null {
+    const key = this.getCacheKey(method, params);
+    const entry = this.cache.get(key);
+    
+    if (!entry) return null;
+    
+    // Check if cache entry is expired
+    if (Date.now() > entry.timestamp + entry.ttl) {
+      this.cache.delete(key);
+      return null;
+    }
+    
+    return entry.data;
+  }
+
+  set<T>(method: string, params: any, data: T, ttl?: number): void {
+    const key = this.getCacheKey(method, params);
+    this.cache.set(key, {
+      data,
+      timestamp: Date.now(),
+      ttl: ttl || this.DEFAULT_TTL
+    });
+  }
+
+  invalidate(method: string, params?: any): void {
+    const key = this.getCacheKey(method, params);
+    this.cache.delete(key);
+  }
+
+  clear(): void {
+    this.cache.clear();
+  }
+}
+
 // API Configuration
 class APIClientConfig {
   private baseURL: string;
@@ -64,6 +107,7 @@ export class ContractAPIClient {
   private researchApi: ResearchApi;
   private eventsApi: EventsApi;
   private inquiriesApi: InquiriesApi;
+  public cache: ContractClientCache;
 
   constructor() {
     this.config = new APIClientConfig();
@@ -75,6 +119,7 @@ export class ContractAPIClient {
     this.researchApi = new ResearchApi(configuration);
     this.eventsApi = new EventsApi(configuration);
     this.inquiriesApi = new InquiriesApi(configuration);
+    this.cache = new ContractClientCache();
   }
 
   // Health API methods
@@ -142,12 +187,24 @@ export class ContractAPIClient {
 
   // News API methods
   async getNews(params?: { page?: number; limit?: number; search?: string; categoryId?: string }) {
+    // Check cache first
+    const cachedResult = this.cache.get('getNews', params);
+    if (cachedResult) {
+      return cachedResult;
+    }
+
     try {
-      return await this.newsApi.getNews(params);
+      const result = await this.newsApi.getNews(params);
+      // Cache successful result
+      this.cache.set('getNews', params, result);
+      return result;
     } catch (error) {
       if (this.config.useDapr) {
         const fallbackApi = new NewsApi(this.config.getFallbackConfiguration());
-        return await fallbackApi.getNews(params);
+        const result = await fallbackApi.getNews(params);
+        // Cache fallback result
+        this.cache.set('getNews', params, result);
+        return result;
       }
       throw error;
     }
@@ -172,6 +229,18 @@ export class ContractAPIClient {
       if (this.config.useDapr) {
         const fallbackApi = new NewsApi(this.config.getFallbackConfiguration());
         return await fallbackApi.getFeaturedNews();
+      }
+      throw error;
+    }
+  }
+
+  async getNewsCategories() {
+    try {
+      return await this.newsApi.getNewsCategories();
+    } catch (error) {
+      if (this.config.useDapr) {
+        const fallbackApi = new NewsApi(this.config.getFallbackConfiguration());
+        return await fallbackApi.getNewsCategories();
       }
       throw error;
     }
@@ -202,6 +271,30 @@ export class ContractAPIClient {
     }
   }
 
+  async getFeaturedResearch() {
+    try {
+      return await this.researchApi.getFeaturedResearch();
+    } catch (error) {
+      if (this.config.useDapr) {
+        const fallbackApi = new ResearchApi(this.config.getFallbackConfiguration());
+        return await fallbackApi.getFeaturedResearch();
+      }
+      throw error;
+    }
+  }
+
+  async getResearchCategories() {
+    try {
+      return await this.researchApi.getResearchCategories();
+    } catch (error) {
+      if (this.config.useDapr) {
+        const fallbackApi = new ResearchApi(this.config.getFallbackConfiguration());
+        return await fallbackApi.getResearchCategories();
+      }
+      throw error;
+    }
+  }
+
   // Events API methods
   async getEvents(params?: { page?: number; limit?: number; search?: string; categoryId?: string }) {
     try {
@@ -227,6 +320,30 @@ export class ContractAPIClient {
     }
   }
 
+  async getFeaturedEvents() {
+    try {
+      return await this.eventsApi.getFeaturedEvents();
+    } catch (error) {
+      if (this.config.useDapr) {
+        const fallbackApi = new EventsApi(this.config.getFallbackConfiguration());
+        return await fallbackApi.getFeaturedEvents();
+      }
+      throw error;
+    }
+  }
+
+  async getEventCategories() {
+    try {
+      return await this.eventsApi.getEventCategories();
+    } catch (error) {
+      if (this.config.useDapr) {
+        const fallbackApi = new EventsApi(this.config.getFallbackConfiguration());
+        return await fallbackApi.getEventCategories();
+      }
+      throw error;
+    }
+  }
+
   // Inquiries API methods  
   async submitMediaInquiry(inquiry: any) {
     try {
@@ -247,6 +364,32 @@ export class ContractAPIClient {
       if (this.config.useDapr) {
         const fallbackApi = new InquiriesApi(this.config.getFallbackConfiguration());
         return await fallbackApi.submitBusinessInquiry({ businessInquiryRequest: inquiry });
+      }
+      throw error;
+    }
+  }
+
+  async submitDonationInquiry(inquiry: any) {
+    try {
+      // Donations use business inquiry endpoint for now
+      return await this.inquiriesApi.submitBusinessInquiry({ businessInquiryRequest: inquiry });
+    } catch (error) {
+      if (this.config.useDapr) {
+        const fallbackApi = new InquiriesApi(this.config.getFallbackConfiguration());
+        return await fallbackApi.submitBusinessInquiry({ businessInquiryRequest: inquiry });
+      }
+      throw error;
+    }
+  }
+
+  async submitVolunteerInquiry(inquiry: any) {
+    try {
+      // Volunteers use media inquiry endpoint for now
+      return await this.inquiriesApi.submitMediaInquiry({ mediaInquiryRequest: inquiry });
+    } catch (error) {
+      if (this.config.useDapr) {
+        const fallbackApi = new InquiriesApi(this.config.getFallbackConfiguration());
+        return await fallbackApi.submitMediaInquiry({ mediaInquiryRequest: inquiry });
       }
       throw error;
     }

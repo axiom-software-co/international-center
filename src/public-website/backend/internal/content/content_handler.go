@@ -1,6 +1,7 @@
 package content
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 
@@ -105,6 +106,155 @@ func (h *ContentHandler) registerLegacyRoutes(router *mux.Router) {
 	h.newsHandler.RegisterRoutes(router)
 	h.researchHandler.RegisterRoutes(router)
 	h.servicesHandler.RegisterRoutes(router)
+	
+	// Add featured content endpoints that frontend contract clients expect
+	h.registerFeaturedContentRoutes(router)
+}
+
+// registerFeaturedContentRoutes registers featured content endpoints for frontend contract clients
+func (h *ContentHandler) registerFeaturedContentRoutes(router *mux.Router) {
+	// Featured news endpoint
+	router.HandleFunc("/api/v1/news/featured", h.GetFeaturedNews).Methods("GET")
+	
+	// Featured services endpoint  
+	router.HandleFunc("/api/v1/services/featured", h.GetFeaturedServices).Methods("GET")
+	
+	// Featured research endpoint
+	router.HandleFunc("/api/v1/research/featured", h.GetFeaturedResearch).Methods("GET")
+	
+	// Featured events endpoint
+	router.HandleFunc("/api/v1/events/featured", h.GetFeaturedEvents).Methods("GET")
+	
+	// Category endpoints that frontend needs
+	router.HandleFunc("/api/v1/news/categories", h.GetNewsCategories).Methods("GET")
+	router.HandleFunc("/api/v1/services/categories", h.GetServicesCategories).Methods("GET")
+	router.HandleFunc("/api/v1/research/categories", h.GetResearchCategories).Methods("GET")
+	router.HandleFunc("/api/v1/events/categories", h.GetEventsCategories).Methods("GET")
+}
+
+// Featured content handlers
+
+// GetFeaturedNews handles GET /api/v1/news/featured
+func (h *ContentHandler) GetFeaturedNews(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	
+	// Get featured news from service
+	featuredNews, err := h.newsService.GetFeaturedNews(ctx, "public")
+	if err != nil {
+		h.writeJSONError(w, http.StatusInternalServerError, "Failed to get featured news", err)
+		return
+	}
+
+	response := map[string]interface{}{
+		"data": featuredNews,
+		"count": 1,
+	}
+
+	h.writeJSONResponse(w, http.StatusOK, response)
+}
+
+// GetFeaturedServices handles GET /api/v1/services/featured
+func (h *ContentHandler) GetFeaturedServices(w http.ResponseWriter, r *http.Request) {
+	response := map[string]interface{}{
+		"data": []interface{}{}, // Placeholder for now
+		"count": 0,
+	}
+
+	h.writeJSONResponse(w, http.StatusOK, response)
+}
+
+// GetFeaturedResearch handles GET /api/v1/research/featured  
+func (h *ContentHandler) GetFeaturedResearch(w http.ResponseWriter, r *http.Request) {
+	response := map[string]interface{}{
+		"data": []interface{}{}, // Placeholder for now
+		"count": 0,
+	}
+
+	h.writeJSONResponse(w, http.StatusOK, response)
+}
+
+// GetFeaturedEvents handles GET /api/v1/events/featured
+func (h *ContentHandler) GetFeaturedEvents(w http.ResponseWriter, r *http.Request) {
+	response := map[string]interface{}{
+		"data": []interface{}{}, // Placeholder for now
+		"count": 0,
+	}
+
+	h.writeJSONResponse(w, http.StatusOK, response)
+}
+
+// Category endpoints
+
+// GetNewsCategories handles GET /api/v1/news/categories
+func (h *ContentHandler) GetNewsCategories(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	
+	categories, err := h.newsService.GetAllNewsCategories(ctx, "public")
+	if err != nil {
+		h.writeJSONError(w, http.StatusInternalServerError, "Failed to get news categories", err)
+		return
+	}
+
+	response := map[string]interface{}{
+		"data": categories,
+		"count": len(categories),
+	}
+
+	h.writeJSONResponse(w, http.StatusOK, response)
+}
+
+// GetServicesCategories handles GET /api/v1/services/categories
+func (h *ContentHandler) GetServicesCategories(w http.ResponseWriter, r *http.Request) {
+	response := map[string]interface{}{
+		"data": []interface{}{}, // Placeholder for now
+		"count": 0,
+	}
+
+	h.writeJSONResponse(w, http.StatusOK, response)
+}
+
+// GetResearchCategories handles GET /api/v1/research/categories
+func (h *ContentHandler) GetResearchCategories(w http.ResponseWriter, r *http.Request) {
+	response := map[string]interface{}{
+		"data": []interface{}{}, // Placeholder for now
+		"count": 0,
+	}
+
+	h.writeJSONResponse(w, http.StatusOK, response)
+}
+
+// GetEventsCategories handles GET /api/v1/events/categories
+func (h *ContentHandler) GetEventsCategories(w http.ResponseWriter, r *http.Request) {
+	response := map[string]interface{}{
+		"data": []interface{}{}, // Placeholder for now
+		"count": 0,
+	}
+
+	h.writeJSONResponse(w, http.StatusOK, response)
+}
+
+// Helper methods
+
+// writeJSONResponse writes a JSON response
+func (h *ContentHandler) writeJSONResponse(w http.ResponseWriter, status int, data interface{}) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	json.NewEncoder(w).Encode(data)
+}
+
+// writeJSONError writes a JSON error response
+func (h *ContentHandler) writeJSONError(w http.ResponseWriter, status int, message string, err error) {
+	errorResponse := map[string]interface{}{
+		"error": map[string]interface{}{
+			"code":    "INTERNAL_ERROR",
+			"message": message,
+			"details": err.Error(),
+		},
+	}
+	
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	json.NewEncoder(w).Encode(errorResponse)
 }
 
 // HealthCheck performs health check across all content domains

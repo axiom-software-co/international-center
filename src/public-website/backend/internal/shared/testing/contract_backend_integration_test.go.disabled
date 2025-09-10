@@ -1,0 +1,264 @@
+// RED PHASE: Frontend-backend contract integration tests - these should FAIL initially
+package testing
+
+import (
+	"context"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+	"time"
+
+	"github.com/axiom-software-co/international-center/src/backend/internal/content"
+	"github.com/axiom-software-co/international-center/src/backend/internal/inquiries"
+	"github.com/axiom-software-co/international-center/src/backend/internal/shared/domain"
+	"github.com/axiom-software-co/international-center/src/backend/internal/shared/middleware"
+	"github.com/gorilla/mux"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+func TestFrontendBackendContractIntegration(t *testing.T) {
+	timeout := 15 * time.Second
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	t.Run("Frontend contract clients should successfully call backend contract endpoints", func(t *testing.T) {
+		// Contract expectation: complete frontend-backend integration should work
+		
+		// Create router with contract handlers
+		router := mux.NewRouter()
+		
+		// Apply contract validation middleware
+		adminRouter := router.PathPrefix("/admin/api/v1").Subrouter()
+		adminMiddleware := middleware.AdminAPIMiddleware()
+		adminMiddleware.Apply(adminRouter)
+		
+		// Mock services for testing
+		mockNewsService := &MockNewsService{}
+		mockInquiryService := &MockMediaService{}
+		
+		// Register contract routes
+		content.RegisterSimplifiedContentRoutes(adminRouter, mockNewsService, nil, nil, nil)
+		inquiries.RegisterContractRoutes(adminRouter, mockInquiryService)
+		
+		// Test news endpoint integration
+		t.Run("News endpoint should return contract-compliant responses", func(t *testing.T) {
+			req := httptest.NewRequest("GET", "/admin/api/v1/news", nil)
+			req.Header.Set("X-User-ID", "admin-test-user")
+			req.Header.Set("Content-Type", "application/json")
+			
+			// Add correlation context that frontend would add
+			correlationCtx := domain.NewCorrelationContext()
+			req = req.WithContext(correlationCtx.ToContext(ctx))
+			
+			rr := httptest.NewRecorder()
+			router.ServeHTTP(rr, req)
+			
+			// Should succeed with contract-compliant response
+			assert.Equal(t, http.StatusOK, rr.Code, "News endpoint should return 200 OK")
+			
+			// Response should match what frontend contract clients expect
+			var response map[string]interface{}
+			err := json.Unmarshal(rr.Body.Bytes(), &response)
+			require.NoError(t, err, "Response should be valid JSON")
+			
+			// Frontend expects data and pagination fields
+			assert.Contains(t, response, "data", "Frontend expects data field")
+			assert.Contains(t, response, "pagination", "Frontend expects pagination field")
+			
+			// Response should have correlation ID
+			assert.NotEmpty(t, rr.Header().Get("X-Correlation-ID"), "Response should have correlation ID")
+			
+			// Contract expectation: should have real news data
+			if data, ok := response["data"].([]interface{}); ok {
+				if len(data) == 0 {
+					t.Error("Frontend expects real news data, got empty response")
+				} else {
+					// Validate structure matches frontend expectations
+					article := data[0].(map[string]interface{})
+					
+					// Frontend contract clients expect these fields
+					frontendExpectedFields := []string{
+						"news_id", "title", "summary", "category_id",
+						"news_type", "priority_level", "publishing_status",
+						"publication_timestamp", "created_on", "slug"
+					}
+					
+					for _, field := range frontendExpectedFields {
+						assert.Contains(t, article, field, "Frontend expects %s field", field)
+					}
+				}
+			}
+		})
+
+		// Test inquiries endpoint integration
+		t.Run("Inquiries endpoint should return contract-compliant responses", func(t *testing.T) {
+			req := httptest.NewRequest("GET", "/admin/api/v1/inquiries", nil)
+			req.Header.Set("X-User-ID", "admin-test-user")
+			req.Header.Set("Content-Type", "application/json")
+			
+			correlationCtx := domain.NewCorrelationContext()
+			req = req.WithContext(correlationCtx.ToContext(ctx))
+			
+			rr := httptest.NewRecorder()
+			router.ServeHTTP(rr, req)
+			
+			// Should succeed
+			assert.Equal(t, http.StatusOK, rr.Code, "Inquiries endpoint should return 200 OK")
+			
+			var response map[string]interface{}
+			err := json.Unmarshal(rr.Body.Bytes(), &response)
+			require.NoError(t, err, "Response should be valid JSON")
+			
+			// Frontend expects specific structure
+			assert.Contains(t, response, "data", "Frontend expects data field")
+			assert.Contains(t, response, "pagination", "Frontend expects pagination field")
+			
+			// Contract expectation: should have real inquiry data
+			if data, ok := response["data"].([]interface{}); ok {
+				if len(data) == 0 {
+					t.Error("Frontend expects real inquiry data, got empty response")
+				} else {
+					inquiry := data[0].(map[string]interface{})
+					
+					// Frontend expects these inquiry fields
+					frontendExpectedFields := []string{
+						"inquiry_id", "inquiry_type", "status", "submitter_name",
+						"submitter_email", "subject", "message", "submitted_on"
+					}
+					
+					for _, field := range frontendExpectedFields {
+						assert.Contains(t, inquiry, field, "Frontend expects %s field", field)
+					}
+				}
+			}
+		})
+	})
+
+	t.Run("Category endpoints should be accessible and functional", func(t *testing.T) {
+		// Contract expectation: category endpoints that frontend needs should work
+		
+		router := mux.NewRouter()
+		
+		// Mock services for categories
+		mockNewsService := &MockNewsService{}
+		
+		// Register routes
+		content.RegisterSimplifiedContentRoutes(router, mockNewsService, nil, nil, nil)
+		
+		// Test news categories endpoint
+		t.Run("News categories endpoint should be functional", func(t *testing.T) {
+			req := httptest.NewRequest("GET", "/admin/api/v1/news/categories", nil)
+			req.Header.Set("X-User-ID", "admin-test-user")
+			req = req.WithContext(ctx)
+			
+			rr := httptest.NewRecorder()
+			router.ServeHTTP(rr, req)
+			
+			// Contract expectation: should return categories for frontend
+			if rr.Code == http.StatusNotFound {
+				t.Error("News categories endpoint not found - frontend needs this endpoint")
+			} else if rr.Code == http.StatusOK {
+				var response map[string]interface{}
+				err := json.Unmarshal(rr.Body.Bytes(), &response)
+				require.NoError(t, err, "Categories response should be valid JSON")
+				
+				assert.Contains(t, response, "data", "Categories response should contain data")
+				
+				// Should have real categories
+				if data, ok := response["data"].([]interface{}); ok {
+					if len(data) == 0 {
+						t.Log("Warning: No news categories returned - frontend components expect categories")
+					} else {
+						category := data[0].(map[string]interface{})
+						assert.Contains(t, category, "category_id", "Category should have category_id")
+						assert.Contains(t, category, "name", "Category should have name") 
+						assert.Contains(t, category, "slug", "Category should have slug")
+					}
+				}
+			}
+		})
+
+		// Test featured content endpoints
+		t.Run("Featured content endpoints should be functional for frontend", func(t *testing.T) {
+			featuredEndpoints := []string{
+				"/api/v1/news/featured",
+				"/api/v1/services/featured",
+				"/api/v1/research/featured",
+				"/api/v1/events/featured",
+			}
+			
+			for _, endpoint := range featuredEndpoints {
+				req := httptest.NewRequest("GET", endpoint, nil)
+				req = req.WithContext(ctx)
+				
+				rr := httptest.NewRecorder()
+				router.ServeHTTP(rr, req)
+				
+				// Contract expectation: featured endpoints should exist
+				if rr.Code == http.StatusNotFound {
+					t.Errorf("Featured endpoint %s not found - frontend needs this endpoint", endpoint)
+				} else {
+					t.Logf("Featured endpoint %s returns status %d", endpoint, rr.Code)
+				}
+			}
+		})
+	})
+
+	t.Run("Contract validation middleware should work with contract endpoints", func(t *testing.T) {
+		// Contract expectation: middleware should validate contract compliance
+		
+		router := mux.NewRouter()
+		
+		// Apply contract validation middleware
+		validator := middleware.NewLightweightValidationMiddleware()
+		router.Use(validator.ValidateRequest)
+		
+		// Mock handlers
+		mockNewsService := &MockNewsService{}
+		content.RegisterSimplifiedContentRoutes(router, mockNewsService, nil, nil, nil)
+		
+		// Test valid request
+		t.Run("Valid contract request should pass middleware validation", func(t *testing.T) {
+			req := httptest.NewRequest("GET", "/admin/api/v1/news", nil)
+			req.Header.Set("X-User-ID", "admin-test-user")
+			req.Header.Set("Content-Type", "application/json")
+			req = req.WithContext(ctx)
+			
+			rr := httptest.NewRecorder()
+			router.ServeHTTP(rr, req)
+			
+			// Should not be rejected by middleware
+			assert.NotEqual(t, http.StatusBadRequest, rr.Code, "Valid request should not be rejected by middleware")
+		})
+
+		// Test invalid request
+		t.Run("Invalid contract request should be rejected by middleware", func(t *testing.T) {
+			invalidBody := `{"invalid": "json structure"}`
+			req := httptest.NewRequest("PUT", "/admin/api/v1/inquiries/"+uuid.New().String(), 
+				bytes.NewBufferString(invalidBody))
+			req.Header.Set("X-User-ID", "admin-test-user")
+			req.Header.Set("Content-Type", "application/json")
+			req = req.WithContext(ctx)
+			
+			rr := httptest.NewRecorder()
+			router.ServeHTTP(rr, req)
+			
+			// Middleware should validate request format
+			if rr.Code == http.StatusBadRequest {
+				var errorResponse map[string]interface{}
+				err := json.Unmarshal(rr.Body.Bytes(), &errorResponse)
+				
+				if err == nil {
+					// Should have contract validation error
+					assert.Contains(t, errorResponse, "error", "Validation error should be contract-compliant")
+				}
+			}
+		})
+	})
+}
+
+// Additional mock services
+type MockNewsService struct{}
+type MockMediaService = inquiries.MockMediaService // Re-use from inquiries package
