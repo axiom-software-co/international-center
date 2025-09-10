@@ -81,7 +81,7 @@ func (h *ContractCompliantInquiryHandler) GetInquiries(w http.ResponseWriter, r 
 	}
 
 	// Call media service (for now, we'll focus on media inquiries)
-	inquiries, pagination, err := h.mediaService.AdminListInquiries(ctx, listParams)
+	inquiries, pagination, err := h.mediaService.AdminListInquiries(ctx, listParams, userID)
 	if err != nil {
 		h.handleError(w, r, err, correlationCtx.CorrelationID)
 		return

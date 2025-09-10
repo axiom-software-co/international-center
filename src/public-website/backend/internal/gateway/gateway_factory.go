@@ -159,6 +159,27 @@ func NewGatewayDAPRConfiguration(environment string) (*DAPRConfig, error) {
 		config.RedisEndpoint = "redis-dev:6379"
 		
 		config.Middleware = []DAPRMiddleware{
+			{Name: "bearer", Type: "middleware.http.bearer", Version: "v1", Config: map[string]interface{}{
+				"authHeader": "Authorization",
+				"token": "development-jwt-secret",
+				"issuer": "https://auth.development.international-center.dev/application/o/gateway/",
+				"audience": "international-center",
+				"clockSkew": "5m",
+			}},
+			{Name: "oauth2", Type: "middleware.http.oauth2", Version: "v1", Config: map[string]interface{}{
+				"clientId": "development-oauth2-client-id",
+				"clientSecret": "development-oauth2-client-secret",
+				"scopes": []string{"openid", "profile", "email"},
+				"authURL": "https://auth.development.international-center.dev/application/o/authorize/",
+				"tokenURL": "https://auth.development.international-center.dev/application/o/token/",
+				"redirectURL": "http://localhost:3000/auth/callback",
+				"authStyle": "2",
+			}},
+			{Name: "opa", Type: "middleware.http.opa", Version: "v1", Config: map[string]interface{}{
+				"defaultStatus": "403",
+				"includedHeaders": []string{"authorization", "content-type"},
+				"rego": "package http_authz\n\ndefault allow = false\n\nallow {\n  input.method == \"GET\"\n  startswith(input.path, \"/api/v1/\")\n}\n\nallow {\n  input.method == \"POST\"\n  startswith(input.path, \"/admin/api/v1/\")\n  token_valid\n  user_has_role(\"admin\")\n}\n\ntoken_valid {\n  true\n}\n\nuser_has_role(role) {\n  true\n}",
+			}},
 			{Name: "routeChecker", Type: "middleware.http.routeguard", Version: "v1", Config: map[string]interface{}{
 				"allowedRoutes": []string{
 					"/api/v1/services", "/api/v1/services/{id}", "/api/v1/services/slug/{slug}",
@@ -209,6 +230,27 @@ func NewGatewayDAPRConfiguration(environment string) (*DAPRConfig, error) {
 		config.RedisEndpoint = "redis-staging.upstash.io:6379"
 		
 		config.Middleware = []DAPRMiddleware{
+			{Name: "bearer", Type: "middleware.http.bearer", Version: "v1", Config: map[string]interface{}{
+				"authHeader": "Authorization",
+				"token": "{vault-jwt-secret}",
+				"issuer": "https://auth.staging.international-center.dev/application/o/gateway/",
+				"audience": "international-center",
+				"clockSkew": "5m",
+			}},
+			{Name: "oauth2", Type: "middleware.http.oauth2", Version: "v1", Config: map[string]interface{}{
+				"clientId": "{vault-oauth2-client-id}",
+				"clientSecret": "{vault-oauth2-client-secret}",
+				"scopes": []string{"openid", "profile", "email"},
+				"authURL": "https://auth.staging.international-center.dev/application/o/authorize/",
+				"tokenURL": "https://auth.staging.international-center.dev/application/o/token/",
+				"redirectURL": "https://staging.international-center.dev/auth/callback",
+				"authStyle": "2",
+			}},
+			{Name: "opa", Type: "middleware.http.opa", Version: "v1", Config: map[string]interface{}{
+				"defaultStatus": "403",
+				"includedHeaders": []string{"authorization", "content-type"},
+				"rego": "package http_authz\n\ndefault allow = false\n\nallow {\n  input.method == \"GET\"\n  startswith(input.path, \"/api/v1/\")\n  token_valid\n}\n\nallow {\n  input.method == \"POST\"\n  startswith(input.path, \"/admin/api/v1/\")\n  token_valid\n  user_has_role(\"admin\")\n}\n\ntoken_valid {\n  jwt.valid_es256(input.headers.authorization, \"{vault-jwt-secret}\")\n}\n\nuser_has_role(role) {\n  [_, payload, _] := io.jwt.decode(input.headers.authorization)\n  payload.roles[_] == role\n}",
+			}},
 			{Name: "routeChecker", Type: "middleware.http.routeguard", Version: "v1", Config: map[string]interface{}{
 				"allowedRoutes": []string{
 					"/api/v1/services", "/api/v1/services/{id}", "/api/v1/services/slug/{slug}",

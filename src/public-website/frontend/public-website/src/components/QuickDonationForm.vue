@@ -169,7 +169,7 @@
 
 <script setup lang="ts">
 import { ref, reactive } from 'vue';
-import { useDonationsInquirySubmission } from '../lib/clients/composables/useDonationsInquiry';
+import { useContractInquiries } from '../composables/useContractApi';
 
 // Preset amounts
 const presetAmounts = [25, 50, 100, 250, 500, 1000];
@@ -206,7 +206,7 @@ const {
   isError, 
   submitInquiry,
   reset: resetSubmission 
-} = useDonationsInquirySubmission();
+} = useContractInquiries();
 
 // Submission state
 const submitStatus = ref<'idle' | 'success' | 'error'>('idle');

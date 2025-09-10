@@ -54,17 +54,18 @@ export const GET: APIRoute = async ({ request }) => {
 
 async function checkServiceConnectivity(serviceName: string, serviceUrl: string) {
   try {
-    const response = await fetch(`${serviceUrl}/health`, {
-      method: 'GET',
-      headers: { 'Content-Type': 'application/json' },
-      signal: AbortSignal.timeout(5000), // 5 second timeout
-    });
+    // Use contract-generated health client for type-safe health checks
+    const { apiClient } = await import('../../../lib/api-client');
+    
+    const healthResponse = await apiClient.getHealth();
     
     return {
       service: serviceName,
       url: serviceUrl,
-      status: response.ok ? 'connected' : 'unreachable',
-      response_code: response.status,
+      status: healthResponse.status === 'healthy' ? 'connected' : 'unreachable',
+      response_code: 200,
+      health_details: healthResponse,
+      client_type: 'contract-generated',
       last_checked: new Date().toISOString(),
     };
   } catch (error) {
@@ -72,7 +73,8 @@ async function checkServiceConnectivity(serviceName: string, serviceUrl: string)
       service: serviceName,
       url: serviceUrl,
       status: 'unreachable',
-      error: error instanceof Error ? error.message : 'Unknown error',
+      error: error instanceof Error ? error.message : 'Contract client error',
+      client_type: 'contract-generated',
       last_checked: new Date().toISOString(),
     };
   }

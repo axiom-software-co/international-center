@@ -813,7 +813,21 @@ func TestMediaService_AdminListInquiries(t *testing.T) {
 			
 			service := NewMediaService(repo)
 			
-			inquiries, err := service.AdminListInquiries(ctx, tt.filters, tt.userID)
+			// Convert InquiryFilters to ListInquiriesParams for contract-compliant method
+			listParams := ListInquiriesParams{
+				Page:  1,
+				Limit: 100, // Large limit for test purposes
+			}
+			
+			// Map filter fields if they exist
+			if tt.filters.Status != nil {
+				listParams.Status = string(*tt.filters.Status)
+			}
+			
+			inquiries, pagination, err := service.AdminListInquiries(ctx, listParams, tt.userID)
+			
+			// Use pagination result for validation
+			_ = pagination
 			
 			if tt.wantError {
 				require.Error(t, err)

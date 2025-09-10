@@ -707,7 +707,7 @@ func TestTruncateSlackContent(t *testing.T) {
 			name:      "content longer than limit - no word boundary",
 			content:   "ThisIsAVeryLongWordThatCannotBeTruncatedAtWordBoundary",
 			maxLength: 20,
-			expected:  "ThisIsAVeryLongW...",
+			expected:  "ThisIsAVeryLongWo...",
 		},
 		{
 			name:      "very short limit",

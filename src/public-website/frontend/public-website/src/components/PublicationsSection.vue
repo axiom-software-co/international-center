@@ -231,10 +231,10 @@ import Pagination from '@/components/vue-ui/Pagination.vue';
 import PaginationContent from '@/components/vue-ui/PaginationContent.vue';
 import PaginationItem from '@/components/vue-ui/PaginationItem.vue';
 import ArticleTableRow from './ArticleTableRow.vue';
-import type { NewsArticle, ResearchArticle, Event } from '@/lib/clients';
+import type { NewsArticle, ResearchPublication, Event } from '@international-center/public-api-client';
 
-// Union type for articles
-type Article = NewsArticle | ResearchArticle | Event;
+// Union type for articles using contract types
+type Article = NewsArticle | ResearchPublication | Event;
 
 interface PublicationsSectionProps {
   title?: string;
@@ -265,24 +265,24 @@ const totalItems = ref(0);
 // Categories from API data
 const categories = ref<{name: string, slug: string}[]>([]);
 
-// Fetch categories from API
+// Fetch categories from API using contract-generated client
 const fetchCategories = async () => {
   try {
+    // Import contract-generated API client for type-safe operations
+    const { apiClient } = await import('@/lib/api-client');
+    
     if (props.dataType === 'news') {
-      const { newsClient } = await import('@/lib/clients');
-      const categoriesData = await newsClient.getNewsCategories();
-      categories.value = categoriesData.map((cat: any) => ({ name: cat.name, slug: cat.slug }));
+      const categoriesResponse = await apiClient.getNewsCategories();
+      categories.value = categoriesResponse.data?.map((cat: any) => ({ name: cat.name, slug: cat.slug })) || [];
     } else if (props.dataType === 'events') {
-      const { eventsClient } = await import('@/lib/clients');
-      const categoriesData = await eventsClient.getEventCategories();
-      categories.value = categoriesData.map((cat: any) => ({ name: cat.name, slug: cat.slug }));
+      const categoriesResponse = await apiClient.getEventCategories();
+      categories.value = categoriesResponse.data?.map((cat: any) => ({ name: cat.name, slug: cat.slug })) || [];
     } else {
-      const { researchClient } = await import('@/lib/clients');
-      const categoriesData = await researchClient.getResearchCategories();
-      categories.value = categoriesData.map((cat: any) => ({ name: cat.name, slug: cat.slug }));
+      const categoriesResponse = await apiClient.getResearchCategories();
+      categories.value = categoriesResponse.data?.map((cat: any) => ({ name: cat.name, slug: cat.slug })) || [];
     }
   } catch (err) {
-    console.error('❌ [PublicationsSection] Error fetching categories:', err);
+    console.error('❌ [PublicationsSection] Contract client error fetching categories:', err);
     categories.value = [];
   }
 };
@@ -371,51 +371,84 @@ const getCategorySlug = (categoryName: string): string | undefined => {
   return category?.slug;
 };
 
-// Real API data fetching functions
+// Contract-compliant API data fetching functions
 const fetchArticles = async () => {
   isLoading.value = true;
   error.value = null;
 
   try {
-    console.log(`🔍 [PublicationsSection] Fetching ${props.dataType} articles...`);
+    console.log(`🔍 [PublicationsSection] Fetching ${props.dataType} articles using contract client...`);
+    
+    // Import contract-generated API client
+    const { apiClient } = await import('@/lib/api-client');
     
     let allArticles: Article[] = [];
     const categorySlug = getCategorySlug(activeCategory.value);
     
     if (props.dataType === 'news') {
-      const { newsClient } = await import('@/lib/clients');
-      const response = await newsClient.getNewsArticles({ 
-        pageSize: 1000, // Get all articles
-        sortBy: sortBy.value as any,
-        category: categorySlug
+      const response = await apiClient.getNews({
+        page: 1,
+        limit: 1000, // Get all articles
+        search: searchQuery.value || undefined,
+        categoryId: categorySlug || undefined
       });
-      allArticles = response.data || [];
+      allArticles = response.data?.map((newsItem: any) => ({
+        id: newsItem.news_id,
+        title: newsItem.title,
+        excerpt: newsItem.summary,
+        category: newsItem.category?.name || 'Uncategorized',
+        date: newsItem.publication_timestamp,
+        slug: newsItem.slug,
+        featured_image: newsItem.image_url,
+        author: newsItem.author_name,
+        type: props.dataType
+      })) || [];
     } else if (props.dataType === 'events') {
-      const { eventsClient } = await import('@/lib/clients');
-      const response = await eventsClient.getEvents({ 
-        pageSize: 1000, // Get all events
-        sortBy: sortBy.value as any,
-        category: categorySlug
+      const response = await apiClient.getEvents({
+        page: 1,
+        limit: 1000, // Get all events
+        search: searchQuery.value || undefined,
+        categoryId: categorySlug || undefined
       });
-      allArticles = response.events || [];
+      allArticles = response.data?.map((eventItem: any) => ({
+        id: eventItem.event_id,
+        title: eventItem.title,
+        excerpt: eventItem.description,
+        category: eventItem.category?.name || 'Uncategorized',
+        date: eventItem.start_datetime,
+        slug: eventItem.slug,
+        featured_image: eventItem.image_url,
+        author: eventItem.organizer?.name,
+        type: props.dataType
+      })) || [];
     } else {
-      const { researchClient } = await import('@/lib/clients');
-      const response = await researchClient.getResearchArticles({ 
-        pageSize: 1000, // Get all articles  
-        sortBy: sortBy.value as any,
-        category: categorySlug
+      const response = await apiClient.getResearch({
+        page: 1,
+        limit: 1000, // Get all articles
+        search: searchQuery.value || undefined,
+        categoryId: categorySlug || undefined
       });
-      allArticles = response.articles || [];
+      allArticles = response.data?.map((researchItem: any) => ({
+        id: researchItem.research_id,
+        title: researchItem.title,
+        excerpt: researchItem.abstract,
+        category: researchItem.category?.name || 'Uncategorized',
+        date: researchItem.publication_date,
+        slug: researchItem.slug,
+        featured_image: null,
+        author: researchItem.authors?.[0]?.name,
+        type: props.dataType
+      })) || [];
     }
 
-    console.log(`✅ [PublicationsSection] Loaded ${allArticles.length} articles for category: ${categorySlug || 'all'}`);
+    console.log(`✅ [PublicationsSection] Contract client loaded ${allArticles.length} articles for category: ${categorySlug || 'all'}`);
     
     articles.value = allArticles;
     totalItems.value = allArticles.length;
     
   } catch (err) {
-    error.value = 'Failed to load articles';
-    console.error('❌ [PublicationsSection] Error fetching articles:', err);
+    error.value = 'Failed to load articles via contract client';
+    console.error('❌ [PublicationsSection] Contract client error fetching articles:', err);
   } finally {
     isLoading.value = false;
   }

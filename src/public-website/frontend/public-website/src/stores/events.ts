@@ -1,11 +1,10 @@
 import { defineStore } from 'pinia';
-import { eventsClient } from '../lib/clients';
+import { apiClient } from '../lib/api-client';
 import type { 
   Event, 
-  EventCategory, 
-  GetEventsParams, 
-  SearchEventsParams 
-} from '../lib/clients/events/types';
+  EventCategory,
+  GetEventsRequest
+} from '@international-center/public-api-client';
 import type { 
   EventsStoreState, 
   EventsStoreActions, 
@@ -66,43 +65,48 @@ export const useEventsStore = defineStore('events', {
     // Domain-specific state setters
 
     // API Actions
-    async fetchEvents(params?: GetEventsParams, options: CacheOptions = {}): Promise<void> {
+    async fetchEvents(params?: GetEventsRequest, options: CacheOptions = {}): Promise<void> {
       await withCachedApiAction(
         this,
         params,
         options,
-        () => eventsClient.getEvents(params),
+        () => apiClient.getEvents({
+          page: params?.page || 1,
+          limit: params?.limit || 20,
+          search: params?.search,
+          categoryId: params?.categoryId
+        }),
         (response) => this.setEvents(
-          response.events, 
-          response.count, 
+          response.data || [], 
+          response.pagination?.total_items || 0, 
           params?.page || 1, 
-          params?.pageSize || 10
+          params?.limit || 20
         ),
-        (items, count) => this.setEvents(items, count, 1, 10),
-        'Failed to fetch events'
+        (items, count) => this.setEvents(items, count, 1, 20),
+        'Failed to fetch events via contract client'
       );
     },
 
     async fetchEvent(slug: string): Promise<Event | null> {
       const result = await withApiAction(
         this,
-        () => eventsClient.getEventBySlug(slug),
-        'Failed to fetch event'
+        () => apiClient.getEventById(slug), // Using ID for now - slug lookup would need API extension
+        'Failed to fetch event via contract client'
       );
-      this.event = result?.event || null;
+      this.event = result?.data || null;
       return this.event;
     },
 
     async fetchFeaturedEvents(limit?: number): Promise<void> {
       const result = await withApiAction(
         this,
-        () => eventsClient.getFeaturedEvents(limit),
-        'Failed to fetch featured events'
+        () => apiClient.getFeaturedEvents(),
+        'Failed to fetch featured events via contract client'
       );
-      this.setFeaturedEvents(result?.events || []);
+      this.setFeaturedEvents(result?.data?.slice(0, limit) || []);
     },
 
-    async searchEvents(params: SearchEventsParams): Promise<void> {
+    async searchEvents(params: { q: string, page?: number, limit?: number }): Promise<void> {
       // Handle empty search queries
       if (handleEmptySearch(params.q, this.setSearchResults)) {
         return;
@@ -110,19 +114,23 @@ export const useEventsStore = defineStore('events', {
 
       const result = await withApiAction(
         this,
-        () => eventsClient.searchEvents(params),
-        'Failed to search events'
+        () => apiClient.getEvents({
+          page: params.page || 1,
+          limit: params.limit || 20,
+          search: params.q
+        }),
+        'Failed to search events via contract client'
       );
-      this.setSearchResults(result?.events || [], result?.count || 0);
+      this.setSearchResults(result?.data || [], result?.pagination?.total_items || 0);
     },
 
     async fetchEventCategories(): Promise<void> {
       const result = await withApiAction(
         this,
-        () => eventsClient.getEventCategories(),
-        'Failed to fetch event categories'
+        () => apiClient.getEventCategories(),
+        'Failed to fetch event categories via contract client'
       );
-      this.setCategories(result?.categories || []);
+      this.setCategories(result?.data || []);
     },
   } satisfies EventsStoreActions,
 });

@@ -18,6 +18,8 @@
 
 - note : do not work with github actions for now
 
+- note : we will not work on the UI of the public admin portal website for the moment
+
 - note : currently we do not own a website domain in cloudflare 
 
 [deployment secrets]

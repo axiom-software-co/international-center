@@ -164,6 +164,21 @@ func (p *PodmanProviderComponent) DeployContainer(ctx context.Context, spec *Con
 	// Add image
 	args = append(args, spec.Image)
 
+	// Add custom command if specified and valid (for platform containers like Dapr)
+	if len(spec.Command) > 0 {
+		// Validate command is not empty strings
+		validCommand := make([]string, 0, len(spec.Command))
+		for _, cmdArg := range spec.Command {
+			if strings.TrimSpace(cmdArg) != "" {
+				validCommand = append(validCommand, cmdArg)
+			}
+		}
+		
+		if len(validCommand) > 0 {
+			args = append(args, validCommand...)
+		}
+	}
+
 	// Execute podman run command
 	cmd := exec.CommandContext(ctx, "podman", args...)
 	output, err := cmd.CombinedOutput()

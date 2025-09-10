@@ -37,6 +37,7 @@ type ContainerSpec struct {
 	Name           string
 	Image          string
 	Port           int
+	Command        []string
 	Environment    map[string]string
 	HealthEndpoint string
 	ResourceLimits ResourceLimits
@@ -241,6 +242,7 @@ func (spec *ContainerSpec) Clone() *ContainerSpec {
 		Name:           spec.Name,
 		Image:          spec.Image,
 		Port:           spec.Port,
+		Command:        make([]string, len(spec.Command)),
 		Environment:    make(map[string]string),
 		HealthEndpoint: spec.HealthEndpoint,
 		ResourceLimits: spec.ResourceLimits,
@@ -249,6 +251,9 @@ func (spec *ContainerSpec) Clone() *ContainerSpec {
 		DaprPort:       spec.DaprPort,
 		DaprConfig:     make(map[string]interface{}),
 	}
+	
+	// Copy command arguments
+	copy(clone.Command, spec.Command)
 	
 	// Copy environment variables
 	for k, v := range spec.Environment {
@@ -336,6 +341,13 @@ func (b *ContainerSpecBuilder) WithResourceLimits(cpu, memory string) *Container
 // WithHealthEndpoint sets a custom health endpoint
 func (b *ContainerSpecBuilder) WithHealthEndpoint(endpoint string) *ContainerSpecBuilder {
 	b.spec.HealthEndpoint = endpoint
+	return b
+}
+
+// WithCommand sets the container command
+func (b *ContainerSpecBuilder) WithCommand(command []string) *ContainerSpecBuilder {
+	b.spec.Command = make([]string, len(command))
+	copy(b.spec.Command, command)
 	return b
 }
 

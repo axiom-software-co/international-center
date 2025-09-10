@@ -8,11 +8,7 @@ import (
 )
 
 // AdminListInquiries lists inquiries with contract-compliant parameters and pagination
-func (s *MediaService) AdminListInquiries(ctx context.Context, params ListInquiriesParams) ([]Inquiry, PaginationResult, error) {
-	// For now, we'll use a hardcoded userID for admin operations
-	// In a real implementation, this would come from authentication context
-	userID := "admin-system"
-	
+func (s *MediaService) AdminListInquiries(ctx context.Context, params ListInquiriesParams, userID string) ([]Inquiry, PaginationResult, error) {
 	if !IsAdminUser(userID) {
 		return nil, PaginationResult{}, domain.NewUnauthorizedError("admin privileges required")
 	}

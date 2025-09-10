@@ -1,11 +1,10 @@
 import { defineStore } from 'pinia';
-import { newsClient } from '../lib/clients';
+import { apiClient } from '../lib/api-client';
 import type { 
   NewsArticle, 
-  NewsCategory, 
-  GetNewsParams, 
-  SearchNewsParams 
-} from '../lib/clients/news/types';
+  NewsCategory,
+  GetNewsRequest
+} from '@international-center/public-api-client';
 import type { 
   NewsStoreState, 
   NewsStoreActions, 
@@ -59,43 +58,48 @@ export const useNewsStore = defineStore('news', {
     // Domain-specific state setters
 
     // API Actions
-    async fetchNews(params?: GetNewsParams, options: CacheOptions = {}): Promise<void> {
+    async fetchNews(params?: GetNewsRequest, options: CacheOptions = {}): Promise<void> {
       await withCachedApiAction(
         this,
         params,
         options,
-        () => newsClient.getNews(params),
+        () => apiClient.getNews({
+          page: params?.page || 1,
+          limit: params?.limit || 20,
+          search: params?.search,
+          categoryId: params?.categoryId
+        }),
         (response) => this.setNews(
-          response.news, 
-          response.count, 
+          response.data || [], 
+          response.pagination?.total_items || 0, 
           params?.page || 1, 
-          params?.pageSize || 10
+          params?.limit || 20
         ),
-        (items, count) => this.setNews(items, count, 1, 10),
-        'Failed to fetch news'
+        (items, count) => this.setNews(items, count, 1, 20),
+        'Failed to fetch news via contract client'
       );
     },
 
     async fetchNewsArticle(slug: string): Promise<NewsArticle | null> {
       const result = await withApiAction(
         this,
-        () => newsClient.getNewsArticleBySlug(slug),
-        'Failed to fetch news article'
+        () => apiClient.getNewsById(slug), // Using ID for now - slug lookup would need API extension
+        'Failed to fetch news article via contract client'
       );
-      this.article = result?.news || null;
+      this.article = result?.data || null;
       return this.article;
     },
 
     async fetchFeaturedNews(limit?: number): Promise<void> {
       const result = await withApiAction(
         this,
-        () => newsClient.getFeaturedNews(limit),
-        'Failed to fetch featured news'
+        () => apiClient.getFeaturedNews(),
+        'Failed to fetch featured news via contract client'
       );
-      this.setFeaturedNews(result?.news || []);
+      this.setFeaturedNews(result?.data?.slice(0, limit) || []);
     },
 
-    async searchNews(params: SearchNewsParams): Promise<void> {
+    async searchNews(params: { q: string, page?: number, limit?: number }): Promise<void> {
       // Handle empty search queries
       if (handleEmptySearch(params.q, this.setSearchResults)) {
         return;
@@ -103,19 +107,23 @@ export const useNewsStore = defineStore('news', {
 
       const result = await withApiAction(
         this,
-        () => newsClient.searchNews(params),
-        'Failed to search news'
+        () => apiClient.getNews({
+          page: params.page || 1,
+          limit: params.limit || 20,
+          search: params.q
+        }),
+        'Failed to search news via contract client'
       );
-      this.setSearchResults(result?.news || [], result?.count || 0);
+      this.setSearchResults(result?.data || [], result?.pagination?.total_items || 0);
     },
 
     async fetchNewsCategories(): Promise<void> {
       const result = await withApiAction(
         this,
-        () => newsClient.getNewsCategories(),
-        'Failed to fetch news categories'
+        () => apiClient.getNewsCategories(),
+        'Failed to fetch news categories via contract client'
       );
-      this.setCategories(result?.categories || []);
+      this.setCategories(result?.data || []);
     },
   } satisfies NewsStoreActions,
 });

@@ -155,7 +155,7 @@ func DefaultPostgreSQLConfig(databaseName, host string) *DatabaseConfig {
 		Port:              5432,
 		Username:          "postgres",
 		Password:          "password",
-		SSLMode:           "prefer",
+		SSLMode:           "disable",
 		MaxConnections:    100,
 		ConnectionTimeout: 30,
 		HealthCheckPath:   "/health",

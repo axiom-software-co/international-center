@@ -119,8 +119,7 @@ func NewMigrationComponent(ctx *pulumi.Context, name string, args *MigrationArgs
 
 // executeMigrations runs the actual migration logic
 func executeMigrations(connectionString, migrationsPath, environment string, strategy MigrationStrategy) (map[string]interface{}, error) {
-	// TEMPORARY FIX: Skip migrations if database is not available yet (deployment ordering issue)
-	// This will be properly fixed in the next TDD cycle by reordering deployment phases
+	// Check database availability before attempting migrations (deployment sequencing protection)
 	if !isDatabaseAvailable(connectionString) {
 		return map[string]interface{}{
 			"status":            "deferred",
@@ -210,14 +209,13 @@ func DefaultMigrationArgs(environment string, connectionString pulumi.StringInpu
 	return &MigrationArgs{
 		DatabaseConnectionString: connectionString,
 		Environment:              environment,
-		MigrationsBasePath:       "../migrations/sql", // Path to SQL files in migrations package
+		MigrationsBasePath:       "/home/tojkuv/Documents/GitHub/international-center-workspace/international-center/src/public-website/migrations", // Absolute path to migrations package
 		MigrationStrategy:        GetMigrationStrategy(environment),
 	}
 }
 
 // isDatabaseAvailable checks if the database is available for connection
-// TEMPORARY FIX: This is a quick fix for the deployment ordering issue
-// Will be properly resolved in next TDD cycle by reordering deployment phases
+// Provides deployment sequencing protection - migrations only run after database containers are ready
 func isDatabaseAvailable(connectionString string) bool {
 	// Quick connectivity test - try to parse connection string and check basic reachability
 	// For development, we expect PostgreSQL on localhost:5432

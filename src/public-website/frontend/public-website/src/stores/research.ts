@@ -1,11 +1,10 @@
 import { defineStore } from 'pinia';
-import { researchClient } from '../lib/clients';
+import { apiClient } from '../lib/api-client';
 import type { 
-  ResearchArticle, 
-  ResearchCategory, 
-  GetResearchParams, 
-  SearchResearchParams 
-} from '../lib/clients/research/types';
+  ResearchPublication, 
+  ResearchCategory,
+  GetResearchRequest
+} from '@international-center/public-api-client';
 import type { 
   ResearchStoreState, 
   ResearchStoreActions, 
@@ -74,43 +73,48 @@ export const useResearchStore = defineStore('research', {
     // Domain-specific state setters
 
     // API Actions
-    async fetchResearch(params?: GetResearchParams, options: CacheOptions = {}): Promise<void> {
+    async fetchResearch(params?: GetResearchRequest, options: CacheOptions = {}): Promise<void> {
       await withCachedApiAction(
         this,
         params,
         options,
-        () => researchClient.getResearch(params),
+        () => apiClient.getResearch({
+          page: params?.page || 1,
+          limit: params?.limit || 20,
+          search: params?.search,
+          categoryId: params?.categoryId
+        }),
         (response) => this.setResearch(
-          response.research, 
-          response.count, 
+          response.data || [], 
+          response.pagination?.total_items || 0, 
           params?.page || 1, 
-          params?.pageSize || 10
+          params?.limit || 20
         ),
-        (items, count) => this.setResearch(items, count, 1, 10),
-        'Failed to fetch research'
+        (items, count) => this.setResearch(items, count, 1, 20),
+        'Failed to fetch research via contract client'
       );
     },
 
-    async fetchResearchArticle(slug: string): Promise<ResearchArticle | null> {
+    async fetchResearchArticle(slug: string): Promise<ResearchPublication | null> {
       const result = await withApiAction(
         this,
-        () => researchClient.getResearchBySlug(slug),
-        'Failed to fetch research article'
+        () => apiClient.getResearchById(slug), // Using ID for now - slug lookup would need API extension
+        'Failed to fetch research article via contract client'
       );
-      this.article = result?.research || null;
+      this.article = result?.data || null;
       return this.article;
     },
 
     async fetchFeaturedResearch(limit?: number): Promise<void> {
       const result = await withApiAction(
         this,
-        () => researchClient.getFeaturedResearch(limit),
-        'Failed to fetch featured research'
+        () => apiClient.getFeaturedResearch(),
+        'Failed to fetch featured research via contract client'
       );
-      this.setFeaturedResearch(result?.research || []);
+      this.setFeaturedResearch(result?.data?.slice(0, limit) || []);
     },
 
-    async searchResearch(params: SearchResearchParams): Promise<void> {
+    async searchResearch(params: { q: string, page?: number, limit?: number }): Promise<void> {
       // Handle empty search queries
       if (handleEmptySearch(params.q, this.setSearchResults)) {
         return;
@@ -118,19 +122,23 @@ export const useResearchStore = defineStore('research', {
 
       const result = await withApiAction(
         this,
-        () => researchClient.searchResearch(params),
-        'Failed to search research'
+        () => apiClient.getResearch({
+          page: params.page || 1,
+          limit: params.limit || 20,
+          search: params.q
+        }),
+        'Failed to search research via contract client'
       );
-      this.setSearchResults(result?.research || [], result?.count || 0);
+      this.setSearchResults(result?.data || [], result?.pagination?.total_items || 0);
     },
 
     async fetchResearchCategories(): Promise<void> {
       const result = await withApiAction(
         this,
-        () => researchClient.getResearchCategories(),
-        'Failed to fetch research categories'
+        () => apiClient.getResearchCategories(),
+        'Failed to fetch research categories via contract client'
       );
-      this.setCategories(result?.categories || []);
+      this.setCategories(result?.data || []);
     },
   } satisfies ResearchStoreActions,
 });

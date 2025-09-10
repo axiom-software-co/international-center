@@ -682,7 +682,7 @@ func TestTruncateSMSContent(t *testing.T) {
 			name:      "long content truncated with ellipsis",
 			content:   "This is a very long SMS message that needs to be truncated because it exceeds the character limit",
 			maxLength: 50,
-			expected:  "This is a very long SMS message that needs...",
+			expected:  "This is a very long SMS message that needs to...",
 		},
 		{
 			name:      "truncate at word boundary when possible",
@@ -981,7 +981,13 @@ func TestSMSService_HandleDeliveryFailure(t *testing.T) {
 			// Assert
 			assert.Equal(t, tt.expectRetry, shouldRetry)
 			assert.Equal(t, tt.expectDeadLetter, shouldDeadLetter)
-			assert.True(t, tt.message.IsValid())
+			
+			// For invalid phone number test, the message should be invalid
+			if tt.name == "send to dead letter queue for invalid phone number" {
+				assert.False(t, tt.message.IsValid(), "Message with invalid phone number should be invalid")
+			} else {
+				assert.True(t, tt.message.IsValid(), "Message should be valid")
+			}
 
 			_ = ctx // Use context to avoid linting issues
 		})

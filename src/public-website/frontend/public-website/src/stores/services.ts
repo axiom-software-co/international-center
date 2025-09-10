@@ -1,11 +1,10 @@
 import { defineStore } from 'pinia';
-import { servicesClient } from '../lib/clients';
+import { apiClient } from '../lib/api-client';
 import type { 
   Service, 
-  ServiceCategory, 
-  GetServicesParams, 
-  SearchServicesParams 
-} from '../lib/clients/services/types';
+  ServiceCategory,
+  GetServicesRequest
+} from '@international-center/public-api-client';
 import type { 
   ServicesStoreState, 
   ServicesStoreActions, 
@@ -53,43 +52,48 @@ export const useServicesStore = defineStore('services', {
     // Domain-specific state setters
 
     // API Actions
-    async fetchServices(params?: GetServicesParams, options: CacheOptions = {}): Promise<void> {
+    async fetchServices(params?: GetServicesRequest, options: CacheOptions = {}): Promise<void> {
       await withCachedApiAction(
         this,
         params,
         options,
-        () => servicesClient.getServices(params),
+        () => apiClient.getServices({
+          page: params?.page || 1,
+          limit: params?.limit || 20,
+          search: params?.search,
+          categoryId: params?.categoryId
+        }),
         (response) => this.setServices(
-          response.services, 
-          response.count, 
+          response.data || [], 
+          response.pagination?.total_items || 0, 
           params?.page || 1, 
-          params?.pageSize || 10
+          params?.limit || 20
         ),
-        (items, count) => this.setServices(items, count, 1, 10),
-        'Failed to fetch services'
+        (items, count) => this.setServices(items, count, 1, 20),
+        'Failed to fetch services via contract client'
       );
     },
 
     async fetchService(slug: string): Promise<Service | null> {
       const result = await withApiAction(
         this,
-        () => servicesClient.getServiceBySlug(slug),
-        'Failed to fetch service'
+        () => apiClient.getServiceById(slug), // Using ID for now - slug lookup would need API extension
+        'Failed to fetch service via contract client'
       );
-      this.service = result?.service || null;
+      this.service = result?.data || null;
       return this.service;
     },
 
     async fetchFeaturedServices(limit?: number): Promise<void> {
       const result = await withApiAction(
         this,
-        () => servicesClient.getFeaturedServices(limit),
-        'Failed to fetch featured services'
+        () => apiClient.getFeaturedServices(),
+        'Failed to fetch featured services via contract client'
       );
-      this.setFeaturedServices(result?.services || []);
+      this.setFeaturedServices(result?.data?.slice(0, limit) || []);
     },
 
-    async searchServices(params: SearchServicesParams): Promise<void> {
+    async searchServices(params: { q: string, page?: number, limit?: number }): Promise<void> {
       // Handle empty search queries
       if (handleEmptySearch(params.q, this.setSearchResults)) {
         return;
@@ -97,19 +101,23 @@ export const useServicesStore = defineStore('services', {
 
       const result = await withApiAction(
         this,
-        () => servicesClient.searchServices(params),
-        'Failed to search services'
+        () => apiClient.getServices({
+          page: params.page || 1,
+          limit: params.limit || 20,
+          search: params.q
+        }),
+        'Failed to search services via contract client'
       );
-      this.setSearchResults(result?.services || [], result?.count || 0);
+      this.setSearchResults(result?.data || [], result?.pagination?.total_items || 0);
     },
 
     async fetchServiceCategories(): Promise<void> {
       const result = await withApiAction(
         this,
-        () => servicesClient.getServiceCategories(),
-        'Failed to fetch service categories'
+        () => apiClient.getServiceCategories(),
+        'Failed to fetch service categories via contract client'
       );
-      this.setCategories(result?.categories || []);
+      this.setCategories(result?.data || []);
     },
   } satisfies ServicesStoreActions,
 });

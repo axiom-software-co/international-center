@@ -323,7 +323,7 @@ import SelectTrigger from '@/components/vue-ui/SelectTrigger.vue';
 import SelectValue from '@/components/vue-ui/SelectValue.vue';
 import Label from '@/components/vue-ui/Label.vue';
 import { cn } from '@/lib/utils';
-import { useVolunteerInquirySubmission } from '../lib/clients/composables/useVolunteerInquiry';
+import { useContractInquiries } from '../composables/useContractApi';
 
 interface VolunteerFormProps {
   className?: string;
@@ -452,7 +452,7 @@ const {
   isError, 
   submitInquiry,
   reset: resetSubmission 
-} = useVolunteerInquirySubmission();
+} = useContractInquiries();
 
 // Success and error states
 const submitStatus = ref<'idle' | 'success' | 'error'>('idle');

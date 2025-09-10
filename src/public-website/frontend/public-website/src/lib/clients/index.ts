@@ -1,111 +1,66 @@
-// Domain Clients - Main exports (Migrated to REST architecture)
-// Clean exports for all domain clients and types
+// Contract-Generated Clients - Main exports (Contract-first architecture)
+// All manual client implementations replaced with contract-generated clients
 
 // Environment configuration
 export { config, isLocal, isStaging, isProduction } from '../../environments';
 export type { EnvironmentConfig, Environment } from '../../environments';
 
-// Shared REST types
-export type {
-  // REST response types
-  RestPaginationInfo,
-  StandardRestResponse,
-  SingleRestResponse,
-  RestError,
-  // Common parameter types
-  PaginationParams,
-  FilterParams,
-  SortParams,
-  SearchParams,
-  BaseEntity,
-} from './rest/types';
+// Contract-generated API client (replaces all manual clients)
+export { apiClient } from '../api-client';
 
-// Services domain (REST-enabled through Public Gateway)
-export { servicesClient } from './rest';
-export type {
-  Service,
-  ServicesResponse,
-  ServiceResponse,
-  GetServicesParams,
-  SearchServicesParams,
-  ServiceCategory,
-} from './rest';
+// Re-export all contract-generated types for convenience
+export type * from '@international-center/public-api-client';
 
-// News domain (REST-enabled through Public Gateway)
-import { NewsRestClient } from './news/NewsRestClient';
-export { NewsRestClient };
-export type {
-  NewsArticle,
-  NewsCategory,
-  NewsResponse,
-  NewsArticleResponse,
-  NewsCategoriesResponse,
-  GetNewsParams,
-  SearchNewsParams,
-} from './news/types';
+// Contract-based composables (replaces all manual composables)
+export {
+  useContractNews,
+  useContractResearch,
+  useContractServices,
+  useContractEvents,
+  useContractHealth,
+  useContractInquiries,
+  useContractApi
+} from '../../composables/useContractApi';
 
-// Create news client instance
-const newsClientInstance = new NewsRestClient();
-export { newsClientInstance as newsClient };
+// Contract-compliant error handling
+export {
+  ContractErrorHandler,
+  ErrorType,
+  createErrorHandler
+} from '../error-handling';
 
-// Events domain (REST-enabled through Public Gateway)
-import { EventsRestClient } from './events/EventsRestClient';
-export { EventsRestClient };
-export type {
-  Event,
-  EventCategory,
-  EventsResponse,
-  EventResponse,
-  GetEventsParams,
-  SearchEventsParams,
-} from './events/types';
+// Legacy compatibility layer - provides clear migration path
+export const newsClient = {
+  getNewsCategories: () => apiClient.getNewsCategories(),
+  getNewsArticles: (params: any) => apiClient.getNews(params),
+  searchNewsArticles: (params: any) => apiClient.getNews({ search: params.q, page: params.page, limit: params.limit }),
+  getFeaturedNews: () => apiClient.getFeaturedNews(),
+  getNewsArticleBySlug: (slug: string) => apiClient.getNewsById(slug)
+};
 
-// Create events client instance
-const eventsClientInstance = new EventsRestClient();
-export { eventsClientInstance as eventsClient };
+export const researchClient = {
+  getResearchArticles: (params: any) => apiClient.getResearch(params),
+  getResearchCategories: () => apiClient.getResearchCategories(),
+  searchResearch: (params: any) => apiClient.getResearch({ search: params.q, page: params.page, limit: params.limit }),
+  getFeaturedResearch: () => apiClient.getFeaturedResearch(),
+  getResearchBySlug: (slug: string) => apiClient.getResearchById(slug)
+};
 
-// Research domain (REST-enabled through Public Gateway)
-import { ResearchRestClient } from './research/ResearchRestClient';
-export { ResearchRestClient };
-export type {
-  ResearchArticle,
-  ResearchResponse,
-  ResearchArticleResponse,
-  GetResearchParams,
-  SearchResearchParams,
-} from './research/types';
+export const eventsClient = {
+  getEvents: (params: any) => apiClient.getEvents(params),
+  getEventCategories: () => apiClient.getEventCategories(),
+  searchEvents: (params: any) => apiClient.getEvents({ search: params.q, page: params.page, limit: params.limit }),
+  getFeaturedEvents: () => apiClient.getFeaturedEvents(),
+  getEventBySlug: (slug: string) => apiClient.getEventById(slug)
+};
 
-// Create research client instance
-const researchClientInstance = new ResearchRestClient();
-export { researchClientInstance as researchClient };
+export const servicesClient = {
+  getServices: (params: any) => apiClient.getServices(params),
+  getServiceCategories: () => apiClient.getServiceCategories(),
+  searchServices: (params: any) => apiClient.getServices({ search: params.q, page: params.page, limit: params.limit }),
+  getFeaturedServices: () => apiClient.getFeaturedServices(),
+  getServiceBySlug: (slug: string) => apiClient.getServiceById(slug)
+};
 
-// Volunteer Inquiry domain (REST-enabled through Public Gateway)
-export { VolunteerInquiryRestClient } from './rest/VolunteerInquiryRestClient';
-export { useVolunteerInquirySubmission, useVolunteerInquiry } from './composables/useVolunteerInquiry';
-export type {
-  UseVolunteerInquirySubmissionResult,
-  UseVolunteerInquiryResult,
-} from './composables/useVolunteerInquiry';
-export type {
-  VolunteerApplication,
-  VolunteerApplicationSubmission,
-  VolunteerInterest,
-  VolunteerAvailability,
-  VolunteerStatus,
-} from './inquiries/types';
-
-// ====================================================================================
-// APIS ON HOLD - These will be migrated to REST architecture when development resumes
-// ====================================================================================
-
-// Events domain (ON HOLD - gRPC implementation preserved but unused)  
-// export { eventsGrpcClient as eventsClient } from './grpc/clients';
-
-// Contacts domain (ON HOLD - gRPC implementation preserved but unused)
-// export { contactsGrpcClient as contactsClient } from './grpc/clients';
-
-// Search domain (ON HOLD - gRPC implementation preserved but unused)
-// export { searchGrpcClient as searchClient } from './grpc/clients';
-
-// Newsletter domain (ON HOLD - gRPC implementation preserved but unused)
-// export { newsletterGrpcClient as newsletterClient } from './grpc/clients';
+// Import the contract client for all operations
+import { apiClient } from '../api-client';

@@ -84,12 +84,9 @@ func TestInquiriesHandler_RegisterRoutes(t *testing.T) {
 		"/admin/api/v1/donations/inquiries/{id}/priority",
 
 		// Media domain routes
-		"/admin/api/v1/media/inquiries",
-		"/admin/api/v1/media/inquiries/{id}",
-		"/admin/api/v1/media/inquiries/{id}/acknowledge",
-		"/admin/api/v1/media/inquiries/{id}/resolve",
-		"/admin/api/v1/media/inquiries/{id}/close",
-		"/admin/api/v1/media/inquiries/{id}/priority",
+		// Media inquiry routes replaced by contract-compliant inquiry endpoints
+		"/admin/api/v1/inquiries",
+		"/admin/api/v1/inquiries/{id}",
 
 		// Volunteers domain routes
 		"/api/v1/volunteers/applications",

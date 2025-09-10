@@ -1,72 +1,90 @@
-// Research Hook - React hook for research data
+// Research Composable - Vue composable for research data using contract-generated clients
 // Provides clean interface for components to interact with research domain
 
-import { useState, useEffect } from 'react';
-import { researchClient } from '../lib/clients';
-import type { ResearchArticle, GetResearchParams } from '../lib/clients';
+import { ref, watch, type Ref } from 'vue';
+import { apiClient } from '../lib/api-client';
+import type { ResearchPublication } from '@international-center/public-api-client';
 
 export interface UseResearchResult {
-  articles: ResearchArticle[];
-  loading: boolean;
-  error: string | null;
-  total: number;
-  page: number;
-  pageSize: number;
-  totalPages: number;
+  articles: Ref<ResearchPublication[]>;
+  loading: Ref<boolean>;
+  error: Ref<string | null>;
+  total: Ref<number>;
+  page: Ref<number>;
+  pageSize: Ref<number>;
+  totalPages: Ref<number>;
+  hasNext: Ref<boolean>;
+  hasPrevious: Ref<boolean>;
   refetch: () => Promise<void>;
 }
 
-export interface UseResearchOptions extends GetResearchParams {
+export interface UseResearchOptions {
+  page?: number;
+  limit?: number;
+  search?: string;
+  categoryId?: string;
   enabled?: boolean;
 }
 
 export function useResearch(options: UseResearchOptions = {}): UseResearchResult {
   const { enabled = true, ...params } = options;
 
-  const [articles, setArticles] = useState<ResearchArticle[]>([]);
-  const [loading, setLoading] = useState(enabled);
-  const [error, setError] = useState<string | null>(null);
-  const [pagination, setPagination] = useState({
-    total: 0,
-    page: 1,
-    pageSize: 10,
-    totalPages: 0,
-  });
+  const articles = ref<ResearchPublication[]>([]);
+  const loading = ref(enabled);
+  const error = ref<string | null>(null);
+  const total = ref(0);
+  const page = ref(params.page || 1);
+  const pageSize = ref(params.limit || 10);
+  const totalPages = ref(0);
+  const hasNext = ref(false);
+  const hasPrevious = ref(false);
 
   const fetchResearch = async () => {
     if (!enabled) return;
 
     try {
-      setLoading(true);
-      setError(null);
+      loading.value = true;
+      error.value = null;
 
-      const response = await researchClient.getResearchArticles(params);
-
-      setArticles(response.articles || []);
-      setPagination({
-        total: response.pagination?.total || 0,
-        page: response.pagination?.page || 1,
-        pageSize: response.pagination?.pageSize || 10,
-        totalPages: response.pagination?.totalPages || 0,
+      // Use contract-generated client for type-safe API calls
+      const response = await apiClient.getResearch({
+        page: page.value,
+        limit: pageSize.value,
+        search: params.search,
+        categoryId: params.categoryId,
       });
+
+      // Extract data with type safety from generated response types
+      articles.value = response.data || [];
+      total.value = response.pagination?.total_items || 0;
+      page.value = response.pagination?.current_page || 1;
+      pageSize.value = response.pagination?.items_per_page || 10;
+      totalPages.value = response.pagination?.total_pages || 0;
+      hasNext.value = response.pagination?.has_next || false;
+      hasPrevious.value = response.pagination?.has_previous || false;
+
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch research';
-      setError(errorMessage);
+      error.value = errorMessage;
       console.error('Error fetching research:', err);
     } finally {
-      setLoading(false);
+      loading.value = false;
     }
   };
 
-  useEffect(() => {
-    fetchResearch();
-  }, [enabled, JSON.stringify(params)]);
+  // Watch for parameter changes and refetch
+  watch(() => [enabled, params.page, params.limit, params.search, params.categoryId], fetchResearch, { immediate: true });
 
   return {
     articles,
     loading,
     error,
-    ...pagination,
+    total,
+    page,
+    pageSize,
+    totalPages,
+    hasNext,
+    hasPrevious,
     refetch: fetchResearch,
   };
 }

@@ -43,9 +43,9 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import type { NewsArticle, ResearchArticle, Event } from '@/lib/clients';
+import type { NewsArticle, ResearchPublication, Event } from '@international-center/public-api-client';
 
-type Article = NewsArticle | ResearchArticle | Event;
+type Article = NewsArticle | ResearchPublication | Event;
 
 interface ArticleTableRowProps {
   article: Article;

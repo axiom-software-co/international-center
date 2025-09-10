@@ -1,105 +1,143 @@
-// Vue 3 Composables - Clean exports for all domain composables
-// Modern Vue Composition API patterns for reactive data management
+// Vue 3 Composables - Contract-based exports for all domain operations
+// Modern Vue Composition API patterns with contract-generated type safety
 
-// Services domain composables
+// Contract-based content domain composables
 export {
-  useServices,
-  useService,
-  useFeaturedServices,
-  useServiceCategories,
-  useSearchServices,
-} from './useServices';
+  useContractNews,
+  useContractResearch,
+  useContractServices, 
+  useContractEvents,
+  useContractHealth,
+  useContractInquiries,
+  useContractApi
+} from './useContractApi';
 
-export type {
-  UseServicesResult,
-  UseServicesOptions,
-  UseServiceResult,
-  UseFeaturedServicesResult,
-  UseServiceCategoriesResult,
-  UseSearchServicesResult,
-} from './useServices';
-
-// Events domain composables
-export {
-  useEvents,
-  useEvent,
-  useFeaturedEvent,
-  useFeaturedEvents,
-  useSearchEvents,
-} from './useEvents';
-
-export type {
-  UseEventsResult,
-  UseEventsOptions,
-  UseEventResult,
-  UseFeaturedEventResult,
-  UseSearchEventsResult,
-} from './useEvents';
-
-// Research domain composables
-export {
-  useResearchArticles,
-  useResearchArticle,
-  useFeaturedResearch,
-  useFeaturedResearchArticles,
-  useSearchResearch,
-} from './useResearch';
-
-export type {
-  UseResearchArticlesResult,
-  UseResearchArticlesOptions,
-  UseResearchArticleResult,
-  UseFeaturedResearchResult,
-  UseSearchResearchResult,
-} from './useResearch';
-
-// News domain composables
+// Legacy hook compatibility (migrated to use contract clients internally)
 export {
   useNews,
   useNewsArticle,
   useFeaturedNews,
-  useSearchNews,
-  useNewsCategories,
-} from './useNews';
+  useRecentNews,
+  useNewsSearch
+} from '../hooks/useNews';
 
-export type {
-  UseNewsResult,
-  UseNewsOptions,
-  UseNewsArticleResult,
-  UseFeaturedNewsResult,
-  UseSearchNewsResult,
-  UseNewsCategoriesResult,
-} from './useNews';
-
-// Business Inquiry domain composables
 export {
-  useBusinessInquiry,
-  useBusinessInquirySubmission,
-} from '../lib/clients/composables/useBusinessInquiry';
+  useResearch
+} from '../hooks/useResearch';
 
-export type {
-  UseBusinessInquiryResult,
-  UseBusinessInquirySubmissionResult,
-} from '../lib/clients/composables/useBusinessInquiry';
+// Legacy composable aliases for research
+export const useResearchArticles = () => {
+  return useResearch({ enabled: true });
+};
 
-// Donations Inquiry domain composables
-export {
-  useDonationsInquiry,
-  useDonationsInquirySubmission,
-} from '../lib/clients/composables/useDonationsInquiry';
+export const useFeaturedResearch = () => {
+  const researchComposable = useContractResearch();
+  return {
+    articles: researchComposable.research,
+    loading: researchComposable.loading,
+    error: researchComposable.error,
+    refetch: () => researchComposable.fetchFeaturedResearch()
+  };
+};
 
-export type {
-  UseDonationsInquiryResult,
-  UseDonationsInquirySubmissionResult,
-} from '../lib/clients/composables/useDonationsInquiry';
+// Legacy composable aliases for events
+export const useEvents = () => {
+  const eventsComposable = useContractEvents();
+  return {
+    events: eventsComposable.events,
+    loading: eventsComposable.loading,
+    error: eventsComposable.error,
+    refetch: () => eventsComposable.fetchEvents()
+  };
+};
 
-// Media Inquiry domain composables
-export {
-  useMediaInquiry,
-  useMediaInquirySubmission,
-} from '../lib/clients/composables/useMediaInquiry';
+export const useFeaturedEvents = () => {
+  const eventsComposable = useContractEvents();
+  return {
+    events: eventsComposable.events,
+    loading: eventsComposable.loading,
+    error: eventsComposable.error,
+    refetch: () => eventsComposable.fetchFeaturedEvents()
+  };
+};
 
-export type {
-  UseMediaInquiryResult,
-  UseMediaInquirySubmissionResult,
-} from '../lib/clients/composables/useMediaInquiry';
+// Legacy composable aliases for services
+export const useServices = () => {
+  const servicesComposable = useContractServices();
+  return {
+    services: servicesComposable.services,
+    loading: servicesComposable.loading,
+    error: servicesComposable.error,
+    refetch: () => servicesComposable.fetchServices()
+  };
+};
+
+export const useFeaturedServices = () => {
+  const servicesComposable = useContractServices();
+  return {
+    services: servicesComposable.services,
+    loading: servicesComposable.loading,
+    error: servicesComposable.error,
+    refetch: () => servicesComposable.fetchFeaturedServices()
+  };
+};
+
+// Legacy compatibility exports for smooth migration
+export const useBusinessInquiry = () => {
+  const inquiryComposable = useContractInquiries();
+  return {
+    ...inquiryComposable,
+    submitInquiry: inquiryComposable.submitBusinessInquiry
+  };
+};
+
+export const useBusinessInquirySubmission = () => {
+  return useBusinessInquiry();
+};
+
+export const useDonationsInquiry = () => {
+  const inquiryComposable = useContractInquiries();
+  return {
+    ...inquiryComposable,
+    submitInquiry: inquiryComposable.submitBusinessInquiry // Donations use business inquiry endpoint
+  };
+};
+
+export const useDonationsInquirySubmission = () => {
+  return useDonationsInquiry();
+};
+
+export const useMediaInquiry = () => {
+  const inquiryComposable = useContractInquiries();
+  return {
+    ...inquiryComposable,
+    submitInquiry: inquiryComposable.submitMediaInquiry
+  };
+};
+
+export const useMediaInquirySubmission = () => {
+  return useMediaInquiry();
+};
+
+export const useVolunteerInquiry = () => {
+  const inquiryComposable = useContractInquiries();
+  return {
+    ...inquiryComposable,
+    submitInquiry: inquiryComposable.submitMediaInquiry // Volunteers use media inquiry endpoint for now
+  };
+};
+
+export const useVolunteerInquirySubmission = () => {
+  return useVolunteerInquiry();
+};
+
+// Import contract composables
+import {
+  useContractNews,
+  useContractResearch,
+  useContractServices, 
+  useContractEvents,
+  useContractHealth,
+  useContractInquiries,
+  useContractApi
+} from './useContractApi';
