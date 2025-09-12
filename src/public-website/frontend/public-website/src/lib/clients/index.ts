@@ -62,5 +62,21 @@ export const servicesClient = {
   getServiceBySlug: (slug: string) => apiClient.getServiceById(slug)
 };
 
+export const newsletterClient = {
+  subscribe: async (data: any) => {
+    // Newsletter subscription through business inquiry for now
+    return await apiClient.submitBusinessInquiry({
+      first_name: data.firstName || data.first_name,
+      last_name: data.lastName || data.last_name || '',
+      email: data.email,
+      phone: data.phone || '',
+      company: data.company || '',
+      inquiry_type: 'newsletter_subscription',
+      message: `Newsletter subscription request. Email: ${data.email}`,
+      preferred_contact_method: 'email'
+    });
+  }
+};
+
 // Import the contract client for all operations
 import { apiClient } from '../api-client';

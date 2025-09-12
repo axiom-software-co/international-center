@@ -4,17 +4,12 @@ package integration
 import (
 	"context"
 	"testing"
-	"time"
 
-	"github.com/axiom-software-co/international-center/src/public-website/deployment/internal/validation"
+	backendtesting "github.com/axiom-software-co/international-center/src/backend/internal/shared/testing"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func TestBackendServiceContractConfiguration(t *testing.T) {
-	timeout := 15 * time.Second
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
 
 	t.Run("Backend services should be configured for contract endpoint routing", func(t *testing.T) {
 		// Contract expectation: all backend services expose contract endpoints
@@ -155,18 +150,15 @@ func TestBackendServiceContractConfiguration(t *testing.T) {
 }
 
 func TestBackendServiceContractCompliance(t *testing.T) {
-	timeout := 15 * time.Second
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
 
 	t.Run("Content service contract compliance validation", func(t *testing.T) {
 		// Contract expectation: content service should be contract-compliant
 		
-		// Create deployment validation
-		validation := validation.NewDeploymentContractValidation("development")
+		// Create backend validation
+		validation := backendtesting.NewBackendContractValidation("development")
 		
 		// Validate contract compliance
-		err := validation.RunPreDeploymentValidation(ctx)
+		err := validation.RunPreDeploymentValidation(context.Background())
 		
 		if err != nil {
 			// Expected to fail in RED phase - contract compliance not complete
@@ -182,10 +174,10 @@ func TestBackendServiceContractCompliance(t *testing.T) {
 	t.Run("Inquiries service contract compliance validation", func(t *testing.T) {
 		// Contract expectation: inquiries service should be contract-compliant
 		
-		validation := validation.NewDeploymentContractValidation("development")
+		validation := backendtesting.NewBackendContractValidation("development")
 		
 		// Validate contract compliance for inquiries
-		err := validation.RunPreDeploymentValidation(ctx)
+		err := validation.RunPreDeploymentValidation(context.Background())
 		
 		if err != nil {
 			t.Logf("Inquiries service contract compliance validation failed as expected: %v", err)

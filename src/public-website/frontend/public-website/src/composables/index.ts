@@ -30,6 +30,10 @@ export const useResearchArticles = () => {
   return useResearch({ enabled: true });
 };
 
+export const useResearchArticle = () => {
+  return useResearchArticles();
+};
+
 export const useFeaturedResearch = () => {
   const researchComposable = useContractResearch();
   return {
@@ -49,6 +53,10 @@ export const useEvents = () => {
     error: eventsComposable.error,
     refetch: () => eventsComposable.fetchEvents()
   };
+};
+
+export const useEvent = () => {
+  return useEvents();
 };
 
 export const useFeaturedEvents = () => {

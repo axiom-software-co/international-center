@@ -1,26 +1,28 @@
 
 
-[ axiom rules ]
+[ rules ]
 
-- IMPORTANT AXIOM RULE TO FOLLOW : outside of unit tests , consider mocks and stubs the worst architectural anti pattern ( stop metioning the fact that you are using real implmentations , this is explicit in the implementation , keep the naming professional )
-
-- IMPORTANT AXIOM RULE TO FOLLOW : you may alter implmentation details . you may ask to delete/create/move/rename files if you have a proper reason to do so 
-
-- IMPORTANT AXIOM RULE TO FOLLOW : do not edit any markdown files without permission . ensure you stop and ask for permission and provide your reasoning
-
-- IMPORTANT AXIOM RULE TO FOLLOW : consider stubs the worst anti-pattern ( we should use propper infrastructure and fix root issues as they arise ) ( we should not fall back to stubs in integration tests ) 
-
-- IMPORTANT AXIOM RULE TO FOLLOW : only run integration tests when the entire development environment is up ( only the deployer implements integration tests ) 
+# axioms 
 
 - IMPORTANT AXIOM RULE TO FOLLOW : use 'export PULUMI_CONFIG_PASSPHRASE="development" && pulumi destroy' to teardown the development environment , instead on killing individual processes
 
+- IMPORTANT AXIOM RULE TO FOLLOW : you may alter implmentation details . you may ask to delete/create/move/rename files if you have a proper reason to do so . do not edit any markdown files without permission . ensure you stop and ask for permission and provide your reasoning
+
+- IMPORTANT AXIOM RULE TO FOLLOW : you must respect the dapr abstractions in the backend ( you are not allowed to bypass dapr and connect directly to infrastructure ) 
+
+- IMPORTANT AXIOM RULE TO FOLLOW : outside of unit tests , consider mocks and stubs the worst architectural anti pattern ( stop metioning the fact that you are using real implmentations , this is explicit in the implementation , keep the naming professional ) . consider stubs the worst anti-pattern ( we should use propper infrastructure and fix root issues as they arise ) ( we should not fall back to stubs in integration tests ) . only run integration tests when the entire development environment is up ( only the deployer implements integration tests ) 
+
+# notes
+
 - note : stop using the term 'medical-grade' ( this is implicit and there is no need to mention it in the naming system ) ( do not use 'kill shell' ) 
+
+- note : currently we do not own a website domain in cloudflare 
 
 - note : do not work with github actions for now
 
 - note : we will not work on the UI of the public admin portal website for the moment
 
-- note : currently we do not own a website domain in cloudflare 
+- note : we are currently focused on integration testing . be causious of integration test files proliferation . you may not create new integration test files , but you may edit our current integration testing framework and and integtation tests implementations if needed . 
 
 [deployment secrets]
 

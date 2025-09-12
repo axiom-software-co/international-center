@@ -208,8 +208,19 @@ func (p *ServiceProxy) parseTargetService(path, targetService, httpMethod string
 		return "", "", "", fmt.Errorf("unknown service: %s", service)
 	}
 
-	// Reconstruct target path
-	targetPath := "/" + strings.Join(parts, "/")
+	// Reconstruct target path for backend service method invocation
+	// Transform admin paths to backend service method paths
+	var targetPath string
+	if len(parts) >= 3 && parts[0] == "api" && parts[1] == "admin" {
+		// Transform /api/admin/inquiries -> api/inquiries
+		targetPath = "api/" + parts[2]
+	} else if len(parts) >= 2 && parts[0] == "api" && parts[1] != "v1" && parts[1] != "admin" {
+		// Transform /api/news -> api/news
+		targetPath = strings.Join(parts, "/")
+	} else {
+		// Keep original path for versioned APIs
+		targetPath = "/" + strings.Join(parts, "/")
+	}
 	
 	return serviceName, httpMethod, targetPath, nil
 }
