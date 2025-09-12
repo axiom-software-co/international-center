@@ -161,24 +161,24 @@ func NewGatewayDAPRConfiguration(environment string) (*DAPRConfig, error) {
 		config.Middleware = []DAPRMiddleware{
 			{Name: "bearer", Type: "middleware.http.bearer", Version: "v1", Config: map[string]interface{}{
 				"authHeader": "Authorization",
-				"token": "development-jwt-secret",
-				"issuer": "https://auth.development.international-center.dev/application/o/gateway/",
+				"jwksURL": "https://www.googleapis.com/oauth2/v3/certs",
+				"issuer": "https://accounts.google.com",
 				"audience": "international-center",
 				"clockSkew": "5m",
 			}},
 			{Name: "oauth2", Type: "middleware.http.oauth2", Version: "v1", Config: map[string]interface{}{
-				"clientId": "development-oauth2-client-id",
-				"clientSecret": "development-oauth2-client-secret",
+				"clientId": "development-google-client-id",
+				"clientSecret": "development-google-client-secret",
 				"scopes": []string{"openid", "profile", "email"},
-				"authURL": "https://auth.development.international-center.dev/application/o/authorize/",
-				"tokenURL": "https://auth.development.international-center.dev/application/o/token/",
-				"redirectURL": "http://localhost:3000/auth/callback",
+				"authURL": "https://accounts.google.com/o/oauth2/v2/auth",
+				"tokenURL": "https://oauth2.googleapis.com/token",
+				"redirectURL": "http://localhost:3001/auth/callback",
 				"authStyle": "2",
 			}},
 			{Name: "opa", Type: "middleware.http.opa", Version: "v1", Config: map[string]interface{}{
 				"defaultStatus": "403",
 				"includedHeaders": []string{"authorization", "content-type"},
-				"rego": "package http_authz\n\ndefault allow = false\n\nallow {\n  input.method == \"GET\"\n  startswith(input.path, \"/api/v1/\")\n}\n\nallow {\n  input.method == \"POST\"\n  startswith(input.path, \"/admin/api/v1/\")\n  token_valid\n  user_has_role(\"admin\")\n}\n\ntoken_valid {\n  true\n}\n\nuser_has_role(role) {\n  true\n}",
+				"rego": "package admin_authz\n\ndefault allow = false\n\n# Email allowlist - only these emails permitted\nallowed_emails := {\"tojkuv@gmail.com\", \"tojkuv@outlook.com\"}\n\n# Admin permissions for tojkuv@gmail.com\nallow {\n  input.email == \"tojkuv@gmail.com\"\n  token_valid\n  startswith(input.path, \"/admin/api/v1/\")\n}\n\n# Viewer permissions for tojkuv@outlook.com - read-only\nallow {\n  input.email == \"tojkuv@outlook.com\"\n  input.method == \"GET\"\n  token_valid\n  startswith(input.path, \"/admin/api/v1/\")\n}\n\n# Public endpoints allow anonymous access\nallow {\n  startswith(input.path, \"/api/v1/\")\n  not startswith(input.path, \"/admin/\")\n}\n\n# Health endpoints\nallow {\n  input.path == \"/health\"\n}\n\n# JWT token validation for Google/Microsoft\ntoken_valid {\n  jwt.valid_es256(input.headers.authorization, jwks_url)\n  input.email in allowed_emails\n}\n\n# JWKS URL for Google (development)\njwks_url := \"https://www.googleapis.com/oauth2/v3/certs\"",
 			}},
 			{Name: "routeChecker", Type: "middleware.http.routeguard", Version: "v1", Config: map[string]interface{}{
 				"allowedRoutes": []string{

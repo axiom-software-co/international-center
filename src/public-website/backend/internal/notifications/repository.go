@@ -101,7 +101,7 @@ func (r *PostgreSQLSubscriberRepository) initializePreparedStatements() error {
 	checkEmailQuery := `
 		SELECT COUNT(*) > 0 
 		FROM notification_subscribers 
-		WHERE email = $1 AND is_deleted = false AND ($2::text IS NULL OR subscriber_id != $2)`
+		WHERE email = $1 AND is_deleted = false AND ($2::text IS NULL OR subscriber_id::text != $2::text)`
 	if r.checkEmailExistsStmt, err = r.db.Prepare(checkEmailQuery); err != nil {
 		return fmt.Errorf("failed to prepare checkEmailExists statement: %w", err)
 	}

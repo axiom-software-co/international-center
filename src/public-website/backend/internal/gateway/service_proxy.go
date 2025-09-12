@@ -115,11 +115,11 @@ func (p *ServiceProxy) ProxyRequest(ctx context.Context, w http.ResponseWriter, 
 	// Invoke service based on target
 	var response *ProxyResponse
 	switch serviceName {
-	case "content-api":
+	case "content-api", "content":
 		response, err = p.invokeContentAPI(requestCtx, httpMethod, targetPath, requestData, headers)
-	case "inquiries-api":
+	case "inquiries-api", "inquiries":
 		response, err = p.invokeInquiriesAPI(requestCtx, httpMethod, targetPath, requestData, headers)
-	case "notification-api":
+	case "notification-api", "notifications":
 		response, err = p.invokeNotificationAPI(requestCtx, httpMethod, targetPath, requestData, headers)
 	default:
 		return domain.NewValidationError(fmt.Sprintf("unknown target service: %s", serviceName))
@@ -141,46 +141,69 @@ func (p *ServiceProxy) parseTargetService(path, targetService, httpMethod string
 	// Parse path components
 	parts := strings.Split(path, "/")
 	
-	// Handle both public (/api/v1/...) and admin (/admin/api/v1/...) paths
+	// Handle multiple path formats:
+	// 1. Public versioned: /api/v1/service
+	// 2. Admin versioned: /admin/api/v1/service  
+	// 3. Simple admin: /api/admin/service (for development) - MUST check before simple public
+	// 4. Simple public: /api/service (for development)
 	var versionIndex, serviceIndex int
-	if len(parts) >= 3 && parts[0] == "api" {
-		// Public path: /api/v1/service
+	var hasVersion bool
+	
+	if len(parts) >= 3 && parts[0] == "api" && parts[1] == "admin" {
+		// Simple admin path: /api/admin/service  
+		serviceIndex = 2  // parts[2] should be the service name (e.g., "inquiries")
+		hasVersion = false
+	} else if len(parts) >= 3 && parts[0] == "api" && parts[1] == "v1" {
+		// Public versioned path: /api/v1/service
 		versionIndex = 1
 		serviceIndex = 2
+		hasVersion = true
 	} else if len(parts) >= 4 && parts[0] == "admin" && parts[1] == "api" {
-		// Admin path: /admin/api/v1/service
+		// Admin versioned path: /admin/api/v1/service
 		versionIndex = 2
 		serviceIndex = 3
+		hasVersion = true
+	} else if len(parts) >= 2 && parts[0] == "api" && parts[1] != "v1" && parts[1] != "admin" {
+		// Simple public path: /api/service (no version, not admin)
+		serviceIndex = 1
+		hasVersion = false
 	} else {
 		return "", "", "", fmt.Errorf("invalid API path format")
 	}
 
 	// Extract version and service from path
-	_ = parts[versionIndex] // version - e.g., "v1" (currently unused)
+	var version string
+	if hasVersion {
+		version = parts[versionIndex] // version - e.g., "v1"
+	}
+	_ = version // Currently unused
 	service := parts[serviceIndex] // e.g., "content" or "services"
 	
 	// Determine service name and remaining path
 	var serviceName string
 	switch service {
 	case "content":
-		serviceName = "content-api"
+		serviceName = "content"
 	case "services":
-		// Services domain consolidated into content-api
-		serviceName = "content-api"
+		// Services domain consolidated into content service
+		serviceName = "content"
 	case "news":
-		// News domain consolidated into content-api
-		serviceName = "content-api"
+		// News domain consolidated into content service
+		serviceName = "content"
 	case "research":
-		// Research domain consolidated into content-api
-		serviceName = "content-api"
+		// Research domain consolidated into content service
+		serviceName = "content"
 	case "events":
-		// Events domain consolidated into content-api
-		serviceName = "content-api"
+		// Events domain consolidated into content service
+		serviceName = "content"
 	case "inquiries":
-		// Handle inquiries domain via consolidated inquiries-api
-		serviceName = "inquiries-api"
+		// Handle inquiries domain via consolidated inquiries service
+		serviceName = "inquiries"
 	case "notifications":
-		serviceName = "notification-api"
+		serviceName = "notifications"
+	case "subscribers":
+		// Subscribers are handled by notifications service
+		serviceName = "notifications"
 	default:
 		return "", "", "", fmt.Errorf("unknown service: %s", service)
 	}
@@ -203,7 +226,12 @@ func (p *ServiceProxy) invokeContentAPI(ctx context.Context, method, path string
 		 strings.HasPrefix(path, "/admin/api/v1/services"),
 		 strings.HasPrefix(path, "/admin/api/v1/research"),
 		 strings.HasPrefix(path, "/admin/api/v1/events"),
-		 strings.HasPrefix(path, "/admin/api/v1/news"):
+		 strings.HasPrefix(path, "/admin/api/v1/news"),
+		 // Simple API paths for development
+		 strings.HasPrefix(path, "/api/news"),
+		 strings.HasPrefix(path, "/api/events"),
+		 strings.HasPrefix(path, "/api/research"),
+		 strings.HasPrefix(path, "/api/services"):
 		// Convert data to []byte if needed
 		var requestData []byte
 		if data != nil {
@@ -237,7 +265,9 @@ func (p *ServiceProxy) invokeContentAPI(ctx context.Context, method, path string
 // invokeInquiriesAPI invokes inquiries API service (handles business, donations, media, volunteers)
 func (p *ServiceProxy) invokeInquiriesAPI(ctx context.Context, method, path string, data interface{}, headers map[string]string) (*ProxyResponse, error) {
 	switch {
-	case strings.HasPrefix(path, "/api/v1/inquiries"):
+	case strings.HasPrefix(path, "/api/v1/inquiries"),
+		 // Admin API paths for development
+		 strings.HasPrefix(path, "/api/admin/inquiries"):
 		// Convert data to []byte if needed
 		var requestData []byte
 		if data != nil {
@@ -272,7 +302,9 @@ func (p *ServiceProxy) invokeInquiriesAPI(ctx context.Context, method, path stri
 // invokeNotificationAPI invokes notification API service
 func (p *ServiceProxy) invokeNotificationAPI(ctx context.Context, method, path string, data interface{}, headers map[string]string) (*ProxyResponse, error) {
 	switch {
-	case strings.HasPrefix(path, "/api/v1/notifications"):
+	case strings.HasPrefix(path, "/api/v1/notifications"),
+		 // Admin API paths for development
+		 strings.HasPrefix(path, "/api/admin/subscribers"):
 		// Convert data to []byte if needed
 		var requestData []byte
 		if data != nil {

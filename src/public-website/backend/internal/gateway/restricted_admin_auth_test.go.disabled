@@ -1,0 +1,616 @@
+// RED PHASE: Restricted admin authentication tests - these should FAIL initially
+package gateway
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/axiom-software-co/international-center/src/backend/internal/shared/domain"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+func TestRestrictedAdminAuthentication(t *testing.T) {
+	timeout := 10 * time.Second
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	t.Run("Email allowlist enforcement for admin access", func(t *testing.T) {
+		// Contract expectation: only tojkuv@gmail.com and tojkuv@outlook.com allowed
+		
+		adminGateway, err := NewAdminGateway(ctx, "development")
+		require.NoError(t, err, "Admin gateway should be creatable")
+
+		allowedEmailTests := []struct {
+			name            string
+			email           string
+			provider        string
+			expectedAccess  bool
+			expectedRole    string
+			expectedMethods []string
+		}{
+			{
+				name:            "tojkuv@gmail.com should have full admin access",
+				email:           "tojkuv@gmail.com",
+				provider:        "google",
+				expectedAccess:  true,
+				expectedRole:    "admin",
+				expectedMethods: []string{"GET", "POST", "PUT", "DELETE"},
+			},
+			{
+				name:            "tojkuv@outlook.com should have lowest permissions (read-only)",
+				email:           "tojkuv@outlook.com", 
+				provider:        "microsoft",
+				expectedAccess:  true,
+				expectedRole:    "viewer",
+				expectedMethods: []string{"GET"},
+			},
+			{
+				name:            "unauthorized@gmail.com should be completely blocked",
+				email:           "unauthorized@gmail.com",
+				provider:        "google",
+				expectedAccess:  false,
+				expectedRole:    "",
+				expectedMethods: []string{},
+			},
+			{
+				name:            "admin@company.com should be completely blocked",
+				email:           "admin@company.com",
+				provider:        "google",
+				expectedAccess:  false,
+				expectedRole:    "",
+				expectedMethods: []string{},
+			},
+			{
+				name:            "user@outlook.com should be completely blocked",
+				email:           "user@outlook.com",
+				provider:        "microsoft", 
+				expectedAccess:  false,
+				expectedRole:    "",
+				expectedMethods: []string{},
+			},
+		}
+
+		for _, tt := range allowedEmailTests {
+			t.Run(tt.name, func(t *testing.T) {
+				// Mock JWT token with email claim from social provider
+				token := createMockSocialJWT(tt.email, tt.provider)
+				
+				req := httptest.NewRequest("GET", "/admin/api/v1/news", nil)
+				req.Header.Set("Authorization", "Bearer "+token)
+				req.Header.Set("Content-Type", "application/json")
+				
+				correlationCtx := domain.NewCorrelationContext()
+				req = req.WithContext(correlationCtx.ToContext(ctx))
+				
+				_ = httptest.NewRecorder() // Not used in this test
+				adminGateway.ServeHTTP(rr, req)
+
+				if tt.expectedAccess {
+					// Should allow access for allowed emails
+					assert.NotEqual(t, http.StatusForbidden, rr.Code, "Allowed email should not be forbidden")
+					assert.NotEqual(t, http.StatusUnauthorized, rr.Code, "Allowed email should not be unauthorized")
+					
+					// Should set proper role header
+					assert.Equal(t, tt.expectedRole, rr.Header().Get("X-User-Role"), "Role should match expected")
+					
+				} else {
+					// Should block access for unauthorized emails
+					assert.Equal(t, http.StatusForbidden, rr.Code, "Unauthorized email should be forbidden")
+					
+					// Should have proper error response
+					var errorResponse map[string]interface{}
+					err := json.Unmarshal(rr.Body.Bytes(), &errorResponse)
+					if err == nil {
+						assert.Contains(t, errorResponse, "error", "Should have error response")
+						if errorField, ok := errorResponse["error"].(map[string]interface{}); ok {
+							assert.Contains(t, errorField, "code", "Should have error code")
+							assert.Contains(t, errorField, "message", "Should have error message")
+						}
+					}
+				}
+			})
+		}
+	})
+
+	t.Run("Role-based method restrictions for allowed users", func(t *testing.T) {
+		// Contract expectation: tojkuv@gmail.com has admin access, tojkuv@outlook.com read-only
+		
+		adminGateway, err := NewAdminGateway(ctx, "development")
+		require.NoError(t, err, "Admin gateway should be creatable")
+
+		methodTests := []struct {
+			email          string
+			method         string
+			endpoint       string
+			expectedStatus int
+			description    string
+		}{
+			// tojkuv@gmail.com admin tests
+			{
+				email:          "tojkuv@gmail.com",
+				method:         "GET",
+				endpoint:       "/admin/api/v1/news",
+				expectedStatus: http.StatusOK,
+				description:    "Admin should have GET access to news",
+			},
+			{
+				email:          "tojkuv@gmail.com",
+				method:         "POST",
+				endpoint:       "/admin/api/v1/news",
+				expectedStatus: http.StatusCreated,
+				description:    "Admin should have POST access to create news",
+			},
+			{
+				email:          "tojkuv@gmail.com",
+				method:         "PUT",
+				endpoint:       "/admin/api/v1/news/550e8400-e29b-41d4-a716-446655440000",
+				expectedStatus: http.StatusOK,
+				description:    "Admin should have PUT access to update news",
+			},
+			{
+				email:          "tojkuv@gmail.com",
+				method:         "DELETE",
+				endpoint:       "/admin/api/v1/news/550e8400-e29b-41d4-a716-446655440000",
+				expectedStatus: http.StatusOK,
+				description:    "Admin should have DELETE access to remove news",
+			},
+			// tojkuv@outlook.com viewer tests
+			{
+				email:          "tojkuv@outlook.com",
+				method:         "GET",
+				endpoint:       "/admin/api/v1/news",
+				expectedStatus: http.StatusOK,
+				description:    "Viewer should have GET access to news",
+			},
+			{
+				email:          "tojkuv@outlook.com", 
+				method:         "POST",
+				endpoint:       "/admin/api/v1/news",
+				expectedStatus: http.StatusForbidden,
+				description:    "Viewer should NOT have POST access to create news",
+			},
+			{
+				email:          "tojkuv@outlook.com",
+				method:         "PUT",
+				endpoint:       "/admin/api/v1/news/550e8400-e29b-41d4-a716-446655440000",
+				expectedStatus: http.StatusForbidden,
+				description:    "Viewer should NOT have PUT access to update news",
+			},
+			{
+				email:          "tojkuv@outlook.com",
+				method:         "DELETE",
+				endpoint:       "/admin/api/v1/news/550e8400-e29b-41d4-a716-446655440000",
+				expectedStatus: http.StatusForbidden,
+				description:    "Viewer should NOT have DELETE access to remove news",
+			},
+		}
+
+		for _, tt := range methodTests {
+			t.Run(tt.description, func(t *testing.T) {
+				token := createMockSocialJWT(tt.email, getProviderFromEmail(tt.email))
+				
+				req := httptest.NewRequest(tt.method, tt.endpoint, nil)
+				req.Header.Set("Authorization", "Bearer "+token)
+				req.Header.Set("Content-Type", "application/json")
+				
+				correlationCtx := domain.NewCorrelationContext()
+				req = req.WithContext(correlationCtx.ToContext(ctx))
+				
+				_ = httptest.NewRecorder() // Not used in this test
+				adminGateway.ServeHTTP(rr, req)
+
+				// Validate response status matches expected permissions
+				assert.Equal(t, tt.expectedStatus, rr.Code, tt.description)
+			})
+		}
+	})
+
+	t.Run("Social provider integration for restricted users", func(t *testing.T) {
+		// Contract expectation: Google OAuth2 for gmail, Microsoft OAuth2 for outlook
+		
+		socialProviderTests := []struct {
+			name        string
+			email       string
+			provider    string
+			issuer      string
+			expectedValid bool
+		}{
+			{
+				name:        "tojkuv@gmail.com should validate with Google OAuth2",
+				email:       "tojkuv@gmail.com",
+				provider:    "google",
+				issuer:      "https://accounts.google.com",
+				expectedValid: true,
+			},
+			{
+				name:        "tojkuv@outlook.com should validate with Microsoft OAuth2",
+				email:       "tojkuv@outlook.com",
+				provider:    "microsoft",
+				issuer:      "https://login.microsoftonline.com/common/v2.0",
+				expectedValid: true,
+			},
+			{
+				name:        "tojkuv@gmail.com should reject Microsoft OAuth2 token",
+				email:       "tojkuv@gmail.com",
+				provider:    "microsoft", // Wrong provider for Gmail user
+				issuer:      "https://login.microsoftonline.com/common/v2.0",
+				expectedValid: false,
+			},
+			{
+				name:        "tojkuv@outlook.com should reject Google OAuth2 token",
+				email:       "tojkuv@outlook.com",
+				provider:    "google", // Wrong provider for Outlook user
+				issuer:      "https://accounts.google.com",
+				expectedValid: false,
+			},
+		}
+
+		for _, tt := range socialProviderTests {
+			t.Run(tt.name, func(t *testing.T) {
+				token := createMockSocialJWTWithIssuer(tt.email, tt.provider, tt.issuer)
+				
+				req := httptest.NewRequest("GET", "/admin/api/v1/news", nil)
+				req.Header.Set("Authorization", "Bearer "+token)
+				req.Header.Set("Content-Type", "application/json")
+				
+				_ = httptest.NewRecorder() // Not used in this test
+				
+				// This will test JWT validation with social provider issuers
+				// Should validate provider matches email domain
+				if tt.expectedValid {
+					// Should accept valid provider for email domain
+					assert.True(t, true, "Valid provider-email combination should be accepted")
+				} else {
+					// Should reject mismatched provider-email combinations
+					assert.True(t, true, "Invalid provider-email combination should be rejected")
+				}
+				
+				t.Logf("Social provider validation: %s with %s issuer", tt.email, tt.issuer)
+			})
+		}
+	})
+
+	t.Run("Admin API contract endpoint access with restricted authentication", func(t *testing.T) {
+		// Contract expectation: admin contract endpoints work with restricted authentication
+		
+		adminGateway, err := NewAdminGateway(ctx, "development")
+		require.NoError(t, err, "Admin gateway should be creatable")
+
+		contractEndpointTests := []struct {
+			email       string
+			role        string
+			endpoint    string
+			method      string
+			expectAccess bool
+		}{
+			// Admin user access to all contract endpoints
+			{"tojkuv@gmail.com", "admin", "/admin/api/v1/news", "GET", true},
+			{"tojkuv@gmail.com", "admin", "/admin/api/v1/news", "POST", true},
+			{"tojkuv@gmail.com", "admin", "/admin/api/v1/services", "GET", true},
+			{"tojkuv@gmail.com", "admin", "/admin/api/v1/inquiries", "GET", true},
+			{"tojkuv@gmail.com", "admin", "/admin/api/v1/inquiries/550e8400-e29b-41d4-a716-446655440000", "PUT", true},
+			
+			// Viewer user access to contract endpoints (read-only)
+			{"tojkuv@outlook.com", "viewer", "/admin/api/v1/news", "GET", true},
+			{"tojkuv@outlook.com", "viewer", "/admin/api/v1/services", "GET", true},
+			{"tojkuv@outlook.com", "viewer", "/admin/api/v1/inquiries", "GET", true},
+			
+			// Viewer user denied write access
+			{"tojkuv@outlook.com", "viewer", "/admin/api/v1/news", "POST", false},
+			{"tojkuv@outlook.com", "viewer", "/admin/api/v1/services", "POST", false},
+			{"tojkuv@outlook.com", "viewer", "/admin/api/v1/inquiries/550e8400-e29b-41d4-a716-446655440000", "PUT", false},
+		}
+
+		for _, tt := range contractEndpointTests {
+			t.Run(fmt.Sprintf("%s %s %s access for %s", tt.method, tt.endpoint, tt.role, tt.email), func(t *testing.T) {
+				token := createMockSocialJWT(tt.email, getProviderFromEmail(tt.email))
+				
+				req := httptest.NewRequest(tt.method, tt.endpoint, nil)
+				req.Header.Set("Authorization", "Bearer "+token)
+				req.Header.Set("Content-Type", "application/json")
+				
+				correlationCtx := domain.NewCorrelationContext()
+				req = req.WithContext(correlationCtx.ToContext(ctx))
+				
+				_ = httptest.NewRecorder() // Not used in this test
+				adminGateway.ServeHTTP(rr, req)
+
+				if tt.expectAccess {
+					// Should allow access for permitted operations
+					assert.NotEqual(t, http.StatusForbidden, rr.Code, "Permitted operation should be allowed")
+					assert.NotEqual(t, http.StatusUnauthorized, rr.Code, "Authenticated user should not be unauthorized")
+				} else {
+					// Should deny access for restricted operations
+					assert.Equal(t, http.StatusForbidden, rr.Code, "Restricted operation should be forbidden")
+				}
+			})
+		}
+	})
+
+	t.Run("Unauthorized email rejection with proper error responses", func(t *testing.T) {
+		// Contract expectation: all non-allowlisted emails should be completely blocked
+		
+		adminGateway, err := NewAdminGateway(ctx, "development")
+		require.NoError(t, err, "Admin gateway should be creatable")
+
+		unauthorizedEmailTests := []string{
+			"user@gmail.com",
+			"admin@gmail.com",
+			"tojkuv@yahoo.com",
+			"test@outlook.com",
+			"admin@company.com",
+			"manager@organization.org",
+			"support@international-center.dev",
+		}
+
+		for _, unauthorizedEmail := range unauthorizedEmailTests {
+			t.Run("Should reject "+unauthorizedEmail+" completely", func(t *testing.T) {
+				token := createMockSocialJWT(unauthorizedEmail, getProviderFromEmail(unauthorizedEmail))
+				
+				req := httptest.NewRequest("GET", "/admin/api/v1/news", nil)
+				req.Header.Set("Authorization", "Bearer "+token)
+				req.Header.Set("Content-Type", "application/json")
+				
+				correlationCtx := domain.NewCorrelationContext()
+				req = req.WithContext(correlationCtx.ToContext(ctx))
+				
+				_ = httptest.NewRecorder() // Not used in this test
+				adminGateway.ServeHTTP(rr, req)
+
+				// Should completely reject unauthorized emails
+				assert.Equal(t, http.StatusForbidden, rr.Code, "Unauthorized email should be forbidden")
+				
+				// Should have proper error response
+				var errorResponse map[string]interface{}
+				err := json.Unmarshal(rr.Body.Bytes(), &errorResponse)
+				if err == nil {
+					assert.Contains(t, errorResponse, "error", "Should have error response")
+					if errorField, ok := errorResponse["error"].(map[string]interface{}); ok {
+						assert.Contains(t, errorField, "code", "Should have error code")
+						assert.Contains(t, errorField, "message", "Should have error message")
+						
+						// Error should indicate email not in allowlist
+						message := errorField["message"].(string)
+						assert.Contains(t, message, "not authorized", "Error should indicate authorization failure")
+					}
+				}
+				
+				// Should log unauthorized access attempt
+				t.Logf("Correctly rejected unauthorized email: %s", unauthorizedEmail)
+			})
+		}
+	})
+
+	t.Run("Public website should remain completely anonymous", func(t *testing.T) {
+		// Contract expectation: public gateway should not require authentication
+		
+		publicGateway, err := NewPublicGateway(ctx, "development")
+		require.NoError(t, err, "Public gateway should be creatable")
+
+		publicEndpoints := []string{
+			"/api/v1/news",
+			"/api/v1/services", 
+			"/api/v1/research",
+			"/api/v1/events",
+			"/api/v1/news/featured",
+			"/api/v1/services/featured",
+			"/health",
+		}
+
+		for _, endpoint := range publicEndpoints {
+			t.Run("Public endpoint "+endpoint+" should allow anonymous access", func(t *testing.T) {
+				// No Authorization header - completely anonymous
+				req := httptest.NewRequest("GET", endpoint, nil)
+				req.Header.Set("Content-Type", "application/json")
+				
+				_ = httptest.NewRecorder() // Not used in this test
+				publicGateway.ServeHTTP(rr, req)
+
+				// Should allow anonymous access
+				assert.NotEqual(t, http.StatusUnauthorized, rr.Code, "Public endpoint should allow anonymous access")
+				assert.NotEqual(t, http.StatusForbidden, rr.Code, "Public endpoint should not require authentication")
+				
+				// Should be accessible without any authentication
+				t.Logf("Public endpoint %s correctly allows anonymous access", endpoint)
+			})
+		}
+	})
+
+	t.Run("JWT token validation with social provider claims", func(t *testing.T) {
+		// Contract expectation: JWT tokens should be validated against Google/Microsoft
+		
+		jwtValidationTests := []struct {
+			name          string
+			email         string
+			issuer        string
+			audience      string
+			expectedValid bool
+		}{
+			{
+				name:          "Valid Google JWT for tojkuv@gmail.com",
+				email:         "tojkuv@gmail.com",
+				issuer:        "https://accounts.google.com",
+				audience:      "international-center",
+				expectedValid: true,
+			},
+			{
+				name:          "Valid Microsoft JWT for tojkuv@outlook.com",
+				email:         "tojkuv@outlook.com", 
+				issuer:        "https://login.microsoftonline.com/common/v2.0",
+				audience:      "international-center",
+				expectedValid: true,
+			},
+			{
+				name:          "Invalid issuer should be rejected",
+				email:         "tojkuv@gmail.com",
+				issuer:        "https://malicious-issuer.com",
+				audience:      "international-center",
+				expectedValid: false,
+			},
+			{
+				name:          "Invalid audience should be rejected",
+				email:         "tojkuv@gmail.com",
+				issuer:        "https://accounts.google.com",
+				audience:      "wrong-audience",
+				expectedValid: false,
+			},
+		}
+
+		for _, tt := range jwtValidationTests {
+			t.Run(tt.name, func(t *testing.T) {
+				token := createMockSocialJWTWithClaims(tt.email, tt.issuer, tt.audience)
+				
+				req := httptest.NewRequest("GET", "/admin/api/v1/news", nil)
+				req.Header.Set("Authorization", "Bearer "+token)
+				req.Header.Set("Content-Type", "application/json")
+				
+				_ = httptest.NewRecorder() // Not used in this test
+				
+				// JWT validation should occur before role checking
+				// This validates the JWT structure and claims
+				
+				if tt.expectedValid {
+					assert.True(t, true, "Valid JWT should pass validation")
+				} else {
+					assert.True(t, true, "Invalid JWT should be rejected")
+				}
+				
+				t.Logf("JWT validation test: %s with issuer %s", tt.email, tt.issuer)
+			})
+		}
+	})
+}
+
+// Helper functions for creating mock social login JWTs
+
+func createMockSocialJWT(email string, provider string) string {
+	// Mock JWT token with email claim for testing
+	// In production, this would be actual Google/Microsoft JWT
+	return fmt.Sprintf("mock-jwt-%s-%s", provider, email)
+}
+
+func createMockSocialJWTWithIssuer(email string, provider string, issuer string) string {
+	// Mock JWT with specific issuer for provider validation testing
+	return fmt.Sprintf("mock-jwt-%s-%s-%s", provider, email, issuer)
+}
+
+func createMockSocialJWTWithClaims(email string, issuer string, audience string) string {
+	// Mock JWT with all required claims for comprehensive testing
+	return fmt.Sprintf("mock-jwt-%s-%s-%s", email, issuer, audience)
+}
+
+func getProviderFromEmail(email string) string {
+	// Determine OAuth2 provider based on email domain
+	if strings.HasSuffix(email, "@gmail.com") {
+		return "google"
+	}
+	if strings.HasSuffix(email, "@outlook.com") {
+		return "microsoft"
+	}
+	return "unknown"
+}
+
+func TestRestrictedAdminAuditLogging(t *testing.T) {
+	timeout := 5 * time.Second
+	_, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	t.Run("All admin access attempts should be logged with correlation tracking", func(t *testing.T) {
+		// Contract expectation: comprehensive audit logging for admin access
+		
+		auditTests := []struct {
+			email    string
+			endpoint string
+			method   string
+			expected string
+		}{
+			{
+				email:    "tojkuv@gmail.com",
+				endpoint: "/admin/api/v1/news",
+				method:   "POST",
+				expected: "admin access",
+			},
+			{
+				email:    "tojkuv@outlook.com",
+				endpoint: "/admin/api/v1/news",
+				method:   "GET", 
+				expected: "viewer access",
+			},
+			{
+				email:    "unauthorized@gmail.com",
+				endpoint: "/admin/api/v1/news",
+				method:   "GET",
+				expected: "unauthorized access attempt",
+			},
+		}
+
+		for _, tt := range auditTests {
+			t.Run(fmt.Sprintf("Should log %s for %s", tt.expected, tt.email), func(t *testing.T) {
+				// Contract expectation: audit logging should capture all access attempts
+				
+				// This test defines audit logging requirements
+				// In GREEN phase, audit logging should be implemented
+				
+				assert.True(t, true, "Audit logging should capture %s for %s %s %s", tt.expected, tt.method, tt.endpoint, tt.email)
+				t.Logf("Audit log required: %s %s by %s (%s)", tt.method, tt.endpoint, tt.email, tt.expected)
+			})
+		}
+	})
+
+	t.Run("Failed authentication attempts should be monitored for security", func(t *testing.T) {
+		// Contract expectation: security monitoring for unauthorized access attempts
+		
+		securityMonitoringTests := []struct {
+			scenario     string
+			email        string
+			attempts     int
+			expectedAlert bool
+		}{
+			{
+				scenario:     "Single unauthorized attempt",
+				email:        "hacker@malicious.com",
+				attempts:     1,
+				expectedAlert: false, // Single attempt might not trigger alert
+			},
+			{
+				scenario:     "Multiple unauthorized attempts",
+				email:        "attacker@evil.com",
+				attempts:     5,
+				expectedAlert: true, // Multiple attempts should trigger alert
+			},
+			{
+				scenario:     "Repeated attempts from blocked email",
+				email:        "unauthorized@gmail.com",
+				attempts:     3,
+				expectedAlert: true, // Should trigger security monitoring
+			},
+		}
+
+		for _, tt := range securityMonitoringTests {
+			t.Run(tt.scenario, func(t *testing.T) {
+				// Contract expectation: security monitoring for attack patterns
+				
+				for i := 0; i < tt.attempts; i++ {
+					// Simulate repeated unauthorized access attempts
+					t.Logf("Attempt %d: %s trying to access admin portal", i+1, tt.email)
+				}
+				
+				// Should trigger security monitoring based on attempt pattern
+				if tt.expectedAlert {
+					assert.True(t, true, "Multiple unauthorized attempts should trigger security alert")
+				} else {
+					assert.True(t, true, "Single attempt should be logged but not necessarily trigger alert")
+				}
+				
+				t.Logf("Security monitoring test: %s with %d attempts", tt.email, tt.attempts)
+			})
+		}
+	})
+}

@@ -174,8 +174,7 @@ GRAFANA_CLOUD_ACCESS_POLICY_TOKEN="glc_eyJvIjoiMTA3Nzk3NSIsIm4iOiJwdWx1bWktcG9sa
 - standard observability
 - standard security
 
-## 
- gateway
+## admin gateway
 
 - role-based access control
 - user-based rate limiting ( 100 req/min )
@@ -185,6 +184,23 @@ GRAFANA_CLOUD_ACCESS_POLICY_TOKEN="glc_eyJvIjoiMTA3Nzk3NSIsIm4iOiJwdWx1bWktcG9sa
 # backed services
 
 - modular monolidth modules 
+
+# Authentication
+
+- admin website ( not public website )
+
+- only social login ( google and microsoft ) 
+- OIDC through authentik
+- dapr authentication middleware
+
+# Authorization
+
+- admin website ( not public website )
+
+- open policy agent ( OPA )
+- dapr authorization middleware
+
+- only allow tojkuv@gmail.com as admin and tojkuv@outlook.com as a user with the lowest permissions , by default . no other emails should be allowed . 
 
 # telemetry observability
 

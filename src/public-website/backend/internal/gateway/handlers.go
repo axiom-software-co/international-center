@@ -72,11 +72,19 @@ func (h *GatewayHandler) RegisterRoutes(router *mux.Router) {
 		router.PathPrefix(apiPrefix + "/v1/content").HandlerFunc(h.ProxyToContentAPI).Methods("GET", "OPTIONS")
 		router.PathPrefix(apiPrefix + "/v1/research").HandlerFunc(h.ProxyToContentAPI).Methods("GET", "PUT", "POST", "DELETE", "OPTIONS")
 		router.PathPrefix(apiPrefix + "/v1/events").HandlerFunc(h.ProxyToContentAPI).Methods("GET", "OPTIONS")
+		
+		// Simple API routes for development (without v1 prefix)
+		router.HandleFunc("/api/news", h.ProxyToContentAPI).Methods("GET", "OPTIONS")
+		router.HandleFunc("/api/events", h.ProxyToContentAPI).Methods("GET", "OPTIONS")
+		router.HandleFunc("/api/research", h.ProxyToContentAPI).Methods("GET", "OPTIONS")
 	}
 	
 	if h.config.ServiceRouting.ServicesAPIEnabled {
 		// Services API routes
 		router.PathPrefix(apiPrefix + "/v1/services").HandlerFunc(h.ProxyToServicesAPI).Methods("GET", "POST", "PUT", "DELETE", "OPTIONS")
+		
+		// Simple API route for development
+		router.HandleFunc("/api/services", h.ProxyToServicesAPI).Methods("GET", "OPTIONS")
 	}
 	
 	if h.config.ServiceRouting.NewsAPIEnabled {
@@ -84,9 +92,13 @@ func (h *GatewayHandler) RegisterRoutes(router *mux.Router) {
 		router.PathPrefix(apiPrefix + "/v1/news").HandlerFunc(h.ProxyToNewsAPI).Methods("GET", "POST", "PUT", "DELETE", "OPTIONS")
 	}
 	
-	// Inquiries API routes (always enabled for public gateway)
+	// Inquiries API routes (always enabled for public gateway, admin routes for admin gateway)
 	if h.config.IsPublic() {
 		router.PathPrefix("/api/v1/inquiries").HandlerFunc(h.ProxyToInquiriesAPI).Methods("POST", "OPTIONS")
+	}
+	if h.config.IsAdmin() {
+		router.HandleFunc("/api/admin/inquiries", h.ProxyToInquiriesAPI).Methods("GET", "POST", "PUT", "DELETE", "OPTIONS")
+		router.HandleFunc("/api/admin/subscribers", h.ProxyToNotificationAPI).Methods("GET", "POST", "PUT", "DELETE", "OPTIONS")
 	}
 	
 	if h.config.ServiceRouting.NotificationAPIEnabled {
@@ -114,8 +126,8 @@ func (h *GatewayHandler) ProxyToContentAPI(w http.ResponseWriter, r *http.Reques
 	ctx, cancel := context.WithTimeout(ctx, h.config.Timeouts.RequestTimeout)
 	defer cancel()
 	
-	// Proxy request to content API
-	err := h.serviceProxy.ProxyRequest(ctx, w, r, "content-api")
+	// Proxy request to content service (matching deployed service name)
+	err := h.serviceProxy.ProxyRequest(ctx, w, r, "content")
 	if err != nil {
 		h.handleError(w, r, err)
 		return
@@ -130,8 +142,8 @@ func (h *GatewayHandler) ProxyToServicesAPI(w http.ResponseWriter, r *http.Reque
 	ctx, cancel := context.WithTimeout(ctx, h.config.Timeouts.RequestTimeout)
 	defer cancel()
 	
-	// Proxy request to content API (services domain is consolidated)
-	err := h.serviceProxy.ProxyRequest(ctx, w, r, "content-api")
+	// Proxy request to content service (services domain is consolidated)
+	err := h.serviceProxy.ProxyRequest(ctx, w, r, "content")
 	if err != nil {
 		h.handleError(w, r, err)
 		return
@@ -146,8 +158,8 @@ func (h *GatewayHandler) ProxyToNewsAPI(w http.ResponseWriter, r *http.Request) 
 	ctx, cancel := context.WithTimeout(ctx, h.config.Timeouts.RequestTimeout)
 	defer cancel()
 	
-	// Proxy request to content API (news domain is consolidated)
-	err := h.serviceProxy.ProxyRequest(ctx, w, r, "content-api")
+	// Proxy request to content service (news domain is consolidated)
+	err := h.serviceProxy.ProxyRequest(ctx, w, r, "content")
 	if err != nil {
 		h.handleError(w, r, err)
 		return
@@ -162,8 +174,8 @@ func (h *GatewayHandler) ProxyToNotificationAPI(w http.ResponseWriter, r *http.R
 	ctx, cancel := context.WithTimeout(ctx, h.config.Timeouts.RequestTimeout)
 	defer cancel()
 	
-	// Proxy request to notification API
-	err := h.serviceProxy.ProxyRequest(ctx, w, r, "notification-api")
+	// Proxy request to notifications service
+	err := h.serviceProxy.ProxyRequest(ctx, w, r, "notifications")
 	if err != nil {
 		h.handleError(w, r, err)
 		return
@@ -178,8 +190,8 @@ func (h *GatewayHandler) ProxyToInquiriesAPI(w http.ResponseWriter, r *http.Requ
 	ctx, cancel := context.WithTimeout(ctx, h.config.Timeouts.RequestTimeout)
 	defer cancel()
 	
-	// Proxy request to inquiries API
-	err := h.serviceProxy.ProxyRequest(ctx, w, r, "inquiries-api")
+	// Proxy request to inquiries service
+	err := h.serviceProxy.ProxyRequest(ctx, w, r, "inquiries")
 	if err != nil {
 		h.handleError(w, r, err)
 		return

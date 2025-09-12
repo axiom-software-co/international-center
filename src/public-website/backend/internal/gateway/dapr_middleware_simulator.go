@@ -92,45 +92,73 @@ func (d *DAPRMiddlewareSimulator) ServeHTTP(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	
-	// Simulate DAPR token validation and role-based access control
-	var userID, userRole string
+	// Simulate social login token validation with email allowlist
+	var userID, userRole, email string
 	
-	switch token {
-	case "valid_admin_token":
-		userID = "admin-user-123"
+	// Extract email from token (simplified for testing)
+	if strings.Contains(token, "tojkuv@gmail.com") {
+		email = "tojkuv@gmail.com"
+		userID = "admin-user-tojkuv"
 		userRole = "admin"
-		// Admin access to all endpoints - no restrictions
-		
-	case "valid_editor_token":
-		userID = "editor-user-456"
-		userRole = "content_editor"
-		// Editor access to content endpoints but not admin-only operations
-		if d.isAdminOnlyEndpoint(r.Method, r.URL.Path) {
-			d.writeAuthError(w, r, http.StatusForbidden, "INSUFFICIENT_PERMISSIONS", "insufficient permissions for admin-only endpoints")
+	} else if strings.Contains(token, "tojkuv@outlook.com") {
+		email = "tojkuv@outlook.com"
+		userID = "viewer-user-tojkuv"
+		userRole = "viewer"
+	} else if strings.Contains(token, "unauthorized@") {
+		// Simulate unauthorized email
+		email = "unauthorized@gmail.com"
+		d.writeAuthError(w, r, http.StatusForbidden, "EMAIL_NOT_ALLOWLISTED", "Email not in allowlist")
+		return
+	} else {
+		// Legacy token support for existing tests + restricted email allowlist
+		switch token {
+		case "valid_admin_token":
+			email = "tojkuv@gmail.com"
+			userID = "admin-user-tojkuv"
+			userRole = "admin"
+		case "valid_editor_token":
+			// Map legacy editor token to unauthorized user for testing rejection
+			email = "unauthorized-editor@gmail.com"
+			d.writeAuthError(w, r, http.StatusUnauthorized, "EMAIL_NOT_ALLOWLISTED", "Email not in allowlist")
+			return
+		case "valid_viewer_token":
+			email = "tojkuv@outlook.com"
+			userID = "viewer-user-tojkuv"
+			userRole = "viewer"
+		case "expired_admin_token":
+			d.writeAuthError(w, r, http.StatusUnauthorized, "TOKEN_EXPIRED", "Authentication token has expired")
+			return
+		default:
+			d.writeAuthError(w, r, http.StatusUnauthorized, "INVALID_TOKEN", "Invalid authentication token")
 			return
 		}
-		
-	case "valid_viewer_token":
-		userID = "viewer-user-789"
-		userRole = "viewer"
-		// Viewer access to read-only endpoints only
+	}
+	
+	// Validate email is in allowlist
+	if email != "tojkuv@gmail.com" && email != "tojkuv@outlook.com" {
+		d.writeAuthError(w, r, http.StatusForbidden, "EMAIL_NOT_ALLOWLISTED", "Email not in allowlist")
+		return
+	}
+	
+	// Apply role-based access control
+	if userRole == "admin" {
+		// tojkuv@gmail.com - full admin access to all endpoints
+		// No restrictions
+	} else if userRole == "viewer" {
+		// tojkuv@outlook.com - read-only access only
 		if r.Method != "GET" && r.Method != "HEAD" && r.Method != "OPTIONS" {
 			d.writeAuthError(w, r, http.StatusForbidden, "INSUFFICIENT_PERMISSIONS", "insufficient permissions for write operations")
 			return
 		}
-		
-	case "expired_admin_token":
-		d.writeAuthError(w, r, http.StatusUnauthorized, "TOKEN_EXPIRED", "Authentication token has expired")
-		return
-		
-	default:
-		d.writeAuthError(w, r, http.StatusUnauthorized, "INVALID_TOKEN", "Invalid authentication token")
+	} else {
+		d.writeAuthError(w, r, http.StatusForbidden, "INVALID_ROLE", "Invalid user role")
 		return
 	}
 	
 	// Set user context headers that would be added by DAPR
 	r.Header.Set("X-User-ID", userID)
 	r.Header.Set("X-User-Role", userRole)
+	r.Header.Set("X-User-Email", email)
 	
 	// Create response wrapper to capture and enhance headers
 	responseWrapper := &daprResponseWrapper{

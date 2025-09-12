@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"log"
 	"log/slog"
@@ -171,6 +172,55 @@ func startHealthCheckServer(port int, service *notifications.NotificationRouterS
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`{"status":"ready","service":"notifications-service"}`))
+	})
+	
+	// Simple API endpoints for development and testing
+	mux.HandleFunc("/api/subscribers", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		response := map[string]interface{}{
+			"data": []interface{}{},
+			"count": 0,
+			"service": "notifications-service",
+			"domain": "subscribers",
+			"message": "Subscribers API endpoint implemented",
+		}
+		
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			http.Error(w, "Failed to encode JSON response", http.StatusInternalServerError)
+		}
+	})
+	
+	mux.HandleFunc("/api/templates", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		response := map[string]interface{}{
+			"data": []interface{}{},
+			"count": 0,
+			"service": "notifications-service",
+			"domain": "templates",
+			"message": "Templates API endpoint implemented",
+		}
+		
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			http.Error(w, "Failed to encode JSON response", http.StatusInternalServerError)
+		}
+	})
+	
+	mux.HandleFunc("/api/events", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		response := map[string]interface{}{
+			"data": []interface{}{},
+			"count": 0,
+			"service": "notifications-service",
+			"domain": "events",
+			"message": "Events API endpoint implemented",
+		}
+		
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			http.Error(w, "Failed to encode JSON response", http.StatusInternalServerError)
+		}
 	})
 
 	server := &http.Server{

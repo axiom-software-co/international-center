@@ -2,6 +2,7 @@ package infrastructure
 
 import (
 	"fmt"
+	"log"
 	"net"
 	"strings"
 	"time"
@@ -119,14 +120,29 @@ func NewMigrationComponent(ctx *pulumi.Context, name string, args *MigrationArgs
 
 // executeMigrations runs the actual migration logic
 func executeMigrations(connectionString, migrationsPath, environment string, strategy MigrationStrategy) (map[string]interface{}, error) {
+	// For development environment, execute migrations aggressively when database is available
 	// Check database availability before attempting migrations (deployment sequencing protection)
 	if !isDatabaseAvailable(connectionString) {
-		return map[string]interface{}{
-			"status":            "deferred",
-			"schema_version":    "0",
-			"migrations_applied": 0,
-			"validation_status": "deferred_until_database_available",
-		}, nil
+		// In development, wait a moment and retry if database isn't available yet
+		if environment == "development" {
+			log.Printf("Database not immediately available, waiting 5 seconds before retry...")
+			time.Sleep(5 * time.Second)
+			if !isDatabaseAvailable(connectionString) {
+				return map[string]interface{}{
+					"status":            "deferred",
+					"schema_version":    "0",
+					"migrations_applied": 0,
+					"validation_status": "deferred_until_database_available",
+				}, nil
+			}
+		} else {
+			return map[string]interface{}{
+				"status":            "deferred",
+				"schema_version":    "0",
+				"migrations_applied": 0,
+				"validation_status": "deferred_until_database_available",
+			}, nil
+		}
 	}
 
 	// Create domain migration configurations

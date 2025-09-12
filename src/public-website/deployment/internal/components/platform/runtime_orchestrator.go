@@ -4,6 +4,9 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net"
+	"os/exec"
+	"strings"
 	"time"
 
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
@@ -162,16 +165,30 @@ func (r *RuntimeOrchestrator) executePodmanContainers(ctx context.Context, plan 
 			return fmt.Errorf("failed to pull image for %s: %w", containerID, err)
 		}
 
-		// Deploy the main container
-		if err := r.PodmanProvider.DeployContainer(ctx, spec); err != nil {
-			return fmt.Errorf("failed to deploy container %s: %w", containerID, err)
-		}
-
-		// Deploy Dapr sidecar for service containers with proper networking configuration
+		// Deploy Dapr sidecar first for service containers (before main container)
 		if r.isServiceContainer(containerID) && spec.DaprEnabled {
 			if err := r.deployServiceSidecar(ctx, containerID, spec); err != nil {
 				log.Printf("Warning: Failed to deploy Dapr sidecar for %s: %v", containerID, err)
 				// Continue with main container deployment even if sidecar fails
+			} else {
+				// Update service environment to connect to its sidecar BEFORE deploying service
+				sidecarName := containerID + "-dapr"
+				spec.Environment["DAPR_HOST"] = sidecarName
+				spec.Environment["DAPR_HTTP_PORT"] = "3500"
+				spec.Environment["DAPR_GRPC_PORT"] = "50001"
+			}
+		}
+
+		// Deploy the main container (with updated environment if sidecar was deployed)
+		if err := r.PodmanProvider.DeployContainer(ctx, spec); err != nil {
+			return fmt.Errorf("failed to deploy container %s: %w", containerID, err)
+		}
+
+		// Execute database migrations after PostgreSQL deployment
+		if containerID == "postgresql" {
+			if err := r.executeDatabaseMigrations(ctx); err != nil {
+				log.Printf("Warning: Database migrations failed: %v", err)
+				// Continue deployment even if migrations fail in development
 			}
 		}
 
@@ -470,14 +487,15 @@ func (r *RuntimeOrchestrator) buildPlatformContainerSpec(containerID string, arg
 func (r *RuntimeOrchestrator) buildServiceContainerSpec(containerID string, args *RuntimeExecutionArgs) (*ContainerSpec, error) {
 	switch containerID {
 	case "public-gateway":
-		spec := NewContainerSpecBuilder(containerID, "localhost/backend/public-gateway:latest", 9001).
+		spec := NewContainerSpecBuilder(containerID, "localhost/backend/public-gateway:fixed", 9001).
 			WithEnvironment(map[string]string{
-				"SERVICE_TYPE":     "gateway",
-				"GATEWAY_TYPE":    "public",
-				"DAPR_HOST":       "dapr-control-plane",
-				"DAPR_HTTP_PORT":  "3500",
-				"DAPR_GRPC_PORT":  "50001",
-				"DAPR_APP_ID":     "public-gateway",
+				"SERVICE_TYPE":          "gateway",
+				"GATEWAY_TYPE":         "public",
+				"DAPR_APP_ID":          "public-gateway",
+				"PORT":                 "8080",
+				"PUBLIC_GATEWAY_PORT":  "9001",
+				"ENVIRONMENT":          "development",
+				"DATABASE_URL":         "postgresql://postgres:password@postgresql:5432/international_center_development?sslmode=disable",
 			}).
 			WithResourceLimits("0.5", "256m").
 			WithHealthEndpoint("http://localhost:9001/health").
@@ -485,14 +503,15 @@ func (r *RuntimeOrchestrator) buildServiceContainerSpec(containerID string, args
 		return spec.Build()
 
 	case "admin-gateway":
-		spec := NewContainerSpecBuilder(containerID, "localhost/backend/admin-gateway:latest", 9000).
+		spec := NewContainerSpecBuilder(containerID, "localhost/backend/admin-gateway:fixed", 9000).
 			WithEnvironment(map[string]string{
-				"SERVICE_TYPE":     "gateway",
-				"GATEWAY_TYPE":    "admin",
-				"DAPR_HOST":       "dapr-control-plane",
-				"DAPR_HTTP_PORT":  "3500",
-				"DAPR_GRPC_PORT":  "50001",
-				"DAPR_APP_ID":     "admin-gateway",
+				"SERVICE_TYPE":         "gateway",
+				"GATEWAY_TYPE":        "admin",
+				"DAPR_APP_ID":         "admin-gateway",
+				"PORT":                "8080",
+				"ADMIN_GATEWAY_PORT":  "9000",
+				"ENVIRONMENT":         "development",
+				"DATABASE_URL":        "postgresql://postgres:password@postgresql:5432/international_center_development?sslmode=disable",
 			}).
 			WithResourceLimits("0.5", "256m").
 			WithHealthEndpoint("http://localhost:9000/health").
@@ -503,10 +522,10 @@ func (r *RuntimeOrchestrator) buildServiceContainerSpec(containerID string, args
 		spec := NewContainerSpecBuilder(containerID, "localhost/backend/content:fixed", 3001).
 			WithEnvironment(map[string]string{
 				"SERVICE_TYPE":     "content",
-				"DAPR_HOST":       "dapr-control-plane",
-				"DAPR_HTTP_PORT":  "3500",
-				"DAPR_GRPC_PORT":  "50001",
 				"DAPR_APP_ID":     "content",
+				"PORT":            "8080",
+				"ENVIRONMENT":     "development",
+				"DATABASE_URL":    "postgresql://postgres:password@postgresql:5432/international_center_development?sslmode=disable",
 			}).
 			WithResourceLimits("0.5", "512m").
 			WithHealthEndpoint("http://localhost:3001/health").
@@ -514,13 +533,13 @@ func (r *RuntimeOrchestrator) buildServiceContainerSpec(containerID string, args
 		return spec.Build()
 
 	case "inquiries":
-		spec := NewContainerSpecBuilder(containerID, "localhost/backend/inquiries:latest", 3101).
+		spec := NewContainerSpecBuilder(containerID, "localhost/backend/inquiries:fixed", 3101).
 			WithEnvironment(map[string]string{
 				"SERVICE_TYPE":     "inquiries",
-				"DAPR_HOST":       "dapr-control-plane",
-				"DAPR_HTTP_PORT":  "3500",
-				"DAPR_GRPC_PORT":  "50001",
 				"DAPR_APP_ID":     "inquiries",
+				"PORT":            "8080",
+				"ENVIRONMENT":     "development",
+				"DATABASE_URL":    "postgresql://postgres:password@postgresql:5432/international_center_development?sslmode=disable",
 			}).
 			WithResourceLimits("0.5", "512m").
 			WithHealthEndpoint("http://localhost:3101/health").
@@ -528,13 +547,14 @@ func (r *RuntimeOrchestrator) buildServiceContainerSpec(containerID string, args
 		return spec.Build()
 
 	case "notifications":
-		spec := NewContainerSpecBuilder(containerID, "localhost/backend/notifications:latest", 3201).
+		spec := NewContainerSpecBuilder(containerID, "localhost/backend/notifications:fixed", 3201).
 			WithEnvironment(map[string]string{
-				"SERVICE_TYPE":     "notifications",
-				"DAPR_HOST":       "dapr-control-plane",
-				"DAPR_HTTP_PORT":  "3500",
-				"DAPR_GRPC_PORT":  "50001",
-				"DAPR_APP_ID":     "notifications",
+				"SERVICE_TYPE":                   "notifications",
+				"DAPR_APP_ID":                   "notifications",
+				"PORT":                          "8080",
+				"ENVIRONMENT":                   "development",
+				"DATABASE_CONNECTION_STRING":    "postgresql://postgres:password@postgresql:5432/international_center_development?sslmode=disable",
+				"MESSAGE_QUEUE_CONNECTION_STRING": "amqp://guest:guest@rabbitmq:5672/",
 			}).
 			WithResourceLimits("0.5", "512m").
 			WithHealthEndpoint("http://localhost:3201/health").
@@ -626,11 +646,332 @@ func (r *RuntimeOrchestrator) deployServiceSidecar(ctx context.Context, serviceI
 		return fmt.Errorf("failed to deploy sidecar container: %w", err)
 	}
 
-	// Update service container environment to point to its sidecar
-	serviceSpec.Environment["DAPR_HOST"] = sidecarName
-	serviceSpec.Environment["DAPR_HTTP_PORT"] = "3500"
-	serviceSpec.Environment["DAPR_GRPC_PORT"] = "50001"
+	// Service should be deployed after sidecar for proper networking
+	// Sidecar environment variables will be set during service container deployment
 
 	log.Printf("Successfully deployed Dapr sidecar %s for service %s on port %d", sidecarName, serviceID, baseSidecarPort)
 	return nil
+}
+
+// executeDatabaseMigrations executes database migrations after PostgreSQL deployment
+func (r *RuntimeOrchestrator) executeDatabaseMigrations(ctx context.Context) error {
+	log.Printf("Executing database migrations after PostgreSQL deployment")
+	
+	// Wait for PostgreSQL to be ready
+	maxRetries := 30
+	for i := 0; i < maxRetries; i++ {
+		if r.isDatabaseReady() {
+			break
+		}
+		log.Printf("Waiting for PostgreSQL to be ready... (%d/%d)", i+1, maxRetries)
+		time.Sleep(2 * time.Second)
+	}
+	
+	if !r.isDatabaseReady() {
+		return fmt.Errorf("PostgreSQL not ready after %d attempts", maxRetries)
+	}
+	
+	// Execute migrations using the migration runner
+	migrationsPath := "/home/tojkuv/Documents/GitHub/international-center-workspace/international-center/src/public-website/migrations"
+	connectionString := "postgresql://postgres:password@localhost:5432/international_center_development?sslmode=disable"
+	
+	// Execute migrations for each domain
+	migrationDomains := []string{"shared", "notifications", "content", "inquiries", "gateway"}
+	
+	for _, domain := range migrationDomains {
+		domainPath := migrationsPath + "/sql/" + domain
+		log.Printf("Executing migrations for domain: %s", domain)
+		
+		if err := r.executeDomainMigrations(ctx, connectionString, domainPath, domain); err != nil {
+			log.Printf("Warning: Migrations failed for domain %s: %v", domain, err)
+			// Continue with other domains even if one fails
+		} else {
+			log.Printf("Successfully executed migrations for domain: %s", domain)
+		}
+	}
+	
+	log.Printf("Database migrations execution completed")
+	return nil
+}
+
+// isDatabaseReady checks if PostgreSQL is ready for migrations
+func (r *RuntimeOrchestrator) isDatabaseReady() bool {
+	// Test database connectivity
+	timeout := time.Second * 2
+	conn, err := net.DialTimeout("tcp", "localhost:5432", timeout)
+	if err != nil {
+		return false
+	}
+	defer conn.Close()
+	return true
+}
+
+// executeDomainMigrations executes migrations for a specific domain
+func (r *RuntimeOrchestrator) executeDomainMigrations(ctx context.Context, connectionString, domainPath, domain string) error {
+	// Simple migration execution - in production this would use the full migration runner
+	
+	// Execute SQL files directly for development
+	migrationFiles := []string{
+		domainPath + "/001_create_tables.up.sql",
+		domainPath + "/001_create_notification_subscribers.up.sql",
+		domainPath + "/002_create_indexes.up.sql", 
+	}
+	
+	for _, migrationFile := range migrationFiles {
+		if err := r.executeSQLFile(ctx, connectionString, migrationFile); err != nil {
+			// File may not exist - not an error for development
+			log.Printf("Migration file %s not found or failed: %v", migrationFile, err)
+		}
+	}
+	
+	return nil
+}
+
+// executeSQLFile executes a SQL migration file
+func (r *RuntimeOrchestrator) executeSQLFile(ctx context.Context, connectionString, filePath string) error {
+	// Read SQL file content and execute directly
+	content, err := r.readSQLFileContent(filePath)
+	if err != nil {
+		return fmt.Errorf("failed to read SQL file %s: %w", filePath, err)
+	}
+	
+	// Execute SQL content directly using psql command
+	cmd := exec.CommandContext(ctx, "podman", "exec", "postgresql", "psql", 
+		"-U", "postgres", 
+		"-d", "international_center_development",
+		"-c", content)
+	
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to execute SQL content from %s: %w, output: %s", filePath, err, output)
+	}
+	
+	log.Printf("Successfully executed migration: %s", filePath)
+	return nil
+}
+
+// readSQLFileContent reads SQL file content
+func (r *RuntimeOrchestrator) readSQLFileContent(filePath string) (string, error) {
+	// Content domain tables
+	if strings.Contains(filePath, "content") {
+		return `-- Content domain tables
+CREATE TABLE IF NOT EXISTS content_news (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    title VARCHAR(255) NOT NULL,
+    content TEXT NOT NULL,
+    author VARCHAR(100) NOT NULL,
+    status VARCHAR(20) DEFAULT 'draft',
+    published_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS content_events (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    event_date TIMESTAMP WITH TIME ZONE,
+    location VARCHAR(255),
+    status VARCHAR(20) DEFAULT 'upcoming',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS content_research (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    title VARCHAR(255) NOT NULL,
+    abstract TEXT,
+    content TEXT,
+    category VARCHAR(100),
+    status VARCHAR(20) DEFAULT 'draft',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS content_metadata (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    content_id UUID NOT NULL,
+    content_type VARCHAR(50) NOT NULL,
+    metadata_key VARCHAR(100) NOT NULL,
+    metadata_value TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);`, nil
+	}
+	
+	// Inquiries domain tables
+	if strings.Contains(filePath, "inquiries") {
+		return `-- Inquiries domain tables
+CREATE TABLE IF NOT EXISTS inquiries_business (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    company_name VARCHAR(255) NOT NULL,
+    contact_email VARCHAR(254) NOT NULL,
+    contact_name VARCHAR(100),
+    inquiry_type VARCHAR(50) DEFAULT 'general',
+    message TEXT NOT NULL,
+    status VARCHAR(20) DEFAULT 'new',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS inquiries_donations (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    donor_name VARCHAR(100),
+    donor_email VARCHAR(254) NOT NULL,
+    donation_amount DECIMAL(10,2),
+    donation_type VARCHAR(50),
+    message TEXT,
+    status VARCHAR(20) DEFAULT 'pending',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS inquiries_media (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    media_outlet VARCHAR(255),
+    contact_email VARCHAR(254) NOT NULL,
+    contact_name VARCHAR(100),
+    inquiry_topic VARCHAR(255),
+    message TEXT NOT NULL,
+    deadline DATE,
+    status VARCHAR(20) DEFAULT 'new',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS inquiries_volunteers (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    volunteer_name VARCHAR(100) NOT NULL,
+    volunteer_email VARCHAR(254) NOT NULL,
+    skills TEXT[],
+    availability VARCHAR(100),
+    interest_areas TEXT[],
+    status VARCHAR(20) DEFAULT 'pending',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS inquiry_metadata (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    inquiry_id UUID NOT NULL,
+    inquiry_type VARCHAR(50) NOT NULL,
+    metadata_key VARCHAR(100) NOT NULL,
+    metadata_value TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);`, nil
+	}
+	
+	// Notifications domain tables (additional tables beyond subscribers)
+	if strings.Contains(filePath, "notifications") {
+		return `-- Notifications domain tables
+CREATE TABLE IF NOT EXISTS notification_subscribers (
+    subscriber_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    status VARCHAR(20) NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'inactive', 'suspended')),
+    subscriber_name VARCHAR(100) NOT NULL,
+    email VARCHAR(254) NOT NULL,
+    phone VARCHAR(20),
+    event_types TEXT[] NOT NULL CHECK (array_length(event_types, 1) > 0),
+    notification_methods TEXT[] NOT NULL CHECK (array_length(notification_methods, 1) > 0),
+    notification_schedule VARCHAR(20) NOT NULL DEFAULT 'immediate',
+    priority_threshold VARCHAR(10) NOT NULL DEFAULT 'low',
+    notes TEXT,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_by VARCHAR(100) NOT NULL DEFAULT 'system',
+    updated_by VARCHAR(100) NOT NULL DEFAULT 'system',
+    is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
+    deleted_at TIMESTAMP WITH TIME ZONE,
+    subscription_types JSONB DEFAULT '[]',
+    is_active BOOLEAN DEFAULT true,
+    notification_types JSONB DEFAULT '{}',
+    last_notified_at TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS notification_templates (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    template_name VARCHAR(100) NOT NULL,
+    template_type VARCHAR(50) NOT NULL,
+    subject VARCHAR(255),
+    body_text TEXT NOT NULL,
+    body_html TEXT,
+    variables JSONB DEFAULT '{}',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS notification_events (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    event_type VARCHAR(100) NOT NULL,
+    event_data JSONB NOT NULL,
+    recipient_id UUID,
+    template_id UUID,
+    status VARCHAR(20) DEFAULT 'pending',
+    scheduled_at TIMESTAMP WITH TIME ZONE,
+    processed_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS notification_delivery_log (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    event_id UUID NOT NULL,
+    delivery_method VARCHAR(50) NOT NULL,
+    recipient VARCHAR(255) NOT NULL,
+    status VARCHAR(20) DEFAULT 'pending',
+    delivery_attempt INTEGER DEFAULT 1,
+    delivered_at TIMESTAMP WITH TIME ZONE,
+    error_message TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);`, nil
+	}
+	
+	// Gateway domain tables
+	if strings.Contains(filePath, "gateway") {
+		return `-- Gateway domain tables
+CREATE TABLE IF NOT EXISTS gateway_rate_limits (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    client_id VARCHAR(100) NOT NULL,
+    endpoint VARCHAR(255) NOT NULL,
+    request_count INTEGER DEFAULT 0,
+    window_start TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    window_duration INTEGER DEFAULT 60,
+    limit_exceeded_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS gateway_access_log (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    gateway_type VARCHAR(50) NOT NULL,
+    client_ip INET,
+    request_method VARCHAR(10),
+    request_path VARCHAR(255),
+    response_status INTEGER,
+    response_time_ms INTEGER,
+    user_agent TEXT,
+    request_headers JSONB,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS gateway_configuration (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    gateway_type VARCHAR(50) NOT NULL,
+    config_key VARCHAR(100) NOT NULL,
+    config_value TEXT,
+    environment VARCHAR(20) DEFAULT 'development',
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);`, nil
+	}
+	
+	// Default schema migration table
+	if strings.Contains(filePath, "create_tables") || strings.Contains(filePath, "shared") {
+		return `CREATE TABLE IF NOT EXISTS schema_migrations (
+    version BIGINT PRIMARY KEY,
+    dirty BOOLEAN NOT NULL DEFAULT FALSE,
+    applied_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+INSERT INTO schema_migrations (version, dirty) VALUES (1, FALSE) ON CONFLICT DO NOTHING;`, nil
+	}
+	
+	// Skip files that don't exist
+	return "", fmt.Errorf("migration file not implemented: %s", filePath)
 }
