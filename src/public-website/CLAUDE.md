@@ -22,6 +22,8 @@
 
 - note : we will not work on the UI of the public admin portal website for the moment
 
+- note : we will not work on the newsletter for now 
+
 - note : we are currently focused on integration testing . be causious of integration test files proliferation . you may not create new integration test files , but you may edit our current integration testing framework and and integtation tests implementations if needed . 
 
 [deployment secrets]

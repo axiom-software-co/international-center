@@ -38,61 +38,61 @@ func NewDomainMigrationConfigs(basePath, databaseURL string) *DomainMigrationCon
 	// Content domain configurations
 	config.Content.Services = MigrationConfig{
 		Domain:        "content-services",
-		MigrationPath: filepath.Join(basePath, "content", "services"),
+		MigrationPath: filepath.Join(basePath, "sql", "content"),
 		DatabaseURL:   databaseURL,
 	}
 	config.Content.News = MigrationConfig{
 		Domain:        "content-news",
-		MigrationPath: filepath.Join(basePath, "content", "news"),
+		MigrationPath: filepath.Join(basePath, "sql", "content"),
 		DatabaseURL:   databaseURL,
 	}
 	config.Content.Research = MigrationConfig{
 		Domain:        "content-research",
-		MigrationPath: filepath.Join(basePath, "content", "research"),
+		MigrationPath: filepath.Join(basePath, "sql", "content"),
 		DatabaseURL:   databaseURL,
 	}
 	config.Content.Events = MigrationConfig{
 		Domain:        "content-events",
-		MigrationPath: filepath.Join(basePath, "content", "events"),
+		MigrationPath: filepath.Join(basePath, "sql", "content"),
 		DatabaseURL:   databaseURL,
 	}
 	
 	// Inquiries domain configurations
 	config.Inquiries.Donations = MigrationConfig{
 		Domain:        "inquiries-donations",
-		MigrationPath: filepath.Join(basePath, "inquiries", "donations"),
+		MigrationPath: filepath.Join(basePath, "sql", "inquiries"),
 		DatabaseURL:   databaseURL,
 	}
 	config.Inquiries.Business = MigrationConfig{
 		Domain:        "inquiries-business",
-		MigrationPath: filepath.Join(basePath, "inquiries", "business"),
+		MigrationPath: filepath.Join(basePath, "sql", "inquiries"),
 		DatabaseURL:   databaseURL,
 	}
 	config.Inquiries.Media = MigrationConfig{
 		Domain:        "inquiries-media",
-		MigrationPath: filepath.Join(basePath, "inquiries", "media"),
+		MigrationPath: filepath.Join(basePath, "sql", "inquiries"),
 		DatabaseURL:   databaseURL,
 	}
 	config.Inquiries.Volunteers = MigrationConfig{
 		Domain:        "inquiries-volunteers",
-		MigrationPath: filepath.Join(basePath, "inquiries", "volunteers"),
+		MigrationPath: filepath.Join(basePath, "sql", "inquiries"),
 		DatabaseURL:   databaseURL,
 	}
 	
 	// Supporting domain configurations
 	config.Notifications = MigrationConfig{
 		Domain:        "notifications",
-		MigrationPath: filepath.Join(basePath, "notifications"),
+		MigrationPath: filepath.Join(basePath, "sql", "notifications"),
 		DatabaseURL:   databaseURL,
 	}
 	config.Gateway = MigrationConfig{
 		Domain:        "gateway",
-		MigrationPath: filepath.Join(basePath, "gateway"),
+		MigrationPath: filepath.Join(basePath, "sql", "gateway"),
 		DatabaseURL:   databaseURL,
 	}
 	config.Shared = MigrationConfig{
 		Domain:        "shared",
-		MigrationPath: filepath.Join(basePath, "shared"),
+		MigrationPath: filepath.Join(basePath, "sql", "shared"),
 		DatabaseURL:   databaseURL,
 	}
 	
@@ -101,7 +101,14 @@ func NewDomainMigrationConfigs(basePath, databaseURL string) *DomainMigrationCon
 
 // GetMigrationURL returns the file:// URL for golang-migrate
 func (c MigrationConfig) GetMigrationURL() string {
-	return fmt.Sprintf("file://%s", c.MigrationPath)
+	// Ensure absolute path for migration URL
+	absolutePath := c.MigrationPath
+	if !filepath.IsAbs(absolutePath) {
+		// If relative path, make it absolute from migrations base
+		basePath := "/home/tojkuv/Documents/GitHub/international-center-workspace/international-center/src/public-website/migrations"
+		absolutePath = filepath.Join(basePath, "sql", c.MigrationPath)
+	}
+	return fmt.Sprintf("file://%s", absolutePath)
 }
 
 // GetAllConfigs returns a slice of all migration configurations for iteration

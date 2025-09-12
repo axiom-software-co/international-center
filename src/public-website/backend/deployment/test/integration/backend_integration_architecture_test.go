@@ -19,8 +19,8 @@ func TestBackendModuleOwnsServiceIntegrationTesting(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	t.Run("Backend services should be accessible for integration testing", func(t *testing.T) {
-		// Test that backend services are running and accessible for testing
+	t.Run("Backend services MUST be accessible and healthy for production readiness", func(t *testing.T) {
+		// RED PHASE: ALL services MUST be accessible and healthy - no exceptions
 		
 		serviceEndpoints := []struct {
 			name        string
@@ -34,9 +34,12 @@ func TestBackendModuleOwnsServiceIntegrationTesting(t *testing.T) {
 			{"admin-gateway", "http://localhost:9000/health", false},
 		}
 
+		accessibilityFailures := 0
+		healthFailures := 0
+
 		for _, service := range serviceEndpoints {
-			t.Run(service.name+" should be accessible for integration testing", func(t *testing.T) {
-				// Create HTTP client for integration testing
+			t.Run(service.name+" MUST be accessible and healthy", func(t *testing.T) {
+				// Create HTTP client for production readiness testing
 				client := &http.Client{Timeout: 5 * time.Second}
 				
 				req, err := http.NewRequestWithContext(ctx, "GET", service.url, nil)
@@ -45,19 +48,99 @@ func TestBackendModuleOwnsServiceIntegrationTesting(t *testing.T) {
 				// Attempt to connect to service
 				resp, err := client.Do(req)
 				if err != nil {
-					t.Errorf("Backend service %s not accessible for integration testing: %v", service.name, err)
+					t.Errorf("❌ FAIL: Service %s INACCESSIBLE - %v", service.name, err)
+					t.Log("🚨 CRITICAL: ALL services MUST be accessible for production readiness")
+					t.Log("    Connection refused indicates service startup failures")
+					accessibilityFailures++
 					return
 				}
 				defer resp.Body.Close()
 				
-				// Service should be healthy for integration testing
+				// RED PHASE: Service MUST be healthy (200 OK required)
 				if resp.StatusCode != http.StatusOK {
-					t.Errorf("Backend service %s not healthy for integration testing: status %d", service.name, resp.StatusCode)
+					t.Errorf("❌ FAIL: Service %s UNHEALTHY - status %d", service.name, resp.StatusCode)
+					t.Log("🚨 CRITICAL: ALL services MUST return healthy status for production readiness")
+					healthFailures++
 				} else {
-					t.Logf("✅ Backend service %s accessible for integration testing", service.name)
+					t.Logf("✅ Service %s accessible and healthy", service.name)
 				}
 			})
 		}
+		
+		// RED PHASE: FAIL if ANY service is inaccessible or unhealthy - NO EXCEPTIONS
+		if accessibilityFailures > 0 {
+			t.Errorf("❌ FAIL: %d services INACCESSIBLE - BLOCKS operational completion", accessibilityFailures)
+			t.Log("🚨 CRITICAL: ALL services MUST be accessible for operational readiness")
+			t.Log("    Infrastructure deployment completed successfully")
+			t.Log("    Service accessibility REQUIRED for development workflow functionality")
+			t.Log("    Connection refused indicates service configuration or startup issues")
+		}
+		
+		if healthFailures > 0 {
+			t.Errorf("❌ FAIL: %d services UNHEALTHY - BLOCKS operational completion", healthFailures)
+			t.Log("🚨 CRITICAL: ALL services MUST return healthy status for operational readiness")
+			t.Log("    Health endpoint functionality REQUIRED for service operational validation")
+		}
+		
+		// RED PHASE: TOTAL FAILURE acceptable only if ALL services operational
+		totalFailures := accessibilityFailures + healthFailures
+		if totalFailures > 0 {
+			t.Errorf("❌ TOTAL OPERATIONAL FAILURE: %d service issues BLOCK development workflow", totalFailures)
+			t.Log("🚨 OPERATIONAL COMPLETION BLOCKED: Service operational readiness REQUIRED")
+		} else {
+			t.Log("✅ ALL services accessible and healthy for operational completion")
+		}
+	})
+
+	t.Run("Container health status MUST be healthy for production readiness", func(t *testing.T) {
+		// RED PHASE: ALL containers MUST show healthy status - no unhealthy containers acceptable
+		
+		t.Log("🚨 CRITICAL REQUIREMENTS for container health:")
+		t.Log("    1. ALL containers MUST show healthy status (not unhealthy)")
+		t.Log("    2. ALL services MUST start successfully without errors")
+		t.Log("    3. ALL health checks MUST pass consistently")
+		t.Log("    4. Container dependency ordering MUST be reliable")
+		t.Log("    5. Service startup MUST complete within health check timeouts")
+		
+		// Test container health status validation
+		t.Log("❌ FAIL: Container health status validation not implemented")
+		t.Log("    Need to validate all containers achieve healthy status after deployment")
+		t.Log("    Current deployment status: 7 healthy, 3 unhealthy containers")
+		t.Log("    Unhealthy containers: public-gateway, admin-gateway, notifications (exited)")
+		t.Log("    Container health achievement REQUIRED for operational completion")
+		t.Log("    Healthy status indicates successful service startup and configuration")
+		
+		// RED PHASE: MUST fail until ALL containers achieve healthy status
+		t.Fail()
+	})
+
+	t.Run("Service startup reliability MUST be ensured for production operations", func(t *testing.T) {
+		// RED PHASE: Service startup MUST be reliable and consistent
+		
+		t.Log("🚨 CRITICAL REQUIREMENTS for service startup reliability:")
+		t.Log("    1. Services MUST start without compilation errors")
+		t.Log("    2. Environment variables MUST be properly configured")
+		t.Log("    3. Service dependencies MUST be available during startup")
+		t.Log("    4. Dapr client initialization MUST succeed")
+		t.Log("    5. Health endpoints MUST be accessible immediately after startup")
+		
+		startupIssues := []string{
+			"Public gateway: Container exited (environment variable fixes may need deployment)",
+			"Admin gateway: Container exited (configuration issues with deployed code)",
+			"Notifications service: Container exited (startup configuration or dependency issues)",
+			"Content service: May be using old code without recent implementation fixes",
+			"Inquiries service: May be using old code without POST endpoint implementations",
+		}
+		
+		t.Log("❌ FAIL: Service startup reliability issues preventing production readiness:")
+		for _, issue := range startupIssues {
+			t.Logf("    %s", issue)
+		}
+		
+		t.Log("🚨 CRITICAL: Reliable service startup REQUIRED for production operations")
+		
+		// RED PHASE: MUST fail until startup reliability is achieved
+		t.Fail()
 	})
 
 	t.Run("Backend module should provide service integration test utilities", func(t *testing.T) {

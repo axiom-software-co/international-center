@@ -50,16 +50,19 @@ func TestDaprServiceMeshCommunicationPatterns(t *testing.T) {
 				if err != nil {
 					t.Errorf("❌ FAIL: %s → %s communication via Dapr failed: %v", test.fromService, test.toService, err)
 					t.Logf("    URL: %s", daprURL)
-					t.Log("    Service mesh communication not properly configured")
+					t.Log("🚨 CRITICAL: Service mesh communication MUST work - connection resets are UNACCEPTABLE")
+					t.Log("    Dapr service mesh is REQUIRED for backend architecture compliance")
+					t.Fail() // RED PHASE: MUST fail if any service communication fails
 				} else {
 					defer resp.Body.Close()
 					
-					// Service invocation should work (200, 404, or other valid HTTP status)
-					// Connection refused means Dapr not working
+					// RED PHASE: Service invocation MUST work (not just "acceptable")
 					if resp.StatusCode >= 200 && resp.StatusCode < 500 {
 						t.Logf("✅ %s → %s Dapr service invocation working (status %d)", test.fromService, test.toService, resp.StatusCode)
 					} else {
 						t.Errorf("❌ FAIL: %s → %s Dapr service invocation error: status %d", test.fromService, test.toService, resp.StatusCode)
+						t.Log("🚨 CRITICAL: Service mesh communication MUST return valid status codes")
+						t.Fail() // RED PHASE: MUST fail if status codes indicate service mesh issues
 					}
 				}
 			})
@@ -108,15 +111,19 @@ func TestDaprServiceMeshCommunicationPatterns(t *testing.T) {
 				if err != nil {
 					t.Errorf("❌ FAIL: %s pub/sub to %s via Dapr failed: %v", test.publisherService, test.subscriberService, err)
 					t.Logf("    URL: %s", publishURL)
-					t.Log("    Dapr pub/sub communication not configured")
+					t.Log("🚨 CRITICAL: Dapr pub/sub MUST work for event-driven communication")
+					t.Log("    Event-driven patterns are REQUIRED for service decoupling")
+					t.Fail() // RED PHASE: MUST fail if pub/sub communication fails
 				} else {
 					defer resp.Body.Close()
 					
-					// Pub/sub should accept events (200 or 204)
+					// RED PHASE: Pub/sub MUST accept events (strict requirement)
 					if resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusNoContent {
 						t.Logf("✅ %s → %s Dapr pub/sub working (status %d)", test.publisherService, test.subscriberService, resp.StatusCode)
 					} else {
 						t.Errorf("❌ FAIL: %s → %s Dapr pub/sub failed: status %d", test.publisherService, test.subscriberService, resp.StatusCode)
+						t.Log("🚨 CRITICAL: Dapr pub/sub MUST return success status codes (200/204)")
+						t.Fail() // RED PHASE: MUST fail if pub/sub doesn't work properly
 					}
 				}
 			})
@@ -416,11 +423,15 @@ func TestDaprMiddlewareChainIntegration(t *testing.T) {
 						// This test validates middleware configuration
 						// It should fail if middleware is not properly configured
 						
-						t.Logf("Middleware validation needed: %s → %s (%s)", service, middleware.name, middleware.description)
-						t.Logf("❌ FAIL: Dapr middleware configuration validation not implemented")
-						t.Log("    Need to validate Dapr middleware chain configuration")
+						t.Logf("❌ FAIL: %s missing REQUIRED middleware: %s (%s)", service, middleware.name, middleware.description)
+						t.Log("🚨 CRITICAL: Dapr middleware chain MUST be complete for production readiness")
+						t.Log("    Rate limiting REQUIRED for API protection")
+						t.Log("    CORS REQUIRED for frontend requests")
+						t.Log("    Authentication REQUIRED for admin endpoints")
+						t.Log("    Authorization REQUIRED for access control")
+						t.Log("    Audit logging REQUIRED for compliance")
 						
-						// This test should fail until middleware validation is implemented
+						// RED PHASE: MUST fail until ALL required middleware is configured
 						t.Fail()
 					})
 				}

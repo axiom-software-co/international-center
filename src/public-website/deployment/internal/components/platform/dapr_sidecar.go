@@ -178,6 +178,7 @@ func (d *UnifiedDaprSidecarManager) BuildDaprCommand(config *DaprSidecarConfig) 
 		fmt.Sprintf("--app-max-concurrency=%d", config.MaxConcurrency),
 		fmt.Sprintf("--placement-host-address=%s", config.PlacementHostAddress),
 		"--dapr-listen-addresses=0.0.0.0",
+		"--components-path=/tmp/dapr-components", // CRITICAL: Load state store and pub/sub components
 	}
 	
 	if config.EnableProfiling {

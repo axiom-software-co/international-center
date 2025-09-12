@@ -770,7 +770,15 @@ components:
       $ref: './components/parameters/pagination.yaml#/LimitParam'
     
     SearchParam:
-      $ref: './components/parameters/search.yaml#/SearchParam'
+      name: search
+      in: query
+      description: Search query string for full-text search
+      required: false
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 255
+      example: "cancer research"
     
     StatusParam:
       $ref: './components/parameters/filters.yaml#/StatusParam'

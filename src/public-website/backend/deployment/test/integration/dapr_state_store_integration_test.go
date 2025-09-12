@@ -103,15 +103,76 @@ func TestDaprStateStoreAbstractionCompliance(t *testing.T) {
 		}
 	})
 
-	t.Run("Services should NOT have direct PostgreSQL connections", func(t *testing.T) {
-		// Test that services respect Dapr abstractions and don't bypass state store
+	t.Run("Database migration execution MUST complete successfully without errors", func(t *testing.T) {
+		// RED PHASE: Database migrations MUST execute successfully during deployment
 		
-		t.Log("❌ FAIL: Direct database connection detection not implemented")
+		t.Log("🚨 CRITICAL REQUIREMENTS for database migration execution completion:")
+		t.Log("    1. Migration runner MUST not fail with path errors ('open .: no such file or directory')")
+		t.Log("    2. Database 'international_center_development' MUST be created successfully")
+		t.Log("    3. All domain migrations MUST execute without PostgreSQL connection failures")
+		t.Log("    4. Migration timing MUST work with container startup sequencing")
+		t.Log("    5. Database schema MUST be complete for all service domains")
+		
+		// Test specific migration execution issues identified from deployment
+		migrationExecutionIssues := []string{
+			"Migration path error: 'open .: no such file or directory' (migration runner path issue)",
+			"Database 'international_center_development' does not exist during migration execution",
+			"PostgreSQL socket connection failures during migration attempts",
+			"Migration timing executing before PostgreSQL container ready",
+			"Working directory issues in migration runner causing path failures",
+		}
+		
+		t.Log("❌ FAIL: Migration execution issues preventing database operational completion:")
+		for _, issue := range migrationExecutionIssues {
+			t.Logf("    %s", issue)
+		}
+		
+		t.Log("🚨 CRITICAL: Successful migration execution REQUIRED for database functionality")
+		t.Log("    Current error: 'open .: no such file or directory' indicates migration runner path issue")
+		t.Log("    Database operations CANNOT function without successful migration completion")
+		
+		// RED PHASE: MUST fail until migration execution succeeds
+		t.Fail()
+	})
+
+	t.Run("Database MUST be accessible and operational for Dapr state store functionality", func(t *testing.T) {
+		// RED PHASE: Database MUST be fully accessible after successful migration execution
+		
+		t.Log("🚨 CRITICAL REQUIREMENTS for database operational accessibility:")
+		t.Log("    1. PostgreSQL database MUST be accessible via localhost:5432")
+		t.Log("    2. Database connection MUST work for Dapr state store component")
+		t.Log("    3. Database schema MUST be present and complete")
+		t.Log("    4. All domain tables MUST exist for service operations")
+		t.Log("    5. Dapr state store MUST connect successfully to operational database")
+		
+		// Test specific database accessibility requirements
+		t.Log("❌ FAIL: Database operational accessibility validation not implemented")
+		t.Log("    Need to validate database fully accessible after migration completion")
+		t.Log("    Database MUST be operational for Dapr state store to function")
+		t.Log("    Current state: Migration failures prevent database operational readiness")
+		
+		// RED PHASE: MUST fail until database is fully accessible and operational
+		t.Fail()
+	})
+
+	t.Run("Services should NOT have direct PostgreSQL connections", func(t *testing.T) {
+		// RED PHASE: Dapr abstraction compliance MUST be enforced
+		
+		t.Log("🚨 CRITICAL REQUIREMENTS for Dapr abstraction compliance:")
+		t.Log("    1. Services MUST use Dapr state store (not direct PostgreSQL)")
+		t.Log("    2. Database access MUST go through Dapr state store component")
+		t.Log("    3. No direct database connection strings in service implementations")
+		t.Log("    4. All persistence operations MUST use Dapr state store API")
+		t.Log("    5. Dapr state store MUST be operational with working database")
+		
+		t.Log("❌ FAIL: Dapr abstraction compliance requires operational database")
 		t.Log("    Need to validate services don't use direct PostgreSQL connections")
 		t.Log("    Services should only access database through Dapr state store")
 		t.Log("    Direct database connections violate Dapr abstraction axiom")
+		t.Log("    Current state: Cannot validate due to migration execution failures")
+		t.Log("    BLOCKED BY: Migration path error preventing database operational completion")
 		
-		// This test should fail until we can detect direct database connections
+		// RED PHASE: MUST fail until database operational and Dapr abstraction compliance validated
 		t.Fail()
 	})
 }

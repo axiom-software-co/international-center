@@ -703,7 +703,35 @@ func (r *RuntimeOrchestrator) isDatabaseReady() bool {
 		return false
 	}
 	defer conn.Close()
+	
+	// Test actual PostgreSQL readiness by creating database if it doesn't exist
+	if err := r.ensureDatabaseExists(); err != nil {
+		log.Printf("Database creation check failed: %v", err)
+		return false
+	}
+	
 	return true
+}
+
+// ensureDatabaseExists ensures the development database exists
+func (r *RuntimeOrchestrator) ensureDatabaseExists() error {
+	// Connect to default postgres database to create development database
+	defaultConnection := "postgresql://postgres:password@localhost:5432/postgres?sslmode=disable"
+	createDBSQL := "CREATE DATABASE international_center_development;"
+	
+	// Try to create database (ignore error if exists)
+	cmd := exec.Command("psql", defaultConnection, "-c", createDBSQL)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		// Check if error is because database already exists
+		if strings.Contains(string(output), "already exists") {
+			return nil // Database exists, this is fine
+		}
+		return fmt.Errorf("failed to ensure database exists: %w, output: %s", err, string(output))
+	}
+	
+	log.Printf("Database 'international_center_development' created successfully")
+	return nil
 }
 
 // executeDomainMigrations executes migrations for a specific domain

@@ -16,39 +16,79 @@ func TestSharedTestingInfrastructure(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	t.Run("Shared environment validator should replace all duplicated validateEnvironmentPrerequisites functions", func(t *testing.T) {
-		// Test that shared environment validator works for all modules
+	t.Run("Environment configuration MUST be complete for production readiness", func(t *testing.T) {
+		// RED PHASE: ALL environment variables and dependencies MUST be properly configured
 		
 		validator := backendtesting.NewSharedEnvironmentValidator()
 		require.NotNil(t, validator, "Shared environment validator should be created")
 		
-		// Test basic environment validation
-		basicServices := []string{"dapr-control-plane", "content", "inquiries", "notifications", "public-gateway", "admin-gateway"}
+		// Test STRICT environment validation for production readiness
+		productionServices := []string{"dapr-control-plane", "content", "inquiries", "notifications", "public-gateway", "admin-gateway"}
 		
-		err := validator.ValidateEnvironmentPrerequisites(ctx, basicServices)
+		err := validator.ValidateEnvironmentPrerequisites(ctx, productionServices)
 		if err != nil {
-			t.Logf("⚠️  Environment validation issues (expected): %v", err)
-			t.Log("    Some services may not be fully operational")
+			t.Errorf("❌ FAIL: Environment validation FAILED - %v", err)
+			t.Log("🚨 CRITICAL: Complete environment configuration REQUIRED for production readiness")
+			t.Log("    ALL services MUST be accessible and operational")
+			t.Log("    Environment validation MUST pass for reliable development workflow")
 		} else {
-			t.Log("✅ All basic services healthy for integration testing")
+			t.Log("✅ All services healthy for production operations")
 		}
 		
-		// Test that validator can handle different service combinations
+		// Test critical service combinations with STRICT requirements
 		backendServices := []string{"content", "inquiries", "notifications"}
 		gatewayServices := []string{"public-gateway", "admin-gateway"}
 		
 		backendErr := validator.ValidateEnvironmentPrerequisites(ctx, backendServices)
 		gatewayErr := validator.ValidateEnvironmentPrerequisites(ctx, gatewayServices)
 		
-		if backendErr == nil {
-			t.Log("✅ Backend services healthy")
-		}
-		if gatewayErr == nil {
-			t.Log("✅ Gateway services healthy")
+		if backendErr != nil {
+			t.Errorf("❌ FAIL: Backend services environment INVALID - %v", backendErr)
+			t.Log("🚨 CRITICAL: Backend services MUST be operational")
 		}
 		
-		// REFACTOR success: One shared function replaces 16+ duplicated functions
+		if gatewayErr != nil {
+			t.Errorf("❌ FAIL: Gateway services environment INVALID - %v", gatewayErr)
+			t.Log("🚨 CRITICAL: Gateway services MUST be operational")
+		}
+		
+		// RED PHASE: Environment validation framework working but environment incomplete
 		t.Log("✅ Shared environment validator eliminates validateEnvironmentPrerequisites() duplication")
+		
+		if err != nil || backendErr != nil || gatewayErr != nil {
+			t.Log("❌ FAIL: Environment configuration INCOMPLETE - BLOCKS production readiness")
+			t.Fail()
+		}
+	})
+	
+	t.Run("Environment variables MUST be complete for service startup", func(t *testing.T) {
+		// RED PHASE: ALL required environment variables MUST be configured
+		
+		t.Log("🚨 CRITICAL REQUIREMENTS for environment variable completeness:")
+		t.Log("    1. PUBLIC_ALLOWED_ORIGINS MUST be configured for public gateway")
+		t.Log("    2. DATABASE_URL MUST be accessible for all services")
+		t.Log("    3. DAPR connection parameters MUST be configured")
+		t.Log("    4. Service-specific environment variables MUST be present")
+		t.Log("    5. Container networking MUST be properly configured")
+		
+		// Test specific environment variable requirements
+		envVarIssues := []string{
+			"PUBLIC_ALLOWED_ORIGINS missing from public gateway (service startup failure)",
+			"Database connectivity configuration may be incorrect",
+			"Dapr client connection parameters may need adjustment",
+			"Container networking configuration may have issues",
+			"Service startup sequencing may need environment dependency management",
+		}
+		
+		t.Log("❌ FAIL: Environment variable configuration issues preventing production readiness:")
+		for _, issue := range envVarIssues {
+			t.Logf("    %s", issue)
+		}
+		
+		t.Log("🚨 CRITICAL: Complete environment configuration REQUIRED for service startup")
+		
+		// RED PHASE: MUST fail until environment variables are complete
+		t.Fail()
 	})
 
 	t.Run("Shared HTTP test client should replace duplicated HTTP client creation patterns", func(t *testing.T) {

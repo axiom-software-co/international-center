@@ -132,16 +132,26 @@ func TestOpenAPIContractCompliance(t *testing.T) {
 	})
 
 	t.Run("Backend services should comply with admin API OpenAPI specification", func(t *testing.T) {
-		// Load admin API specification
+		// RED PHASE: Admin API specification MUST load without errors
 		loader := &openapi3.Loader{Context: ctx, IsExternalRefsAllowed: true}
 		adminSpec, err := loader.LoadFromFile(adminSpecPath)
 		if err != nil {
-			t.Fatalf("❌ FAIL: Cannot load admin API specification: %v", err)
+			t.Errorf("❌ FAIL: Admin API specification loading failed: %v", err)
+			t.Log("🚨 CRITICAL: OpenAPI specifications MUST parse without errors")
+			t.Log("    YAML corruption prevents contract-first development")
+			t.Log("    Parameter references and component definitions MUST be valid")
+			t.Log("    Contract generation REQUIRES error-free specifications")
+			t.Fail() // RED PHASE: MUST fail if admin spec can't load
+			return
 		}
 
-		// Validate specification is valid
+		// RED PHASE: Specification MUST be structurally valid
 		if err := adminSpec.Validate(ctx); err != nil {
-			t.Fatalf("❌ FAIL: Admin API specification is invalid: %v", err)
+			t.Errorf("❌ FAIL: Admin API specification validation failed: %v", err)
+			t.Log("🚨 CRITICAL: OpenAPI specification MUST be structurally valid")
+			t.Log("    Schema validation REQUIRED for contract compliance")
+			t.Fail() // RED PHASE: MUST fail if spec is invalid
+			return
 		}
 
 		// Test admin API endpoints against specification  
@@ -162,7 +172,7 @@ func TestOpenAPIContractCompliance(t *testing.T) {
 
 		for _, endpoint := range adminEndpoints {
 			t.Run(fmt.Sprintf("%s %s should comply with admin OpenAPI specification", endpoint.method, endpoint.path), func(t *testing.T) {
-				// Check if endpoint exists in admin specification
+				// RED PHASE: ALL admin endpoints MUST be defined in OpenAPI specification
 				pathPattern := endpoint.path
 				
 				// Convert {id} patterns to OpenAPI format if needed
@@ -174,6 +184,10 @@ func TestOpenAPIContractCompliance(t *testing.T) {
 				if pathItem == nil {
 					t.Errorf("❌ FAIL: Admin endpoint %s not found in OpenAPI specification", pathPattern)
 					t.Logf("Available paths in admin spec: %v", getAvailablePaths(adminSpec))
+					t.Log("🚨 CRITICAL: ALL admin endpoints MUST be defined in OpenAPI specification")
+					t.Log("    Contract-first development REQUIRES complete endpoint coverage")
+					t.Log("    Backend implementations without contracts violate architecture")
+					t.Fail() // RED PHASE: MUST fail if endpoints missing from spec
 					return
 				}
 
@@ -455,14 +469,33 @@ func TestContractResponseValidation(t *testing.T) {
 		}
 	})
 
-	t.Run("Contract evolution should not break existing endpoints", func(t *testing.T) {
-		// Test that contract changes don't break existing functionality
+	t.Run("OpenAPI specifications MUST have complete endpoint coverage without corruption", func(t *testing.T) {
+		// RED PHASE: OpenAPI specifications MUST be complete and error-free
 		
-		t.Log("❌ FAIL: Contract evolution validation not implemented")
-		t.Log("    Need to validate contract changes don't break existing client integrations")
-		t.Log("    Backward compatibility testing required for contract-first development")
+		t.Log("🚨 CRITICAL REQUIREMENTS for OpenAPI specification integrity:")
+		t.Log("    1. Admin API specification MUST parse without YAML errors")
+		t.Log("    2. ALL backend endpoints MUST be defined in specifications")
+		t.Log("    3. Parameter references MUST be valid and resolvable")
+		t.Log("    4. Component definitions MUST be syntactically correct")
+		t.Log("    5. Response schemas MUST match backend implementations")
 		
-		// This test should fail until contract evolution validation is implemented
+		// Test specific specification integrity requirements
+		specIntegrityIssues := []string{
+			"Admin API YAML parsing errors (parameter reference corruption)",
+			"Missing featured endpoints in public API specification",
+			"Missing inquiry submission endpoints in specifications",
+			"Missing admin endpoints in admin API specification",
+			"Component parameter reference syntax errors",
+		}
+		
+		t.Log("❌ FAIL: OpenAPI specification integrity issues preventing contract-first development:")
+		for _, issue := range specIntegrityIssues {
+			t.Logf("    %s", issue)
+		}
+		
+		t.Log("🚨 CRITICAL: Complete specification integrity REQUIRED for development workflow")
+		
+		// RED PHASE: MUST fail until specification integrity is achieved
 		t.Fail()
 	})
 }

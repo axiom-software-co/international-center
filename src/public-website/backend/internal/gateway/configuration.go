@@ -126,7 +126,9 @@ type ObservabilityConfig struct {
 func NewPublicGatewayConfiguration() *GatewayConfiguration {
 	port := os.Getenv("PUBLIC_GATEWAY_PORT")
 	if port == "" {
-		log.Fatalf("PUBLIC_GATEWAY_PORT environment variable is required")
+		// Set development default if not configured
+		port = "8080"
+		log.Printf("Using default PUBLIC_GATEWAY_PORT for development: %s", port)
 	}
 	portInt, err := strconv.Atoi(port)
 	if err != nil {
@@ -135,12 +137,16 @@ func NewPublicGatewayConfiguration() *GatewayConfiguration {
 
 	environment := os.Getenv("ENVIRONMENT")
 	if environment == "" {
-		log.Fatalf("ENVIRONMENT environment variable is required")
+		// Set development default if not configured
+		environment = "development"
+		log.Printf("Using default ENVIRONMENT for development: %s", environment)
 	}
 
 	allowedOrigins := os.Getenv("PUBLIC_ALLOWED_ORIGINS")
 	if allowedOrigins == "" {
-		log.Fatalf("PUBLIC_ALLOWED_ORIGINS environment variable is required")
+		// Set development defaults if not configured
+		allowedOrigins = "http://localhost:3000,http://localhost:3002,http://localhost:5173"
+		log.Printf("Using default PUBLIC_ALLOWED_ORIGINS for development: %s", allowedOrigins)
 	}
 
 	return &GatewayConfiguration{
@@ -221,7 +227,9 @@ func NewPublicGatewayConfiguration() *GatewayConfiguration {
 func NewAdminGatewayConfiguration() *GatewayConfiguration {
 	port := os.Getenv("ADMIN_GATEWAY_PORT")
 	if port == "" {
-		log.Fatalf("ADMIN_GATEWAY_PORT environment variable is required")
+		// Set development default if not configured
+		port = "8080"
+		log.Printf("Using default ADMIN_GATEWAY_PORT for development: %s", port)
 	}
 	portInt, err := strconv.Atoi(port)
 	if err != nil {
@@ -230,12 +238,16 @@ func NewAdminGatewayConfiguration() *GatewayConfiguration {
 
 	environment := os.Getenv("ENVIRONMENT")
 	if environment == "" {
-		log.Fatalf("ENVIRONMENT environment variable is required")
+		// Set development default if not configured
+		environment = "development"
+		log.Printf("Using default ENVIRONMENT for development: %s", environment)
 	}
 
 	allowedOrigins := os.Getenv("ADMIN_ALLOWED_ORIGINS")
 	if allowedOrigins == "" {
-		log.Fatalf("ADMIN_ALLOWED_ORIGINS environment variable is required")
+		// Set development default if not configured
+		allowedOrigins = "http://localhost:3002,http://localhost:3001"
+		log.Printf("Using default ADMIN_ALLOWED_ORIGINS for development: %s", allowedOrigins)
 	}
 
 	return &GatewayConfiguration{
