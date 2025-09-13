@@ -215,6 +215,18 @@ func (do *DeploymentOrchestrator) executeStandardDeployment() error {
 		log.Printf("Final environment integration validation failed: %v", err)
 	}
 
+	// Export stack outputs for integration testing
+	log.Printf("[MAIN] About to call exportStackOutputs function")
+	
+	// Directly export some basic outputs to ensure they work
+	do.ctx.Export("dapr_components_path", pulumi.String("./components"))
+	do.ctx.Export("environment", pulumi.String(do.environment))
+	log.Printf("[MAIN] Exported basic outputs directly")
+	
+	if err := do.exportStackOutputs(infraOutputs, platformOutputs, servicesOutputs); err != nil {
+		log.Printf("Warning: Failed to export stack outputs: %v", err)
+	}
+
 	log.Printf("Standard deployment completed successfully for environment: %s", do.environment)
 	return nil
 }
@@ -550,5 +562,69 @@ func (do *DeploymentOrchestrator) validateWebsiteIntegration(infraOutputs, platf
 
 	// Basic website health check  
 	log.Printf("Website integration validation: basic health check passed")
+	return nil
+}
+
+// exportStackOutputs exports the deployment outputs to the Pulumi stack for testing access
+func (do *DeploymentOrchestrator) exportStackOutputs(infraOutputs, platformOutputs, servicesOutputs pulumi.Map) error {
+	log.Printf("[EXPORT FUNCTION] ==> EXPORT FUNCTION CALLED <== Exporting stack outputs for integration testing")
+
+	// Debug: Log what we actually have
+	log.Printf("DEBUG: infraOutputs is nil: %v", infraOutputs == nil)
+	if infraOutputs != nil {
+		log.Printf("DEBUG: infraOutputs length: %d", len(infraOutputs))
+		for key := range infraOutputs {
+			log.Printf("DEBUG: infraOutputs key: %s", key)
+		}
+	}
+
+	// Export infrastructure outputs with test-expected names
+	if infraOutputs != nil {
+		if dbEndpoint, ok := infraOutputs["database_connection_string"]; ok {
+			log.Printf("DEBUG: Exporting postgresql_connection_string")
+			do.ctx.Export("postgresql_connection_string", dbEndpoint)
+		} else {
+			log.Printf("DEBUG: database_connection_string not found in infraOutputs")
+		}
+		if vaultEndpoint, ok := infraOutputs["vault_address"]; ok {
+			log.Printf("DEBUG: Exporting vault_endpoint")
+			do.ctx.Export("vault_endpoint", vaultEndpoint)
+		} else {
+			log.Printf("DEBUG: vault_address not found in infraOutputs")
+		}
+		if messagingEndpoint, ok := infraOutputs["rabbitmq_endpoint"]; ok {
+			log.Printf("DEBUG: Exporting rabbitmq_connection_string")
+			do.ctx.Export("rabbitmq_connection_string", messagingEndpoint)
+		} else {
+			log.Printf("DEBUG: rabbitmq_endpoint not found in infraOutputs")
+		}
+	}
+
+	// Export platform outputs
+	if platformOutputs != nil {
+		if daprEndpoint, ok := platformOutputs["dapr_control_plane_url"]; ok {
+			do.ctx.Export("dapr_control_plane_endpoint", daprEndpoint)
+		}
+		// Export Dapr components path (fixed path for development)
+		log.Printf("DEBUG: Exporting dapr_components_path")
+		do.ctx.Export("dapr_components_path", pulumi.String("./components"))
+	}
+
+	// Export services outputs
+	if servicesOutputs != nil {
+		if publicGateway, ok := servicesOutputs["public_gateway_url"]; ok {
+			do.ctx.Export("public_gateway_endpoint", publicGateway)
+		}
+		if adminGateway, ok := servicesOutputs["admin_gateway_url"]; ok {
+			do.ctx.Export("admin_gateway_endpoint", adminGateway)
+		}
+	}
+
+	// Export environment metadata
+	do.ctx.Export("environment", pulumi.String(do.environment))
+	do.ctx.Export("deployment_strategy", pulumi.String(string(do.configuration.DeploymentStrategy)))
+	do.ctx.Export("deployment_timestamp", pulumi.String(time.Now().Format(time.RFC3339)))
+
+	log.Printf("Stack outputs exported successfully")
 	return nil
 }

@@ -43,10 +43,10 @@ func NewDaprComponent(ctx *pulumi.Context, name string, args *DaprArgs, opts ...
 
 	switch args.Environment {
 	case "development":
-		controlPlaneURL = pulumi.String("http://localhost:3500").ToStringOutput()
+		controlPlaneURL = pulumi.String("http://localhost:3502").ToStringOutput()
 		placementService = pulumi.String("localhost:50005").ToStringOutput()
 		sidecarEnabled = pulumi.Bool(true).ToBoolOutput()
-		healthEndpoint = pulumi.String("http://localhost:3500/v1.0/healthz").ToStringOutput()
+		healthEndpoint = pulumi.String("http://localhost:3502/v1.0/healthz").ToStringOutput()
 	case "staging":
 		controlPlaneURL = pulumi.String("https://dapr-control-plane-staging.azurecontainerapp.io").ToStringOutput()
 		placementService = pulumi.String("dapr-control-plane-staging.azurecontainerapp.io:50005").ToStringOutput()

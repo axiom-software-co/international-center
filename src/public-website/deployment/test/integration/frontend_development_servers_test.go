@@ -97,7 +97,7 @@ func TestFrontendDevelopmentServers_FullStackEnvironmentValidation(t *testing.T)
 	}{
 		{
 			component:     "backend-service-mesh",
-			endpoint:      "http://localhost:3500/v1.0/healthz",
+			endpoint:      "http://localhost:3502/v1.0/healthz",
 			componentType: "backend",
 			description:   "Backend service mesh must be operational",
 			operational:   true, // Should be working

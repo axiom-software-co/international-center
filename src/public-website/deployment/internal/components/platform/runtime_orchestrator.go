@@ -122,6 +122,7 @@ func (r *RuntimeOrchestrator) buildExecutionPlan(args *RuntimeExecutionArgs) (*C
 	}
 	plan.ExecutionOrder = executionOrder
 
+
 	return plan, nil
 }
 
@@ -151,9 +152,10 @@ func (r *RuntimeOrchestrator) executePodmanContainers(ctx context.Context, plan 
 	// Execute containers in dependency order (infrastructure, platform, and services)
 	for _, containerID := range plan.ExecutionOrder {
 		log.Printf("Deploying container: %s", containerID)
-		
+
+
 		// Deploy all container types (infrastructure, platform, and services)
-		
+
 		// Get container specification
 		spec, err := r.getContainerSpecification(containerID, args)
 		if err != nil {
@@ -172,7 +174,7 @@ func (r *RuntimeOrchestrator) executePodmanContainers(ctx context.Context, plan 
 				// Continue with main container deployment even if sidecar fails
 			} else {
 				// Update service environment to connect to its sidecar BEFORE deploying service
-				sidecarName := containerID + "-dapr"
+				sidecarName := containerID + "-sidecar"
 				spec.Environment["DAPR_HOST"] = sidecarName
 				spec.Environment["DAPR_HTTP_PORT"] = "3500"
 				spec.Environment["DAPR_GRPC_PORT"] = "50001"
@@ -318,10 +320,11 @@ func (r *RuntimeOrchestrator) getPlatformContainerList() []string {
 func (r *RuntimeOrchestrator) getServiceContainerList() []string {
 	return []string{
 		"public-gateway",
-		"admin-gateway", 
-		"content",
-		"inquiries",
-		"notifications",
+		"admin-gateway",
+		"content-api",
+		"inquiries-api",
+		"notification-api",
+		"services-api",
 	}
 }
 
@@ -340,26 +343,28 @@ func (r *RuntimeOrchestrator) buildDependencyGraph() map[string][]string {
 	case "development":
 		// Simplified Dapr setup for development
 		dependencies["dapr-control-plane"] = []string{"postgresql"}
-		
-		// Consolidated service containers depend on simplified control plane
+
+		// Service containers depend on simplified control plane
 		dependencies["public-gateway"] = []string{"dapr-control-plane", "postgresql", "vault"}
 		dependencies["admin-gateway"] = []string{"dapr-control-plane", "postgresql", "vault"}
-		dependencies["content"] = []string{"dapr-control-plane", "postgresql"}
-		dependencies["inquiries"] = []string{"dapr-control-plane", "postgresql"}
-		dependencies["notifications"] = []string{"dapr-control-plane", "rabbitmq", "postgresql"}
-		
+		dependencies["content-api"] = []string{"dapr-control-plane", "postgresql"}
+		dependencies["inquiries-api"] = []string{"dapr-control-plane", "postgresql"}
+		dependencies["notification-api"] = []string{"dapr-control-plane", "rabbitmq", "postgresql"}
+		dependencies["services-api"] = []string{"dapr-control-plane", "postgresql"}
+
 	default:
 		// Full Dapr control plane setup for staging/production
 		dependencies["dapr-placement"] = []string{"postgresql", "vault"}
 		dependencies["dapr-control-plane"] = []string{"dapr-placement"}
 		dependencies["dapr-sentry"] = []string{"dapr-placement"}
-		
-		// Consolidated service containers depend on full control plane
+
+		// Service containers depend on full control plane
 		dependencies["public-gateway"] = []string{"dapr-control-plane", "postgresql", "vault"}
 		dependencies["admin-gateway"] = []string{"dapr-control-plane", "postgresql", "vault"}
-		dependencies["content"] = []string{"dapr-control-plane", "postgresql"}
-		dependencies["inquiries"] = []string{"dapr-control-plane", "postgresql"}
-		dependencies["notifications"] = []string{"dapr-control-plane", "rabbitmq", "postgresql"}
+		dependencies["content-api"] = []string{"dapr-control-plane", "postgresql"}
+		dependencies["inquiries-api"] = []string{"dapr-control-plane", "postgresql"}
+		dependencies["notification-api"] = []string{"dapr-control-plane", "rabbitmq", "postgresql"}
+		dependencies["services-api"] = []string{"dapr-control-plane", "postgresql"}
 	}
 
 	return dependencies
@@ -479,7 +484,7 @@ func (r *RuntimeOrchestrator) buildPlatformContainerSpec(containerID string, arg
 		spec := NewContainerSpecBuilder(containerID, "daprio/dapr:latest", 3500).
 			WithCommand([]string{"/daprd", "--mode", "standalone", "--dapr-http-port", "3500", "--dapr-grpc-port", "50001", "--log-level", "info", "--app-id", "control-plane", "--components-path", "/dapr/components"}).
 			WithResourceLimits("0.5", "256m").
-			WithHealthEndpoint("http://localhost:3500/v1.0/healthz").
+			WithHealthEndpoint("http://localhost:3502/v1.0/healthz").
 			WithVolumeMount("/tmp/dapr-config", "/dapr/components", true)
 		return spec.Build()
 
@@ -529,39 +534,39 @@ func (r *RuntimeOrchestrator) buildServiceContainerSpec(containerID string, args
 			WithDapr("admin-gateway", 9000)
 		return spec.Build()
 
-	case "content":
-		spec := NewContainerSpecBuilder(containerID, "localhost/backend/content:fixed", 3001).
+	case "content-api":
+		spec := NewContainerSpecBuilder(containerID, "localhost/backend/content:latest", 3001).
 			WithEnvironment(map[string]string{
 				"SERVICE_TYPE":     "content",
-				"DAPR_APP_ID":     "content",
+				"DAPR_APP_ID":     "content-api",
 				"PORT":            "8080",
 				"ENVIRONMENT":     "development",
 				"DATABASE_URL":    "postgresql://postgres:password@postgresql:5432/international_center_development?sslmode=disable",
 			}).
 			WithResourceLimits("0.5", "512m").
 			WithHealthEndpoint("http://localhost:3001/health").
-			WithDapr("content", 3001)
+			WithDapr("content-api", 3001)
 		return spec.Build()
 
-	case "inquiries":
-		spec := NewContainerSpecBuilder(containerID, "localhost/backend/inquiries:fixed", 3101).
+	case "inquiries-api":
+		spec := NewContainerSpecBuilder(containerID, "localhost/backend/inquiries:latest", 3101).
 			WithEnvironment(map[string]string{
 				"SERVICE_TYPE":     "inquiries",
-				"DAPR_APP_ID":     "inquiries",
+				"DAPR_APP_ID":     "inquiries-api",
 				"PORT":            "8080",
 				"ENVIRONMENT":     "development",
 				"DATABASE_URL":    "postgresql://postgres:password@postgresql:5432/international_center_development?sslmode=disable",
 			}).
 			WithResourceLimits("0.5", "512m").
 			WithHealthEndpoint("http://localhost:3101/health").
-			WithDapr("inquiries", 3101)
+			WithDapr("inquiries-api", 3101)
 		return spec.Build()
 
-	case "notifications":
-		spec := NewContainerSpecBuilder(containerID, "localhost/backend/notifications:fixed", 3201).
+	case "notification-api":
+		spec := NewContainerSpecBuilder(containerID, "localhost/backend/notifications:latest", 3201).
 			WithEnvironment(map[string]string{
 				"SERVICE_TYPE":                   "notifications",
-				"DAPR_APP_ID":                   "notifications",
+				"DAPR_APP_ID":                   "notification-api",
 				"PORT":                          "8080",
 				"ENVIRONMENT":                   "development",
 				"DATABASE_CONNECTION_STRING":    "postgresql://postgres:password@postgresql:5432/international_center_development?sslmode=disable",
@@ -569,7 +574,21 @@ func (r *RuntimeOrchestrator) buildServiceContainerSpec(containerID string, args
 			}).
 			WithResourceLimits("0.5", "512m").
 			WithHealthEndpoint("http://localhost:3201/health").
-			WithDapr("notifications", 3201)
+			WithDapr("notification-api", 3201)
+		return spec.Build()
+
+	case "services-api":
+		spec := NewContainerSpecBuilder(containerID, "localhost/backend/content:latest", 3002).
+			WithEnvironment(map[string]string{
+				"SERVICE_TYPE":     "services",
+				"DAPR_APP_ID":     "services-api",
+				"PORT":            "8080",
+				"ENVIRONMENT":     "development",
+				"DATABASE_URL":    "postgresql://postgres:password@postgresql:5432/international_center_development?sslmode=disable",
+			}).
+			WithResourceLimits("0.5", "512m").
+			WithHealthEndpoint("http://localhost:3002/health").
+			WithDapr("services-api", 3002)
 		return spec.Build()
 
 	default:
@@ -611,56 +630,23 @@ func (r *RuntimeOrchestrator) isServiceContainer(containerID string) bool {
 
 // deployServiceSidecar deploys a properly configured Dapr sidecar for a service container
 func (r *RuntimeOrchestrator) deployServiceSidecar(ctx context.Context, serviceID string, serviceSpec *ContainerSpec) error {
-	sidecarName := serviceID + "-dapr"
-	
-	// Stop and remove existing sidecar if it exists
+	sidecarName := serviceID + "-sidecar"
+
+	// Stop and remove existing sidecar if it exists (both old and new naming conventions)
+	oldSidecarName := serviceID + "-dapr"
+	if err := r.PodmanProvider.StopContainer(ctx, oldSidecarName); err != nil {
+		log.Printf("Warning: Could not stop existing old sidecar %s: %v", oldSidecarName, err)
+	}
 	if err := r.PodmanProvider.StopContainer(ctx, sidecarName); err != nil {
 		log.Printf("Warning: Could not stop existing sidecar %s: %v", sidecarName, err)
 	}
 
-	// Calculate unique sidecar port based on service
-	baseSidecarPort := 50030
-	switch serviceID {
-	case "public-gateway":
-		baseSidecarPort = 50010
-	case "admin-gateway":
-		baseSidecarPort = 50020
-	case "content":
-		baseSidecarPort = 50030
-	case "inquiries":
-		baseSidecarPort = 50040
-	case "notifications":
-		baseSidecarPort = 50050
+	// Use the unified Dapr sidecar deployment method that includes proper project configuration volume mounting
+	if err := r.PodmanProvider.DeployDaprSidecar(ctx, serviceSpec); err != nil {
+		return fmt.Errorf("failed to deploy Dapr sidecar for %s: %w", serviceID, err)
 	}
 
-	// Create sidecar specification with proper networking configuration
-	sidecarSpec := NewContainerSpecBuilder(sidecarName, "daprio/dapr:latest", baseSidecarPort).
-		WithCommand([]string{
-			"/daprd",
-			"--mode", "standalone",
-			"--app-id", serviceSpec.DaprAppID,
-			"--app-port", "8080", // All services listen on 8080 internally
-			"--app-channel-address", serviceID, // Use service container name for network address
-			"--dapr-http-port", "3500",
-			"--dapr-grpc-port", "50001", 
-			"--log-level", "info",
-		}).
-		WithResourceLimits("0.3", "128m")
-
-	sidecar, err := sidecarSpec.Build()
-	if err != nil {
-		return fmt.Errorf("failed to build sidecar specification: %w", err)
-	}
-
-	// Deploy the sidecar container
-	if err := r.PodmanProvider.DeployContainer(ctx, sidecar); err != nil {
-		return fmt.Errorf("failed to deploy sidecar container: %w", err)
-	}
-
-	// Service should be deployed after sidecar for proper networking
-	// Sidecar environment variables will be set during service container deployment
-
-	log.Printf("Successfully deployed Dapr sidecar %s for service %s on port %d", sidecarName, serviceID, baseSidecarPort)
+	log.Printf("Successfully deployed Dapr sidecar %s with project configuration mounting", sidecarName)
 	return nil
 }
 
@@ -1033,14 +1019,12 @@ func (r *RuntimeOrchestrator) deployDaprComponents(ctx context.Context) error {
 		return fmt.Errorf("Dapr control plane not ready after %d attempts", maxRetries)
 	}
 
-	// Setup Dapr configuration directory
-	configDir := "/tmp/dapr-config"
-	if err := r.setupDaprConfigDirectory(ctx, configDir); err != nil {
-		return fmt.Errorf("failed to setup Dapr config directory: %w", err)
-	}
+	// Use project-managed Dapr configuration directory instead of temporary directory
+	configDir := "/home/tojkuv/Documents/GitHub/international-center-workspace/international-center/src/public-website/deployment/configs/dapr"
+	log.Printf("Using project-managed Dapr configuration directory: %s", configDir)
 
-	// Deploy Dapr component configurations
-	componentFiles := []string{"statestore.yaml", "pubsub.yaml", "secretstore.yaml", "blobstore.yaml", "config.yaml"}
+	// Deploy Dapr component configurations from project directory
+	componentFiles := []string{"statestore.yaml", "pubsub.yaml", "secretstore.yaml", "config.yaml"}
 	
 	for _, componentFile := range componentFiles {
 		componentName := strings.TrimSuffix(componentFile, ".yaml")
@@ -1069,14 +1053,14 @@ func (r *RuntimeOrchestrator) deployDaprComponents(ctx context.Context) error {
 func (r *RuntimeOrchestrator) isDaprControlPlaneReady() bool {
 	// Test Dapr HTTP endpoint connectivity
 	timeout := time.Second * 2
-	conn, err := net.DialTimeout("tcp", "localhost:3500", timeout)
+	conn, err := net.DialTimeout("tcp", "localhost:3502", timeout)
 	if err != nil {
 		return false
 	}
 	defer conn.Close()
 	
 	// Test Dapr healthz endpoint
-	cmd := exec.Command("curl", "-f", "http://localhost:3500/v1.0/healthz")
+	cmd := exec.Command("curl", "-f", "http://localhost:3502/v1.0/healthz")
 	if err := cmd.Run(); err != nil {
 		return false
 	}
@@ -1131,7 +1115,7 @@ func (r *RuntimeOrchestrator) deployDaprComponent(ctx context.Context, configDir
 // validateDaprComponentsRegistered validates that all Dapr components are registered and accessible
 func (r *RuntimeOrchestrator) validateDaprComponentsRegistered(ctx context.Context) error {
 	// Validate components are registered via Dapr metadata API
-	cmd := exec.CommandContext(ctx, "curl", "-s", "http://localhost:3500/v1.0/metadata")
+	cmd := exec.CommandContext(ctx, "curl", "-s", "http://localhost:3502/v1.0/metadata")
 	output, err := cmd.Output()
 	if err != nil {
 		return fmt.Errorf("failed to query Dapr metadata: %w", err)
@@ -1154,8 +1138,8 @@ func (r *RuntimeOrchestrator) validateDaprComponentsRegistered(ctx context.Conte
 		name string
 		url  string
 	}{
-		{"statestore", "http://localhost:3500/v1.0/state/statestore"},
-		{"pubsub", "http://localhost:3500/v1.0/subscribe"},
+		{"statestore", "http://localhost:3502/v1.0/state/statestore"},
+		{"pubsub", "http://localhost:3502/v1.0/subscribe"},
 	}
 	
 	for _, test := range componentTests {

@@ -45,6 +45,10 @@ func TestEnvironmentHealth_CompleteDeploymentValidation(t *testing.T) {
 	t.Run("WebsitePhaseHealth", func(t *testing.T) {
 		validateWebsitePhaseHealth(t, ctx)
 	})
+
+	t.Run("ConfigurationDeploymentValidation", func(t *testing.T) {
+		validateConfigurationDeployment(t, ctx)
+	})
 }
 
 // validateInfrastructurePhaseHealth validates infrastructure components through Dapr component APIs
@@ -86,10 +90,10 @@ func validateInfrastructurePhaseHealth(t *testing.T, ctx context.Context) {
 		endpoint      string
 		description   string
 	}{
-		{"statestore", "state.postgresql", "http://localhost:3500/v1.0/state/statestore", "PostgreSQL state store via Dapr"},
-		{"pubsub", "pubsub.rabbitmq", "http://localhost:3500/v1.0/subscribe", "RabbitMQ pub/sub via Dapr"},
-		{"secretstore", "secretstores.hashicorp.vault", "http://localhost:3500/v1.0/secrets/secretstore", "Vault secrets via Dapr"},
-		{"blobstore", "bindings.azure.blobstorage", "http://localhost:3500/v1.0/bindings/blobstore", "Blob storage via Dapr"},
+		{"statestore", "state.postgresql", "http://localhost:3502/v1.0/state/statestore", "PostgreSQL state store via content-api sidecar"},
+		{"pubsub", "pubsub.rabbitmq", "http://localhost:3508/v1.0/subscribe", "RabbitMQ pub/sub via notification-api sidecar"},
+		{"secretstore", "secretstores.hashicorp.vault", "http://localhost:3502/v1.0/secrets/secretstore", "Vault secrets via content-api sidecar"},
+		{"blobstore", "bindings.azure.blobstorage", "http://localhost:3502/v1.0/bindings/blobstore", "Blob storage via content-api sidecar"},
 	}
 
 	client := &http.Client{Timeout: 5 * time.Second}
@@ -112,7 +116,7 @@ func validateInfrastructurePhaseHealth(t *testing.T, ctx context.Context) {
 
 			// RED PHASE: Additional validation that will fail until properly implemented
 			// Validate component metadata is accessible
-			metadataReq, _ := http.NewRequestWithContext(ctx, "GET", "http://localhost:3500/v1.0/metadata", nil)
+			metadataReq, _ := http.NewRequestWithContext(ctx, "GET", "http://localhost:3502/v1.0/metadata", nil)
 			metadataResp, err := client.Do(metadataReq)
 			require.NoError(t, err, "Dapr metadata API must be accessible")
 			defer metadataResp.Body.Close()
@@ -131,10 +135,10 @@ func validatePlatformPhaseHealth(t *testing.T, ctx context.Context) {
 		method   string
 		description string
 	}{
-		{"control-plane-health", "http://localhost:3500/v1.0/healthz", "GET", "Dapr control plane health via service mesh API"},
-		{"service-discovery", "http://localhost:3500/v1.0/metadata", "GET", "Service discovery through Dapr metadata API"},
-		{"component-registry", "http://localhost:3500/v1.0/metadata", "GET", "Component registry validation via Dapr API"},
-		{"centralized-control-plane", "http://localhost:3500/v1.0/healthz", "GET", "Centralized control plane connectivity validation"},
+		{"sidecar-health", "http://localhost:3502/v1.0/healthz", "GET", "Dapr sidecar health via content-api sidecar"},
+		{"service-discovery", "http://localhost:3502/v1.0/metadata", "GET", "Service discovery through content-api sidecar metadata API"},
+		{"component-registry", "http://localhost:3502/v1.0/metadata", "GET", "Component registry validation via content-api sidecar"},
+		{"distributed-sidecar-connectivity", "http://localhost:3503/v1.0/healthz", "GET", "Distributed sidecar connectivity via gateway sidecar"},
 	}
 
 	client := &http.Client{Timeout: 5 * time.Second}
@@ -177,12 +181,12 @@ func validateServicesPhaseHealth(t *testing.T, ctx context.Context) {
 		endpoint  string
 		description string
 	}{
-		{"public-gateway", "health", "http://localhost:3500/v1.0/invoke/public-gateway/method/health", "Public gateway via Dapr service invocation"},
-		{"admin-gateway", "health", "http://localhost:3500/v1.0/invoke/admin-gateway/method/health", "Admin gateway via Dapr service invocation"},
-		{"content-api", "health", "http://localhost:3500/v1.0/invoke/content-api/method/health", "Content service via Dapr service invocation"},
-		{"inquiries-api", "health", "http://localhost:3500/v1.0/invoke/inquiries-api/method/health", "Inquiries service via Dapr service invocation"},
-		{"services-api", "health", "http://localhost:3500/v1.0/invoke/services-api/method/health", "Services service via Dapr service invocation"},
-		{"notification-api", "health", "http://localhost:3500/v1.0/invoke/notification-api/method/health", "Notifications service via Dapr service invocation"},
+		{"public-gateway", "health", "http://localhost:3502/v1.0/invoke/public-gateway/method/health", "Public gateway via content-api sidecar invocation"},
+		{"admin-gateway", "health", "http://localhost:3502/v1.0/invoke/admin-gateway/method/health", "Admin gateway via content-api sidecar invocation"},
+		{"content-api", "health", "http://localhost:3502/v1.0/invoke/content-api/method/health", "Content service via content-api sidecar invocation"},
+		{"inquiries-api", "health", "http://localhost:3502/v1.0/invoke/inquiries-api/method/health", "Inquiries service via content-api sidecar invocation"},
+		{"services-api", "health", "http://localhost:3502/v1.0/invoke/services-api/method/health", "Services service via content-api sidecar invocation"},
+		{"notification-api", "health", "http://localhost:3502/v1.0/invoke/notification-api/method/health", "Notifications service via content-api sidecar invocation"},
 	}
 
 	client := &http.Client{Timeout: 5 * time.Second}
@@ -205,7 +209,7 @@ func validateServicesPhaseHealth(t *testing.T, ctx context.Context) {
 
 			// RED PHASE: Additional service mesh validation that will fail until properly implemented
 			// Validate service registration in Dapr metadata
-			metadataReq, _ := http.NewRequestWithContext(ctx, "GET", "http://localhost:3500/v1.0/metadata", nil)
+			metadataReq, _ := http.NewRequestWithContext(ctx, "GET", "http://localhost:3502/v1.0/metadata", nil)
 			metadataResp, err := client.Do(metadataReq)
 			require.NoError(t, err, "Dapr metadata API must be accessible for service registration validation")
 			defer metadataResp.Body.Close()
@@ -228,8 +232,8 @@ func validateWebsitePhaseHealth(t *testing.T, ctx context.Context) {
 		endpoint    string
 		description string
 	}{
-		{"public-website", "public-gateway", "http://localhost:3500/v1.0/invoke/public-gateway/method/health", "Public website via public gateway service mesh"},
-		{"admin-portal", "admin-gateway", "http://localhost:3500/v1.0/invoke/admin-gateway/method/health", "Admin portal via admin gateway service mesh"},
+		{"public-website", "public-gateway", "http://localhost:3502/v1.0/invoke/public-gateway/method/health", "Public website via public gateway service mesh"},
+		{"admin-portal", "admin-gateway", "http://localhost:3502/v1.0/invoke/admin-gateway/method/health", "Admin portal via admin gateway service mesh"},
 	}
 
 	client := &http.Client{Timeout: 10 * time.Second}
@@ -280,7 +284,7 @@ func TestEnvironmentHealth_CrossPhaseIntegration(t *testing.T) {
 				// This will fail until services properly integrate with Dapr state store
 				
 				stateKey := fmt.Sprintf("health-check-%s", serviceName)
-				stateStoreURL := fmt.Sprintf("http://localhost:3500/v1.0/state/statestore/%s", stateKey)
+				stateStoreURL := fmt.Sprintf("http://localhost:3502/v1.0/state/statestore/%s", stateKey)
 				
 				// Try to access state store through Dapr API
 				req, err := http.NewRequestWithContext(ctx, "GET", stateStoreURL, nil)
@@ -313,9 +317,9 @@ func TestEnvironmentHealth_CrossPhaseIntegration(t *testing.T) {
 			endpoint string
 			description string
 		}{
-			{"public-gateway", "content-api", "http://localhost:3500/v1.0/invoke/content-api/method/health", "Public gateway to content service communication"},
-			{"admin-gateway", "inquiries-api", "http://localhost:3500/v1.0/invoke/inquiries-api/method/health", "Admin gateway to inquiries service communication"},
-			{"content-api", "notifications-api", "http://localhost:3500/v1.0/invoke/notifications-api/method/health", "Content service to notifications service communication"},
+			{"public-gateway", "content-api", "http://localhost:3502/v1.0/invoke/content-api/method/health", "Public gateway to content service communication"},
+			{"admin-gateway", "inquiries-api", "http://localhost:3502/v1.0/invoke/inquiries-api/method/health", "Admin gateway to inquiries service communication"},
+			{"content-api", "notifications-api", "http://localhost:3502/v1.0/invoke/notifications-api/method/health", "Content service to notifications service communication"},
 		}
 		
 		for _, comm := range serviceCommunications {
@@ -348,9 +352,9 @@ func TestEnvironmentHealth_CrossPhaseIntegration(t *testing.T) {
 			testEndpoint  string
 			description   string
 		}{
-			{"content-api", "inquiries-api", "http://localhost:3500/v1.0/invoke/inquiries-api/method/health", "Content to Inquiries cross-service communication"},
-			{"inquiries-api", "notifications-api", "http://localhost:3500/v1.0/invoke/notifications-api/method/health", "Inquiries to Notifications cross-service communication"},
-			{"public-gateway", "notifications-api", "http://localhost:3500/v1.0/invoke/notifications-api/method/health", "Gateway to Notifications service mesh routing"},
+			{"content-api", "inquiries-api", "http://localhost:3502/v1.0/invoke/inquiries-api/method/health", "Content to Inquiries cross-service communication"},
+			{"inquiries-api", "notifications-api", "http://localhost:3502/v1.0/invoke/notifications-api/method/health", "Inquiries to Notifications cross-service communication"},
+			{"public-gateway", "notifications-api", "http://localhost:3502/v1.0/invoke/notifications-api/method/health", "Gateway to Notifications service mesh routing"},
 		}
 		
 		for _, path := range serviceToServicePaths {
@@ -400,7 +404,7 @@ func TestEnvironmentHealth_ServiceMeshComprehensive(t *testing.T) {
 		for _, service := range expectedServices {
 			t.Run("ServiceRegistration_"+service.appId, func(t *testing.T) {
 				// Validate service is discoverable through Dapr service invocation
-				healthEndpoint := fmt.Sprintf("http://localhost:3500/v1.0/invoke/%s/method/health", service.appId)
+				healthEndpoint := fmt.Sprintf("http://localhost:3502/v1.0/invoke/%s/method/health", service.appId)
 				req, err := http.NewRequestWithContext(ctx, "GET", healthEndpoint, nil)
 				require.NoError(t, err, "Failed to create service discovery request for %s", service.displayName)
 
@@ -423,9 +427,9 @@ func TestEnvironmentHealth_ServiceMeshComprehensive(t *testing.T) {
 			endpoint  string
 			maxLatency time.Duration
 		}{
-			{"content-api", "http://localhost:3500/v1.0/invoke/content-api/method/health", 2 * time.Second},
-			{"inquiries-api", "http://localhost:3500/v1.0/invoke/inquiries-api/method/health", 2 * time.Second},
-			{"notifications-api", "http://localhost:3500/v1.0/invoke/notifications-api/method/health", 2 * time.Second},
+			{"content-api", "http://localhost:3502/v1.0/invoke/content-api/method/health", 2 * time.Second},
+			{"inquiries-api", "http://localhost:3502/v1.0/invoke/inquiries-api/method/health", 2 * time.Second},
+			{"notifications-api", "http://localhost:3502/v1.0/invoke/notifications-api/method/health", 2 * time.Second},
 		}
 
 		for _, service := range serviceEndpoints {
@@ -453,7 +457,7 @@ func TestEnvironmentHealth_ServiceMeshComprehensive(t *testing.T) {
 		
 		// Test non-existent service handling
 		t.Run("NonExistentServiceHandling", func(t *testing.T) {
-			nonExistentEndpoint := "http://localhost:3500/v1.0/invoke/non-existent-service/method/health"
+			nonExistentEndpoint := "http://localhost:3502/v1.0/invoke/non-existent-service/method/health"
 			req, err := http.NewRequestWithContext(ctx, "GET", nonExistentEndpoint, nil)
 			require.NoError(t, err, "Failed to create non-existent service request")
 
@@ -468,7 +472,7 @@ func TestEnvironmentHealth_ServiceMeshComprehensive(t *testing.T) {
 		
 		// Test malformed requests handling  
 		t.Run("MalformedRequestHandling", func(t *testing.T) {
-			malformedEndpoint := "http://localhost:3500/v1.0/invoke//method/"
+			malformedEndpoint := "http://localhost:3502/v1.0/invoke//method/"
 			req, err := http.NewRequestWithContext(ctx, "GET", malformedEndpoint, nil)
 			require.NoError(t, err, "Failed to create malformed request")
 
@@ -500,7 +504,7 @@ func TestEnvironmentHealth_DeploymentStateConsistency(t *testing.T) {
 		}
 
 		// Validate services are registered and discoverable through Dapr
-		metadataReq, err := http.NewRequestWithContext(ctx, "GET", "http://localhost:3500/v1.0/metadata", nil)
+		metadataReq, err := http.NewRequestWithContext(ctx, "GET", "http://localhost:3502/v1.0/metadata", nil)
 		require.NoError(t, err, "Failed to create Dapr metadata request")
 
 		resp, err := client.Do(metadataReq)
@@ -529,7 +533,7 @@ func TestEnvironmentHealth_DeploymentStateConsistency(t *testing.T) {
 		for _, componentName := range expectedComponents {
 			t.Run("Component_"+componentName, func(t *testing.T) {
 				// RED PHASE: Validate component availability through Dapr metadata API
-				metadataReq, err := http.NewRequestWithContext(ctx, "GET", "http://localhost:3500/v1.0/metadata", nil)
+				metadataReq, err := http.NewRequestWithContext(ctx, "GET", "http://localhost:3502/v1.0/metadata", nil)
 				require.NoError(t, err, "Failed to create component metadata request")
 
 				resp, err := client.Do(metadataReq)
@@ -591,7 +595,7 @@ func TestEnvironmentHealth_DataLayerHealthChecks(t *testing.T) {
 		for _, dataset := range testDataSets {
 			t.Run("DataConsistency_"+dataset.dataType, func(t *testing.T) {
 				// RED PHASE: Create test data through Dapr state store
-				stateStoreURL := fmt.Sprintf("http://localhost:3500/v1.0/state/statestore")
+				stateStoreURL := fmt.Sprintf("http://localhost:3502/v1.0/state/statestore")
 				
 				// Create state entry
 				stateData := fmt.Sprintf(`[{"key":"%s","value":%s}]`, dataset.testKey, dataset.testPayload)
@@ -608,7 +612,7 @@ func TestEnvironmentHealth_DataLayerHealthChecks(t *testing.T) {
 							t.Run("ServiceConsistency_"+serviceName, func(t *testing.T) {
 								// RED PHASE: Verify data is accessible via service through Dapr service invocation
 								// This validates that services can consistently access the same data layer
-								serviceHealthURL := fmt.Sprintf("http://localhost:3500/v1.0/invoke/%s/method/health", serviceName)
+								serviceHealthURL := fmt.Sprintf("http://localhost:3502/v1.0/invoke/%s/method/health", serviceName)
 								serviceReq, serviceErr := http.NewRequestWithContext(ctx, "GET", serviceHealthURL, nil)
 								require.NoError(t, serviceErr, "Failed to create service consistency request")
 
@@ -645,13 +649,13 @@ func TestEnvironmentHealth_DataLayerHealthChecks(t *testing.T) {
 		}{
 			{
 				operation:    "state_store_read",
-				testEndpoint: "http://localhost:3500/v1.0/state/statestore/performance-test-key",
+				testEndpoint: "http://localhost:3502/v1.0/state/statestore/performance-test-key",
 				maxLatency:   500 * time.Millisecond,
 				description:  "State store read operations must complete within acceptable latency",
 			},
 			{
 				operation:    "metadata_access",
-				testEndpoint: "http://localhost:3500/v1.0/metadata",
+				testEndpoint: "http://localhost:3502/v1.0/metadata",
 				maxLatency:   200 * time.Millisecond,
 				description:  "Dapr metadata access must be fast for service discovery",
 			},
@@ -706,7 +710,7 @@ func TestEnvironmentHealth_DataLayerHealthChecks(t *testing.T) {
 		for _, durabilityTest := range durabilityTests {
 			t.Run("Durability_"+durabilityTest.testName, func(t *testing.T) {
 				// RED PHASE: Write data and verify persistence
-				stateStoreURL := fmt.Sprintf("http://localhost:3500/v1.0/state/statestore")
+				stateStoreURL := fmt.Sprintf("http://localhost:3502/v1.0/state/statestore")
 				stateData := fmt.Sprintf(`[{"key":"%s","value":%s}]`, durabilityTest.testKey, durabilityTest.testValue)
 				
 				// Write operation
@@ -719,7 +723,7 @@ func TestEnvironmentHealth_DataLayerHealthChecks(t *testing.T) {
 					defer writeResp.Body.Close()
 					if writeResp.StatusCode >= 200 && writeResp.StatusCode < 300 {
 						// Verify immediate read after write
-						readURL := fmt.Sprintf("http://localhost:3500/v1.0/state/statestore/%s", durabilityTest.testKey)
+						readURL := fmt.Sprintf("http://localhost:3502/v1.0/state/statestore/%s", durabilityTest.testKey)
 						readReq, readErr := http.NewRequestWithContext(ctx, "GET", readURL, nil)
 						require.NoError(t, readErr, "Failed to create durability read request")
 
@@ -782,7 +786,7 @@ func TestEnvironmentHealth_DataLayerHealthChecks(t *testing.T) {
 		for _, flowTest := range dataFlowTests {
 			t.Run("DataFlow_"+flowTest.flowName, func(t *testing.T) {
 				// RED PHASE: Test event publishing through Dapr pub/sub
-				pubsubURL := fmt.Sprintf("http://localhost:3500/v1.0/publish/pubsub/%s", flowTest.publishTopic)
+				pubsubURL := fmt.Sprintf("http://localhost:3508/v1.0/publish/pubsub/%s", flowTest.publishTopic)
 				
 				publishReq, err := http.NewRequestWithContext(ctx, "POST", pubsubURL, strings.NewReader(flowTest.eventPayload))
 				require.NoError(t, err, "Failed to create pub/sub publish request")
@@ -797,7 +801,7 @@ func TestEnvironmentHealth_DataLayerHealthChecks(t *testing.T) {
 						// Verify subscriber services are operational (they should be able to receive events)
 						for _, subscriberApp := range flowTest.subscriberApps {
 							t.Run("SubscriberHealth_"+subscriberApp, func(t *testing.T) {
-								subscriberHealthURL := fmt.Sprintf("http://localhost:3500/v1.0/invoke/%s/method/health", subscriberApp)
+								subscriberHealthURL := fmt.Sprintf("http://localhost:3502/v1.0/invoke/%s/method/health", subscriberApp)
 								subscriberReq, subscriberErr := http.NewRequestWithContext(ctx, "GET", subscriberHealthURL, nil)
 								require.NoError(t, subscriberErr, "Failed to create subscriber health request")
 
@@ -833,12 +837,12 @@ func TestEnvironmentHealth_DataLayerHealthChecks(t *testing.T) {
 		}{
 			{
 				monitoringAspect: "dapr_metrics",
-				testEndpoint:     "http://localhost:3500/v1.0/metadata",
+				testEndpoint:     "http://localhost:3502/v1.0/metadata",
 				description:      "Dapr metrics must be accessible for data layer monitoring",
 			},
 			{
 				monitoringAspect: "component_health",
-				testEndpoint:     "http://localhost:3500/v1.0/healthz",
+				testEndpoint:     "http://localhost:3502/v1.0/healthz",
 				description:      "Component health metrics must be available for data layer observability",
 			},
 		}
@@ -874,5 +878,428 @@ func TestEnvironmentHealth_DataLayerHealthChecks(t *testing.T) {
 			t.Log("RED PHASE: Data layer operations should generate structured logs with correlation IDs, user IDs, operation types, and performance metrics")
 			t.Log("RED PHASE: This validation will fail until structured logging is properly implemented across all data layer operations")
 		})
+	})
+}
+
+// RED PHASE: Environment Bootstrapping & Service Deployment Validation Tests
+// These tests validate that the complete development environment can be bootstrapped
+// and that all services are properly deployed through automated deployment process
+
+func TestEnvironmentBootstrapping_PulumiDeploymentStatus(t *testing.T) {
+	// RED PHASE: This test validates Pulumi deployment automation
+	sharedValidation.ValidateEnvironmentPrerequisites(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	t.Run("PulumiDeployment_AutomationValidation", func(t *testing.T) {
+		// RED PHASE: Validate Pulumi deployment is active and managing resources
+		
+		// Check if Pulumi stack exists and is deployed
+		stackCmd := exec.CommandContext(ctx, "pulumi", "stack", "select", "development")
+		stackCmd.Dir = "../../../" // Adjust to pulumi project directory
+		stackOutput, err := stackCmd.CombinedOutput()
+		
+		if err == nil {
+			// Stack exists, check deployment status
+			statusCmd := exec.CommandContext(ctx, "pulumi", "stack", "output", "--json")
+			statusCmd.Dir = "../../../"
+			statusOutput, statusErr := statusCmd.CombinedOutput()
+			
+			assert.NoError(t, statusErr, "Pulumi stack outputs must be accessible for deployment validation")
+			assert.NotEmpty(t, statusOutput, "Pulumi stack must have deployed outputs indicating active infrastructure")
+			
+			t.Logf("Pulumi stack status: %s", string(statusOutput))
+		} else {
+			t.Logf("RED PHASE: Pulumi stack not selected or not deployed - expected until environment is bootstrapped: %v", err)
+			t.Logf("Stack command output: %s", string(stackOutput))
+		}
+	})
+
+	t.Run("PulumiDeployment_InfrastructureProvisioning", func(t *testing.T) {
+		// RED PHASE: Validate that Pulumi has provisioned required infrastructure components
+		
+		requiredInfrastructureOutputs := []string{
+			"postgresql_connection_string",
+			"vault_endpoint",
+			"rabbitmq_connection_string",
+			"dapr_components_path",
+		}
+
+		for _, output := range requiredInfrastructureOutputs {
+			outputCmd := exec.CommandContext(ctx, "pulumi", "stack", "output", output)
+			outputCmd.Dir = "../../../"
+			outputValue, err := outputCmd.CombinedOutput()
+
+			if err == nil {
+				assert.NotEmpty(t, strings.TrimSpace(string(outputValue)), 
+					"Pulumi must provision and output %s for infrastructure deployment", output)
+			} else {
+				t.Logf("RED PHASE: Pulumi output %s not available - expected until infrastructure is deployed: %v", output, err)
+			}
+		}
+	})
+}
+
+func TestEnvironmentBootstrapping_InfrastructureComponentHealth(t *testing.T) {
+	// RED PHASE: This test validates infrastructure components are healthy and accessible
+	sharedValidation.ValidateEnvironmentPrerequisites(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	t.Run("InfrastructureHealth_DatabaseConnectivity", func(t *testing.T) {
+		// RED PHASE: Validate PostgreSQL database is running and accessible
+		
+		// Check if PostgreSQL container is running
+		psqlCmd := exec.CommandContext(ctx, "podman", "ps", "--filter", "name=postgresql", "--format", "{{.Names}}")
+		psqlOutput, err := psqlCmd.Output()
+		
+		if err == nil && strings.Contains(string(psqlOutput), "postgresql") {
+			// Database container is running - test connectivity
+			connStr := "postgresql://postgres:password@localhost:5432/international_center_development?sslmode=disable"
+			
+			// Use podman exec to test database connectivity from within container network
+			testCmd := exec.CommandContext(ctx, "podman", "exec", "postgresql", 
+				"psql", connStr, "-c", "SELECT 1")
+			testOutput, testErr := testCmd.CombinedOutput()
+			
+			if testErr == nil {
+				assert.Contains(t, string(testOutput), "1", 
+					"PostgreSQL must be responsive and accept connections for service data persistence")
+			} else {
+				t.Logf("RED PHASE: PostgreSQL connectivity test failed - expected until properly configured: %v", testErr)
+				t.Logf("Database test output: %s", string(testOutput))
+			}
+		} else {
+			t.Logf("RED PHASE: PostgreSQL container not running - expected until environment is deployed: %v", err)
+			t.Log("Database must be running for service data persistence")
+		}
+	})
+
+	t.Run("InfrastructureHealth_VaultAccessibility", func(t *testing.T) {
+		// RED PHASE: Validate HashiCorp Vault is running and accessible
+		
+		// Check if Vault container is running
+		vaultCmd := exec.CommandContext(ctx, "podman", "ps", "--filter", "name=vault", "--format", "{{.Names}}")
+		vaultOutput, err := vaultCmd.Output()
+		
+		if err == nil && strings.Contains(string(vaultOutput), "vault") {
+			// Vault container is running - test API accessibility
+			client := &http.Client{Timeout: 10 * time.Second}
+			
+			req, reqErr := http.NewRequestWithContext(ctx, "GET", "http://localhost:8200/v1/sys/health", nil)
+			if reqErr == nil {
+				resp, respErr := client.Do(req)
+				if respErr == nil {
+					defer resp.Body.Close()
+					assert.True(t, resp.StatusCode == 200 || resp.StatusCode == 429, 
+						"Vault must be accessible for secret management operations")
+				} else {
+					t.Logf("RED PHASE: Vault HTTP API not accessible - expected until properly configured: %v", respErr)
+				}
+			}
+		} else {
+			t.Logf("RED PHASE: Vault container not running - expected until environment is deployed: %v", err)
+			t.Log("Vault must be running for secure secret management")
+		}
+	})
+
+	t.Run("InfrastructureHealth_RabbitMQMessaging", func(t *testing.T) {
+		// RED PHASE: Validate RabbitMQ is running and accessible
+		
+		// Check if RabbitMQ container is running
+		rabbitmqCmd := exec.CommandContext(ctx, "podman", "ps", "--filter", "name=rabbitmq", "--format", "{{.Names}}")
+		rabbitmqOutput, err := rabbitmqCmd.Output()
+		
+		if err == nil && strings.Contains(string(rabbitmqOutput), "rabbitmq") {
+			// RabbitMQ container is running - test management API
+			client := &http.Client{Timeout: 10 * time.Second}
+			
+			req, reqErr := http.NewRequestWithContext(ctx, "GET", "http://localhost:15672/api/overview", nil)
+			if reqErr == nil {
+				req.SetBasicAuth("guest", "guest")
+				resp, respErr := client.Do(req)
+				if respErr == nil {
+					defer resp.Body.Close()
+					assert.True(t, resp.StatusCode >= 200 && resp.StatusCode < 300,
+						"RabbitMQ must be accessible for pub/sub messaging operations")
+				} else {
+					t.Logf("RED PHASE: RabbitMQ management API not accessible - expected until properly configured: %v", respErr)
+				}
+			}
+		} else {
+			t.Logf("RED PHASE: RabbitMQ container not running - expected until environment is deployed: %v", err)
+			t.Log("RabbitMQ must be running for event-driven communication")
+		}
+	})
+}
+
+func TestEnvironmentBootstrapping_DaprRuntimeInitialization(t *testing.T) {
+	// RED PHASE: This test validates Dapr runtime is properly initialized
+	sharedValidation.ValidateEnvironmentPrerequisites(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	t.Run("DaprRuntime_ControlPlaneHealth", func(t *testing.T) {
+		// RED PHASE: Validate Dapr control plane is running and healthy
+		
+		// Check if Dapr placement service is running
+		placementCmd := exec.CommandContext(ctx, "podman", "ps", "--filter", "name=dapr_placement", "--format", "{{.Names}}")
+		placementOutput, err := placementCmd.Output()
+		
+		if err == nil && strings.Contains(string(placementOutput), "dapr_placement") {
+			// Dapr placement is running - check health
+			client := &http.Client{Timeout: 10 * time.Second}
+			
+			req, reqErr := http.NewRequestWithContext(ctx, "GET", "http://localhost:50005/v1.0/healthz", nil)
+			if reqErr == nil {
+				resp, respErr := client.Do(req)
+				if respErr == nil {
+					defer resp.Body.Close()
+					assert.Equal(t, 200, resp.StatusCode, 
+						"Dapr placement service must be healthy for distributed applications")
+				} else {
+					t.Logf("RED PHASE: Dapr placement health endpoint not accessible: %v", respErr)
+				}
+			}
+		} else {
+			t.Logf("RED PHASE: Dapr placement service not running - expected until Dapr runtime is deployed: %v", err)
+		}
+	})
+
+	t.Run("DaprRuntime_ComponentRegistration", func(t *testing.T) {
+		// RED PHASE: Validate Dapr components are properly registered
+		
+		expectedComponents := []struct {
+			name        string
+			componentType string
+			description string
+		}{
+			{"statestore", "state", "PostgreSQL state store for service data persistence"},
+			{"secretstore", "secretstore", "Vault secret store for secure configuration"},
+			{"pubsub", "pubsub", "RabbitMQ pub/sub for event-driven communication"},
+		}
+
+		for _, component := range expectedComponents {
+			t.Run("Component_"+component.name, func(t *testing.T) {
+				// Check if any Dapr sidecar is running to test component registration
+				sidecarCmd := exec.CommandContext(ctx, "podman", "ps", "--filter", "name=daprd", "--format", "{{.Names}}")
+				sidecarOutput, err := sidecarCmd.Output()
+				
+				if err == nil && strings.Contains(string(sidecarOutput), "daprd") {
+					// Dapr sidecar is running - test component via metadata API
+					client := &http.Client{Timeout: 10 * time.Second}
+					
+					req, reqErr := http.NewRequestWithContext(ctx, "GET", "http://localhost:3502/v1.0/metadata", nil)
+					if reqErr == nil {
+						resp, respErr := client.Do(req)
+						if respErr == nil {
+							defer resp.Body.Close()
+							body, bodyErr := io.ReadAll(resp.Body)
+							if bodyErr == nil {
+								assert.Contains(t, string(body), component.name,
+									"%s must be registered in Dapr runtime", component.description)
+							}
+						} else {
+							t.Logf("RED PHASE: Dapr metadata API not accessible for component validation: %v", respErr)
+						}
+					}
+				} else {
+					t.Logf("RED PHASE: No Dapr sidecars running - expected until services are deployed: %v", err)
+				}
+			})
+		}
+	})
+}
+
+func TestEnvironmentBootstrapping_ServiceContainerDeployment(t *testing.T) {
+	// RED PHASE: This test validates service containers are properly deployed
+	sharedValidation.ValidateEnvironmentPrerequisites(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	t.Run("ServiceDeployment_BackendServicesRunning", func(t *testing.T) {
+		// RED PHASE: Validate backend service containers are deployed and running
+		
+		expectedServices := []struct {
+			serviceName   string
+			containerName string
+			description   string
+		}{
+			{"content", "content", "Content management service"},
+			{"inquiries", "inquiries", "Inquiry management service"},
+			{"notifications", "notifications", "Notification delivery service"},
+			{"public-gateway", "public-gateway", "Public API gateway"},
+			{"admin-gateway", "admin-gateway", "Admin API gateway"},
+		}
+
+		for _, service := range expectedServices {
+			t.Run("Service_"+service.serviceName, func(t *testing.T) {
+				// Check if service container is running
+				serviceCmd := exec.CommandContext(ctx, "podman", "ps", "--filter", "name="+service.containerName, "--format", "{{.Names}}")
+				serviceOutput, err := serviceCmd.Output()
+				
+				if err == nil && strings.Contains(string(serviceOutput), service.containerName) {
+					// Service container is running - validate it's healthy
+					t.Logf("Service %s is running", service.serviceName)
+					
+					// Additional health check could be added here
+					// For now, just validate the container is present
+					assert.True(t, true, "%s must be deployed and running", service.description)
+				} else {
+					t.Logf("RED PHASE: %s not running - expected until service deployment is automated: %v", service.description, err)
+					
+					// This should fail in RED PHASE until services are properly deployed
+					assert.Fail(t, fmt.Sprintf("%s must be deployed and running for environment validation", service.description))
+				}
+			})
+		}
+	})
+
+	t.Run("ServiceDeployment_DaprSidecarIntegration", func(t *testing.T) {
+		// RED PHASE: Validate services are integrated with Dapr sidecars
+		
+		// Check for Dapr sidecar containers
+		sidecarCmd := exec.CommandContext(ctx, "podman", "ps", "--filter", "name=daprd", "--format", "{{.Names}}")
+		sidecarOutput, err := sidecarCmd.Output()
+		
+		if err == nil {
+			sidecars := strings.Fields(string(sidecarOutput))
+			assert.Greater(t, len(sidecars), 0, 
+				"At least one Dapr sidecar must be running for service mesh integration")
+			
+			for _, sidecar := range sidecars {
+				if strings.Contains(sidecar, "daprd") {
+					t.Logf("Dapr sidecar found: %s", sidecar)
+				}
+			}
+		} else {
+			t.Logf("RED PHASE: No Dapr sidecars detected - expected until services are deployed with Dapr integration: %v", err)
+			
+			// This should fail in RED PHASE until Dapr sidecars are deployed
+			assert.Fail(t, "Services must be deployed with Dapr sidecar integration for service mesh functionality")
+		}
+	})
+
+	t.Run("ServiceDeployment_ServiceDiscoveryValidation", func(t *testing.T) {
+		// RED PHASE: Validate services can be discovered through Dapr
+		
+		// Test service discovery by attempting to call a service through Dapr
+		client := &http.Client{Timeout: 10 * time.Second}
+		
+		// Try to access a service through Dapr service invocation
+		req, err := http.NewRequestWithContext(ctx, "GET", "http://localhost:3502/v1.0/invoke/content/method/health", nil)
+		if err == nil {
+			resp, respErr := client.Do(req)
+			if respErr == nil {
+				defer resp.Body.Close()
+				assert.True(t, resp.StatusCode >= 200 && resp.StatusCode < 500, 
+					"Services must be discoverable through Dapr service invocation")
+				
+				t.Logf("Service discovery test - Status: %d", resp.StatusCode)
+			} else {
+				t.Logf("RED PHASE: Service discovery through Dapr not working - expected until services are deployed: %v", respErr)
+				
+				// This should fail in RED PHASE until service discovery is working
+				assert.Fail(t, "Service discovery through Dapr must be functional for microservices communication")
+			}
+		} else {
+			t.Logf("RED PHASE: Cannot create service discovery request - expected until Dapr is configured: %v", err)
+		}
+	})
+}
+
+// validateConfigurationDeployment validates proper project configuration deployment
+func validateConfigurationDeployment(t *testing.T, ctx context.Context) {
+	// RED PHASE: Detect improper temporary directory usage
+	t.Run("DetectTemporaryDirectoryAntiPattern", func(t *testing.T) {
+		configFailures := sharedValidation.DetectConfigurationDeploymentFailures(ctx)
+
+		// Test should initially fail when containers use /tmp directories
+		for _, failure := range configFailures {
+			if strings.Contains(failure, "/tmp") {
+				t.Logf("RED PHASE: Detected temporary directory anti-pattern: %s", failure)
+				assert.Fail(t, "Container configuration must not use temporary directories - found: %s", failure)
+			}
+		}
+	})
+
+	// RED PHASE: Validate project configuration directory mounting
+	t.Run("ValidateProjectConfigurationMounting", func(t *testing.T) {
+		sidecarContainers := []string{
+			"content-api-sidecar",
+			"inquiries-api-sidecar",
+			"notification-api-sidecar",
+			"services-api-sidecar",
+			"public-gateway-sidecar",
+			"admin-gateway-sidecar",
+		}
+
+		expectedMounts := []string{
+			"/home/tojkuv/Documents/GitHub/international-center-workspace/international-center/src/public-website/deployment/configs/dapr",
+		}
+
+		for _, sidecar := range sidecarContainers {
+			t.Run("ProjectMount_"+sidecar, func(t *testing.T) {
+				err := sharedValidation.ValidateContainerVolumeMounts(ctx, sidecar, expectedMounts)
+				if err != nil {
+					t.Logf("RED PHASE: Project configuration mounting failure for %s: %v", sidecar, err)
+					assert.Fail(t, "Sidecar %s must mount project configuration directory properly", sidecar)
+				} else {
+					t.Logf("Project configuration properly mounted for %s", sidecar)
+				}
+			})
+		}
+	})
+
+	// RED PHASE: Validate Dapr configuration paths in container startup commands
+	t.Run("ValidateDaprConfigurationPaths", func(t *testing.T) {
+		sidecarContainers := []string{
+			"content-api-sidecar",
+			"inquiries-api-sidecar",
+			"notification-api-sidecar",
+			"services-api-sidecar",
+			"public-gateway-sidecar",
+			"admin-gateway-sidecar",
+		}
+
+		for _, sidecar := range sidecarContainers {
+			t.Run("ConfigPaths_"+sidecar, func(t *testing.T) {
+				err := sharedValidation.ValidateDaprConfigurationPaths(ctx, sidecar)
+				if err != nil {
+					t.Logf("RED PHASE: Configuration path failure for %s: %v", sidecar, err)
+					assert.Fail(t, "Sidecar %s must have proper Dapr configuration paths", sidecar)
+				} else {
+					t.Logf("Dapr configuration paths properly set for %s", sidecar)
+				}
+			})
+		}
+	})
+
+	// RED PHASE: Comprehensive configuration deployment validation
+	t.Run("ComprehensiveConfigurationValidation", func(t *testing.T) {
+		sidecarContainers := []string{
+			"content-api-sidecar",
+			"inquiries-api-sidecar",
+			"notification-api-sidecar",
+			"services-api-sidecar",
+			"public-gateway-sidecar",
+			"admin-gateway-sidecar",
+		}
+
+		for _, sidecar := range sidecarContainers {
+			t.Run("FullValidation_"+sidecar, func(t *testing.T) {
+				err := sharedValidation.ValidateProjectConfigurationDeployment(ctx, sidecar)
+				if err != nil {
+					t.Logf("RED PHASE: Full configuration validation failure for %s: %v", sidecar, err)
+					assert.Fail(t, "Sidecar %s must use proper project configuration deployment", sidecar)
+				} else {
+					t.Logf("Full configuration validation passed for %s", sidecar)
+				}
+			})
+		}
 	})
 }

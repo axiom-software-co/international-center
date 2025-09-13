@@ -209,7 +209,7 @@ func TestFrontendCodeQuality_DevelopmentWorkflowValidation(t *testing.T) {
 		{
 			workflow:   "backend-integration",
 			components: []string{"service-mesh", "gateways", "APIs"},
-			endpoints:  []string{"http://localhost:3500/v1.0/healthz", "http://localhost:9001/health", "http://localhost:9001/api/news"},
+			endpoints:  []string{"http://localhost:3502/v1.0/healthz", "http://localhost:9001/health", "http://localhost:9001/api/news"},
 			status:     "functional",
 			description: "Backend integration must be fully functional for frontend consumption",
 		},

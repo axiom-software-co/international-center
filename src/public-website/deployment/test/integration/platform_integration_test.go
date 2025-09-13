@@ -18,32 +18,32 @@ import (
 
 // Platform Integration Tests
 // Validates platform phase components working together as integrated system
-// Tests Dapr control plane, orchestration, networking integration
+// Tests Dapr distributed sidecars, orchestration, networking integration
 
-func TestPlatformIntegration_DaprControlPlaneOrchestration(t *testing.T) {
+func TestPlatformIntegration_DaprSidecarOrchestration(t *testing.T) {
 	// This test requires complete environment health - enforcing axiom rule
 	sharedValidation.ValidateEnvironmentPrerequisites(t)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	t.Run("DaprControlPlane_ServiceMeshReadiness", func(t *testing.T) {
-		// Test Dapr control plane is operational and ready for service mesh
+	t.Run("DaprSidecar_ServiceMeshReadiness", func(t *testing.T) {
+		// Test Dapr sidecar is operational and ready for service mesh
 		client := &http.Client{Timeout: 5 * time.Second}
 
 		// Test Dapr health endpoint
-		healthReq, err := http.NewRequestWithContext(ctx, "GET", "http://localhost:3500/v1.0/healthz", nil)
+		healthReq, err := http.NewRequestWithContext(ctx, "GET", "http://localhost:3502/v1.0/healthz", nil)
 		require.NoError(t, err, "Failed to create Dapr health request")
 
 		healthResp, err := client.Do(healthReq)
-		require.NoError(t, err, "Dapr control plane health endpoint must be accessible for platform integration")
+		require.NoError(t, err, "Dapr sidecar health endpoint must be accessible for platform integration")
 		defer healthResp.Body.Close()
 
 		assert.True(t, healthResp.StatusCode >= 200 && healthResp.StatusCode < 300, 
 			"Dapr control plane must be healthy for service mesh functionality")
 
 		// Test Dapr metadata endpoint for service mesh configuration
-		metadataReq, err := http.NewRequestWithContext(ctx, "GET", "http://localhost:3500/v1.0/metadata", nil)
+		metadataReq, err := http.NewRequestWithContext(ctx, "GET", "http://localhost:3502/v1.0/metadata", nil)
 		require.NoError(t, err, "Failed to create metadata request")
 
 		metadataResp, err := client.Do(metadataReq)
@@ -75,7 +75,7 @@ func TestPlatformIntegration_DaprControlPlaneOrchestration(t *testing.T) {
 
 		// Test Dapr service invocation capability (without actual services)
 		// This validates the platform layer service mesh infrastructure
-		serviceInvocationURL := "http://localhost:3500/v1.0/invoke/test-service/method/health"
+		serviceInvocationURL := "http://localhost:3502/v1.0/invoke/test-service/method/health"
 		
 		req, err := http.NewRequestWithContext(ctx, "GET", serviceInvocationURL, nil)
 		require.NoError(t, err, "Failed to create service invocation request")
@@ -151,7 +151,7 @@ func TestPlatformIntegration_ServiceMeshInfrastructure(t *testing.T) {
 		client := &http.Client{Timeout: 5 * time.Second}
 
 		// Test Dapr metadata for service discovery infrastructure
-		metadataReq, err := http.NewRequestWithContext(ctx, "GET", "http://localhost:3500/v1.0/metadata", nil)
+		metadataReq, err := http.NewRequestWithContext(ctx, "GET", "http://localhost:3502/v1.0/metadata", nil)
 		require.NoError(t, err, "Failed to create metadata request")
 
 		metadataResp, err := client.Do(metadataReq)
@@ -174,7 +174,7 @@ func TestPlatformIntegration_ServiceMeshInfrastructure(t *testing.T) {
 		client := &http.Client{Timeout: 5 * time.Second}
 
 		// Test service invocation endpoint availability (without actual target service)
-		invocationURL := "http://localhost:3500/v1.0/invoke/platform-test/method/health"
+		invocationURL := "http://localhost:3502/v1.0/invoke/platform-test/method/health"
 		
 		req, err := http.NewRequestWithContext(ctx, "GET", invocationURL, nil)
 		require.NoError(t, err, "Failed to create service invocation request")
@@ -195,7 +195,7 @@ func TestPlatformIntegration_ServiceMeshInfrastructure(t *testing.T) {
 		client := &http.Client{Timeout: 5 * time.Second}
 
 		// Test that platform can handle component queries
-		componentsURL := "http://localhost:3500/v1.0/components"
+		componentsURL := "http://localhost:3502/v1.0/components"
 		
 		req, err := http.NewRequestWithContext(ctx, "GET", componentsURL, nil)
 		require.NoError(t, err, "Failed to create components request")
@@ -271,7 +271,7 @@ func TestPlatformIntegration_ServiceMeshCommunication(t *testing.T) {
 		for _, commTest := range serviceCommunicationTests {
 			t.Run("ServiceMeshComm_"+commTest.sourceService+"_to_"+commTest.targetService, func(t *testing.T) {
 				// Test service-to-service communication via Dapr service invocation
-				serviceURL := fmt.Sprintf("http://localhost:3500/v1.0/invoke/%s/method%s", 
+				serviceURL := fmt.Sprintf("http://localhost:3502/v1.0/invoke/%s/method%s", 
 					commTest.targetService, commTest.testEndpoint)
 				
 				req, err := http.NewRequestWithContext(ctx, "GET", serviceURL, nil)
@@ -384,7 +384,7 @@ func TestPlatformIntegration_ServiceMeshCommunication(t *testing.T) {
 		for _, resilienceTest := range resilienceTests {
 			t.Run("Resilience_"+resilienceTest.pattern, func(t *testing.T) {
 				// Test service mesh resilience by attempting to invoke non-existent service
-				nonExistentURL := "http://localhost:3500/v1.0/invoke/non-existent-service/method/health"
+				nonExistentURL := "http://localhost:3502/v1.0/invoke/non-existent-service/method/health"
 				
 				req, err := http.NewRequestWithContext(ctx, "GET", nonExistentURL, nil)
 				require.NoError(t, err, "Failed to create resilience test request")
@@ -418,7 +418,7 @@ func TestPlatformIntegration_ServiceMeshCommunication(t *testing.T) {
 		// Test service discovery by attempting to invoke each service's health endpoint
 		for _, serviceName := range expectedServices {
 			t.Run("ServiceDiscovery_"+serviceName, func(t *testing.T) {
-				discoveryURL := fmt.Sprintf("http://localhost:3500/v1.0/invoke/%s/method/health", serviceName)
+				discoveryURL := fmt.Sprintf("http://localhost:3502/v1.0/invoke/%s/method/health", serviceName)
 				
 				req, err := http.NewRequestWithContext(ctx, "GET", discoveryURL, nil)
 				require.NoError(t, err, "Failed to create service discovery request")
@@ -503,7 +503,7 @@ func TestPlatformIntegration_PubSubMessagingValidation(t *testing.T) {
 		for _, eventSchema := range eventSchemas {
 			t.Run("Publish_"+eventSchema.eventType+"_to_"+eventSchema.topicName, func(t *testing.T) {
 				// Test event publishing through Dapr pub/sub API
-				publishURL := fmt.Sprintf("http://localhost:3500/v1.0/publish/%s/%s", pubsubComponent, eventSchema.topicName)
+				publishURL := fmt.Sprintf("http://localhost:3502/v1.0/publish/%s/%s", pubsubComponent, eventSchema.topicName)
 				
 				publishReq, err := http.NewRequestWithContext(ctx, "POST", publishURL, strings.NewReader(eventSchema.payload))
 				require.NoError(t, err, "Failed to create event publish request for %s", eventSchema.eventType)
@@ -566,7 +566,7 @@ func TestPlatformIntegration_PubSubMessagingValidation(t *testing.T) {
 			t.Run("CommunicationFlow_"+flow.flowName, func(t *testing.T) {
 				// Test complete event communication flow
 				workflowTopicName := "workflow-" + flow.flowName
-				publishURL := fmt.Sprintf("http://localhost:3500/v1.0/publish/%s/%s", pubsubComponent, workflowTopicName)
+				publishURL := fmt.Sprintf("http://localhost:3502/v1.0/publish/%s/%s", pubsubComponent, workflowTopicName)
 				
 				publishReq, err := http.NewRequestWithContext(ctx, "POST", publishURL, strings.NewReader(flow.eventPayload))
 				require.NoError(t, err, "Failed to create workflow event publish request")
@@ -613,7 +613,7 @@ func TestPlatformIntegration_PubSubMessagingValidation(t *testing.T) {
 			t.Run("DeliveryPattern_"+deliveryTest.deliveryPattern, func(t *testing.T) {
 				// Test event delivery patterns through dedicated test topic
 				testTopicName := "delivery-test-" + deliveryTest.deliveryPattern
-				publishURL := fmt.Sprintf("http://localhost:3500/v1.0/publish/%s/%s", pubsubComponent, testTopicName)
+				publishURL := fmt.Sprintf("http://localhost:3502/v1.0/publish/%s/%s", pubsubComponent, testTopicName)
 				
 				publishReq, err := http.NewRequestWithContext(ctx, "POST", publishURL, strings.NewReader(deliveryTest.testPayload))
 				require.NoError(t, err, "Failed to create delivery test publish request")
@@ -627,6 +627,300 @@ func TestPlatformIntegration_PubSubMessagingValidation(t *testing.T) {
 					"Delivery test publishing must return success status for %s", deliveryTest.deliveryPattern)
 
 				t.Logf("RED PHASE SUCCESS: %s - Event delivery pattern validated", deliveryTest.description)
+			})
+		}
+	})
+}
+
+// RED PHASE: Service Deployment Verification
+func TestPlatformIntegration_ServiceDeploymentVerification(t *testing.T) {
+	// RED PHASE: Validate service deployment through Dapr and comprehensive service verification
+	sharedValidation.ValidateEnvironmentPrerequisites(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	t.Run("ServiceDeployment_ContainerStatusValidation", func(t *testing.T) {
+		// Validate all expected services are deployed and running
+		expectedServices := []struct {
+			serviceName    string
+			containerName  string
+			servicePort    int
+			description    string
+		}{
+			{"content", "content", 3001, "Content service must be deployed for content management operations"},
+			{"inquiries", "inquiries", 3101, "Inquiries service must be deployed for inquiry processing"},
+			{"notifications", "notifications", 3201, "Notifications service must be deployed for event notifications"},
+			{"public-gateway", "public-gateway", 9001, "Public gateway must be deployed for public API routing"},
+			{"admin-gateway", "admin-gateway", 9000, "Admin gateway must be deployed for admin operations"},
+		}
+
+		for _, service := range expectedServices {
+			t.Run("ServiceStatus_"+service.serviceName, func(t *testing.T) {
+				// Check service container deployment status
+				serviceCmd := exec.CommandContext(ctx, "podman", "ps", "--filter", "name="+service.containerName, "--format", "{{.Names}} {{.Status}}")
+				serviceOutput, err := serviceCmd.Output()
+				require.NoError(t, err, "Failed to check service %s deployment status", service.serviceName)
+
+				serviceStatus := strings.TrimSpace(string(serviceOutput))
+				assert.Contains(t, serviceStatus, service.containerName, 
+					"Service %s must be deployed as container", service.serviceName)
+
+				if strings.Contains(serviceStatus, service.containerName) {
+					assert.Contains(t, serviceStatus, "Up", 
+						"%s - Service must be running after deployment", service.description)
+					assert.NotContains(t, serviceStatus, "Exited", 
+						"%s - Service must not exit after deployment", service.description)
+				} else {
+					t.Errorf("RED PHASE VALIDATION FAILED: %s - Service not deployed", service.description)
+				}
+			})
+		}
+	})
+
+	t.Run("ServiceDeployment_StartupSequenceValidation", func(t *testing.T) {
+		// Validate service startup sequence and initialization order
+		startupSequence := []struct {
+			phase          string
+			components     []string
+			description    string
+		}{
+			{"infrastructure", []string{"postgresql", "vault", "rabbitmq"}, "Infrastructure components must start before services"},
+			{"dapr-control-plane", []string{"dapr-placement", "dapr-sentry"}, "Dapr control plane must start before service sidecars"},
+			{"service-sidecars", []string{"content-dapr", "inquiries-dapr", "notifications-dapr"}, "Service sidecars must start before application services"},
+			{"application-services", []string{"content", "inquiries", "notifications"}, "Application services must start after sidecars"},
+			{"gateway-services", []string{"public-gateway", "admin-gateway"}, "Gateway services must start after backend services"},
+		}
+
+		for _, phase := range startupSequence {
+			t.Run("StartupPhase_"+phase.phase, func(t *testing.T) {
+				for _, component := range phase.components {
+					// Check if component is running in expected startup phase
+					componentCmd := exec.CommandContext(ctx, "podman", "ps", "--filter", "name="+component, "--format", "{{.Names}}")
+					componentOutput, err := componentCmd.Output()
+					require.NoError(t, err, "Failed to check startup phase component %s", component)
+
+					runningComponents := strings.TrimSpace(string(componentOutput))
+					if strings.Contains(runningComponents, component) {
+						t.Logf("Startup phase %s: Component %s deployed successfully", phase.phase, component)
+					} else {
+						t.Errorf("RED PHASE VALIDATION: %s - Component %s not running in startup phase %s", 
+							phase.description, component, phase.phase)
+					}
+				}
+			})
+		}
+	})
+
+	t.Run("ServiceDeployment_HealthEndpointAccessibility", func(t *testing.T) {
+		// Validate service health endpoints are accessible after deployment
+		client := &http.Client{Timeout: 10 * time.Second}
+		
+		serviceHealthEndpoints := []struct {
+			serviceName   string
+			healthURL     string
+			description   string
+		}{
+			{"content", "http://localhost:3001/health", "Content service health endpoint must be accessible"},
+			{"inquiries", "http://localhost:3101/health", "Inquiries service health endpoint must be accessible"},
+			{"notifications", "http://localhost:3201/health", "Notifications service health endpoint must be accessible"},
+			{"public-gateway", "http://localhost:9001/health", "Public gateway health endpoint must be accessible"},
+			{"admin-gateway", "http://localhost:9000/health", "Admin gateway health endpoint must be accessible"},
+		}
+
+		for _, endpoint := range serviceHealthEndpoints {
+			t.Run("HealthEndpoint_"+endpoint.serviceName, func(t *testing.T) {
+				healthReq, err := http.NewRequestWithContext(ctx, "GET", endpoint.healthURL, nil)
+				require.NoError(t, err, "Failed to create health endpoint request for %s", endpoint.serviceName)
+
+				healthResp, err := client.Do(healthReq)
+				if err != nil {
+					t.Errorf("RED PHASE VALIDATION: %s - Health endpoint not accessible: %v", 
+						endpoint.description, err)
+					return
+				}
+				defer healthResp.Body.Close()
+
+				assert.True(t, healthResp.StatusCode >= 200 && healthResp.StatusCode < 300,
+					"%s - Must return healthy status", endpoint.description)
+
+				if healthResp.StatusCode >= 200 && healthResp.StatusCode < 300 {
+					t.Logf("Service %s health endpoint accessible and healthy", endpoint.serviceName)
+				} else {
+					body, _ := io.ReadAll(healthResp.Body)
+					t.Errorf("RED PHASE VALIDATION: %s - Health check failed with status %d: %s", 
+						endpoint.description, healthResp.StatusCode, string(body))
+				}
+			})
+		}
+	})
+
+	t.Run("ServiceDeployment_DaprRegistrationValidation", func(t *testing.T) {
+		// Validate services are properly registered with Dapr after deployment
+		client := &http.Client{Timeout: 10 * time.Second}
+		
+		expectedDaprServices := []struct {
+			serviceName string
+			appID       string
+			description string
+		}{
+			{"content", "content", "Content service must be registered with Dapr for service mesh communication"},
+			{"inquiries", "inquiries", "Inquiries service must be registered with Dapr for service mesh communication"},
+			{"notifications", "notifications", "Notifications service must be registered with Dapr for service mesh communication"},
+			{"public-gateway", "public-gateway", "Public gateway must be registered with Dapr for service routing"},
+			{"admin-gateway", "admin-gateway", "Admin gateway must be registered with Dapr for admin operations"},
+		}
+
+		for _, daprService := range expectedDaprServices {
+			t.Run("DaprRegistration_"+daprService.serviceName, func(t *testing.T) {
+				// Test service registration through Dapr service invocation
+				serviceInvocationURL := fmt.Sprintf("http://localhost:3502/v1.0/invoke/%s/method/health", daprService.appID)
+				
+				invocationReq, err := http.NewRequestWithContext(ctx, "GET", serviceInvocationURL, nil)
+				require.NoError(t, err, "Failed to create Dapr service invocation request for %s", daprService.serviceName)
+
+				invocationResp, err := client.Do(invocationReq)
+				if err != nil {
+					t.Errorf("RED PHASE VALIDATION: %s - Service not accessible through Dapr: %v", 
+						daprService.description, err)
+					return
+				}
+				defer invocationResp.Body.Close()
+
+				if invocationResp.StatusCode >= 200 && invocationResp.StatusCode < 300 {
+					t.Logf("Service %s registered and accessible through Dapr service mesh", daprService.serviceName)
+				} else {
+					body, _ := io.ReadAll(invocationResp.Body)
+					t.Errorf("RED PHASE VALIDATION: %s - Dapr service invocation failed with status %d: %s", 
+						daprService.description, invocationResp.StatusCode, string(body))
+				}
+			})
+		}
+	})
+
+	t.Run("ServiceDeployment_DependencyResolutionValidation", func(t *testing.T) {
+		// Validate service dependencies are properly resolved after deployment
+		serviceDependencies := []struct {
+			serviceName        string
+			requiredServices   []string
+			requiredComponents []string
+			description        string
+		}{
+			{
+				serviceName:        "content",
+				requiredServices:   []string{"notifications"},
+				requiredComponents: []string{"postgres-state", "rabbitmq-pubsub"},
+				description:        "Content service requires notifications service and database/pubsub components",
+			},
+			{
+				serviceName:        "inquiries",
+				requiredServices:   []string{"notifications"},
+				requiredComponents: []string{"postgres-state", "rabbitmq-pubsub"},
+				description:        "Inquiries service requires notifications service and database/pubsub components",
+			},
+			{
+				serviceName:        "notifications",
+				requiredServices:   []string{},
+				requiredComponents: []string{"postgres-state", "rabbitmq-pubsub"},
+				description:        "Notifications service requires database and pubsub components",
+			},
+			{
+				serviceName:        "public-gateway",
+				requiredServices:   []string{"content", "inquiries"},
+				requiredComponents: []string{"postgres-state"},
+				description:        "Public gateway requires content and inquiries services with database component",
+			},
+			{
+				serviceName:        "admin-gateway",
+				requiredServices:   []string{"content", "inquiries", "notifications"},
+				requiredComponents: []string{"postgres-state", "vault-secrets"},
+				description:        "Admin gateway requires all backend services with database and secrets components",
+			},
+		}
+
+		client := &http.Client{Timeout: 5 * time.Second}
+
+		for _, dependency := range serviceDependencies {
+			t.Run("Dependencies_"+dependency.serviceName, func(t *testing.T) {
+				// Validate required services are accessible through Dapr
+				for _, requiredService := range dependency.requiredServices {
+					serviceURL := fmt.Sprintf("http://localhost:3502/v1.0/invoke/%s/method/health", requiredService)
+					
+					req, err := http.NewRequestWithContext(ctx, "GET", serviceURL, nil)
+					require.NoError(t, err, "Failed to create dependency check request")
+
+					resp, err := client.Do(req)
+					if err != nil {
+						t.Errorf("RED PHASE VALIDATION: %s - Required service %s not accessible", 
+							dependency.description, requiredService)
+						continue
+					}
+					defer resp.Body.Close()
+
+					if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+						t.Logf("Dependency resolved: %s can access %s", dependency.serviceName, requiredService)
+					} else {
+						t.Errorf("RED PHASE VALIDATION: %s - Required service %s returned status %d", 
+							dependency.description, requiredService, resp.StatusCode)
+					}
+				}
+
+				// Validate required Dapr components are available
+				for _, component := range dependency.requiredComponents {
+					t.Logf("Component dependency: %s requires %s (validation in GREEN phase)", 
+						dependency.serviceName, component)
+				}
+			})
+		}
+	})
+
+	t.Run("ServiceDeployment_CrossServiceCommunicationValidation", func(t *testing.T) {
+		// Validate cross-service communication capabilities after deployment
+		client := &http.Client{Timeout: 10 * time.Second}
+		
+		communicationTests := []struct {
+			sourceService string
+			targetService string
+			endpoint      string
+			description   string
+		}{
+			{"public-gateway", "content", "/api/content/health", "Public gateway must communicate with content service"},
+			{"public-gateway", "inquiries", "/api/inquiries/health", "Public gateway must communicate with inquiries service"},
+			{"admin-gateway", "content", "/api/admin/content/health", "Admin gateway must communicate with content service"},
+			{"admin-gateway", "inquiries", "/api/admin/inquiries/health", "Admin gateway must communicate with inquiries service"},
+			{"admin-gateway", "notifications", "/api/admin/notifications/health", "Admin gateway must communicate with notifications service"},
+			{"content", "notifications", "/notifications/health", "Content service must communicate with notifications service"},
+			{"inquiries", "notifications", "/notifications/health", "Inquiries service must communicate with notifications service"},
+		}
+
+		for _, commTest := range communicationTests {
+			t.Run("Communication_"+commTest.sourceService+"_to_"+commTest.targetService, func(t *testing.T) {
+				// Test cross-service communication through Dapr service invocation
+				communicationURL := fmt.Sprintf("http://localhost:3502/v1.0/invoke/%s/method%s", 
+					commTest.targetService, commTest.endpoint)
+				
+				commReq, err := http.NewRequestWithContext(ctx, "GET", communicationURL, nil)
+				require.NoError(t, err, "Failed to create cross-service communication request")
+
+				commResp, err := client.Do(commReq)
+				if err != nil {
+					t.Errorf("RED PHASE VALIDATION: %s - Cross-service communication failed: %v", 
+						commTest.description, err)
+					return
+				}
+				defer commResp.Body.Close()
+
+				if commResp.StatusCode >= 200 && commResp.StatusCode < 300 {
+					t.Logf("Cross-service communication validated: %s -> %s", 
+						commTest.sourceService, commTest.targetService)
+				} else if commResp.StatusCode == 404 {
+					t.Logf("Cross-service communication infrastructure ready but endpoint not implemented: %s -> %s", 
+						commTest.sourceService, commTest.targetService)
+				} else {
+					body, _ := io.ReadAll(commResp.Body)
+					t.Errorf("RED PHASE VALIDATION: %s - Communication failed with status %d: %s", 
+						commTest.description, commResp.StatusCode, string(body))
+				}
 			})
 		}
 	})

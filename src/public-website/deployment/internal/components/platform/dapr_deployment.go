@@ -84,7 +84,7 @@ func NewDaprDeploymentComponent(ctx *pulumi.Context, name string, args *DaprDepl
 			"health_check": pulumi.Map{
 				"test":     pulumi.Array{
 					pulumi.String("CMD-SHELL"),
-					pulumi.String("wget --no-verbose --tries=1 --spider http://localhost:3500/v1.0/healthz || exit 1"),
+					pulumi.String("wget --no-verbose --tries=1 --spider http://localhost:3502/v1.0/healthz || exit 1"),
 				},
 				"interval": pulumi.String("30s"),
 				"timeout":  pulumi.String("10s"),
@@ -165,7 +165,7 @@ func NewDaprDeploymentComponent(ctx *pulumi.Context, name string, args *DaprDepl
 		}.ToMapOutput()
 
 		healthEndpoints = pulumi.Map{
-			"control_plane": pulumi.String("http://localhost:3500/v1.0/healthz"),
+			"control_plane": pulumi.String("http://localhost:3502/v1.0/healthz"),
 			"placement":     pulumi.String("tcp://localhost:50005"),
 			"sentry":        pulumi.String("tcp://localhost:50003"),
 		}.ToMapOutput()

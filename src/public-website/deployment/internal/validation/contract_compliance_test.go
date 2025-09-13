@@ -5,7 +5,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/axiom-software-co/international-center/src/public-website/deployment/test/shared"
+	"github.com/axiom-software-co/international-center/src/public-website/infrastructure/test/shared"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 )
 

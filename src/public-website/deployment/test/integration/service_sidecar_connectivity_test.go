@@ -211,7 +211,7 @@ func TestServiceSidecarConnectivity_ServiceMeshRegistration(t *testing.T) {
 	t.Run("ServiceMeshRegistration_DaprDiscovery", func(t *testing.T) {
 		// Test service discovery through Dapr control plane
 		client := &http.Client{Timeout: 10 * time.Second}
-		metadataReq, err := http.NewRequestWithContext(ctx, "GET", "http://localhost:3500/v1.0/metadata", nil)
+		metadataReq, err := http.NewRequestWithContext(ctx, "GET", "http://localhost:3502/v1.0/metadata", nil)
 		require.NoError(t, err, "Failed to create metadata request")
 
 		metadataResp, err := client.Do(metadataReq)
@@ -231,7 +231,7 @@ func TestServiceSidecarConnectivity_ServiceMeshRegistration(t *testing.T) {
 			client := &http.Client{Timeout: 10 * time.Second}
 			
 			// Test service invocation through Dapr (should work when service is properly registered)
-			serviceInvocationURL := fmt.Sprintf("http://localhost:3500/v1.0/invoke/%s/method/health", serviceName)
+			serviceInvocationURL := fmt.Sprintf("http://localhost:3502/v1.0/invoke/%s/method/health", serviceName)
 			
 			req, err := http.NewRequestWithContext(ctx, "GET", serviceInvocationURL, nil)
 			require.NoError(t, err, "Failed to create service invocation request")
@@ -388,5 +388,262 @@ func TestServiceSidecarConnectivity_DaprClientConfiguration(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestServiceSidecarConnectivity_DaprRuntimeStatusValidation(t *testing.T) {
+	// RED PHASE: Validate Dapr runtime initialization and sidecar readiness
+	sharedValidation.ValidateEnvironmentPrerequisites(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	t.Run("DaprRuntime_ControlPlaneStatus", func(t *testing.T) {
+		// Validate Dapr control plane is running and healthy
+		controlPlaneCmd := exec.CommandContext(ctx, "podman", "ps", "--filter", "name=dapr-placement", "--format", "{{.Names}}")
+		controlPlaneOutput, err := controlPlaneCmd.Output()
+		require.NoError(t, err, "Failed to check Dapr control plane status")
+
+		runningControlPlane := strings.TrimSpace(string(controlPlaneOutput))
+		assert.Contains(t, runningControlPlane, "dapr-placement", 
+			"Dapr control plane must be running for service mesh coordination")
+
+		// Validate control plane health through API
+		client := &http.Client{Timeout: 10 * time.Second}
+		healthReq, err := http.NewRequestWithContext(ctx, "GET", "http://localhost:50005/v1.0/healthz", nil)
+		require.NoError(t, err, "Failed to create control plane health request")
+
+		healthResp, err := client.Do(healthReq)
+		if err == nil {
+			defer healthResp.Body.Close()
+			assert.True(t, healthResp.StatusCode >= 200 && healthResp.StatusCode < 300,
+				"Dapr control plane health endpoint must be operational")
+		} else {
+			t.Logf("Dapr control plane health endpoint not accessible: %v", err)
+			t.Fail() // Should fail in RED phase until Dapr runtime is properly configured
+		}
+	})
+
+	t.Run("DaprRuntime_SidecarInitialization", func(t *testing.T) {
+		// Validate all Dapr sidecars are properly initialized
+		expectedSidecars := []struct {
+			sidecarName string
+			healthPort  int
+			appID       string
+		}{
+			{"public-gateway-dapr", 50010, "public-gateway"},
+			{"admin-gateway-dapr", 50020, "admin-gateway"},
+			{"content-dapr", 50030, "content"},
+			{"inquiries-dapr", 50040, "inquiries"},
+			{"notifications-dapr", 50050, "notifications"},
+		}
+
+		for _, sidecar := range expectedSidecars {
+			t.Run("SidecarInit_"+sidecar.sidecarName, func(t *testing.T) {
+				// Check sidecar container status
+				sidecarCmd := exec.CommandContext(ctx, "podman", "ps", "--filter", "name="+sidecar.sidecarName, "--format", "{{.Status}}")
+				sidecarOutput, err := sidecarCmd.Output()
+				require.NoError(t, err, "Failed to check sidecar %s status", sidecar.sidecarName)
+
+				sidecarStatus := strings.TrimSpace(string(sidecarOutput))
+				assert.Contains(t, sidecarStatus, "Up", 
+					"Dapr sidecar %s must be running for runtime validation", sidecar.sidecarName)
+
+				// Validate sidecar health endpoint
+				client := &http.Client{Timeout: 5 * time.Second}
+				sidecarHealthURL := fmt.Sprintf("http://localhost:%d/v1.0/healthz", sidecar.healthPort)
+				
+				healthReq, err := http.NewRequestWithContext(ctx, "GET", sidecarHealthURL, nil)
+				require.NoError(t, err, "Failed to create sidecar health request")
+
+				healthResp, err := client.Do(healthReq)
+				if err == nil {
+					defer healthResp.Body.Close()
+					assert.True(t, healthResp.StatusCode >= 200 && healthResp.StatusCode < 300,
+						"Sidecar %s health endpoint must be accessible", sidecar.sidecarName)
+				} else {
+					t.Logf("Sidecar %s health endpoint not accessible: %v", sidecar.sidecarName, err)
+					t.Fail() // Should fail in RED phase until sidecars are properly initialized
+				}
+
+				// Validate sidecar metadata endpoint
+				metadataURL := fmt.Sprintf("http://localhost:%d/v1.0/metadata", sidecar.healthPort)
+				metadataReq, err := http.NewRequestWithContext(ctx, "GET", metadataURL, nil)
+				require.NoError(t, err, "Failed to create sidecar metadata request")
+
+				metadataResp, err := client.Do(metadataReq)
+				if err == nil {
+					defer metadataResp.Body.Close()
+					assert.True(t, metadataResp.StatusCode >= 200 && metadataResp.StatusCode < 300,
+						"Sidecar %s metadata endpoint must be operational for runtime validation", sidecar.sidecarName)
+				} else {
+					t.Logf("Sidecar %s metadata endpoint not accessible: %v", sidecar.sidecarName, err)
+				}
+			})
+		}
+	})
+
+	t.Run("DaprRuntime_ComponentRegistrationStatus", func(t *testing.T) {
+		// Validate Dapr components are properly registered and operational
+		client := &http.Client{Timeout: 10 * time.Second}
+		
+		// Expected Dapr components that should be registered
+		expectedComponents := []string{
+			"postgres-state",
+			"postgres-config",
+			"vault-secrets",
+			"rabbitmq-pubsub",
+		}
+
+		// Test component registration through any available sidecar
+		componentsURL := "http://localhost:50010/v1.0/metadata"
+		metadataReq, err := http.NewRequestWithContext(ctx, "GET", componentsURL, nil)
+		require.NoError(t, err, "Failed to create components metadata request")
+
+		metadataResp, err := client.Do(metadataReq)
+		if err == nil {
+			defer metadataResp.Body.Close()
+			assert.True(t, metadataResp.StatusCode >= 200 && metadataResp.StatusCode < 300,
+				"Dapr component registration endpoint must be accessible")
+
+			// Note: In RED phase, components may not be properly registered yet
+			// This validates the infrastructure is ready for component registration
+			for _, component := range expectedComponents {
+				t.Logf("Expected component %s should be registered in GREEN phase", component)
+			}
+		} else {
+			t.Logf("Component registration validation failed: %v", err)
+			t.Fail() // Should fail in RED phase until Dapr runtime is properly configured
+		}
+	})
+
+	t.Run("DaprRuntime_ServiceInvocationReadiness", func(t *testing.T) {
+		// Validate Dapr service invocation infrastructure is ready
+		client := &http.Client{Timeout: 10 * time.Second}
+		
+		// Services that should be invocable through Dapr
+		expectedServices := []string{
+			"public-gateway",
+			"admin-gateway",
+			"content",
+			"inquiries",
+			"notifications",
+		}
+
+		for _, serviceName := range expectedServices {
+			t.Run("ServiceInvocation_"+serviceName, func(t *testing.T) {
+				// Test service invocation readiness through Dapr
+				invocationURL := fmt.Sprintf("http://localhost:3502/v1.0/invoke/%s/method/health", serviceName)
+				
+				invocationReq, err := http.NewRequestWithContext(ctx, "GET", invocationURL, nil)
+				require.NoError(t, err, "Failed to create service invocation request")
+
+				invocationResp, err := client.Do(invocationReq)
+				if err != nil {
+					t.Logf("Service %s not invocable through Dapr (expected in RED phase): %v", serviceName, err)
+					t.Fail() // Should fail until service invocation is properly configured
+					return
+				}
+				defer invocationResp.Body.Close()
+
+				// Service invocation infrastructure should be operational
+				assert.True(t, invocationResp.StatusCode >= 200 && invocationResp.StatusCode < 500,
+					"Service %s invocation through Dapr must be operational", serviceName)
+			})
+		}
+	})
+}
+
+func TestServiceSidecarConnectivity_DaprRuntimeLogValidation(t *testing.T) {
+	// RED PHASE: Validate Dapr runtime logs show proper initialization
+	sharedValidation.ValidateEnvironmentPrerequisites(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	t.Run("DaprLogs_ControlPlaneInitialization", func(t *testing.T) {
+		// Validate Dapr control plane logs show proper startup
+		controlPlaneComponents := []string{"dapr-placement", "dapr-sentry", "dapr-operator"}
+		
+		for _, component := range controlPlaneComponents {
+			t.Run("ControlPlaneLogs_"+component, func(t *testing.T) {
+				// Check if control plane component is running
+				componentCmd := exec.CommandContext(ctx, "podman", "ps", "--filter", "name="+component, "--format", "{{.Names}}")
+				componentOutput, err := componentCmd.Output()
+				require.NoError(t, err, "Failed to check component %s", component)
+
+				runningComponents := strings.TrimSpace(string(componentOutput))
+				
+				if strings.Contains(runningComponents, component) {
+					// Check component logs for proper initialization
+					logsCmd := exec.CommandContext(ctx, "podman", "logs", "--tail", "20", component)
+					logsOutput, err := logsCmd.Output()
+					require.NoError(t, err, "Failed to get logs for %s", component)
+
+					logs := string(logsOutput)
+					
+					// Control plane should not show critical errors
+					assert.NotContains(t, logs, "failed to start", 
+						"Control plane %s must not fail during startup", component)
+					assert.NotContains(t, logs, "panic:", 
+						"Control plane %s must not panic during initialization", component)
+					
+					// Control plane should show successful startup
+					if !strings.Contains(logs, "failed to start") && !strings.Contains(logs, "panic:") {
+						assert.Contains(t, logs, "starting", 
+							"Control plane %s should show startup messages", component)
+					}
+				} else {
+					t.Logf("Control plane component %s not running - cannot validate logs", component)
+					t.Fail() // Should fail until control plane is properly deployed
+				}
+			})
+		}
+	})
+
+	t.Run("DaprLogs_SidecarInitialization", func(t *testing.T) {
+		// Validate Dapr sidecar logs show proper startup sequences
+		sidecars := []string{
+			"public-gateway-dapr",
+			"admin-gateway-dapr", 
+			"content-dapr",
+			"inquiries-dapr",
+			"notifications-dapr",
+		}
+
+		for _, sidecarName := range sidecars {
+			t.Run("SidecarLogs_"+sidecarName, func(t *testing.T) {
+				// Check if sidecar is running
+				sidecarCmd := exec.CommandContext(ctx, "podman", "ps", "--filter", "name="+sidecarName, "--format", "{{.Names}}")
+				sidecarOutput, err := sidecarCmd.Output()
+				require.NoError(t, err, "Failed to check sidecar %s", sidecarName)
+
+				runningSidecars := strings.TrimSpace(string(sidecarOutput))
+				
+				if strings.Contains(runningSidecars, sidecarName) {
+					// Check sidecar logs for proper initialization
+					logsCmd := exec.CommandContext(ctx, "podman", "logs", "--tail", "30", sidecarName)
+					logsOutput, err := logsCmd.Output()
+					require.NoError(t, err, "Failed to get logs for %s", sidecarName)
+
+					logs := string(logsOutput)
+					
+					// Sidecar should not show connection failures to control plane
+					assert.NotContains(t, logs, "connection refused", 
+						"Sidecar %s must not fail to connect to control plane", sidecarName)
+					assert.NotContains(t, logs, "placement service disconnected", 
+						"Sidecar %s must maintain connection to placement service", sidecarName)
+					
+					// Sidecar should show successful runtime startup
+					if !strings.Contains(logs, "connection refused") && !strings.Contains(logs, "placement service disconnected") {
+						assert.Contains(t, logs, "dapr initialized", 
+							"Sidecar %s should show successful Dapr initialization", sidecarName)
+					}
+				} else {
+					t.Logf("Sidecar %s not running - cannot validate logs", sidecarName)
+					t.Fail() // Should fail until sidecars are properly deployed
+				}
+			})
+		}
+	})
 }
 

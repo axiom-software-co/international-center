@@ -402,7 +402,7 @@ func TestServiceEnvironmentConfiguration_SecretStoreAccess(t *testing.T) {
 	// RED PHASE: Secret Store Connectivity Validation
 	t.Run("SecretStoreConnectivity", func(t *testing.T) {
 		// Test that Dapr secret store is accessible and operational
-		secretStoreURL := fmt.Sprintf("http://localhost:3500/v1.0/secrets/%s/test-connectivity", secretStoreComponent)
+		secretStoreURL := fmt.Sprintf("http://localhost:3502/v1.0/secrets/%s/test-connectivity", secretStoreComponent)
 		
 		connectivityReq, err := http.NewRequestWithContext(ctx, "GET", secretStoreURL, nil)
 		require.NoError(t, err, "Failed to create secret store connectivity request")
@@ -434,7 +434,7 @@ func TestServiceEnvironmentConfiguration_SecretStoreAccess(t *testing.T) {
 		for _, secret := range requiredSecrets {
 			t.Run("SecretRetrieval_"+secret.secretName+"_"+secret.secretKey, func(t *testing.T) {
 				// Test secret retrieval through Dapr secrets API
-				secretURL := fmt.Sprintf("http://localhost:3500/v1.0/secrets/%s/%s", secretStoreComponent, secret.secretName)
+				secretURL := fmt.Sprintf("http://localhost:3502/v1.0/secrets/%s/%s", secretStoreComponent, secret.secretName)
 				
 				secretReq, err := http.NewRequestWithContext(ctx, "GET", secretURL, nil)
 				require.NoError(t, err, "Failed to create secret retrieval request for %s", secret.secretName)
@@ -505,7 +505,7 @@ func TestServiceEnvironmentConfiguration_SecretStoreAccess(t *testing.T) {
 					// Service is running - validate secret access capability
 					for _, secretName := range requiredSecretNames {
 						// Test service's ability to access required secrets via Dapr
-						secretURL := fmt.Sprintf("http://localhost:3500/v1.0/secrets/%s/%s", secretStoreComponent, secretName)
+						secretURL := fmt.Sprintf("http://localhost:3502/v1.0/secrets/%s/%s", secretStoreComponent, secretName)
 						
 						secretReq, err := http.NewRequestWithContext(ctx, "GET", secretURL, nil)
 						require.NoError(t, err, "Failed to create secret access request")
@@ -548,19 +548,19 @@ func TestServiceEnvironmentConfiguration_SecretStoreAccess(t *testing.T) {
 		}{
 			{
 				testName:        "unauthorized_secret_access",
-				testURL:         fmt.Sprintf("http://localhost:3500/v1.0/secrets/%s/nonexistent-secret", secretStoreComponent),
+				testURL:         fmt.Sprintf("http://localhost:3502/v1.0/secrets/%s/nonexistent-secret", secretStoreComponent),
 				expectedBehavior: "should_return_404_or_403",
 				description:     "Secret store must handle unauthorized access attempts securely",
 			},
 			{
 				testName:        "malformed_secret_request",
-				testURL:         "http://localhost:3500/v1.0/secrets//",
+				testURL:         "http://localhost:3502/v1.0/secrets//",
 				expectedBehavior: "should_return_400_or_404",
 				description:     "Secret store must handle malformed requests gracefully",
 			},
 			{
 				testName:        "secret_enumeration_protection",
-				testURL:         fmt.Sprintf("http://localhost:3500/v1.0/secrets/%s/", secretStoreComponent),
+				testURL:         fmt.Sprintf("http://localhost:3502/v1.0/secrets/%s/", secretStoreComponent),
 				expectedBehavior: "should_not_list_secrets",
 				description:     "Secret store must not allow secret enumeration",
 			},

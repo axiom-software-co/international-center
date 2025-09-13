@@ -605,7 +605,7 @@ func (component *ContainerOrchestratorComponent) getContainerSpec(containerID st
 			Environment: map[string]string{
 				"DAPR_HOST": "0.0.0.0",
 			},
-			HealthEndpoint: "http://localhost:3500/v1.0/healthz",
+			HealthEndpoint: "http://localhost:3502/v1.0/healthz",
 			ResourceLimits: ResourceLimits{
 				CPU:    "500m",
 				Memory: "256Mi",
@@ -653,7 +653,7 @@ func (component *ContainerOrchestratorComponent) getContainerSpec(containerID st
 			Port:           9001,
 			Environment: map[string]string{
 				"DATABASE_CONNECTION_STRING": "postgresql://postgres:5432/development",
-				"DAPR_HTTP_ENDPOINT":         "http://localhost:3500",
+				"DAPR_HTTP_ENDPOINT":         "http://localhost:3502",
 				"ENVIRONMENT":                "development",
 				"LOG_LEVEL":                  "debug",
 			},
@@ -675,7 +675,7 @@ func (component *ContainerOrchestratorComponent) getContainerSpec(containerID st
 			Port:           9000,
 			Environment: map[string]string{
 				"DATABASE_CONNECTION_STRING": "postgresql://postgres:5432/development",
-				"DAPR_HTTP_ENDPOINT":         "http://localhost:3500",
+				"DAPR_HTTP_ENDPOINT":         "http://localhost:3502",
 				"ENVIRONMENT":                "development",
 				"LOG_LEVEL":                  "debug",
 			},
@@ -697,7 +697,7 @@ func (component *ContainerOrchestratorComponent) getContainerSpec(containerID st
 			Port:           3001,
 			Environment: map[string]string{
 				"DATABASE_CONNECTION_STRING": "postgresql://postgres:5432/development",
-				"DAPR_HTTP_ENDPOINT":         "http://localhost:3500",
+				"DAPR_HTTP_ENDPOINT":         "http://localhost:3502",
 				"ENVIRONMENT":                "development",
 				"SERVICE_TYPE":               "news",
 				"LOG_LEVEL":                  "debug",
@@ -720,7 +720,7 @@ func (component *ContainerOrchestratorComponent) getContainerSpec(containerID st
 			Port:           3002,
 			Environment: map[string]string{
 				"DATABASE_CONNECTION_STRING": "postgresql://postgres:5432/development",
-				"DAPR_HTTP_ENDPOINT":         "http://localhost:3500",
+				"DAPR_HTTP_ENDPOINT":         "http://localhost:3502",
 				"ENVIRONMENT":                "development",
 				"SERVICE_TYPE":               "events",
 				"LOG_LEVEL":                  "debug",
@@ -743,7 +743,7 @@ func (component *ContainerOrchestratorComponent) getContainerSpec(containerID st
 			Port:           3003,
 			Environment: map[string]string{
 				"DATABASE_CONNECTION_STRING": "postgresql://postgres:5432/development",
-				"DAPR_HTTP_ENDPOINT":         "http://localhost:3500",
+				"DAPR_HTTP_ENDPOINT":         "http://localhost:3502",
 				"ENVIRONMENT":                "development",
 				"SERVICE_TYPE":               "research",
 				"LOG_LEVEL":                  "debug",
@@ -766,7 +766,7 @@ func (component *ContainerOrchestratorComponent) getContainerSpec(containerID st
 			Port:           3101,
 			Environment: map[string]string{
 				"DATABASE_CONNECTION_STRING": "postgresql://postgres:5432/development",
-				"DAPR_HTTP_ENDPOINT":         "http://localhost:3500",
+				"DAPR_HTTP_ENDPOINT":         "http://localhost:3502",
 				"ENVIRONMENT":                "development",
 				"SERVICE_TYPE":               "business",
 				"LOG_LEVEL":                  "debug",
@@ -789,7 +789,7 @@ func (component *ContainerOrchestratorComponent) getContainerSpec(containerID st
 			Port:           3102,
 			Environment: map[string]string{
 				"DATABASE_CONNECTION_STRING": "postgresql://postgres:5432/development",
-				"DAPR_HTTP_ENDPOINT":         "http://localhost:3500",
+				"DAPR_HTTP_ENDPOINT":         "http://localhost:3502",
 				"ENVIRONMENT":                "development",
 				"SERVICE_TYPE":               "donations",
 				"LOG_LEVEL":                  "debug",
@@ -812,7 +812,7 @@ func (component *ContainerOrchestratorComponent) getContainerSpec(containerID st
 			Port:           3103,
 			Environment: map[string]string{
 				"DATABASE_CONNECTION_STRING": "postgresql://postgres:5432/development",
-				"DAPR_HTTP_ENDPOINT":         "http://localhost:3500",
+				"DAPR_HTTP_ENDPOINT":         "http://localhost:3502",
 				"ENVIRONMENT":                "development",
 				"SERVICE_TYPE":               "media",
 				"LOG_LEVEL":                  "debug",
@@ -835,7 +835,7 @@ func (component *ContainerOrchestratorComponent) getContainerSpec(containerID st
 			Port:           3104,
 			Environment: map[string]string{
 				"DATABASE_CONNECTION_STRING": "postgresql://postgres:5432/development",
-				"DAPR_HTTP_ENDPOINT":         "http://localhost:3500",
+				"DAPR_HTTP_ENDPOINT":         "http://localhost:3502",
 				"ENVIRONMENT":                "development",
 				"SERVICE_TYPE":               "volunteers",
 				"LOG_LEVEL":                  "debug",
@@ -858,7 +858,7 @@ func (component *ContainerOrchestratorComponent) getContainerSpec(containerID st
 			Port:           3201,
 			Environment: map[string]string{
 				"DATABASE_CONNECTION_STRING": "postgresql://postgres:5432/development",
-				"DAPR_HTTP_ENDPOINT":         "http://localhost:3500",
+				"DAPR_HTTP_ENDPOINT":         "http://localhost:3502",
 				"ENVIRONMENT":                "development",
 				"LOG_LEVEL":                  "debug",
 			},

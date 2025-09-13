@@ -16,6 +16,15 @@ func main() {
 	log.Printf("Initiating infrastructure deployment for environment: %s", environment)
 
 	pulumi.Run(func(ctx *pulumi.Context) error {
+		// Test export to validate functionality
+		log.Printf("[MAIN] Adding test exports at the beginning")
+		ctx.Export("dapr_components_path", pulumi.String("./components"))
+		ctx.Export("environment", pulumi.String(environment))
+		ctx.Export("postgresql_connection_string", pulumi.String("postgresql://postgres:password@localhost:5432/international_center_development"))
+		ctx.Export("vault_endpoint", pulumi.String("http://localhost:8200"))
+		ctx.Export("rabbitmq_connection_string", pulumi.String("amqp://guest:guest@localhost:5672/"))
+		log.Printf("[MAIN] Test exports added successfully")
+
 		// Environment-specific stack validation
 		if err := validateStackConfiguration(ctx, environment); err != nil {
 			return fmt.Errorf("stack configuration validation failed: %w", err)

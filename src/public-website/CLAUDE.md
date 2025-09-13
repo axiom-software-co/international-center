@@ -4,7 +4,7 @@
 
 # axioms 
 
-- IMPORTANT AXIOM RULE TO FOLLOW : use 'export PULUMI_CONFIG_PASSPHRASE="development" && pulumi destroy' to teardown the development environment , instead on killing individual processes
+- IMPORTANT AXIOM RULE TO FOLLOW : use 'export PULUMI_CONFIG_PASSPHRASE="development" && pulumi destroy' to teardown the development environment , instead on killing individual processes . use 'export PULUMI_CONFIG_PASSPHRASE="development" && pulumi up --yes --skip-preview' to start up the development environment , instead of ephimeral configuration with podman cli
 
 - IMPORTANT AXIOM RULE TO FOLLOW : you may alter implmentation details . you may ask to delete/create/move/rename files if you have a proper reason to do so . do not edit any markdown files without permission . ensure you stop and ask for permission and provide your reasoning
 
@@ -66,6 +66,8 @@ GRAFANA_CLOUD_ACCESS_POLICY_TOKEN="glc_eyJvIjoiMTA3Nzk3NSIsIm4iOiJwdWx1bWktcG9sa
 - you may alter existing tests in new tdd cycles if there are good reasons to do so
 
 - you do not have to create new files if you are still validating our development environmnet and ensuring all tests pass 
+
+- the deployment module does all the integration and performance testing ( all other modules only do unit testing ; testing that does not rely on deployment nor other modules ) 
 
 # version control
 

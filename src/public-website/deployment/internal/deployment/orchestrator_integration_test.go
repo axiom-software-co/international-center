@@ -210,9 +210,9 @@ func validateInfrastructureAccessibility() error {
 		endpoint     string
 		description  string
 	}{
-		{"statestore", "http://localhost:3500/v1.0/state/statestore/health-check", "PostgreSQL state store via Dapr"},
-		{"secretstore", "http://localhost:3500/v1.0/secrets/secretstore", "HashiCorp Vault secrets via Dapr"},
-		{"pubsub", "http://localhost:3500/v1.0/subscribe", "RabbitMQ pub/sub via Dapr"},
+		{"statestore", "http://localhost:3502/v1.0/state/statestore/health-check", "PostgreSQL state store via Dapr"},
+		{"secretstore", "http://localhost:3502/v1.0/secrets/secretstore", "HashiCorp Vault secrets via Dapr"},
+		{"pubsub", "http://localhost:3502/v1.0/subscribe", "RabbitMQ pub/sub via Dapr"},
 	}
 	
 	for _, component := range infraComponents {
@@ -249,9 +249,9 @@ func validatePlatformAccessibility() error {
 		expectedCode int
 		description  string
 	}{
-		{"control-plane", "http://localhost:3500/v1.0/healthz", 204, "Dapr control plane health"},
-		{"metadata-api", "http://localhost:3500/v1.0/metadata", 200, "Dapr metadata and service discovery"},
-		{"centralized-control-plane", "http://localhost:3500/v1.0/healthz", 204, "Centralized control plane connectivity validation"},
+		{"control-plane", "http://localhost:3502/v1.0/healthz", 204, "Dapr control plane health"},
+		{"metadata-api", "http://localhost:3502/v1.0/metadata", 200, "Dapr metadata and service discovery"},
+		{"centralized-control-plane", "http://localhost:3502/v1.0/healthz", 204, "Centralized control plane connectivity validation"},
 	}
 	
 	for _, validation := range platformValidations {
@@ -287,11 +287,11 @@ func validateServicesAccessibility() error {
 		endpoint    string
 		description string
 	}{
-		{"public-gateway", "http://localhost:3500/v1.0/invoke/public-gateway/method/health", "Public gateway via Dapr service invocation"},
-		{"admin-gateway", "http://localhost:3500/v1.0/invoke/admin-gateway/method/health", "Admin gateway via Dapr service invocation"},
-		{"content-api", "http://localhost:3500/v1.0/invoke/content-api/method/health", "Content service via Dapr service invocation"},
-		{"inquiries-api", "http://localhost:3500/v1.0/invoke/inquiries-api/method/health", "Inquiries service via Dapr service invocation"},
-		{"notification-api", "http://localhost:3500/v1.0/invoke/notification-api/method/health", "Notifications service via Dapr service invocation"},
+		{"public-gateway", "http://localhost:3502/v1.0/invoke/public-gateway/method/health", "Public gateway via Dapr service invocation"},
+		{"admin-gateway", "http://localhost:3502/v1.0/invoke/admin-gateway/method/health", "Admin gateway via Dapr service invocation"},
+		{"content-api", "http://localhost:3502/v1.0/invoke/content-api/method/health", "Content service via Dapr service invocation"},
+		{"inquiries-api", "http://localhost:3502/v1.0/invoke/inquiries-api/method/health", "Inquiries service via Dapr service invocation"},
+		{"notification-api", "http://localhost:3502/v1.0/invoke/notification-api/method/health", "Notifications service via Dapr service invocation"},
 	}
 	
 	for _, service := range services {
@@ -328,8 +328,8 @@ func validateWebsiteAccessibility() error {
 		endpoint     string
 		description  string
 	}{
-		{"public-website", "public-gateway", "http://localhost:3500/v1.0/invoke/public-gateway/method/", "Public website via public gateway service mesh"},
-		{"admin-portal", "admin-gateway", "http://localhost:3500/v1.0/invoke/admin-gateway/method/", "Admin portal via admin gateway service mesh"},
+		{"public-website", "public-gateway", "http://localhost:3502/v1.0/invoke/public-gateway/method/", "Public website via public gateway service mesh"},
+		{"admin-portal", "admin-gateway", "http://localhost:3502/v1.0/invoke/admin-gateway/method/", "Admin portal via admin gateway service mesh"},
 	}
 	
 	for _, website := range websiteValidations {
@@ -366,10 +366,10 @@ func validateServiceToServiceCommunication() error {
 		endpoint     string
 		description  string
 	}{
-		{"public-gateway", "content", "http://localhost:3500/v1.0/invoke/content/method/health", "Gateway to content service communication"},
-		{"admin-gateway", "inquiries", "http://localhost:3500/v1.0/invoke/inquiries/method/health", "Gateway to inquiries service communication"},
-		{"content", "notifications", "http://localhost:3500/v1.0/invoke/notifications/method/health", "Content to notifications service communication"},
-		{"inquiries", "notifications", "http://localhost:3500/v1.0/invoke/notifications/method/health", "Inquiries to notifications service communication"},
+		{"public-gateway", "content", "http://localhost:3502/v1.0/invoke/content/method/health", "Gateway to content service communication"},
+		{"admin-gateway", "inquiries", "http://localhost:3502/v1.0/invoke/inquiries/method/health", "Gateway to inquiries service communication"},
+		{"content", "notifications", "http://localhost:3502/v1.0/invoke/notifications/method/health", "Content to notifications service communication"},
+		{"inquiries", "notifications", "http://localhost:3502/v1.0/invoke/notifications/method/health", "Inquiries to notifications service communication"},
 	}
 	
 	for _, comm := range serviceCommunications {
@@ -438,9 +438,9 @@ func testGatewayToContentServiceCommunication() error {
 		endpoint    string
 		description string
 	}{
-		{"health-check", "http://localhost:3500/v1.0/invoke/content/method/health", "Gateway to content health check via Dapr"},
-		{"news-endpoint", "http://localhost:3500/v1.0/invoke/content/method/api/news", "Gateway to content news API via Dapr"},
-		{"api-discovery", "http://localhost:3500/v1.0/invoke/public-gateway/method/api/v1/news", "Public gateway API routing via Dapr"},
+		{"health-check", "http://localhost:3502/v1.0/invoke/content/method/health", "Gateway to content health check via Dapr"},
+		{"news-endpoint", "http://localhost:3502/v1.0/invoke/content/method/api/news", "Gateway to content news API via Dapr"},
+		{"api-discovery", "http://localhost:3502/v1.0/invoke/public-gateway/method/api/v1/news", "Public gateway API routing via Dapr"},
 	}
 	
 	for _, test := range gatewayToContentTests {
@@ -475,10 +475,10 @@ func testAdminGatewayToBackendServicesCommunication() error {
 		endpoint    string
 		description string
 	}{
-		{"content", "http://localhost:3500/v1.0/invoke/content/method/health", "Admin gateway to content service via Dapr"},
-		{"inquiries", "http://localhost:3500/v1.0/invoke/inquiries/method/health", "Admin gateway to inquiries service via Dapr"},
-		{"notifications", "http://localhost:3500/v1.0/invoke/notifications/method/health", "Admin gateway to notifications service via Dapr"},
-		{"admin-gateway", "http://localhost:3500/v1.0/invoke/admin-gateway/method/api/admin/health", "Admin gateway self-routing via Dapr"},
+		{"content", "http://localhost:3502/v1.0/invoke/content/method/health", "Admin gateway to content service via Dapr"},
+		{"inquiries", "http://localhost:3502/v1.0/invoke/inquiries/method/health", "Admin gateway to inquiries service via Dapr"},
+		{"notifications", "http://localhost:3502/v1.0/invoke/notifications/method/health", "Admin gateway to notifications service via Dapr"},
+		{"admin-gateway", "http://localhost:3502/v1.0/invoke/admin-gateway/method/api/admin/health", "Admin gateway self-routing via Dapr"},
 	}
 	
 	for _, service := range backendServices {
@@ -513,9 +513,9 @@ func testContentServiceToServiceCommunication() error {
 		endpoint      string
 		description   string
 	}{
-		{"inquiries", "http://localhost:3500/v1.0/invoke/inquiries/method/health", "Content to inquiries service communication via Dapr"},
-		{"notifications", "http://localhost:3500/v1.0/invoke/notifications/method/health", "Content to notifications service communication via Dapr"},
-		{"public-gateway", "http://localhost:3500/v1.0/invoke/public-gateway/method/health", "Content service discovery of gateway via Dapr"},
+		{"inquiries", "http://localhost:3502/v1.0/invoke/inquiries/method/health", "Content to inquiries service communication via Dapr"},
+		{"notifications", "http://localhost:3502/v1.0/invoke/notifications/method/health", "Content to notifications service communication via Dapr"},
+		{"public-gateway", "http://localhost:3502/v1.0/invoke/public-gateway/method/health", "Content service discovery of gateway via Dapr"},
 	}
 	
 	for _, comm := range serviceCommunications {
@@ -551,11 +551,11 @@ func testDaprServiceInvocation() error {
 		endpoint     string
 		description  string
 	}{
-		{"content", "health", "http://localhost:3500/v1.0/invoke/content/method/health", "Content service invocation via Dapr"},
-		{"inquiries", "health", "http://localhost:3500/v1.0/invoke/inquiries/method/health", "Inquiries service invocation via Dapr"},
-		{"notifications", "health", "http://localhost:3500/v1.0/invoke/notifications/method/health", "Notifications service invocation via Dapr"},
-		{"public-gateway", "health", "http://localhost:3500/v1.0/invoke/public-gateway/method/health", "Public gateway service invocation via Dapr"},
-		{"admin-gateway", "health", "http://localhost:3500/v1.0/invoke/admin-gateway/method/health", "Admin gateway service invocation via Dapr"},
+		{"content", "health", "http://localhost:3502/v1.0/invoke/content/method/health", "Content service invocation via Dapr"},
+		{"inquiries", "health", "http://localhost:3502/v1.0/invoke/inquiries/method/health", "Inquiries service invocation via Dapr"},
+		{"notifications", "health", "http://localhost:3502/v1.0/invoke/notifications/method/health", "Notifications service invocation via Dapr"},
+		{"public-gateway", "health", "http://localhost:3502/v1.0/invoke/public-gateway/method/health", "Public gateway service invocation via Dapr"},
+		{"admin-gateway", "health", "http://localhost:3502/v1.0/invoke/admin-gateway/method/health", "Admin gateway service invocation via Dapr"},
 	}
 	
 	for _, invocation := range serviceInvocations {
@@ -604,9 +604,9 @@ func testDaprPubSubCommunication() error {
 		payload     string
 		description string
 	}{
-		{"subscription-list", "GET", "http://localhost:3500/v1.0/subscribe", "", "Dapr pub/sub subscription endpoint"},
-		{"publish-test", "POST", "http://localhost:3500/v1.0/publish/pubsub/test-topic", `{"message":"test"}`, "Dapr pub/sub publish functionality"},
-		{"metadata-pubsub", "GET", "http://localhost:3500/v1.0/metadata", "", "Dapr pub/sub component in metadata"},
+		{"subscription-list", "GET", "http://localhost:3502/v1.0/subscribe", "", "Dapr pub/sub subscription endpoint"},
+		{"publish-test", "POST", "http://localhost:3502/v1.0/publish/pubsub/test-topic", `{"message":"test"}`, "Dapr pub/sub publish functionality"},
+		{"metadata-pubsub", "GET", "http://localhost:3502/v1.0/metadata", "", "Dapr pub/sub component in metadata"},
 	}
 	
 	for _, test := range pubSubTests {
@@ -655,10 +655,10 @@ func testDaprControlPlaneHealth() error {
 		expectedCode int
 		description  string
 	}{
-		{"sidecar-health", "http://localhost:3500/v1.0/healthz", 204, "Dapr sidecar health endpoint"},
+		{"sidecar-health", "http://localhost:3502/v1.0/healthz", 204, "Dapr sidecar health endpoint"},
 		{"control-plane-health", "http://localhost:50001/v1.0/healthz", 200, "Dapr control plane health endpoint"},
-		{"metadata-api", "http://localhost:3500/v1.0/metadata", 200, "Dapr metadata API endpoint"},
-		{"component-api", "http://localhost:3500/v1.0/components", 200, "Dapr components API endpoint"},
+		{"metadata-api", "http://localhost:3502/v1.0/metadata", 200, "Dapr metadata API endpoint"},
+		{"component-api", "http://localhost:3502/v1.0/components", 200, "Dapr components API endpoint"},
 	}
 
 	for _, test := range controlPlaneTests {
@@ -711,7 +711,7 @@ func testContentServiceHealthChecks() error {
 	ctx := context.Background()
 	
 	// Test content service health via Dapr
-	req, _ := http.NewRequestWithContext(ctx, "GET", "http://localhost:3500/v1.0/invoke/content/method/health", nil)
+	req, _ := http.NewRequestWithContext(ctx, "GET", "http://localhost:3502/v1.0/invoke/content/method/health", nil)
 	if resp, err := client.Do(req); err == nil {
 		resp.Body.Close()
 	}

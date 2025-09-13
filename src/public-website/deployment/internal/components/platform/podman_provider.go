@@ -324,7 +324,7 @@ func (p *PodmanProviderComponent) ValidateDaprConfiguration(ctx context.Context,
 // GetDaprHealth checks the health of Dapr sidecar for an app
 func (p *PodmanProviderComponent) GetDaprHealth(ctx context.Context, appID string) error {
 	// Use unified health checker for Dapr health validation
-	daprEndpoint := "http://localhost:3500" // Default Dapr HTTP port
+	daprEndpoint := "http://localhost:3502" // Default Dapr HTTP port
 	return p.HealthChecker.ValidateDaprHealth(ctx, appID, daprEndpoint)
 }
 
@@ -346,7 +346,7 @@ func (p *PodmanProviderComponent) CheckContainerStatus(ctx context.Context, cont
 func (p *PodmanProviderComponent) GetContainerEndpoint(containerName string) string {
 	// Map container names to their health endpoints
 	healthEndpoints := map[string]string{
-		"dapr-control-plane":   "http://localhost:3500/v1.0/healthz",
+		"dapr-control-plane":   "http://localhost:3502/v1.0/healthz",
 		"dapr-placement":       "http://localhost:50005/v1.0/healthz", 
 		"dapr-sentry":          "http://localhost:50003/v1.0/healthz",
 		"public-gateway":       "http://localhost:9001/health",
@@ -402,6 +402,10 @@ func (p *PodmanProviderComponent) InjectSidecar(ctx context.Context, spec *Conta
 	
 	// Add network configuration
 	args = append(args, "--network", "international-center-dev")
+
+	// Add volume mount for project Dapr configuration directory
+	projectConfigPath := "/home/tojkuv/Documents/GitHub/international-center-workspace/international-center/src/public-website/deployment/configs/dapr"
+	args = append(args, "-v", fmt.Sprintf("%s:/opt/dapr/components:ro", projectConfigPath))
 
 	// Add Dapr sidecar specific ports
 	args = append(args, "-p", fmt.Sprintf("%d:3500", config.DaprHTTPPort))      // Dapr HTTP

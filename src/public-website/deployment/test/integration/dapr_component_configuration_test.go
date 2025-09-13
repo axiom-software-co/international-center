@@ -32,7 +32,7 @@ func TestDaprComponentConfiguration_StateStoreAvailability(t *testing.T) {
 		client := &http.Client{Timeout: 10 * time.Second}
 		
 		// Check Dapr components endpoint
-		componentsURL := "http://localhost:3500/v1.0/components"
+		componentsURL := "http://localhost:3502/v1.0/components"
 		req, err := http.NewRequestWithContext(ctx, "GET", componentsURL, nil)
 		require.NoError(t, err, "Failed to create components request")
 
@@ -79,7 +79,7 @@ func TestDaprComponentConfiguration_StateStoreAvailability(t *testing.T) {
 		client := &http.Client{Timeout: 10 * time.Second}
 		
 		// Test state store through Dapr state API
-		stateURL := "http://localhost:3500/v1.0/state/statestore/test-key"
+		stateURL := "http://localhost:3502/v1.0/state/statestore/test-key"
 		
 		// Try to read from state store
 		req, err := http.NewRequestWithContext(ctx, "GET", stateURL, nil)
@@ -109,7 +109,7 @@ func TestDaprComponentConfiguration_PubSubAvailability(t *testing.T) {
 		client := &http.Client{Timeout: 10 * time.Second}
 		
 		// Test pub/sub through Dapr publish endpoint
-		publishURL := "http://localhost:3500/v1.0/publish/pubsub/test-topic"
+		publishURL := "http://localhost:3502/v1.0/publish/pubsub/test-topic"
 		testMessage := `{"message": "test"}`
 		
 		req, err := http.NewRequestWithContext(ctx, "POST", publishURL, strings.NewReader(testMessage))
@@ -132,7 +132,7 @@ func TestDaprComponentConfiguration_PubSubAvailability(t *testing.T) {
 		client := &http.Client{Timeout: 10 * time.Second}
 		
 		// RED PHASE: Validate pub/sub component through Dapr metadata instead of direct RabbitMQ container inspection
-		componentsURL := "http://localhost:3500/v1.0/metadata"
+		componentsURL := "http://localhost:3502/v1.0/metadata"
 		req, err := http.NewRequestWithContext(ctx, "GET", componentsURL, nil)
 		require.NoError(t, err, "Failed to create Dapr metadata request")
 
@@ -222,7 +222,7 @@ func TestDaprComponentConfiguration_ComprehensiveComponentValidation(t *testing.
 
 	t.Run("ComponentRegistration_ComprehensiveValidation", func(t *testing.T) {
 		// RED PHASE: Validate all expected components are registered through Dapr metadata API
-		metadataReq, err := http.NewRequestWithContext(ctx, "GET", "http://localhost:3500/v1.0/metadata", nil)
+		metadataReq, err := http.NewRequestWithContext(ctx, "GET", "http://localhost:3502/v1.0/metadata", nil)
 		require.NoError(t, err, "Failed to create Dapr metadata request")
 
 		resp, err := client.Do(metadataReq)
@@ -283,9 +283,9 @@ func TestDaprComponentConfiguration_ComprehensiveComponentValidation(t *testing.
 			method        string
 			description   string
 		}{
-			{"statestore", "http://localhost:3500/v1.0/state/statestore/test", "GET", "State store component accessibility"},
-			{"secretstore", "http://localhost:3500/v1.0/secrets/secretstore/test", "GET", "Secret store component accessibility"},
-			{"blobstore", "http://localhost:3500/v1.0/bindings/blobstore", "POST", "Blob store component accessibility"},
+			{"statestore", "http://localhost:3502/v1.0/state/statestore/test", "GET", "State store component accessibility"},
+			{"secretstore", "http://localhost:3502/v1.0/secrets/secretstore/test", "GET", "Secret store component accessibility"},
+			{"blobstore", "http://localhost:3502/v1.0/bindings/blobstore", "POST", "Blob store component accessibility"},
 		}
 
 		for _, endpoint := range componentEndpoints {
@@ -367,8 +367,8 @@ func TestDaprComponentConfiguration_ServiceStateIntegration(t *testing.T) {
 	}{
 		{
 			serviceName:        "content-api",
-			healthEndpoint:     "http://localhost:3500/v1.0/invoke/content-api/method/health",
-			dataEndpoint:       "http://localhost:3500/v1.0/invoke/content-api/method/api/v1/news/featured",
+			healthEndpoint:     "http://localhost:3502/v1.0/invoke/content-api/method/health",
+			dataEndpoint:       "http://localhost:3502/v1.0/invoke/content-api/method/api/v1/news/featured",
 			expectedHTTPStatus: 200,
 			expectedContentType: "application/json",
 			requiredFields:     []string{"data"},
@@ -378,8 +378,8 @@ func TestDaprComponentConfiguration_ServiceStateIntegration(t *testing.T) {
 		},
 		{
 			serviceName:        "inquiries-api",
-			healthEndpoint:     "http://localhost:3500/v1.0/invoke/inquiries-api/method/health",
-			dataEndpoint:       "http://localhost:3500/v1.0/invoke/inquiries-api/method/api/inquiries",
+			healthEndpoint:     "http://localhost:3502/v1.0/invoke/inquiries-api/method/health",
+			dataEndpoint:       "http://localhost:3502/v1.0/invoke/inquiries-api/method/api/inquiries",
 			expectedHTTPStatus: 200,
 			expectedContentType: "application/json",
 			requiredFields:     []string{"data", "count"},
@@ -389,8 +389,8 @@ func TestDaprComponentConfiguration_ServiceStateIntegration(t *testing.T) {
 		},
 		{
 			serviceName:        "notification-api",
-			healthEndpoint:     "http://localhost:3500/v1.0/invoke/notification-api/method/health",
-			dataEndpoint:       "http://localhost:3500/v1.0/invoke/notification-api/method/api/subscribers",
+			healthEndpoint:     "http://localhost:3502/v1.0/invoke/notification-api/method/health",
+			dataEndpoint:       "http://localhost:3502/v1.0/invoke/notification-api/method/api/subscribers",
 			expectedHTTPStatus: 200,
 			expectedContentType: "application/json",
 			requiredFields:     []string{"data", "count"},
@@ -550,7 +550,7 @@ func TestDaprComponentConfiguration_ServiceRegistration(t *testing.T) {
 	// Act & Assert: Validate service registration through Dapr metadata API
 	t.Run("DaprServiceDiscovery", func(t *testing.T) {
 		// Test Dapr metadata endpoint accessibility
-		metadataURL := "http://localhost:3500/v1.0/metadata"
+		metadataURL := "http://localhost:3502/v1.0/metadata"
 		req, err := http.NewRequestWithContext(ctx, "GET", metadataURL, nil)
 		require.NoError(t, err, "Failed to create Dapr metadata request")
 
@@ -580,7 +580,7 @@ func TestDaprComponentConfiguration_ServiceRegistration(t *testing.T) {
 	for _, expectedService := range expectedServices {
 		t.Run("ServiceRegistration_"+expectedService.appId, func(t *testing.T) {
 			// Test service registration via Dapr service invocation health check
-			serviceURL := fmt.Sprintf("http://localhost:3500/v1.0/invoke/%s/method/health", expectedService.appId)
+			serviceURL := fmt.Sprintf("http://localhost:3502/v1.0/invoke/%s/method/health", expectedService.appId)
 			req, err := http.NewRequestWithContext(ctx, "GET", serviceURL, nil)
 			require.NoError(t, err, "Failed to create service invocation request for %s", expectedService.appId)
 
@@ -651,7 +651,7 @@ func TestDaprComponentConfiguration_ServiceRegistration(t *testing.T) {
 		}
 
 		for _, testEndpoint := range testEndpoints {
-			serviceURL := fmt.Sprintf("http://localhost:3500/v1.0/invoke/%s/method%s", 
+			serviceURL := fmt.Sprintf("http://localhost:3502/v1.0/invoke/%s/method%s", 
 				testEndpoint.serviceAppId, testEndpoint.methodPath)
 			
 			req, err := http.NewRequestWithContext(ctx, "GET", serviceURL, nil)
@@ -694,21 +694,21 @@ func TestDaprComponentConfiguration_CrossServiceCommunication(t *testing.T) {
 			communicationPattern: "content-to-notifications",
 			sourceService:        "content-api",
 			targetService:        "notification-api",
-			testEndpoint:         "http://localhost:3500/v1.0/invoke/notification-api/method/health",
+			testEndpoint:         "http://localhost:3502/v1.0/invoke/notification-api/method/health",
 			description:          "Content service must communicate with notifications through Dapr for event publishing",
 		},
 		{
 			communicationPattern: "inquiries-to-notifications",
 			sourceService:        "inquiries-api",
 			targetService:        "notification-api",
-			testEndpoint:         "http://localhost:3500/v1.0/invoke/notification-api/method/health",
+			testEndpoint:         "http://localhost:3502/v1.0/invoke/notification-api/method/health",
 			description:          "Inquiries service must communicate with notifications through Dapr for inquiry alerts",
 		},
 		{
 			communicationPattern: "gateway-to-content",
 			sourceService:        "public-gateway",
 			targetService:        "content-api",
-			testEndpoint:         "http://localhost:3500/v1.0/invoke/content-api/method/health",
+			testEndpoint:         "http://localhost:3502/v1.0/invoke/content-api/method/health",
 			description:          "Public gateway must communicate with content service through Dapr for API routing",
 		},
 	}
@@ -794,7 +794,7 @@ func TestDaprComponentConfiguration_ComprehensiveOperationalValidation(t *testin
 		for _, component := range dataComponents {
 			t.Run("ComponentHealth_"+component.componentName, func(t *testing.T) {
 				// Test component health through Dapr metadata API
-				metadataURL := "http://localhost:3500/v1.0/metadata"
+				metadataURL := "http://localhost:3502/v1.0/metadata"
 				
 				metadataReq, err := http.NewRequestWithContext(ctx, "GET", metadataURL, nil)
 				require.NoError(t, err, "Failed to create component health request")
@@ -861,21 +861,21 @@ func TestDaprComponentConfiguration_ComprehensiveOperationalValidation(t *testin
 		}{
 			{
 				componentName: "statestore",
-				operationURL:  "http://localhost:3500/v1.0/state/statestore/operational-test-key",
+				operationURL:  "http://localhost:3502/v1.0/state/statestore/operational-test-key",
 				operationType: "state_read",
 				testPayload:   "",
 				description:   "State store must be operationally accessible for read operations",
 			},
 			{
 				componentName: "pubsub",
-				operationURL:  "http://localhost:3500/v1.0/publish/pubsub/operational-test-topic",
+				operationURL:  "http://localhost:3502/v1.0/publish/pubsub/operational-test-topic",
 				operationType: "message_publish",
 				testPayload:   `{"operational_test": "pub_sub_validation", "timestamp": "` + time.Now().Format(time.RFC3339) + `"}`,
 				description:   "Pub/sub must be operationally accessible for message publishing",
 			},
 			{
 				componentName: "secretstore",
-				operationURL:  "http://localhost:3500/v1.0/secrets/secretstore/operational-test-secret",
+				operationURL:  "http://localhost:3502/v1.0/secrets/secretstore/operational-test-secret",
 				operationType: "secret_read",
 				testPayload:   "",
 				description:   "Secret store must be operationally accessible for secret operations",
@@ -934,7 +934,7 @@ func TestDaprComponentConfiguration_ComprehensiveOperationalValidation(t *testin
 				operationCount:  5,
 				maxResponseTime: 2 * time.Second,
 				testDescription: "State store must handle multiple operations with acceptable performance",
-				testURL:        "http://localhost:3500/v1.0/state/statestore",
+				testURL:        "http://localhost:3502/v1.0/state/statestore",
 				httpMethod:     "POST",
 				payload:        `[{"key": "perf-test-{{INDEX}}", "value": {"test": "performance", "index": {{INDEX}}}}]`,
 			},
@@ -943,7 +943,7 @@ func TestDaprComponentConfiguration_ComprehensiveOperationalValidation(t *testin
 				operationCount:  3,
 				maxResponseTime: 1 * time.Second,
 				testDescription: "Pub/sub must handle multiple message publishing with acceptable performance",
-				testURL:        "http://localhost:3500/v1.0/publish/pubsub/performance-test-topic",
+				testURL:        "http://localhost:3502/v1.0/publish/pubsub/performance-test-topic",
 				httpMethod:     "POST",
 				payload:        `{"performance_test": "message_{{INDEX}}", "timestamp": "` + time.Now().Format(time.RFC3339) + `"}`,
 			},
@@ -952,7 +952,7 @@ func TestDaprComponentConfiguration_ComprehensiveOperationalValidation(t *testin
 				operationCount:  3,
 				maxResponseTime: 1 * time.Second,
 				testDescription: "Secret store must handle multiple secret requests with acceptable performance",
-				testURL:        "http://localhost:3500/v1.0/secrets/secretstore/performance-test-secret-{{INDEX}}",
+				testURL:        "http://localhost:3502/v1.0/secrets/secretstore/performance-test-secret-{{INDEX}}",
 				httpMethod:     "GET",
 				payload:        "",
 			},
@@ -1022,21 +1022,21 @@ func TestDaprComponentConfiguration_ComprehensiveOperationalValidation(t *testin
 		}{
 			{
 				componentName:   "secretstore",
-				testURL:        "http://localhost:3500/v1.0/secrets/secretstore/unauthorized-access-test",
+				testURL:        "http://localhost:3502/v1.0/secrets/secretstore/unauthorized-access-test",
 				httpMethod:     "GET",
 				expectedBehavior: "should_handle_gracefully",
 				description:    "Secret store must handle unauthorized access attempts securely",
 			},
 			{
 				componentName:   "statestore",
-				testURL:        "http://localhost:3500/v1.0/state/statestore/security-test",
+				testURL:        "http://localhost:3502/v1.0/state/statestore/security-test",
 				httpMethod:     "GET", 
 				expectedBehavior: "should_be_accessible",
 				description:    "State store must be accessible through proper Dapr channels",
 			},
 			{
 				componentName:   "pubsub",
-				testURL:        "http://localhost:3500/v1.0/publish/pubsub/security-test-topic",
+				testURL:        "http://localhost:3502/v1.0/publish/pubsub/security-test-topic",
 				httpMethod:     "POST",
 				expectedBehavior: "should_be_accessible",
 				description:    "Pub/sub must be accessible through proper Dapr channels",
@@ -1106,7 +1106,7 @@ func TestDaprComponentConfiguration_OperationalMetricsMonitoring(t *testing.T) {
 		},
 		{
 			endpointName:   "dapr_healthz",
-			endpointURL:    "http://localhost:3500/v1.0/healthz",
+			endpointURL:    "http://localhost:3502/v1.0/healthz",
 			expectedMetrics: []string{"health_status"},
 			description:    "Dapr health endpoint must provide operational status",
 		},
@@ -1187,7 +1187,7 @@ func TestDaprComponentConfiguration_OperationalMetricsMonitoring(t *testing.T) {
 				switch pattern.componentName {
 				case "statestore":
 					// Test state store monitoring through operation execution
-					stateURL := "http://localhost:3500/v1.0/state/statestore/monitoring-test-key"
+					stateURL := "http://localhost:3502/v1.0/state/statestore/monitoring-test-key"
 					startTime := time.Now()
 					
 					stateReq, err := http.NewRequestWithContext(ctx, "GET", stateURL, nil)
@@ -1204,7 +1204,7 @@ func TestDaprComponentConfiguration_OperationalMetricsMonitoring(t *testing.T) {
 
 				case "pubsub":
 					// Test pub/sub monitoring through message publishing
-					pubsubURL := "http://localhost:3500/v1.0/publish/pubsub/monitoring-test-topic"
+					pubsubURL := "http://localhost:3502/v1.0/publish/pubsub/monitoring-test-topic"
 					monitoringPayload := `{"monitoring_test": "message_delivery", "timestamp": "` + time.Now().Format(time.RFC3339) + `"}`
 					
 					pubsubReq, err := http.NewRequestWithContext(ctx, "POST", pubsubURL, strings.NewReader(monitoringPayload))
@@ -1220,7 +1220,7 @@ func TestDaprComponentConfiguration_OperationalMetricsMonitoring(t *testing.T) {
 
 				case "secretstore":
 					// Test secret store monitoring through access operations
-					secretURL := "http://localhost:3500/v1.0/secrets/secretstore/monitoring-test-secret"
+					secretURL := "http://localhost:3502/v1.0/secrets/secretstore/monitoring-test-secret"
 					
 					secretReq, err := http.NewRequestWithContext(ctx, "GET", secretURL, nil)
 					require.NoError(t, err, "Failed to create secret store monitoring request")

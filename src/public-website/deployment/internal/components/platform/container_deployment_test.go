@@ -26,7 +26,7 @@ func TestDaprContainerDeployment_Development(t *testing.T) {
 
 		// Validate actual container deployment outputs
 		component.ControlPlaneURL.ApplyT(func(url string) string {
-			assert.Contains(t, url, "localhost:3500")
+			assert.Contains(t, url, "localhost:3502")
 			return url
 		})
 

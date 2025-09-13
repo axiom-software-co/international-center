@@ -243,7 +243,7 @@ func TestInfrastructureIntegration_DaprStateStoreConnectivity(t *testing.T) {
 	// Validate Dapr state store component registration
 	t.Run("DaprStateStoreComponentRegistration", func(t *testing.T) {
 		// Check Dapr components endpoint to validate state store is registered
-		componentsURL := "http://localhost:3500/v1.0/components"
+		componentsURL := "http://localhost:3502/v1.0/components"
 		req, err := http.NewRequestWithContext(ctx, "GET", componentsURL, nil)
 		require.NoError(t, err, "Failed to create Dapr components request")
 
@@ -267,7 +267,7 @@ func TestInfrastructureIntegration_DaprStateStoreConnectivity(t *testing.T) {
 			testValue := `{"test": "connectivity", "timestamp": "` + time.Now().Format(time.RFC3339) + `"}`
 
 			// Test state save operation
-			saveURL := fmt.Sprintf("http://localhost:3500/v1.0/state/%s", component.componentName)
+			saveURL := fmt.Sprintf("http://localhost:3502/v1.0/state/%s", component.componentName)
 			savePayload := fmt.Sprintf(`[{"key": "%s", "value": %s}]`, testKey, testValue)
 			
 			saveReq, err := http.NewRequestWithContext(ctx, "POST", saveURL, strings.NewReader(savePayload))
@@ -290,7 +290,7 @@ func TestInfrastructureIntegration_DaprStateStoreConnectivity(t *testing.T) {
 			}
 
 			// Test state get operation
-			getURL := fmt.Sprintf("http://localhost:3500/v1.0/state/%s/%s", component.componentName, testKey)
+			getURL := fmt.Sprintf("http://localhost:3502/v1.0/state/%s/%s", component.componentName, testKey)
 			getReq, err := http.NewRequestWithContext(ctx, "GET", getURL, nil)
 			require.NoError(t, err, "Failed to create state get request")
 
@@ -310,7 +310,7 @@ func TestInfrastructureIntegration_DaprStateStoreConnectivity(t *testing.T) {
 			}
 
 			// Clean up test data
-			deleteURL := fmt.Sprintf("http://localhost:3500/v1.0/state/%s/%s", component.componentName, testKey)
+			deleteURL := fmt.Sprintf("http://localhost:3502/v1.0/state/%s/%s", component.componentName, testKey)
 			deleteReq, err := http.NewRequestWithContext(ctx, "DELETE", deleteURL, nil)
 			if err == nil {
 				deleteResp, _ := client.Do(deleteReq)
@@ -326,7 +326,7 @@ func TestInfrastructureIntegration_DaprStateStoreConnectivity(t *testing.T) {
 	// Validate state store query capabilities 
 	t.Run("DaprStateStoreQueryCapabilities", func(t *testing.T) {
 		// Test state store query functionality that services depend on
-		queryURL := "http://localhost:3500/v1.0/state/statestore/query"
+		queryURL := "http://localhost:3502/v1.0/state/statestore/query"
 		queryPayload := `{
 			"filter": {},
 			"page": {
@@ -414,7 +414,7 @@ func TestInfrastructureIntegration_ComprehensiveStateStoreCRUD(t *testing.T) {
 	defer cancel()
 
 	client := &http.Client{Timeout: 15 * time.Second}
-	baseURL := "http://localhost:3500/v1.0/state/statestore"
+	baseURL := "http://localhost:3502/v1.0/state/statestore"
 
 	// Test data for comprehensive CRUD operations across different entity types
 	testEntities := []struct {
@@ -585,7 +585,7 @@ func TestInfrastructureIntegration_DataPersistenceValidation(t *testing.T) {
 	defer cancel()
 
 	client := &http.Client{Timeout: 15 * time.Second}
-	baseURL := "http://localhost:3500/v1.0/state/statestore"
+	baseURL := "http://localhost:3502/v1.0/state/statestore"
 
 	t.Run("DataPersistenceAcrossOperations", func(t *testing.T) {
 		// Test data that should persist through various operations
@@ -685,6 +685,309 @@ func TestInfrastructureIntegration_DataPersistenceValidation(t *testing.T) {
 		}
 
 		t.Logf("RED PHASE SUCCESS: Transaction consistency validation completed - multi-key operations maintain consistency")
+	})
+}
+
+// RED PHASE: Deployment Automation Verification Tests
+// These tests validate that the deployment automation process properly brings up
+// all infrastructure components and that the deployment is coordinated correctly
+
+func TestDeploymentAutomation_PulumiStackManagement(t *testing.T) {
+	// RED PHASE: This test validates Pulumi stack management and deployment coordination
+	sharedValidation.ValidateEnvironmentPrerequisites(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	t.Run("DeploymentAutomation_StackLifecycleValidation", func(t *testing.T) {
+		// RED PHASE: Validate Pulumi stack lifecycle management
+		
+		// Check if Pulumi is available
+		pulumiCmd := exec.CommandContext(ctx, "pulumi", "version")
+		pulumiOutput, err := pulumiCmd.Output()
+		
+		if err == nil {
+			t.Logf("Pulumi version available: %s", strings.TrimSpace(string(pulumiOutput)))
+			
+			// Check if development stack exists
+			stackListCmd := exec.CommandContext(ctx, "pulumi", "stack", "ls")
+			stackListCmd.Dir = "../../../"
+			stackListOutput, stackListErr := stackListCmd.Output()
+			
+			if stackListErr == nil {
+				stackList := string(stackListOutput)
+				assert.Contains(t, stackList, "development", 
+					"Development stack must exist for automated deployment")
+				
+				// If stack exists, validate it has recent activity
+				if strings.Contains(stackList, "development") {
+					historyCmd := exec.CommandContext(ctx, "pulumi", "history", "--page-size", "1")
+					historyCmd.Dir = "../../../"
+					historyOutput, historyErr := historyCmd.Output()
+					
+					if historyErr == nil {
+						assert.NotEmpty(t, historyOutput, 
+							"Stack must have deployment history indicating automation activity")
+						t.Logf("Recent stack activity found: %s", strings.TrimSpace(string(historyOutput)))
+					} else {
+						t.Logf("RED PHASE: Cannot access stack history - expected until deployment automation is active: %v", historyErr)
+					}
+				}
+			} else {
+				t.Logf("RED PHASE: Cannot list Pulumi stacks - expected until deployment automation is configured: %v", stackListErr)
+			}
+		} else {
+			t.Logf("RED PHASE: Pulumi not available - expected until deployment automation is configured: %v", err)
+			
+			// This should fail in RED PHASE until Pulumi is properly set up
+			assert.Fail(t, "Pulumi must be available for infrastructure deployment automation")
+		}
+	})
+
+	t.Run("DeploymentAutomation_ResourceProvisioning", func(t *testing.T) {
+		// RED PHASE: Validate automated resource provisioning
+		
+		// Check if Pulumi has provisioned resources by examining outputs
+		resourceOutputs := []struct {
+			outputName  string
+			description string
+			required    bool
+		}{
+			{"postgresql_connection_string", "PostgreSQL database connection", true},
+			{"vault_endpoint", "Vault secret store endpoint", true},
+			{"rabbitmq_connection_string", "RabbitMQ messaging connection", true},
+			{"dapr_components_path", "Dapr components configuration path", true},
+			{"grafana_endpoint", "Grafana monitoring endpoint", false},
+			{"monitoring_config", "Monitoring configuration", false},
+		}
+
+		for _, resource := range resourceOutputs {
+			t.Run("Resource_"+resource.outputName, func(t *testing.T) {
+				outputCmd := exec.CommandContext(ctx, "pulumi", "stack", "output", resource.outputName)
+				outputCmd.Dir = "../../../"
+				outputValue, outputErr := outputCmd.CombinedOutput()
+
+				if outputErr == nil && len(strings.TrimSpace(string(outputValue))) > 0 {
+					t.Logf("Resource %s provisioned: %s", resource.description, strings.TrimSpace(string(outputValue)))
+					assert.NotEmpty(t, strings.TrimSpace(string(outputValue)), 
+						"%s must be provisioned by deployment automation", resource.description)
+				} else {
+					if resource.required {
+						t.Logf("RED PHASE: Required resource %s not provisioned - expected until deployment automation is complete: %v", resource.description, outputErr)
+						
+						// Required resources should fail in RED PHASE
+						assert.Fail(t, fmt.Sprintf("Required resource %s must be provisioned by deployment automation", resource.description))
+					} else {
+						t.Logf("Optional resource %s not provisioned - acceptable: %v", resource.description, outputErr)
+					}
+				}
+			})
+		}
+	})
+}
+
+func TestDeploymentAutomation_ComponentInitializationOrder(t *testing.T) {
+	// RED PHASE: This test validates that components are initialized in correct order
+	sharedValidation.ValidateEnvironmentPrerequisites(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	t.Run("DeploymentAutomation_InfrastructureFirstValidation", func(t *testing.T) {
+		// RED PHASE: Validate infrastructure components start before application services
+		
+		infrastructureComponents := []struct {
+			containerName string
+			description   string
+			priority      int // Lower numbers should start first
+		}{
+			{"postgresql", "PostgreSQL database", 1},
+			{"vault", "HashiCorp Vault", 1},
+			{"rabbitmq", "RabbitMQ messaging", 1},
+			{"dapr_placement", "Dapr placement service", 2},
+			{"grafana", "Grafana monitoring", 1},
+		}
+
+		applicationServices := []struct {
+			containerName string
+			description   string
+			priority      int
+		}{
+			{"content", "Content service", 3},
+			{"inquiries", "Inquiries service", 3},
+			{"notifications", "Notifications service", 3},
+			{"public-gateway", "Public gateway", 4},
+			{"admin-gateway", "Admin gateway", 4},
+		}
+
+		// Check infrastructure components are running
+		infraRunning := 0
+		for _, component := range infrastructureComponents {
+			containerCmd := exec.CommandContext(ctx, "podman", "ps", "--filter", "name="+component.containerName, "--format", "{{.Names}}")
+			containerOutput, err := containerCmd.Output()
+			
+			if err == nil && strings.Contains(string(containerOutput), component.containerName) {
+				infraRunning++
+				t.Logf("Infrastructure component running: %s", component.description)
+			} else {
+				t.Logf("RED PHASE: Infrastructure component %s not running - expected until deployment automation provides correct startup order: %v", component.description, err)
+			}
+		}
+
+		// Check application services
+		appRunning := 0
+		for _, service := range applicationServices {
+			containerCmd := exec.CommandContext(ctx, "podman", "ps", "--filter", "name="+service.containerName, "--format", "{{.Names}}")
+			containerOutput, err := containerCmd.Output()
+			
+			if err == nil && strings.Contains(string(containerOutput), service.containerName) {
+				appRunning++
+				t.Logf("Application service running: %s", service.description)
+			} else {
+				t.Logf("RED PHASE: Application service %s not running - expected until deployment automation is complete: %v", service.description, err)
+			}
+		}
+
+		// In proper deployment, infrastructure should be running before applications
+		if appRunning > 0 {
+			assert.Greater(t, infraRunning, 0, 
+				"Infrastructure components must be running before application services")
+		}
+
+		// RED PHASE: This should fail until deployment automation ensures proper startup order
+		if infraRunning == 0 && appRunning == 0 {
+			assert.Fail(t, "Deployment automation must ensure proper component initialization order")
+		}
+	})
+
+	t.Run("DeploymentAutomation_DependencyValidation", func(t *testing.T) {
+		// RED PHASE: Validate that dependent services wait for dependencies
+		
+		dependencies := []struct {
+			serviceName    string
+			dependsOn      []string
+			description    string
+		}{
+			{"content", []string{"postgresql", "vault"}, "Content service depends on database and secrets"},
+			{"inquiries", []string{"postgresql", "vault"}, "Inquiries service depends on database and secrets"},
+			{"notifications", []string{"postgresql", "vault", "rabbitmq"}, "Notifications service depends on database, secrets, and messaging"},
+			{"public-gateway", []string{"content", "inquiries", "notifications"}, "Public gateway depends on backend services"},
+			{"admin-gateway", []string{"content", "inquiries", "notifications"}, "Admin gateway depends on backend services"},
+		}
+
+		for _, dep := range dependencies {
+			t.Run("Dependency_"+dep.serviceName, func(t *testing.T) {
+				// Check if the service is running
+				serviceCmd := exec.CommandContext(ctx, "podman", "ps", "--filter", "name="+dep.serviceName, "--format", "{{.Names}}")
+				serviceOutput, serviceErr := serviceCmd.Output()
+
+				if serviceErr == nil && strings.Contains(string(serviceOutput), dep.serviceName) {
+					// Service is running - check if its dependencies are also running
+					missingDeps := []string{}
+					
+					for _, depName := range dep.dependsOn {
+						depCmd := exec.CommandContext(ctx, "podman", "ps", "--filter", "name="+depName, "--format", "{{.Names}}")
+						depOutput, depErr := depCmd.Output()
+						
+						if depErr != nil || !strings.Contains(string(depOutput), depName) {
+							missingDeps = append(missingDeps, depName)
+						}
+					}
+
+					assert.Empty(t, missingDeps, 
+						"%s is running but dependencies %v are not running - deployment automation must ensure proper dependency order", 
+						dep.description, missingDeps)
+				} else {
+					t.Logf("Service %s not running - dependency validation skipped", dep.serviceName)
+				}
+			})
+		}
+	})
+}
+
+func TestDeploymentAutomation_ComponentConfiguration(t *testing.T) {
+	// RED PHASE: This test validates that components are properly configured during deployment
+	sharedValidation.ValidateEnvironmentPrerequisites(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	t.Run("DeploymentAutomation_DaprComponentFiles", func(t *testing.T) {
+		// RED PHASE: Validate Dapr component files are properly deployed
+		
+		expectedComponentFiles := []struct {
+			filePath    string
+			description string
+		}{
+			{"../../../configs/dapr/statestore.yaml", "PostgreSQL state store configuration"},
+			{"../../../configs/dapr/secretstore.yaml", "Vault secret store configuration"},
+			{"../../../configs/dapr/pubsub.yaml", "RabbitMQ pub/sub configuration"},
+			{"../../../configs/dapr/config.yaml", "Dapr runtime configuration"},
+		}
+
+		for _, componentFile := range expectedComponentFiles {
+			t.Run("ComponentFile_"+strings.Replace(componentFile.filePath, "/", "_", -1), func(t *testing.T) {
+				// Check if component file exists
+				_, err := exec.CommandContext(ctx, "ls", "-la", componentFile.filePath).Output()
+				
+				if err == nil {
+					// File exists - validate it has proper content
+					catCmd := exec.CommandContext(ctx, "cat", componentFile.filePath)
+					catOutput, catErr := catCmd.Output()
+					
+					if catErr == nil {
+						content := string(catOutput)
+						assert.Contains(t, content, "apiVersion", 
+							"%s must be valid Dapr component configuration", componentFile.description)
+						assert.Contains(t, content, "kind: Component", 
+							"%s must be valid Dapr component", componentFile.description)
+						
+						t.Logf("Dapr component file validated: %s", componentFile.description)
+					} else {
+						t.Logf("RED PHASE: Cannot read component file %s - expected until deployment automation configures components: %v", componentFile.description, catErr)
+					}
+				} else {
+					t.Logf("RED PHASE: Component file %s not found - expected until deployment automation creates configurations: %v", componentFile.description, err)
+					
+					// This should fail in RED PHASE until component files are deployed
+					assert.Fail(t, fmt.Sprintf("Deployment automation must create %s", componentFile.description))
+				}
+			})
+		}
+	})
+
+	t.Run("DeploymentAutomation_EnvironmentVariables", func(t *testing.T) {
+		// RED PHASE: Validate environment variables are properly configured
+		
+		requiredEnvVars := []struct {
+			varName     string
+			description string
+			required    bool
+		}{
+			{"PULUMI_CONFIG_PASSPHRASE", "Pulumi configuration passphrase", true},
+			{"DAPR_HTTP_PORT", "Dapr HTTP port configuration", false},
+			{"DAPR_GRPC_PORT", "Dapr gRPC port configuration", false},
+		}
+
+		for _, envVar := range requiredEnvVars {
+			t.Run("EnvVar_"+envVar.varName, func(t *testing.T) {
+				envCmd := exec.CommandContext(ctx, "printenv", envVar.varName)
+				envOutput, envErr := envCmd.Output()
+
+				if envErr == nil && len(strings.TrimSpace(string(envOutput))) > 0 {
+					t.Logf("Environment variable %s configured: %s", envVar.description, strings.TrimSpace(string(envOutput)))
+				} else {
+					if envVar.required {
+						t.Logf("RED PHASE: Required environment variable %s not configured - expected until deployment automation sets up environment: %v", envVar.description, envErr)
+						
+						// Required environment variables should fail in RED PHASE
+						assert.Fail(t, fmt.Sprintf("Required environment variable %s must be configured by deployment automation", envVar.description))
+					} else {
+						t.Logf("Optional environment variable %s not configured - acceptable", envVar.description)
+					}
+				}
+			})
+		}
 	})
 }
 

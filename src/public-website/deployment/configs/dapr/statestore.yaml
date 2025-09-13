@@ -8,9 +8,7 @@ spec:
   version: v1
   metadata:
   - name: connectionString
-    secretKeyRef:
-      name: postgresql-connection
-      key: connectionString
+    value: "postgresql://postgres:password@postgresql:5432/international_center_development?sslmode=disable"
   - name: tableName
     value: "state"
   - name: metadataTableName
