@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	sharedValidation "github.com/axiom-software-co/international-center/src/public-website/deployment/test/shared"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -19,7 +20,7 @@ import (
 
 func TestServiceSidecarConnectivity_ConsolidatedServiceReliability(t *testing.T) {
 	// This test requires complete environment health - enforcing axiom rule
-	validateEnvironmentPrerequisites(t)
+	sharedValidation.ValidateEnvironmentPrerequisites(t)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -77,7 +78,7 @@ func TestServiceSidecarConnectivity_ConsolidatedServiceReliability(t *testing.T)
 
 func TestServiceSidecarConnectivity_EnvironmentVariableConfiguration(t *testing.T) {
 	// Test that services have proper environment variables for sidecar connectivity
-	validateEnvironmentPrerequisites(t)
+	sharedValidation.ValidateEnvironmentPrerequisites(t)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -134,7 +135,7 @@ func TestServiceSidecarConnectivity_EnvironmentVariableConfiguration(t *testing.
 
 func TestServiceSidecarConnectivity_PortAllocationConflicts(t *testing.T) {
 	// Test that Dapr sidecar ports are allocated without conflicts
-	validateEnvironmentPrerequisites(t)
+	sharedValidation.ValidateEnvironmentPrerequisites(t)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -193,7 +194,7 @@ func TestServiceSidecarConnectivity_PortAllocationConflicts(t *testing.T) {
 
 func TestServiceSidecarConnectivity_ServiceMeshRegistration(t *testing.T) {
 	// Test that services are properly registered with Dapr service mesh
-	validateEnvironmentPrerequisites(t)
+	sharedValidation.ValidateEnvironmentPrerequisites(t)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -252,7 +253,7 @@ func TestServiceSidecarConnectivity_ServiceMeshRegistration(t *testing.T) {
 
 func TestServiceSidecarConnectivity_ContainerNetworkingIntegration(t *testing.T) {
 	// Test that service containers and sidecars are properly connected to development network
-	validateEnvironmentPrerequisites(t)
+	sharedValidation.ValidateEnvironmentPrerequisites(t)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -336,7 +337,7 @@ func TestServiceSidecarConnectivity_ContainerNetworkingIntegration(t *testing.T)
 
 func TestServiceSidecarConnectivity_DaprClientConfiguration(t *testing.T) {
 	// Test that service containers have correct Dapr client configuration
-	validateEnvironmentPrerequisites(t)
+	sharedValidation.ValidateEnvironmentPrerequisites(t)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -389,18 +390,3 @@ func TestServiceSidecarConnectivity_DaprClientConfiguration(t *testing.T) {
 	}
 }
 
-// validateEnvironmentPrerequisites ensures environment health before integration testing
-func validateEnvironmentPrerequisites(t *testing.T) {
-	// Check critical infrastructure and platform components are running
-	criticalContainers := []string{"postgresql", "dapr-control-plane"}
-	
-	for _, container := range criticalContainers {
-		cmd := exec.Command("podman", "ps", "--filter", "name="+container, "--format", "{{.Names}}")
-		output, err := cmd.Output()
-		require.NoError(t, err, "Failed to check critical container %s", container)
-
-		if !strings.Contains(string(output), container) {
-			t.Skipf("Critical container %s not running - environment not ready for integration testing", container)
-		}
-	}
-}

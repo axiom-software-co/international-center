@@ -141,6 +141,15 @@ func (p *PodmanProviderComponent) DeployContainer(ctx context.Context, spec *Con
 		args = append(args, "-e", fmt.Sprintf("%s=%s", key, value))
 	}
 
+	// Add volume mounts
+	for _, volume := range spec.Volumes {
+		mountFlag := fmt.Sprintf("%s:%s", volume.HostPath, volume.ContainerPath)
+		if volume.ReadOnly {
+			mountFlag += ":ro"
+		}
+		args = append(args, "-v", mountFlag)
+	}
+
 	// Add resource limits
 	if spec.ResourceLimits.CPU != "" {
 		args = append(args, "--cpus", spec.ResourceLimits.CPU)

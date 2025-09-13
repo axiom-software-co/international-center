@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	sharedValidation "github.com/axiom-software-co/international-center/src/public-website/deployment/test/shared"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	_ "github.com/lib/pq" // PostgreSQL driver
@@ -19,7 +20,7 @@ import (
 
 func TestDatabaseMigrationIntegration_MigrationExecution(t *testing.T) {
 	// This test requires complete environment health - enforcing axiom rule
-	validateEnvironmentPrerequisites(t)
+	sharedValidation.ValidateEnvironmentPrerequisites(t)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -110,7 +111,7 @@ func TestDatabaseMigrationIntegration_MigrationExecution(t *testing.T) {
 
 func TestDatabaseMigrationIntegration_ServiceDatabaseConnectivity(t *testing.T) {
 	// Test that all services can connect to database with proper schema
-	validateEnvironmentPrerequisites(t)
+	sharedValidation.ValidateEnvironmentPrerequisites(t)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -201,7 +202,7 @@ func TestDatabaseMigrationIntegration_ServiceDatabaseConnectivity(t *testing.T) 
 
 func TestDatabaseMigrationIntegration_MigrationDeploymentCoordination(t *testing.T) {
 	// Test that migrations are properly coordinated with deployment phases
-	validateEnvironmentPrerequisites(t)
+	sharedValidation.ValidateEnvironmentPrerequisites(t)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -261,18 +262,3 @@ func TestDatabaseMigrationIntegration_MigrationDeploymentCoordination(t *testing
 	})
 }
 
-// validateEnvironmentPrerequisites ensures environment health before integration testing
-func validateEnvironmentPrerequisites(t *testing.T) {
-	// Check critical infrastructure and platform components are running
-	criticalContainers := []string{"postgresql", "dapr-control-plane"}
-	
-	for _, container := range criticalContainers {
-		cmd := exec.Command("podman", "ps", "--filter", "name="+container, "--format", "{{.Names}}")
-		output, err := cmd.Output()
-		require.NoError(t, err, "Failed to check critical container %s", container)
-
-		if !strings.Contains(string(output), container) {
-			t.Skipf("Critical container %s not running - environment not ready for integration testing", container)
-		}
-	}
-}

@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	sharedValidation "github.com/axiom-software-co/international-center/src/public-website/deployment/test/shared"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -18,7 +19,7 @@ import (
 
 func TestServiceEnvironmentConfiguration_RequiredVariables(t *testing.T) {
 	// This test requires complete environment health - enforcing axiom rule
-	validateEnvironmentPrerequisites(t)
+	sharedValidation.ValidateEnvironmentPrerequisites(t)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -149,7 +150,7 @@ func TestServiceEnvironmentConfiguration_RequiredVariables(t *testing.T) {
 
 func TestServiceEnvironmentConfiguration_DatabaseConnectivity(t *testing.T) {
 	// Test that services requiring database access have proper database configuration
-	validateEnvironmentPrerequisites(t)
+	sharedValidation.ValidateEnvironmentPrerequisites(t)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -206,7 +207,7 @@ func TestServiceEnvironmentConfiguration_DatabaseConnectivity(t *testing.T) {
 
 func TestServiceEnvironmentConfiguration_ServiceSpecificSettings(t *testing.T) {
 	// Test service-specific configuration requirements beyond basic Dapr and database
-	validateEnvironmentPrerequisites(t)
+	sharedValidation.ValidateEnvironmentPrerequisites(t)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -275,7 +276,7 @@ func TestServiceEnvironmentConfiguration_ServiceSpecificSettings(t *testing.T) {
 
 func TestServiceEnvironmentConfiguration_ServiceStartupReliability(t *testing.T) {
 	// Test that services start reliably without configuration errors
-	validateEnvironmentPrerequisites(t)
+	sharedValidation.ValidateEnvironmentPrerequisites(t)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -345,18 +346,3 @@ func TestServiceEnvironmentConfiguration_ServiceStartupReliability(t *testing.T)
 	}
 }
 
-// validateEnvironmentPrerequisites ensures environment health before integration testing
-func validateEnvironmentPrerequisites(t *testing.T) {
-	// Check critical infrastructure and platform components are running
-	criticalContainers := []string{"postgresql", "dapr-control-plane"}
-	
-	for _, container := range criticalContainers {
-		cmd := exec.Command("podman", "ps", "--filter", "name="+container, "--format", "{{.Names}}")
-		output, err := cmd.Output()
-		require.NoError(t, err, "Failed to check critical container %s", container)
-
-		if !strings.Contains(string(output), container) {
-			t.Skipf("Critical container %s not running - environment not ready for integration testing", container)
-		}
-	}
-}

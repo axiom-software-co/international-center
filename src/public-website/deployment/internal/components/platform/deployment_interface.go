@@ -41,6 +41,7 @@ type ContainerSpec struct {
 	Environment    map[string]string
 	HealthEndpoint string
 	ResourceLimits ResourceLimits
+	Volumes        []VolumeMount
 	
 	// Dapr configuration
 	DaprEnabled    bool
@@ -114,6 +115,13 @@ type PortMapping struct {
 	ContainerPort int
 	HostPort      int
 	Protocol      string
+}
+
+// VolumeMount represents a volume mount configuration
+type VolumeMount struct {
+	HostPath      string
+	ContainerPath string
+	ReadOnly      bool
 }
 
 // BaseContainerProvider provides common functionality for container providers
@@ -246,6 +254,7 @@ func (spec *ContainerSpec) Clone() *ContainerSpec {
 		Environment:    make(map[string]string),
 		HealthEndpoint: spec.HealthEndpoint,
 		ResourceLimits: spec.ResourceLimits,
+		Volumes:        make([]VolumeMount, len(spec.Volumes)),
 		DaprEnabled:    spec.DaprEnabled,
 		DaprAppID:      spec.DaprAppID,
 		DaprPort:       spec.DaprPort,
@@ -254,6 +263,9 @@ func (spec *ContainerSpec) Clone() *ContainerSpec {
 	
 	// Copy command arguments
 	copy(clone.Command, spec.Command)
+	
+	// Copy volume mounts
+	copy(clone.Volumes, spec.Volumes)
 	
 	// Copy environment variables
 	for k, v := range spec.Environment {
@@ -348,6 +360,16 @@ func (b *ContainerSpecBuilder) WithHealthEndpoint(endpoint string) *ContainerSpe
 func (b *ContainerSpecBuilder) WithCommand(command []string) *ContainerSpecBuilder {
 	b.spec.Command = make([]string, len(command))
 	copy(b.spec.Command, command)
+	return b
+}
+
+// WithVolumeMount adds a volume mount
+func (b *ContainerSpecBuilder) WithVolumeMount(hostPath, containerPath string, readOnly bool) *ContainerSpecBuilder {
+	b.spec.Volumes = append(b.spec.Volumes, VolumeMount{
+		HostPath:      hostPath,
+		ContainerPath: containerPath,
+		ReadOnly:      readOnly,
+	})
 	return b
 }
 

@@ -1,0 +1,32 @@
+apiVersion: dapr.io/v1alpha1
+kind: Component
+metadata:
+  name: statestore
+  namespace: default
+spec:
+  type: state.postgresql
+  version: v1
+  metadata:
+  - name: connectionString
+    value: "postgresql://postgres:password@postgresql:5432/international_center_development?sslmode=disable"
+  - name: tableName
+    value: "state"
+  - name: metadataTableName
+    value: "metadata"
+  - name: timeout
+    value: "20s"
+  - name: maxIdleConns
+    value: "10"
+  - name: maxOpenConns
+    value: "25"
+  - name: connMaxLifetime
+    value: "0"
+  - name: cleanupInterval
+    value: "1h"
+scopes:
+- content-api
+- inquiries-api
+- notification-api
+- services-api
+- public-gateway
+- admin-gateway

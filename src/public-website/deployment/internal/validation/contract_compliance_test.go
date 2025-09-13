@@ -5,6 +5,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/axiom-software-co/international-center/src/public-website/deployment/test/shared"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 )
 
@@ -101,13 +102,12 @@ func TestDeploymentContractValidation(t *testing.T) {
 			t.Run(env, func(t *testing.T) {
 				validation := NewDeploymentContractValidation(env)
 				
-				// Create mock Pulumi context for testing
-				mockCtx := &MockPulumiContext{
-					environment: env,
-				}
+				// Use proper Pulumi testing approach with shared mock
+				err := pulumi.RunErr(func(ctx *pulumi.Context) error {
+					// Test environment-specific validation logic
+					return validation.validateEnvironmentSpecificContracts(ctx)
+				}, pulumi.WithMocks("project", "stack", &shared.SharedMockResourceMonitor{}))
 				
-				// Test environment-specific validation logic
-				err := validation.validateEnvironmentSpecificContracts(mockCtx)
 				if err != nil {
 					t.Errorf("Environment-specific validation failed for %s: %v", env, err)
 				}
@@ -116,19 +116,6 @@ func TestDeploymentContractValidation(t *testing.T) {
 	})
 }
 
-// MockPulumiContext provides a mock Pulumi context for testing
-type MockPulumiContext struct {
-	environment string
-	logs        []string
-}
-
-func (m *MockPulumiContext) Info(message string, args *pulumi.LogArgs) {
-	m.logs = append(m.logs, "INFO: "+message)
-}
-
-func (m *MockPulumiContext) Warn(message string, args *pulumi.LogArgs) {
-	m.logs = append(m.logs, "WARN: "+message)
-}
 
 // TestContractValidationWorkflow tests the full validation workflow
 func TestContractValidationWorkflow(t *testing.T) {

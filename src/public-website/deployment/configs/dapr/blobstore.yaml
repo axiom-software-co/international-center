@@ -1,0 +1,19 @@
+apiVersion: dapr.io/v1alpha1
+kind: Component
+metadata:
+  name: blobstore
+  namespace: default
+spec:
+  type: bindings.azure.blobstorage
+  version: v1
+  metadata:
+  - name: storageAccount
+    value: "devstoreaccount1"
+  - name: storageAccessKey
+    value: "Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw=="
+  - name: container
+    value: "files"
+  - name: endpoint
+    value: "http://azurite:10000/devstoreaccount1"
+  - name: publicAccessLevel
+    value: "none"

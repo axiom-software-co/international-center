@@ -67,7 +67,7 @@ func NewDaprDeploymentComponent(ctx *pulumi.Context, name string, args *DaprDepl
 			},
 			"volumes": pulumi.Array{
 				pulumi.Map{
-					"host_path":      pulumi.String("/tmp/dapr-config"),
+					"host_path":      pulumi.String("src/public-website/deployment/configs/dapr"),
 					"container_path": pulumi.String("/dapr/config"),
 				},
 			},
@@ -140,7 +140,7 @@ func NewDaprDeploymentComponent(ctx *pulumi.Context, name string, args *DaprDepl
 			},
 			"volumes": pulumi.Array{
 				pulumi.Map{
-					"host_path":      pulumi.String("/tmp/dapr-certs"),
+					"host_path":      pulumi.String("src/public-website/deployment/configs/dapr/certs"),
 					"container_path": pulumi.String("/dapr/certs"),
 				},
 			},

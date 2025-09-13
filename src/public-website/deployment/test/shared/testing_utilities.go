@@ -1,7 +1,12 @@
-package validation
+package shared
 
 import (
+	"context"
+	"net/http"
+	"os/exec"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/pulumi/pulumi/sdk/v3/go/common/resource"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
@@ -168,6 +173,60 @@ func RunPropertyBasedTest(t *testing.T, test ComponentPropertyTest, config Prope
 					assert.True(t, result, "Property should hold for environment %s with config %v", env, configSet)
 				})
 			}
+		}
+	}
+}
+
+// HTTPTestClient creates a standardized HTTP client for testing with timeout
+func HTTPTestClient() *http.Client {
+	return &http.Client{Timeout: 5 * time.Second}
+}
+
+// HTTPTestRequest creates a standardized HTTP request for testing
+func HTTPTestRequest(ctx context.Context, method, url string) (*http.Request, error) {
+	return http.NewRequestWithContext(ctx, method, url, nil)
+}
+
+// TestHealthEndpoint performs a standard health check request and returns only error status
+func TestHealthEndpoint(ctx context.Context, url string) error {
+	client := HTTPTestClient()
+	req, err := HTTPTestRequest(ctx, "GET", url)
+	if err != nil {
+		return err
+	}
+	
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	
+	// For testing purposes, we just verify the endpoint is reachable
+	return nil
+}
+
+// ValidateEnvironmentPrerequisites ensures environment health before integration testing
+// This function checks that all critical containers are running before tests execute
+func ValidateEnvironmentPrerequisites(t *testing.T) {
+	// Check critical infrastructure, platform, service, and gateway components are running
+	criticalContainers := []string{
+		"postgresql", 
+		"dapr-control-plane", 
+		"content-api", 
+		"inquiries-api", 
+		"notification-api", 
+		"services-api",
+		"public-gateway", 
+		"admin-gateway",
+	}
+	
+	for _, container := range criticalContainers {
+		cmd := exec.Command("podman", "ps", "--filter", "name="+container, "--format", "{{.Names}}")
+		output, err := cmd.Output()
+		require.NoError(t, err, "Failed to check critical container %s", container)
+
+		if !strings.Contains(string(output), container) {
+			t.Skipf("Critical container %s not running - environment not ready for integration testing", container)
 		}
 	}
 }
