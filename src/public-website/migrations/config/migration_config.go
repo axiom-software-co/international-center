@@ -38,44 +38,44 @@ func NewDomainMigrationConfigs(basePath, databaseURL string) *DomainMigrationCon
 	// Content domain configurations
 	config.Content.Services = MigrationConfig{
 		Domain:        "content-services",
-		MigrationPath: filepath.Join(basePath, "sql", "content"),
+		MigrationPath: filepath.Join(basePath, "sql", "content", "services"),
 		DatabaseURL:   databaseURL,
 	}
 	config.Content.News = MigrationConfig{
 		Domain:        "content-news",
-		MigrationPath: filepath.Join(basePath, "sql", "content"),
+		MigrationPath: filepath.Join(basePath, "sql", "content", "news"),
 		DatabaseURL:   databaseURL,
 	}
 	config.Content.Research = MigrationConfig{
 		Domain:        "content-research",
-		MigrationPath: filepath.Join(basePath, "sql", "content"),
+		MigrationPath: filepath.Join(basePath, "sql", "content", "research"),
 		DatabaseURL:   databaseURL,
 	}
 	config.Content.Events = MigrationConfig{
 		Domain:        "content-events",
-		MigrationPath: filepath.Join(basePath, "sql", "content"),
+		MigrationPath: filepath.Join(basePath, "sql", "content", "events"),
 		DatabaseURL:   databaseURL,
 	}
 	
 	// Inquiries domain configurations
 	config.Inquiries.Donations = MigrationConfig{
 		Domain:        "inquiries-donations",
-		MigrationPath: filepath.Join(basePath, "sql", "inquiries"),
+		MigrationPath: filepath.Join(basePath, "sql", "inquiries", "donations"),
 		DatabaseURL:   databaseURL,
 	}
 	config.Inquiries.Business = MigrationConfig{
 		Domain:        "inquiries-business",
-		MigrationPath: filepath.Join(basePath, "sql", "inquiries"),
+		MigrationPath: filepath.Join(basePath, "sql", "inquiries", "business"),
 		DatabaseURL:   databaseURL,
 	}
 	config.Inquiries.Media = MigrationConfig{
 		Domain:        "inquiries-media",
-		MigrationPath: filepath.Join(basePath, "sql", "inquiries"),
+		MigrationPath: filepath.Join(basePath, "sql", "inquiries", "media"),
 		DatabaseURL:   databaseURL,
 	}
 	config.Inquiries.Volunteers = MigrationConfig{
 		Domain:        "inquiries-volunteers",
-		MigrationPath: filepath.Join(basePath, "sql", "inquiries"),
+		MigrationPath: filepath.Join(basePath, "sql", "inquiries", "volunteers"),
 		DatabaseURL:   databaseURL,
 	}
 	

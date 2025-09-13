@@ -12,6 +12,8 @@
 
 - IMPORTANT AXIOM RULE TO FOLLOW : outside of unit tests , consider mocks and stubs the worst architectural anti pattern ( stop metioning the fact that you are using real implmentations , this is explicit in the implementation , keep the naming professional ) . consider stubs the worst anti-pattern ( we should use propper infrastructure and fix root issues as they arise ) ( we should not fall back to stubs in integration tests ) . only run integration tests when the entire development environment is up ( only the deployer implements integration tests ) 
 
+- IMPORTANT AXIOM RULE TO FOLLOW : when performing tdd with integration testing , we should work our way sequentially , ensure the previous phase is working as intended ( infrastructure deployment , database migrations , backend deployment , frontend public website deployment , databse schema and backend to frontend public website contract validation , infrastructure to backend integration , backend to frontend public website integration ) . only work on a single phase per tdd cycle to improve the effectiveness of our efforts .
+
 # notes
 
 - note : stop using the term 'medical-grade' ( this is implicit and there is no need to mention it in the naming system ) ( do not use 'kill shell' ) 
@@ -20,11 +22,11 @@
 
 - note : do not work with github actions for now
 
-- note : we will not work on the UI of the public admin portal website for the moment
+- note : we will not work on the backend nor frontend of the newsletter feature for now 
 
-- note : we will not work on the newsletter for now 
+- note : wee will not work on observability for now 
 
-- note : we will not work with blob store for the moment 
+- note : we will not work on the admin portal website frontend for now
 
 - note : we are currently focused on integration testing . be causious of integration test files proliferation . you may not create new integration test files , but you may edit our current integration testing framework and and integtation tests implementations if needed . 
 
@@ -66,8 +68,6 @@ GRAFANA_CLOUD_ACCESS_POLICY_TOKEN="glc_eyJvIjoiMTA3Nzk3NSIsIm4iOiJwdWx1bWktcG9sa
 - you may alter existing tests in new tdd cycles if there are good reasons to do so
 
 - you do not have to create new files if you are still validating our development environmnet and ensuring all tests pass 
-
-- the deployment module does all the integration and performance testing ( all other modules only do unit testing ; testing that does not rely on deployment nor other modules ) 
 
 # version control
 
@@ -123,6 +123,8 @@ GRAFANA_CLOUD_ACCESS_POLICY_TOKEN="glc_eyJvIjoiMTA3Nzk3NSIsIm4iOiJwdWx1bWktcG9sa
 
 - testing results should be reprodusable ( temporary fixes need to followed up with reprodusable implmentation )
 - all tests must have timeouts ( they should fail fast if something is wrong ) ( 5 seconds for unit tests ) ( 15 secnds for integration ) ( 30 seconds for end to end tests )
+
+- the deployment module does all the integration and performance testing ( all other modules only do unit testing ; testing that does not rely on deployment nor other modules ) 
 
 - do not use curl commmands or cli tools for testing ( test through our testing framework )
 

@@ -10,12 +10,7 @@ CREATE TABLE featured_categories (
     modified_on TIMESTAMPTZ,
     modified_by VARCHAR(255),
     
-    UNIQUE(feature_position),
-    CONSTRAINT no_default_unassigned_featured CHECK (
-        NOT EXISTS (
-            SELECT 1 FROM service_categories sc 
-            WHERE sc.category_id = featured_categories.category_id 
-            AND sc.is_default_unassigned = TRUE
-        )
-    )
+    UNIQUE(feature_position)
+    -- TODO: Implement constraint validation using database triggers or application logic
+    -- Business rule: featured categories cannot reference default unassigned categories
 );

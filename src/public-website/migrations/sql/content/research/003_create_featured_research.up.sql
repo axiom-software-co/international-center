@@ -9,15 +9,7 @@ CREATE TABLE featured_research (
     modified_on TIMESTAMPTZ,
     modified_by VARCHAR(255),
     
-    CONSTRAINT only_one_featured_research CHECK (
-        (SELECT COUNT(*) FROM featured_research) <= 1
-    ),
-    CONSTRAINT no_default_unassigned_featured CHECK (
-        NOT EXISTS (
-            SELECT 1 FROM research r
-            JOIN research_categories rc ON r.category_id = rc.category_id
-            WHERE r.research_id = featured_research.research_id 
-            AND rc.is_default_unassigned = TRUE
-        )
-    )
+    -- TODO: Implement constraint validation using database triggers or application logic
+    -- Business rule: only one featured research item allowed
+    -- Business rule: featured research cannot reference default unassigned categories
 );

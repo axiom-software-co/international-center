@@ -9,16 +9,7 @@ CREATE TABLE featured_events (
     modified_on TIMESTAMPTZ,
     modified_by VARCHAR(255),
     
-    -- Business rule constraints
-    CONSTRAINT only_one_featured_event CHECK (
-        (SELECT COUNT(*) FROM featured_events) <= 1
-    ),
-    CONSTRAINT no_default_unassigned_featured CHECK (
-        NOT EXISTS (
-            SELECT 1 FROM events e
-            JOIN event_categories ec ON e.category_id = ec.category_id
-            WHERE e.event_id = featured_events.event_id 
-            AND ec.is_default_unassigned = TRUE
-        )
-    )
+    -- TODO: Implement constraint validation using database triggers or application logic
+    -- Business rule: only one featured event allowed
+    -- Business rule: featured events cannot reference default unassigned categories
 );

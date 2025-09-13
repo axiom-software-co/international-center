@@ -2,7 +2,9 @@ package shared
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"os/exec"
@@ -664,5 +666,269 @@ func ValidateEnvironmentPrerequisites(t *testing.T) {
 		if !strings.Contains(string(output), container) {
 			t.Skipf("Critical container %s not running - environment not ready for integration testing", container)
 		}
+	}
+}
+
+// ValidateEnvironmentPrerequisitesForBenchmarks ensures environment health before benchmark testing
+// This function checks that all critical containers are running before benchmarks execute
+func ValidateEnvironmentPrerequisitesForBenchmarks(b *testing.B) {
+	// Check critical infrastructure, platform, service, and gateway components are running
+	criticalContainers := []string{
+		"postgresql",
+		"content-api",
+		"content-api-sidecar",
+		"inquiries-api",
+		"inquiries-api-sidecar",
+		"notification-api",
+		"notification-api-sidecar",
+		"services-api",
+		"services-api-sidecar",
+		"public-gateway",
+		"public-gateway-sidecar",
+		"admin-gateway",
+		"admin-gateway-sidecar",
+	}
+
+	for _, container := range criticalContainers {
+		cmd := exec.Command("podman", "ps", "--filter", "name="+container, "--format", "{{.Names}}")
+		output, err := cmd.Output()
+		if err != nil {
+			b.Fatalf("Failed to check critical container %s: %v", container, err)
+		}
+
+		if !strings.Contains(string(output), container) {
+			b.Skipf("Critical container %s not running - environment not ready for benchmark testing", container)
+		}
+	}
+}
+
+// REFACTORED COMMON TESTING PATTERNS
+// These utilities extract common patterns from our integration tests
+
+// HTTPIntegrationTestClient provides standardized HTTP client configurations for integration tests
+type HTTPIntegrationTestClient struct {
+	Client *http.Client
+}
+
+// NewHTTPIntegrationTestClient creates an HTTP client with appropriate timeout for integration tests
+func NewHTTPIntegrationTestClient(timeout time.Duration) *HTTPIntegrationTestClient {
+	if timeout == 0 {
+		timeout = 10 * time.Second // Default timeout for integration tests
+	}
+
+	return &HTTPIntegrationTestClient{
+		Client: &http.Client{Timeout: timeout},
+	}
+}
+
+// ServiceEndpoint represents a service endpoint for testing
+type ServiceEndpoint struct {
+	Name        string
+	URL         string
+	Method      string
+	Description string
+}
+
+// TestServiceEndpoints tests multiple service endpoints with common validation patterns
+func (c *HTTPIntegrationTestClient) TestServiceEndpoints(t *testing.T, endpoints []ServiceEndpoint) {
+	for _, endpoint := range endpoints {
+		t.Run(endpoint.Name, func(t *testing.T) {
+			var resp *http.Response
+			var err error
+
+			switch endpoint.Method {
+			case "GET", "":
+				resp, err = c.Client.Get(endpoint.URL)
+			default:
+				req, reqErr := http.NewRequest(endpoint.Method, endpoint.URL, nil)
+				require.NoError(t, reqErr, "Should create request for %s %s", endpoint.Method, endpoint.Name)
+				resp, err = c.Client.Do(req)
+			}
+
+			require.NoError(t, err, "Should be able to reach %s endpoint", endpoint.Name)
+			defer resp.Body.Close()
+
+			// Common validation: no server errors
+			assert.True(t, resp.StatusCode < 500,
+				"Endpoint %s should not return server errors, got %d", endpoint.Name, resp.StatusCode)
+
+			t.Logf("✅ Endpoint %s: %s (status: %d)", endpoint.Name, endpoint.Description, resp.StatusCode)
+		})
+	}
+}
+
+// HealthCheckResponse represents expected health check response structure
+type HealthCheckResponse struct {
+	Service string `json:"service"`
+	Status  string `json:"status"`
+	Health  string `json:"health"`
+}
+
+// TestServiceHealthEndpoints tests service health endpoints with structured validation
+func (c *HTTPIntegrationTestClient) TestServiceHealthEndpoints(t *testing.T, services []string, urlPattern string) {
+	for _, service := range services {
+		t.Run(service+"HealthCheck", func(t *testing.T) {
+			url := strings.ReplaceAll(urlPattern, "{service}", service)
+			resp, err := c.Client.Get(url)
+			require.NoError(t, err, "Should be able to reach %s health endpoint", service)
+			defer resp.Body.Close()
+
+			// Validate status code
+			assert.True(t, resp.StatusCode >= 200 && resp.StatusCode < 300,
+				"Service %s health endpoint should return success status, got %d", service, resp.StatusCode)
+
+			// Validate content type
+			contentType := resp.Header.Get("Content-Type")
+			assert.True(t, strings.Contains(contentType, "application/json"),
+				"Service %s health endpoint should return JSON, got %s", service, contentType)
+
+			// Try to parse as JSON health response
+			body, err := io.ReadAll(resp.Body)
+			if err == nil {
+				var healthData map[string]interface{}
+				if json.Unmarshal(body, &healthData) == nil {
+					t.Logf("✅ Service %s: Health endpoint returns structured data", service)
+				}
+			}
+
+			t.Logf("✅ Service %s: Health check validated (status: %d)", service, resp.StatusCode)
+		})
+	}
+}
+
+// DaprServiceEndpoint represents a Dapr service invocation endpoint
+type DaprServiceEndpoint struct {
+	ServiceName string
+	Method      string
+	Path        string
+	Description string
+}
+
+// TestDaprServiceInvocation tests Dapr service invocation endpoints
+func (c *HTTPIntegrationTestClient) TestDaprServiceInvocation(t *testing.T, endpoints []DaprServiceEndpoint, daprPort string) {
+	if daprPort == "" {
+		daprPort = "3500"
+	}
+
+	for _, endpoint := range endpoints {
+		t.Run(endpoint.ServiceName+endpoint.Path, func(t *testing.T) {
+			url := fmt.Sprintf("http://localhost:%s/v1.0/invoke/%s/method%s", daprPort, endpoint.ServiceName, endpoint.Path)
+
+			var resp *http.Response
+			var err error
+
+			switch endpoint.Method {
+			case "GET", "":
+				resp, err = c.Client.Get(url)
+			default:
+				req, reqErr := http.NewRequest(endpoint.Method, url, nil)
+				require.NoError(t, reqErr, "Should create Dapr request for %s", endpoint.ServiceName)
+				resp, err = c.Client.Do(req)
+			}
+
+			require.NoError(t, err, "Should be able to invoke %s via Dapr", endpoint.ServiceName)
+			defer resp.Body.Close()
+
+			// Validate service is reachable through Dapr
+			assert.True(t, resp.StatusCode < 500,
+				"Dapr service invocation for %s should not return server errors, got %d",
+				endpoint.ServiceName, resp.StatusCode)
+
+			t.Logf("✅ Dapr service %s: %s - %s (status: %d)",
+				endpoint.ServiceName, endpoint.Path, endpoint.Description, resp.StatusCode)
+		})
+	}
+}
+
+// GatewayRoutingTest represents a gateway routing test case
+type GatewayRoutingTest struct {
+	Name           string
+	Path           string
+	ExpectedStatus []int
+	Description    string
+}
+
+// TestGatewayRouting tests gateway routing with flexible status code validation
+func (c *HTTPIntegrationTestClient) TestGatewayRouting(t *testing.T, baseURL string, routes []GatewayRoutingTest) {
+	for _, route := range routes {
+		t.Run(route.Name, func(t *testing.T) {
+			url := baseURL + route.Path
+			resp, err := c.Client.Get(url)
+
+			if err != nil {
+				t.Logf("❌ Gateway routing failed for %s: %v", route.Name, err)
+				require.NoError(t, err, "Gateway should be reachable for %s", route.Name)
+				return
+			}
+			defer resp.Body.Close()
+
+			// Validate status code is within expected range
+			statusValid := false
+			for _, validStatus := range route.ExpectedStatus {
+				if resp.StatusCode == validStatus {
+					statusValid = true
+					break
+				}
+			}
+
+			assert.True(t, statusValid,
+				"Gateway route %s should return valid status code, got %d (expected one of %v)",
+				route.Name, resp.StatusCode, route.ExpectedStatus)
+
+			// No server errors
+			assert.True(t, resp.StatusCode < 500,
+				"Gateway route %s should not return server errors, got %d", route.Name, resp.StatusCode)
+
+			t.Logf("✅ Gateway route %s: %s (status: %d)", route.Name, route.Description, resp.StatusCode)
+		})
+	}
+}
+
+// ContractComplianceTest represents a contract compliance test
+type ContractComplianceTest struct {
+	Name            string
+	Endpoint        string
+	ExpectedHeaders map[string]string
+	RequiresJSON    bool
+	Description     string
+}
+
+// TestContractCompliance tests API contract compliance
+func (c *HTTPIntegrationTestClient) TestContractCompliance(t *testing.T, contracts []ContractComplianceTest) {
+	for _, contract := range contracts {
+		t.Run(contract.Name+"Contract", func(t *testing.T) {
+			resp, err := c.Client.Get(contract.Endpoint)
+			require.NoError(t, err, "Should be able to reach %s contract endpoint", contract.Name)
+			defer resp.Body.Close()
+
+			// Validate status code contract
+			assert.True(t, resp.StatusCode < 500,
+				"Contract %s should not return server errors, got %d", contract.Name, resp.StatusCode)
+
+			// Validate expected headers
+			for header, expectedValue := range contract.ExpectedHeaders {
+				actualValue := resp.Header.Get(header)
+				assert.True(t, strings.Contains(actualValue, expectedValue),
+					"Contract %s should have %s header with %s, got %s",
+					contract.Name, header, expectedValue, actualValue)
+			}
+
+			// Validate JSON response if required
+			if contract.RequiresJSON && resp.StatusCode >= 200 && resp.StatusCode < 300 {
+				contentType := resp.Header.Get("Content-Type")
+				assert.True(t, strings.Contains(contentType, "application/json"),
+					"Contract %s should return JSON content type, got %s", contract.Name, contentType)
+
+				// Try to parse JSON
+				body, err := io.ReadAll(resp.Body)
+				if err == nil {
+					var jsonData map[string]interface{}
+					assert.NoError(t, json.Unmarshal(body, &jsonData),
+						"Contract %s should return valid JSON structure", contract.Name)
+				}
+			}
+
+			t.Logf("✅ Contract %s: %s compliance validated", contract.Name, contract.Description)
+		})
 	}
 }
