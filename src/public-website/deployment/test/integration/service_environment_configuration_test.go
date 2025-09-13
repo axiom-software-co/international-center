@@ -2,13 +2,16 @@ package integration
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
 	"os/exec"
 	"strings"
 	"testing"
 	"time"
 
-	sharedValidation "github.com/axiom-software-co/international-center/src/public-website/deployment/test/shared"
+	sharedValidation "github.com/axiom-software-co/international-center/src/public-website/infrastructure/test/shared"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -344,5 +347,255 @@ func TestServiceEnvironmentConfiguration_ServiceStartupReliability(t *testing.T)
 			}
 		})
 	}
+}
+
+// RED PHASE: Secret Store Access Validation
+func TestServiceEnvironmentConfiguration_SecretStoreAccess(t *testing.T) {
+	// This test validates secret store access through Dapr secret store components
+	// Critical for secure configuration management and sensitive data protection
+	sharedValidation.ValidateEnvironmentPrerequisites(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	client := &http.Client{Timeout: 15 * time.Second}
+	secretStoreComponent := "secretstore" // Default Dapr secret store component name
+
+	// Secrets that services must be able to access for proper operation
+	requiredSecrets := []struct {
+		secretName   string
+		secretKey    string
+		description  string
+		requiredBy   []string
+		secretType   string
+	}{
+		{
+			secretName:  "database-credentials",
+			secretKey:   "connection-string",
+			description: "Database connection credentials must be accessible for data layer operations",
+			requiredBy:  []string{"content", "inquiries", "notifications", "public-gateway", "admin-gateway"},
+			secretType:  "connection",
+		},
+		{
+			secretName:  "messaging-credentials",
+			secretKey:   "rabbitmq-connection",
+			description: "Messaging service credentials must be accessible for pub/sub operations",
+			requiredBy:  []string{"notifications", "content", "inquiries"},
+			secretType:  "connection",
+		},
+		{
+			secretName:  "api-keys",
+			secretKey:   "external-service-key",
+			description: "External service API keys must be accessible for third-party integrations",
+			requiredBy:  []string{"notifications", "admin-gateway"},
+			secretType:  "authentication",
+		},
+		{
+			secretName:  "encryption-keys",
+			secretKey:   "data-encryption-key",
+			description: "Data encryption keys must be accessible for sensitive data protection",
+			requiredBy:  []string{"content", "inquiries", "notifications"},
+			secretType:  "encryption",
+		},
+	}
+
+	// RED PHASE: Secret Store Connectivity Validation
+	t.Run("SecretStoreConnectivity", func(t *testing.T) {
+		// Test that Dapr secret store is accessible and operational
+		secretStoreURL := fmt.Sprintf("http://localhost:3500/v1.0/secrets/%s/test-connectivity", secretStoreComponent)
+		
+		connectivityReq, err := http.NewRequestWithContext(ctx, "GET", secretStoreURL, nil)
+		require.NoError(t, err, "Failed to create secret store connectivity request")
+
+		connectivityResp, err := client.Do(connectivityReq)
+		if err != nil {
+			t.Errorf("RED PHASE VALIDATION: Secret store connectivity failed - Dapr secret store not accessible: %v", err)
+			return
+		}
+		defer connectivityResp.Body.Close()
+
+		// Secret store should respond (even with 404 for non-existent secret)
+		assert.True(t, connectivityResp.StatusCode >= 200 && connectivityResp.StatusCode < 500,
+			"Secret store must be accessible through Dapr for service configuration")
+
+		if connectivityResp.StatusCode == 404 {
+			t.Logf("RED PHASE SUCCESS: Secret store accessible - returning 404 for non-existent test secret (expected)")
+		} else if connectivityResp.StatusCode >= 200 && connectivityResp.StatusCode < 300 {
+			t.Logf("RED PHASE SUCCESS: Secret store accessible and operational")
+		} else {
+			body, _ := io.ReadAll(connectivityResp.Body)
+			t.Logf("RED PHASE VALIDATION: Secret store returned status %d: %s", 
+				connectivityResp.StatusCode, string(body))
+		}
+	})
+
+	// RED PHASE: Secret Retrieval Operations Validation
+	t.Run("SecretRetrievalOperations", func(t *testing.T) {
+		for _, secret := range requiredSecrets {
+			t.Run("SecretRetrieval_"+secret.secretName+"_"+secret.secretKey, func(t *testing.T) {
+				// Test secret retrieval through Dapr secrets API
+				secretURL := fmt.Sprintf("http://localhost:3500/v1.0/secrets/%s/%s", secretStoreComponent, secret.secretName)
+				
+				secretReq, err := http.NewRequestWithContext(ctx, "GET", secretURL, nil)
+				require.NoError(t, err, "Failed to create secret retrieval request for %s", secret.secretName)
+
+				secretResp, err := client.Do(secretReq)
+				if err != nil {
+					t.Errorf("RED PHASE VALIDATION: %s - Secret retrieval failed: %v", secret.description, err)
+					return
+				}
+				defer secretResp.Body.Close()
+
+				if secretResp.StatusCode == http.StatusOK {
+					// Secret exists and is accessible
+					body, err := io.ReadAll(secretResp.Body)
+					require.NoError(t, err, "Failed to read secret response")
+
+					var secretData map[string]interface{}
+					err = json.Unmarshal(body, &secretData)
+					if err == nil {
+						// Validate secret structure
+						if secretValue, exists := secretData[secret.secretKey]; exists {
+							assert.NotEmpty(t, secretValue, 
+								"Secret %s must contain non-empty value for key %s", secret.secretName, secret.secretKey)
+							
+							t.Logf("RED PHASE SUCCESS: %s - Secret %s accessible with key %s", 
+								secret.description, secret.secretName, secret.secretKey)
+						} else {
+							t.Errorf("RED PHASE VALIDATION: %s - Secret %s missing required key %s", 
+								secret.description, secret.secretName, secret.secretKey)
+						}
+					} else {
+						t.Logf("RED PHASE VALIDATION: %s - Secret %s response not valid JSON: %v", 
+							secret.description, secret.secretName, err)
+					}
+				} else if secretResp.StatusCode == 404 {
+					t.Logf("RED PHASE VALIDATION: %s - Secret %s not found (needs to be configured)", 
+						secret.description, secret.secretName)
+				} else {
+					body, _ := io.ReadAll(secretResp.Body)
+					t.Errorf("RED PHASE VALIDATION: %s - Secret retrieval returned %d: %s", 
+						secret.description, secretResp.StatusCode, string(body))
+				}
+			})
+		}
+	})
+
+	// RED PHASE: Service-Specific Secret Access Validation
+	t.Run("ServiceSpecificSecretAccess", func(t *testing.T) {
+		// Test that each service can access its required secrets
+		serviceSecretRequirements := map[string][]string{
+			"content": {"database-credentials", "encryption-keys"},
+			"inquiries": {"database-credentials", "encryption-keys", "messaging-credentials"},
+			"notifications": {"database-credentials", "messaging-credentials", "api-keys", "encryption-keys"},
+			"public-gateway": {"database-credentials"},
+			"admin-gateway": {"database-credentials", "api-keys"},
+		}
+
+		for serviceName, requiredSecretNames := range serviceSecretRequirements {
+			t.Run("ServiceSecretAccess_"+serviceName, func(t *testing.T) {
+				// Check if service is running
+				serviceCmd := exec.CommandContext(ctx, "podman", "ps", "--filter", "name="+serviceName, "--format", "{{.Names}}")
+				serviceOutput, err := serviceCmd.Output()
+				require.NoError(t, err, "Failed to check service %s status", serviceName)
+
+				runningServices := strings.TrimSpace(string(serviceOutput))
+
+				if strings.Contains(runningServices, serviceName) {
+					// Service is running - validate secret access capability
+					for _, secretName := range requiredSecretNames {
+						// Test service's ability to access required secrets via Dapr
+						secretURL := fmt.Sprintf("http://localhost:3500/v1.0/secrets/%s/%s", secretStoreComponent, secretName)
+						
+						secretReq, err := http.NewRequestWithContext(ctx, "GET", secretURL, nil)
+						require.NoError(t, err, "Failed to create secret access request")
+
+						secretResp, err := client.Do(secretReq)
+						if err == nil {
+							defer secretResp.Body.Close()
+							
+							if secretResp.StatusCode == http.StatusOK {
+								t.Logf("RED PHASE SUCCESS: Service %s can access required secret %s", 
+									serviceName, secretName)
+							} else if secretResp.StatusCode == 404 {
+								t.Logf("RED PHASE VALIDATION: Service %s requires secret %s but it's not configured", 
+									serviceName, secretName)
+							} else {
+								body, _ := io.ReadAll(secretResp.Body)
+								t.Errorf("RED PHASE VALIDATION: Service %s failed to access secret %s: %d - %s", 
+									serviceName, secretName, secretResp.StatusCode, string(body))
+							}
+						} else {
+							t.Errorf("RED PHASE VALIDATION: Service %s cannot access secret %s: %v", 
+								serviceName, secretName, err)
+						}
+					}
+				} else {
+					t.Logf("Service %s not running - cannot validate secret access", serviceName)
+				}
+			})
+		}
+	})
+
+	// RED PHASE: Secret Store Security Validation
+	t.Run("SecretStoreSecurity", func(t *testing.T) {
+		// Test secret store security patterns and access control
+		securityTests := []struct {
+			testName        string
+			testURL         string
+			expectedBehavior string
+			description     string
+		}{
+			{
+				testName:        "unauthorized_secret_access",
+				testURL:         fmt.Sprintf("http://localhost:3500/v1.0/secrets/%s/nonexistent-secret", secretStoreComponent),
+				expectedBehavior: "should_return_404_or_403",
+				description:     "Secret store must handle unauthorized access attempts securely",
+			},
+			{
+				testName:        "malformed_secret_request",
+				testURL:         "http://localhost:3500/v1.0/secrets//",
+				expectedBehavior: "should_return_400_or_404",
+				description:     "Secret store must handle malformed requests gracefully",
+			},
+			{
+				testName:        "secret_enumeration_protection",
+				testURL:         fmt.Sprintf("http://localhost:3500/v1.0/secrets/%s/", secretStoreComponent),
+				expectedBehavior: "should_not_list_secrets",
+				description:     "Secret store must not allow secret enumeration",
+			},
+		}
+
+		for _, securityTest := range securityTests {
+			t.Run("Security_"+securityTest.testName, func(t *testing.T) {
+				securityReq, err := http.NewRequestWithContext(ctx, "GET", securityTest.testURL, nil)
+				require.NoError(t, err, "Failed to create security test request")
+
+				securityResp, err := client.Do(securityReq)
+				if err == nil {
+					defer securityResp.Body.Close()
+					
+					// Validate security behavior
+					switch securityTest.expectedBehavior {
+					case "should_return_404_or_403":
+						assert.True(t, securityResp.StatusCode == 404 || securityResp.StatusCode == 403,
+							"%s - Secret store should return 404 or 403 for unauthorized access", securityTest.description)
+					case "should_return_400_or_404":
+						assert.True(t, securityResp.StatusCode == 400 || securityResp.StatusCode == 404,
+							"%s - Secret store should return 400 or 404 for malformed requests", securityTest.description)
+					case "should_not_list_secrets":
+						assert.NotEqual(t, 200, securityResp.StatusCode,
+							"%s - Secret store should not allow secret enumeration", securityTest.description)
+					}
+					
+					t.Logf("RED PHASE SUCCESS: %s - Security behavior validated (status: %d)", 
+						securityTest.description, securityResp.StatusCode)
+				} else {
+					t.Logf("RED PHASE VALIDATION: %s - Security test failed: %v", 
+						securityTest.description, err)
+				}
+			})
+		}
+	})
 }
 

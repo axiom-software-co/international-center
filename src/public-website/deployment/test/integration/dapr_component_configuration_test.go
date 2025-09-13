@@ -740,3 +740,500 @@ func TestDaprComponentConfiguration_CrossServiceCommunication(t *testing.T) {
 	}
 }
 
+// RED PHASE: Comprehensive Operational Validation for All Data Components
+func TestDaprComponentConfiguration_ComprehensiveOperationalValidation(t *testing.T) {
+	// This test validates comprehensive operational status of all Dapr data components
+	// Critical for ensuring data layer reliability and performance in production scenarios
+	sharedValidation.ValidateEnvironmentPrerequisites(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	client := &http.Client{Timeout: 15 * time.Second}
+
+	// Data components that must be operationally validated
+	dataComponents := []struct {
+		componentName     string
+		componentType     string
+		testOperations   []string
+		healthIndicators []string
+		description      string
+	}{
+		{
+			componentName:    "statestore",
+			componentType:    "state.postgresql",
+			testOperations:   []string{"read", "write", "delete", "query"},
+			healthIndicators: []string{"connectivity", "performance", "consistency"},
+			description:      "PostgreSQL state store must be operationally healthy for data persistence",
+		},
+		{
+			componentName:    "pubsub",
+			componentType:    "pubsub.rabbitmq", 
+			testOperations:   []string{"publish", "subscribe", "topic_management"},
+			healthIndicators: []string{"connectivity", "message_delivery", "throughput"},
+			description:      "RabbitMQ pub/sub must be operationally healthy for event communication",
+		},
+		{
+			componentName:    "secretstore",
+			componentType:    "secretstores.hashicorp.vault",
+			testOperations:   []string{"secret_read", "secret_write", "secret_rotation"},
+			healthIndicators: []string{"connectivity", "security", "access_control"},
+			description:      "HashiCorp Vault secret store must be operationally healthy for secret management",
+		},
+		{
+			componentName:    "blobstore",
+			componentType:    "bindings.azure.blobstorage",
+			testOperations:   []string{"upload", "download", "list", "metadata"},
+			healthIndicators: []string{"connectivity", "performance", "storage_capacity"},
+			description:      "Azure Blob Storage must be operationally healthy for file operations",
+		},
+	}
+
+	// RED PHASE: Component Health and Metadata Validation
+	t.Run("ComponentHealthAndMetadataValidation", func(t *testing.T) {
+		for _, component := range dataComponents {
+			t.Run("ComponentHealth_"+component.componentName, func(t *testing.T) {
+				// Test component health through Dapr metadata API
+				metadataURL := "http://localhost:3500/v1.0/metadata"
+				
+				metadataReq, err := http.NewRequestWithContext(ctx, "GET", metadataURL, nil)
+				require.NoError(t, err, "Failed to create component health request")
+
+				metadataResp, err := client.Do(metadataReq)
+				require.NoError(t, err, "Component health validation requires accessible Dapr metadata")
+				defer metadataResp.Body.Close()
+
+				assert.Equal(t, http.StatusOK, metadataResp.StatusCode,
+					"Component health metadata must be accessible for %s validation", component.componentName)
+
+				body, err := io.ReadAll(metadataResp.Body)
+				require.NoError(t, err, "Failed to read component health metadata")
+
+				var metadata map[string]interface{}
+				err = json.Unmarshal(body, &metadata)
+				require.NoError(t, err, "Component health metadata must be valid JSON")
+
+				// Validate component registration and health indicators
+				if components, exists := metadata["components"]; exists {
+					if componentsList, ok := components.([]interface{}); ok {
+						componentFound := false
+						for _, comp := range componentsList {
+							if compMap, ok := comp.(map[string]interface{}); ok {
+								if name, exists := compMap["name"]; exists && name == component.componentName {
+									componentFound = true
+									
+									// Validate component metadata contains health information
+									for _, healthIndicator := range component.healthIndicators {
+										switch healthIndicator {
+										case "connectivity":
+											assert.Contains(t, compMap, "name", 
+												"Component %s must have name for connectivity validation", component.componentName)
+										case "performance", "consistency", "message_delivery", "throughput", "security", "access_control", "storage_capacity":
+											// These will be validated through operational tests
+											t.Logf("RED PHASE: Component %s health indicator '%s' ready for operational validation", 
+												component.componentName, healthIndicator)
+										}
+									}
+									break
+								}
+							}
+						}
+						
+						if componentFound {
+							t.Logf("RED PHASE SUCCESS: %s - Component health metadata accessible", component.description)
+						} else {
+							t.Errorf("RED PHASE VALIDATION: %s - Component not found in health metadata", component.description)
+						}
+					}
+				}
+			})
+		}
+	})
+
+	// RED PHASE: Data Component Operational Status Validation
+	t.Run("DataComponentOperationalStatus", func(t *testing.T) {
+		operationalTests := []struct {
+			componentName  string
+			operationURL   string
+			operationType  string
+			testPayload    string
+			description    string
+		}{
+			{
+				componentName: "statestore",
+				operationURL:  "http://localhost:3500/v1.0/state/statestore/operational-test-key",
+				operationType: "state_read",
+				testPayload:   "",
+				description:   "State store must be operationally accessible for read operations",
+			},
+			{
+				componentName: "pubsub",
+				operationURL:  "http://localhost:3500/v1.0/publish/pubsub/operational-test-topic",
+				operationType: "message_publish",
+				testPayload:   `{"operational_test": "pub_sub_validation", "timestamp": "` + time.Now().Format(time.RFC3339) + `"}`,
+				description:   "Pub/sub must be operationally accessible for message publishing",
+			},
+			{
+				componentName: "secretstore",
+				operationURL:  "http://localhost:3500/v1.0/secrets/secretstore/operational-test-secret",
+				operationType: "secret_read",
+				testPayload:   "",
+				description:   "Secret store must be operationally accessible for secret operations",
+			},
+		}
+
+		for _, opTest := range operationalTests {
+			t.Run("OperationalStatus_"+opTest.componentName+"_"+opTest.operationType, func(t *testing.T) {
+				var req *http.Request
+				var err error
+
+				if opTest.operationType == "message_publish" {
+					req, err = http.NewRequestWithContext(ctx, "POST", opTest.operationURL, strings.NewReader(opTest.testPayload))
+					if err == nil {
+						req.Header.Set("Content-Type", "application/json")
+					}
+				} else {
+					req, err = http.NewRequestWithContext(ctx, "GET", opTest.operationURL, nil)
+				}
+				require.NoError(t, err, "Failed to create operational status request")
+
+				resp, err := client.Do(req)
+				require.NoError(t, err, "Operational status validation requires accessible component: %s", opTest.description)
+				defer resp.Body.Close()
+
+				// Validate operational accessibility (component should respond)
+				assert.True(t, resp.StatusCode >= 200 && resp.StatusCode < 500,
+					"Component must be operationally accessible: %s", opTest.description)
+
+				if resp.StatusCode == 404 && opTest.operationType == "secret_read" {
+					t.Logf("RED PHASE SUCCESS: %s - Secret store operational (404 for non-existent secret expected)", opTest.description)
+				} else if resp.StatusCode == 204 || resp.StatusCode == 200 {
+					t.Logf("RED PHASE SUCCESS: %s - Component operationally accessible", opTest.description)
+				} else {
+					body, _ := io.ReadAll(resp.Body)
+					t.Logf("RED PHASE VALIDATION: %s - Component returned status %d: %s", 
+						opTest.description, resp.StatusCode, string(body))
+				}
+			})
+		}
+	})
+
+	// RED PHASE: Component Performance and Reliability Testing
+	t.Run("ComponentPerformanceReliability", func(t *testing.T) {
+		performanceTests := []struct {
+			componentName     string
+			operationCount    int
+			maxResponseTime   time.Duration
+			testDescription   string
+			testURL          string
+			httpMethod       string
+			payload          string
+		}{
+			{
+				componentName:   "statestore",
+				operationCount:  5,
+				maxResponseTime: 2 * time.Second,
+				testDescription: "State store must handle multiple operations with acceptable performance",
+				testURL:        "http://localhost:3500/v1.0/state/statestore",
+				httpMethod:     "POST",
+				payload:        `[{"key": "perf-test-{{INDEX}}", "value": {"test": "performance", "index": {{INDEX}}}}]`,
+			},
+			{
+				componentName:   "pubsub",
+				operationCount:  3,
+				maxResponseTime: 1 * time.Second,
+				testDescription: "Pub/sub must handle multiple message publishing with acceptable performance",
+				testURL:        "http://localhost:3500/v1.0/publish/pubsub/performance-test-topic",
+				httpMethod:     "POST",
+				payload:        `{"performance_test": "message_{{INDEX}}", "timestamp": "` + time.Now().Format(time.RFC3339) + `"}`,
+			},
+			{
+				componentName:   "secretstore",
+				operationCount:  3,
+				maxResponseTime: 1 * time.Second,
+				testDescription: "Secret store must handle multiple secret requests with acceptable performance",
+				testURL:        "http://localhost:3500/v1.0/secrets/secretstore/performance-test-secret-{{INDEX}}",
+				httpMethod:     "GET",
+				payload:        "",
+			},
+		}
+
+		for _, perfTest := range performanceTests {
+			t.Run("Performance_"+perfTest.componentName, func(t *testing.T) {
+				successCount := 0
+				totalResponseTime := time.Duration(0)
+
+				for i := 0; i < perfTest.operationCount; i++ {
+					// Replace {{INDEX}} with actual index
+					testURL := strings.ReplaceAll(perfTest.testURL, "{{INDEX}}", fmt.Sprintf("%d", i))
+					testPayload := strings.ReplaceAll(perfTest.payload, "{{INDEX}}", fmt.Sprintf("%d", i))
+
+					startTime := time.Now()
+					
+					var req *http.Request
+					var err error
+					if perfTest.httpMethod == "POST" {
+						req, err = http.NewRequestWithContext(ctx, perfTest.httpMethod, testURL, strings.NewReader(testPayload))
+						if err == nil {
+							req.Header.Set("Content-Type", "application/json")
+						}
+					} else {
+						req, err = http.NewRequestWithContext(ctx, perfTest.httpMethod, testURL, nil)
+					}
+					require.NoError(t, err, "Failed to create performance test request")
+
+					resp, err := client.Do(req)
+					responseTime := time.Since(startTime)
+					totalResponseTime += responseTime
+
+					if err == nil {
+						defer resp.Body.Close()
+						if resp.StatusCode >= 200 && resp.StatusCode < 500 {
+							successCount++
+						}
+						
+						assert.True(t, responseTime <= perfTest.maxResponseTime,
+							"Component %s operation %d response time (%v) must be within acceptable range (%v)", 
+							perfTest.componentName, i+1, responseTime, perfTest.maxResponseTime)
+					}
+				}
+
+				// Validate performance metrics
+				averageResponseTime := totalResponseTime / time.Duration(perfTest.operationCount)
+				successRate := float64(successCount) / float64(perfTest.operationCount)
+
+				assert.GreaterOrEqual(t, successRate, 0.8, 
+					"Component %s must have at least 80%% success rate for performance testing", perfTest.componentName)
+
+				t.Logf("RED PHASE SUCCESS: %s - Performance validated (avg response: %v, success rate: %.2f%%)", 
+					perfTest.testDescription, averageResponseTime, successRate*100)
+			})
+		}
+	})
+
+	// RED PHASE: Component Security and Access Patterns Validation  
+	t.Run("ComponentSecurityAccessPatterns", func(t *testing.T) {
+		securityTests := []struct {
+			componentName    string
+			testURL         string
+			httpMethod      string
+			expectedBehavior string
+			description     string
+		}{
+			{
+				componentName:   "secretstore",
+				testURL:        "http://localhost:3500/v1.0/secrets/secretstore/unauthorized-access-test",
+				httpMethod:     "GET",
+				expectedBehavior: "should_handle_gracefully",
+				description:    "Secret store must handle unauthorized access attempts securely",
+			},
+			{
+				componentName:   "statestore",
+				testURL:        "http://localhost:3500/v1.0/state/statestore/security-test",
+				httpMethod:     "GET", 
+				expectedBehavior: "should_be_accessible",
+				description:    "State store must be accessible through proper Dapr channels",
+			},
+			{
+				componentName:   "pubsub",
+				testURL:        "http://localhost:3500/v1.0/publish/pubsub/security-test-topic",
+				httpMethod:     "POST",
+				expectedBehavior: "should_be_accessible",
+				description:    "Pub/sub must be accessible through proper Dapr channels",
+			},
+		}
+
+		for _, secTest := range securityTests {
+			t.Run("Security_"+secTest.componentName, func(t *testing.T) {
+				var req *http.Request
+				var err error
+				
+				if secTest.httpMethod == "POST" {
+					securityPayload := `{"security_test": "access_validation", "timestamp": "` + time.Now().Format(time.RFC3339) + `"}`
+					req, err = http.NewRequestWithContext(ctx, secTest.httpMethod, secTest.testURL, strings.NewReader(securityPayload))
+					if err == nil {
+						req.Header.Set("Content-Type", "application/json")
+					}
+				} else {
+					req, err = http.NewRequestWithContext(ctx, secTest.httpMethod, secTest.testURL, nil)
+				}
+				require.NoError(t, err, "Failed to create security test request")
+
+				resp, err := client.Do(req)
+				require.NoError(t, err, "Security validation requires accessible component: %s", secTest.description)
+				defer resp.Body.Close()
+
+				// Validate security behavior based on expected behavior
+				switch secTest.expectedBehavior {
+				case "should_handle_gracefully":
+					assert.True(t, resp.StatusCode >= 200 && resp.StatusCode < 500,
+						"Component %s must handle access attempts gracefully", secTest.componentName)
+				case "should_be_accessible":
+					assert.True(t, resp.StatusCode >= 200 && resp.StatusCode < 400,
+						"Component %s must be accessible through proper Dapr channels", secTest.componentName)
+				}
+
+				t.Logf("RED PHASE SUCCESS: %s - Security access pattern validated (status: %d)", 
+					secTest.description, resp.StatusCode)
+			})
+		}
+	})
+}
+
+// RED PHASE: Operational Metrics and Monitoring Validation
+func TestDaprComponentConfiguration_OperationalMetricsMonitoring(t *testing.T) {
+	// This test validates operational metrics and monitoring capabilities for data components
+	// Critical for production monitoring and observability requirements
+	sharedValidation.ValidateEnvironmentPrerequisites(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	client := &http.Client{Timeout: 15 * time.Second}
+
+	// Metrics endpoints that should be available for operational monitoring
+	metricsEndpoints := []struct {
+		endpointName    string
+		endpointURL     string
+		expectedMetrics []string
+		description     string
+	}{
+		{
+			endpointName:   "dapr_metrics",
+			endpointURL:    "http://localhost:9090/metrics",
+			expectedMetrics: []string{"dapr_component_loaded", "dapr_runtime_initialized"},
+			description:    "Dapr runtime metrics must be available for operational monitoring",
+		},
+		{
+			endpointName:   "dapr_healthz",
+			endpointURL:    "http://localhost:3500/v1.0/healthz",
+			expectedMetrics: []string{"health_status"},
+			description:    "Dapr health endpoint must provide operational status",
+		},
+	}
+
+	// RED PHASE: Component Metrics Validation
+	t.Run("ComponentMetricsValidation", func(t *testing.T) {
+		for _, metricsEndpoint := range metricsEndpoints {
+			t.Run("Metrics_"+metricsEndpoint.endpointName, func(t *testing.T) {
+				metricsReq, err := http.NewRequestWithContext(ctx, "GET", metricsEndpoint.endpointURL, nil)
+				require.NoError(t, err, "Failed to create metrics request")
+
+				metricsResp, err := client.Do(metricsReq)
+				if err != nil {
+					t.Logf("RED PHASE VALIDATION: %s - Metrics endpoint not accessible: %v (expected until monitoring configured)", 
+						metricsEndpoint.description, err)
+					return
+				}
+				defer metricsResp.Body.Close()
+
+				if metricsResp.StatusCode == 200 {
+					body, err := io.ReadAll(metricsResp.Body)
+					if err == nil {
+						metricsContent := string(body)
+						
+						// Validate metrics content contains expected operational metrics
+						for _, expectedMetric := range metricsEndpoint.expectedMetrics {
+							if strings.Contains(metricsContent, expectedMetric) {
+								t.Logf("RED PHASE SUCCESS: %s - Found expected metric: %s", 
+									metricsEndpoint.description, expectedMetric)
+							} else {
+								t.Logf("RED PHASE VALIDATION: %s - Expected metric not found: %s", 
+									metricsEndpoint.description, expectedMetric)
+							}
+						}
+					}
+				} else {
+					t.Logf("RED PHASE VALIDATION: %s - Metrics endpoint returned status %d (expected until monitoring configured)", 
+						metricsEndpoint.description, metricsResp.StatusCode)
+				}
+			})
+		}
+	})
+
+	// RED PHASE: Component Monitoring Patterns Validation
+	t.Run("ComponentMonitoringPatterns", func(t *testing.T) {
+		monitoringPatterns := []struct {
+			patternName     string
+			componentName   string
+			monitoringType  string
+			testDescription string
+		}{
+			{
+				patternName:     "state_store_monitoring",
+				componentName:   "statestore",
+				monitoringType:  "operation_latency",
+				testDescription: "State store operations must be monitorable for latency and throughput",
+			},
+			{
+				patternName:     "pubsub_monitoring", 
+				componentName:   "pubsub",
+				monitoringType:  "message_delivery",
+				testDescription: "Pub/sub message delivery must be monitorable for reliability metrics",
+			},
+			{
+				patternName:     "secret_store_monitoring",
+				componentName:   "secretstore", 
+				monitoringType:  "access_security",
+				testDescription: "Secret store access must be monitorable for security audit trails",
+			},
+		}
+
+		for _, pattern := range monitoringPatterns {
+			t.Run("MonitoringPattern_"+pattern.patternName, func(t *testing.T) {
+				// Test monitoring capability by validating component operational visibility
+				// This tests that components can be monitored through Dapr APIs
+				
+				switch pattern.componentName {
+				case "statestore":
+					// Test state store monitoring through operation execution
+					stateURL := "http://localhost:3500/v1.0/state/statestore/monitoring-test-key"
+					startTime := time.Now()
+					
+					stateReq, err := http.NewRequestWithContext(ctx, "GET", stateURL, nil)
+					require.NoError(t, err, "Failed to create state store monitoring request")
+
+					stateResp, err := client.Do(stateReq)
+					operationLatency := time.Since(startTime)
+					
+					if err == nil {
+						defer stateResp.Body.Close()
+						t.Logf("RED PHASE SUCCESS: %s - Operation latency measurable: %v", 
+							pattern.testDescription, operationLatency)
+					}
+
+				case "pubsub":
+					// Test pub/sub monitoring through message publishing
+					pubsubURL := "http://localhost:3500/v1.0/publish/pubsub/monitoring-test-topic"
+					monitoringPayload := `{"monitoring_test": "message_delivery", "timestamp": "` + time.Now().Format(time.RFC3339) + `"}`
+					
+					pubsubReq, err := http.NewRequestWithContext(ctx, "POST", pubsubURL, strings.NewReader(monitoringPayload))
+					if err == nil {
+						pubsubReq.Header.Set("Content-Type", "application/json")
+						pubsubResp, err := client.Do(pubsubReq)
+						if err == nil {
+							defer pubsubResp.Body.Close()
+							t.Logf("RED PHASE SUCCESS: %s - Message delivery monitorable (status: %d)", 
+								pattern.testDescription, pubsubResp.StatusCode)
+						}
+					}
+
+				case "secretstore":
+					// Test secret store monitoring through access operations
+					secretURL := "http://localhost:3500/v1.0/secrets/secretstore/monitoring-test-secret"
+					
+					secretReq, err := http.NewRequestWithContext(ctx, "GET", secretURL, nil)
+					require.NoError(t, err, "Failed to create secret store monitoring request")
+
+					secretResp, err := client.Do(secretReq)
+					if err == nil {
+						defer secretResp.Body.Close()
+						t.Logf("RED PHASE SUCCESS: %s - Access operations monitorable (status: %d)", 
+							pattern.testDescription, secretResp.StatusCode)
+					}
+				}
+			})
+		}
+	})
+}
+

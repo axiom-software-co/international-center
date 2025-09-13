@@ -3,11 +3,10 @@ package integration
 import (
 	"context"
 	"net/http"
-	"os/exec"
-	"strings"
 	"testing"
 	"time"
 
+	sharedValidation "github.com/axiom-software-co/international-center/src/public-website/infrastructure/test/shared"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -18,7 +17,7 @@ import (
 
 func TestWebsiteIntegration_FrontendToBackendFlow(t *testing.T) {
 	// This test requires complete environment health - enforcing axiom rule
-	validateEnvironmentPrerequisites(t)
+	sharedValidation.ValidateEnvironmentPrerequisites(t)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -109,7 +108,7 @@ func TestWebsiteIntegration_FrontendToBackendFlow(t *testing.T) {
 
 func TestWebsiteIntegration_ContentDeliveryAndCaching(t *testing.T) {
 	// Test website content delivery and caching integration
-	validateEnvironmentPrerequisites(t)
+	sharedValidation.ValidateEnvironmentPrerequisites(t)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -168,7 +167,7 @@ func TestWebsiteIntegration_ContentDeliveryAndCaching(t *testing.T) {
 
 func TestWebsiteIntegration_SecurityAndSSLConfiguration(t *testing.T) {
 	// Test website security and SSL configuration integration
-	validateEnvironmentPrerequisites(t)
+	sharedValidation.ValidateEnvironmentPrerequisites(t)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()

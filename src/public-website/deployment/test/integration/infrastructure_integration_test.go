@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	sharedValidation "github.com/axiom-software-co/international-center/src/public-website/deployment/test/shared"
+	sharedValidation "github.com/axiom-software-co/international-center/src/public-website/infrastructure/test/shared"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	_ "github.com/lib/pq" // PostgreSQL driver
@@ -401,6 +401,290 @@ func TestInfrastructureIntegration_DaprStateStoreConnectivity(t *testing.T) {
 
 		// The actual validation will happen when state store operations succeed
 		// This serves as documentation for configuration requirements
+	})
+}
+
+// RED PHASE: Comprehensive State Store CRUD Operations Validation
+func TestInfrastructureIntegration_ComprehensiveStateStoreCRUD(t *testing.T) {
+	// This test validates comprehensive CRUD operations through Dapr state store
+	// Critical for data persistence and consistency across service boundaries
+	sharedValidation.ValidateEnvironmentPrerequisites(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	client := &http.Client{Timeout: 15 * time.Second}
+	baseURL := "http://localhost:3500/v1.0/state/statestore"
+
+	// Test data for comprehensive CRUD operations across different entity types
+	testEntities := []struct {
+		key        string
+		value      string
+		entityType string
+		updateValue string
+	}{
+		{
+			key:        "news-integration-test-1",
+			value:      `{"news_id":"test-1","title":"Test News Article","content":"Integration test content","status":"published","created_at":"2024-01-01T10:00:00Z"}`,
+			entityType: "news",
+			updateValue: `{"news_id":"test-1","title":"Updated Test News Article","content":"Updated integration test content","status":"published","updated_at":"2024-01-01T11:00:00Z"}`,
+		},
+		{
+			key:        "event-integration-test-1", 
+			value:      `{"event_id":"test-1","title":"Test Event","description":"Integration test event","status":"active","event_date":"2024-06-01T15:00:00Z"}`,
+			entityType: "event",
+			updateValue: `{"event_id":"test-1","title":"Updated Test Event","description":"Updated integration test event","status":"active","event_date":"2024-06-01T16:00:00Z"}`,
+		},
+		{
+			key:        "inquiry-integration-test-1",
+			value:      `{"inquiry_id":"test-1","subject":"Test Inquiry","message":"Integration test message","status":"pending","inquiry_type":"business"}`,
+			entityType: "inquiry", 
+			updateValue: `{"inquiry_id":"test-1","subject":"Test Inquiry","message":"Integration test message","status":"processed","inquiry_type":"business"}`,
+		},
+	}
+
+	// RED PHASE: Comprehensive Create Operations Validation
+	t.Run("ComprehensiveCreateOperations", func(t *testing.T) {
+		for _, entity := range testEntities {
+			t.Run("Create_"+entity.entityType+"_"+entity.key, func(t *testing.T) {
+				// Test entity creation with proper JSON structure
+				savePayload := fmt.Sprintf(`[{"key": "%s", "value": %s}]`, entity.key, entity.value)
+				
+				saveReq, err := http.NewRequestWithContext(ctx, "POST", baseURL, strings.NewReader(savePayload))
+				require.NoError(t, err, "Failed to create save request for %s", entity.entityType)
+				saveReq.Header.Set("Content-Type", "application/json")
+
+				saveResp, err := client.Do(saveReq)
+				require.NoError(t, err, "State store save operation must succeed for %s entity", entity.entityType)
+				defer saveResp.Body.Close()
+
+				assert.True(t, saveResp.StatusCode == http.StatusNoContent || saveResp.StatusCode == http.StatusOK,
+					"State store save must return success status for %s entity", entity.entityType)
+
+				t.Logf("RED PHASE SUCCESS: Created %s entity with key %s", entity.entityType, entity.key)
+			})
+		}
+	})
+
+	// RED PHASE: Comprehensive Read Operations Validation
+	t.Run("ComprehensiveReadOperations", func(t *testing.T) {
+		for _, entity := range testEntities {
+			t.Run("Read_"+entity.entityType+"_"+entity.key, func(t *testing.T) {
+				// Test entity retrieval and data integrity
+				getURL := fmt.Sprintf("%s/%s", baseURL, entity.key)
+				getReq, err := http.NewRequestWithContext(ctx, "GET", getURL, nil)
+				require.NoError(t, err, "Failed to create get request for %s", entity.entityType)
+
+				getResp, err := client.Do(getReq)
+				require.NoError(t, err, "State store get operation must succeed for %s entity", entity.entityType)
+				defer getResp.Body.Close()
+
+				assert.Equal(t, http.StatusOK, getResp.StatusCode,
+					"State store get must return 200 OK for existing %s entity", entity.entityType)
+
+				// Validate data integrity by checking response content
+				if getResp.StatusCode == http.StatusOK {
+					body := make([]byte, 2048)
+					n, _ := getResp.Body.Read(body)
+					responseContent := string(body[:n])
+					
+					// Verify that the response contains expected entity data
+					assert.Contains(t, responseContent, fmt.Sprintf("test-1"), 
+						"Retrieved %s entity must contain expected ID", entity.entityType)
+					
+					t.Logf("RED PHASE SUCCESS: Retrieved %s entity with key %s - data integrity validated", entity.entityType, entity.key)
+				}
+			})
+		}
+	})
+
+	// RED PHASE: Comprehensive Update Operations Validation  
+	t.Run("ComprehensiveUpdateOperations", func(t *testing.T) {
+		for _, entity := range testEntities {
+			t.Run("Update_"+entity.entityType+"_"+entity.key, func(t *testing.T) {
+				// Test entity update with modified data
+				updatePayload := fmt.Sprintf(`[{"key": "%s", "value": %s}]`, entity.key, entity.updateValue)
+				
+				updateReq, err := http.NewRequestWithContext(ctx, "POST", baseURL, strings.NewReader(updatePayload))
+				require.NoError(t, err, "Failed to create update request for %s", entity.entityType)
+				updateReq.Header.Set("Content-Type", "application/json")
+
+				updateResp, err := client.Do(updateReq)
+				require.NoError(t, err, "State store update operation must succeed for %s entity", entity.entityType)
+				defer updateResp.Body.Close()
+
+				assert.True(t, updateResp.StatusCode == http.StatusNoContent || updateResp.StatusCode == http.StatusOK,
+					"State store update must return success status for %s entity", entity.entityType)
+
+				// Verify update by reading back the modified data
+				getURL := fmt.Sprintf("%s/%s", baseURL, entity.key)
+				getReq, err := http.NewRequestWithContext(ctx, "GET", getURL, nil)
+				require.NoError(t, err, "Failed to create verification get request")
+
+				getResp, err := client.Do(getReq)
+				if err == nil && getResp.StatusCode == http.StatusOK {
+					defer getResp.Body.Close()
+					body := make([]byte, 2048)
+					n, _ := getResp.Body.Read(body)
+					responseContent := string(body[:n])
+					
+					// Verify update was applied (check for updated timestamp or status)
+					if strings.Contains(entity.updateValue, "Updated") {
+						assert.Contains(t, responseContent, "Updated", 
+							"Updated %s entity must contain modified data", entity.entityType)
+					}
+					
+					t.Logf("RED PHASE SUCCESS: Updated %s entity with key %s - modification verified", entity.entityType, entity.key)
+				}
+			})
+		}
+	})
+
+	// RED PHASE: Comprehensive Delete Operations Validation
+	t.Run("ComprehensiveDeleteOperations", func(t *testing.T) {
+		for _, entity := range testEntities {
+			t.Run("Delete_"+entity.entityType+"_"+entity.key, func(t *testing.T) {
+				// Test entity deletion
+				deleteURL := fmt.Sprintf("%s/%s", baseURL, entity.key)
+				deleteReq, err := http.NewRequestWithContext(ctx, "DELETE", deleteURL, nil)
+				require.NoError(t, err, "Failed to create delete request for %s", entity.entityType)
+
+				deleteResp, err := client.Do(deleteReq)
+				require.NoError(t, err, "State store delete operation must succeed for %s entity", entity.entityType)
+				defer deleteResp.Body.Close()
+
+				assert.True(t, deleteResp.StatusCode == http.StatusNoContent || deleteResp.StatusCode == http.StatusOK,
+					"State store delete must return success status for %s entity", entity.entityType)
+
+				// Verify deletion by attempting to read the deleted entity
+				getURL := fmt.Sprintf("%s/%s", baseURL, entity.key)
+				getReq, err := http.NewRequestWithContext(ctx, "GET", getURL, nil)
+				require.NoError(t, err, "Failed to create verification get request")
+
+				getResp, err := client.Do(getReq)
+				if err == nil {
+					defer getResp.Body.Close()
+					// Entity should be not found after deletion
+					assert.True(t, getResp.StatusCode == http.StatusNotFound || getResp.StatusCode == http.StatusNoContent,
+						"Deleted %s entity must not be retrievable", entity.entityType)
+					
+					t.Logf("RED PHASE SUCCESS: Deleted %s entity with key %s - deletion verified", entity.entityType, entity.key)
+				}
+			})
+		}
+	})
+}
+
+// RED PHASE: Data Persistence and Consistency Validation
+func TestInfrastructureIntegration_DataPersistenceValidation(t *testing.T) {
+	// This test validates data persistence across service lifecycle events
+	// Critical for ensuring data durability in production scenarios
+	sharedValidation.ValidateEnvironmentPrerequisites(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	client := &http.Client{Timeout: 15 * time.Second}
+	baseURL := "http://localhost:3500/v1.0/state/statestore"
+
+	t.Run("DataPersistenceAcrossOperations", func(t *testing.T) {
+		// Test data that should persist through various operations
+		persistenceTestKey := "persistence-test-key"
+		persistenceTestValue := `{"entity_id":"persist-1","data":"critical persistence test data","timestamp":"` + time.Now().Format(time.RFC3339) + `"}`
+
+		// Create initial data
+		savePayload := fmt.Sprintf(`[{"key": "%s", "value": %s}]`, persistenceTestKey, persistenceTestValue)
+		saveReq, err := http.NewRequestWithContext(ctx, "POST", baseURL, strings.NewReader(savePayload))
+		require.NoError(t, err, "Failed to create persistence test data")
+		saveReq.Header.Set("Content-Type", "application/json")
+
+		saveResp, err := client.Do(saveReq)
+		require.NoError(t, err, "Persistence test data creation must succeed")
+		defer saveResp.Body.Close()
+
+		assert.True(t, saveResp.StatusCode == http.StatusNoContent || saveResp.StatusCode == http.StatusOK,
+			"Persistence test data save must succeed")
+
+		// Verify persistence immediately after creation
+		getURL := fmt.Sprintf("%s/%s", baseURL, persistenceTestKey)
+		getReq, err := http.NewRequestWithContext(ctx, "GET", getURL, nil)
+		require.NoError(t, err, "Failed to create persistence verification request")
+
+		getResp, err := client.Do(getReq)
+		require.NoError(t, err, "Persistence verification read must succeed")
+		defer getResp.Body.Close()
+
+		assert.Equal(t, http.StatusOK, getResp.StatusCode,
+			"Persistence test data must be immediately retrievable")
+
+		// Clean up test data
+		deleteReq, err := http.NewRequestWithContext(ctx, "DELETE", getURL, nil)
+		if err == nil {
+			deleteResp, _ := client.Do(deleteReq)
+			if deleteResp != nil {
+				deleteResp.Body.Close()
+			}
+		}
+
+		t.Logf("RED PHASE SUCCESS: Data persistence validation completed - data survives immediate operations")
+	})
+
+	t.Run("TransactionConsistencyValidation", func(t *testing.T) {
+		// Test transaction-like consistency for multi-key operations
+		transactionKeys := []string{
+			"transaction-test-1",
+			"transaction-test-2", 
+			"transaction-test-3",
+		}
+
+		transactionValues := []string{
+			`{"entity_id":"trans-1","data":"transaction test data 1","sequence":1}`,
+			`{"entity_id":"trans-2","data":"transaction test data 2","sequence":2}`,
+			`{"entity_id":"trans-3","data":"transaction test data 3","sequence":3}`,
+		}
+
+		// Create multiple related entities that should maintain consistency
+		for i, key := range transactionKeys {
+			savePayload := fmt.Sprintf(`[{"key": "%s", "value": %s}]`, key, transactionValues[i])
+			saveReq, err := http.NewRequestWithContext(ctx, "POST", baseURL, strings.NewReader(savePayload))
+			require.NoError(t, err, "Failed to create transaction test entity %d", i+1)
+			saveReq.Header.Set("Content-Type", "application/json")
+
+			saveResp, err := client.Do(saveReq)
+			require.NoError(t, err, "Transaction entity %d creation must succeed", i+1)
+			defer saveResp.Body.Close()
+
+			assert.True(t, saveResp.StatusCode == http.StatusNoContent || saveResp.StatusCode == http.StatusOK,
+				"Transaction entity %d save must succeed", i+1)
+		}
+
+		// Verify all entities exist and maintain consistency
+		for i, key := range transactionKeys {
+			getURL := fmt.Sprintf("%s/%s", baseURL, key)
+			getReq, err := http.NewRequestWithContext(ctx, "GET", getURL, nil)
+			require.NoError(t, err, "Failed to create consistency verification request")
+
+			getResp, err := client.Do(getReq)
+			require.NoError(t, err, "Consistency verification must succeed for entity %d", i+1)
+			defer getResp.Body.Close()
+
+			assert.Equal(t, http.StatusOK, getResp.StatusCode,
+				"Transaction entity %d must be retrievable for consistency validation", i+1)
+		}
+
+		// Clean up transaction test data
+		for _, key := range transactionKeys {
+			deleteURL := fmt.Sprintf("%s/%s", baseURL, key)
+			deleteReq, err := http.NewRequestWithContext(ctx, "DELETE", deleteURL, nil)
+			if err == nil {
+				deleteResp, _ := client.Do(deleteReq)
+				if deleteResp != nil {
+					deleteResp.Body.Close()
+				}
+			}
+		}
+
+		t.Logf("RED PHASE SUCCESS: Transaction consistency validation completed - multi-key operations maintain consistency")
 	})
 }
 

@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	sharedValidation "github.com/axiom-software-co/international-center/src/public-website/deployment/test/shared"
+	sharedValidation "github.com/axiom-software-co/international-center/src/public-website/infrastructure/test/shared"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	_ "github.com/lib/pq" // PostgreSQL driver
