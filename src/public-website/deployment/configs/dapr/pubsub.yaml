@@ -8,15 +8,23 @@ spec:
   version: v1
   metadata:
   - name: connectionString
-    value: "amqp://guest:guest@rabbitmq:5672/"
+    secretKeyRef:
+      name: rabbitmq-connection
+      key: connectionString
   - name: protocol
     value: "amqp"
   - name: hostname
-    value: "rabbitmq"
+    secretKeyRef:
+      name: rabbitmq-connection
+      key: hostname
   - name: username
-    value: "guest"
+    secretKeyRef:
+      name: rabbitmq-connection
+      key: username
   - name: password
-    value: "guest"
+    secretKeyRef:
+      name: rabbitmq-connection
+      key: password
   - name: durable
     value: "false"
   - name: deletedWhenUnused
@@ -30,7 +38,6 @@ spec:
 scopes:
 - content-api
 - inquiries-api
-- notification-api
-- services-api
+- notifications-api
 - public-gateway
 - admin-gateway

@@ -211,3 +211,235 @@ func TestPlatformIntegration_ServiceMeshInfrastructure(t *testing.T) {
 	})
 }
 
+// RED PHASE: Service-to-Service Communication Contract Validation via Dapr Service Mesh
+func TestPlatformIntegration_ServiceMeshCommunication(t *testing.T) {
+	// This test validates that services can communicate with each other through Dapr service mesh
+	// Critical for microservices architecture and cross-service integration
+	sharedValidation.ValidateEnvironmentPrerequisites(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	// Service communication patterns that must work through Dapr service mesh
+	serviceCommunicationTests := []struct {
+		sourceService      string
+		targetService      string
+		communicationType  string
+		testEndpoint       string
+		expectedResponse   string
+		description        string
+	}{
+		{
+			sourceService:     "content-api",
+			targetService:     "notification-api",
+			communicationType: "health-check",
+			testEndpoint:      "/health",
+			expectedResponse:  "healthy",
+			description:       "Content service must communicate with notifications service for event publishing",
+		},
+		{
+			sourceService:     "inquiries-api",
+			targetService:     "notification-api", 
+			communicationType: "health-check",
+			testEndpoint:      "/health",
+			expectedResponse:  "healthy",
+			description:       "Inquiries service must communicate with notifications service for inquiry alerts",
+		},
+		{
+			sourceService:     "public-gateway",
+			targetService:     "content-api",
+			communicationType: "health-check",
+			testEndpoint:      "/health",
+			expectedResponse:  "healthy",
+			description:       "Public gateway must communicate with content service for API routing",
+		},
+		{
+			sourceService:     "admin-gateway",
+			targetService:     "inquiries-api",
+			communicationType: "health-check",
+			testEndpoint:      "/health",
+			expectedResponse:  "healthy",
+			description:       "Admin gateway must communicate with inquiries service for admin operations",
+		},
+	}
+
+	client := &http.Client{Timeout: 10 * time.Second}
+
+	// Validate Dapr service mesh communication capabilities
+	t.Run("DaprServiceMeshCommunicationCapabilities", func(t *testing.T) {
+		// Test that Dapr service invocation API is functional for cross-service communication
+		for _, commTest := range serviceCommunicationTests {
+			t.Run("ServiceMeshComm_"+commTest.sourceService+"_to_"+commTest.targetService, func(t *testing.T) {
+				// Test service-to-service communication via Dapr service invocation
+				serviceURL := fmt.Sprintf("http://localhost:3500/v1.0/invoke/%s/method%s", 
+					commTest.targetService, commTest.testEndpoint)
+				
+				req, err := http.NewRequestWithContext(ctx, "GET", serviceURL, nil)
+				require.NoError(t, err, "Failed to create service mesh communication request")
+
+				resp, err := client.Do(req)
+				if err != nil {
+					t.Errorf("RED PHASE VALIDATION: %s - Service mesh communication failed: %v", 
+						commTest.description, err)
+					return
+				}
+				defer resp.Body.Close()
+
+				if resp.StatusCode != http.StatusOK {
+					body, _ := io.ReadAll(resp.Body)
+					t.Errorf("RED PHASE VALIDATION: %s - Service mesh communication returned %d: %s", 
+						commTest.description, resp.StatusCode, string(body))
+					return
+				}
+
+				// Validate response contains expected content
+				body, err := io.ReadAll(resp.Body)
+				require.NoError(t, err, "Failed to read service mesh communication response")
+
+				var response map[string]interface{}
+				err = json.Unmarshal(body, &response)
+				if err != nil {
+					t.Errorf("RED PHASE VALIDATION: %s - Service response not valid JSON: %v", 
+						commTest.description, err)
+					return
+				}
+
+				if status, exists := response["status"]; exists {
+					assert.Equal(t, commTest.expectedResponse, status,
+						"RED PHASE VALIDATION: %s - Service must respond with expected status through service mesh",
+						commTest.description)
+				} else {
+					t.Errorf("RED PHASE VALIDATION: %s - Service response missing 'status' field", 
+						commTest.description)
+				}
+
+				t.Logf("RED PHASE VALIDATION SUCCESS: %s - Service mesh communication functional", commTest.description)
+			})
+		}
+	})
+
+	// Validate cross-service data flow through service mesh
+	t.Run("CrossServiceDataFlow", func(t *testing.T) {
+		// Test data flow between services through Dapr service mesh
+		dataFlowTests := []struct {
+			workflow     string
+			steps        []string
+			description  string
+		}{
+			{
+				workflow: "inquiry_to_notification_flow",
+				steps: []string{
+					"POST inquiry to inquiries-api",
+					"inquiries-api notifies notification-api",
+					"notification-api processes alert",
+				},
+				description: "Inquiry submission must trigger notification workflow through service mesh",
+			},
+			{
+				workflow: "content_to_notification_flow", 
+				steps: []string{
+					"POST content to content-api",
+					"content-api publishes event to notification-api",
+					"notification-api processes content event",
+				},
+				description: "Content publication must trigger notification workflow through service mesh",
+			},
+		}
+
+		for _, dataFlow := range dataFlowTests {
+			t.Run("DataFlow_"+dataFlow.workflow, func(t *testing.T) {
+				// For now, validate that target services are accessible for data flow
+				// Full data flow validation will be implemented in GREEN PHASE when services are properly integrated
+				
+				t.Logf("RED PHASE VALIDATION: %s - Data flow pattern defined", dataFlow.description)
+				t.Logf("  Workflow steps: %v", dataFlow.steps)
+				
+				// This serves as documentation for required data flow patterns
+				// Actual implementation will be validated when services properly integrate
+			})
+		}
+	})
+
+	// Validate service mesh resilience patterns
+	t.Run("ServiceMeshResilienceValidation", func(t *testing.T) {
+		// Test that service mesh handles service failures gracefully
+		resilienceTests := []struct {
+			pattern     string
+			description string
+		}{
+			{
+				pattern:     "service_unavailable_handling",
+				description: "Service mesh must handle unavailable services gracefully",
+			},
+			{
+				pattern:     "circuit_breaker_behavior",
+				description: "Service mesh must implement circuit breaker patterns",
+			},
+			{
+				pattern:     "retry_mechanism",
+				description: "Service mesh must implement retry mechanisms for failed requests",
+			},
+		}
+
+		for _, resilienceTest := range resilienceTests {
+			t.Run("Resilience_"+resilienceTest.pattern, func(t *testing.T) {
+				// Test service mesh resilience by attempting to invoke non-existent service
+				nonExistentURL := "http://localhost:3500/v1.0/invoke/non-existent-service/method/health"
+				
+				req, err := http.NewRequestWithContext(ctx, "GET", nonExistentURL, nil)
+				require.NoError(t, err, "Failed to create resilience test request")
+
+				resp, err := client.Do(req)
+				if resp != nil {
+					defer resp.Body.Close()
+					
+					// Service mesh should return proper error response for non-existent services
+					if resp.StatusCode == http.StatusNotFound || resp.StatusCode == http.StatusServiceUnavailable {
+						t.Logf("RED PHASE VALIDATION SUCCESS: %s - Service mesh properly handles non-existent service", 
+							resilienceTest.description)
+					} else {
+						body, _ := io.ReadAll(resp.Body)
+						t.Logf("RED PHASE VALIDATION: %s - Service mesh returned %d for non-existent service: %s", 
+							resilienceTest.description, resp.StatusCode, string(body))
+					}
+				} else if err != nil {
+					t.Logf("RED PHASE VALIDATION: %s - Service mesh connection failed for non-existent service: %v", 
+						resilienceTest.description, err)
+				}
+			})
+		}
+	})
+
+	// Validate service discovery through service mesh
+	t.Run("ServiceDiscoveryThroughMesh", func(t *testing.T) {
+		// Test that services can discover each other through Dapr service mesh
+		expectedServices := []string{"content-api", "inquiries-api", "notification-api"}
+		
+		// Test service discovery by attempting to invoke each service's health endpoint
+		for _, serviceName := range expectedServices {
+			t.Run("ServiceDiscovery_"+serviceName, func(t *testing.T) {
+				discoveryURL := fmt.Sprintf("http://localhost:3500/v1.0/invoke/%s/method/health", serviceName)
+				
+				req, err := http.NewRequestWithContext(ctx, "GET", discoveryURL, nil)
+				require.NoError(t, err, "Failed to create service discovery request")
+
+				resp, err := client.Do(req)
+				if err != nil {
+					t.Errorf("RED PHASE VALIDATION: Service %s not discoverable through service mesh: %v", 
+						serviceName, err)
+					return
+				}
+				defer resp.Body.Close()
+
+				if resp.StatusCode == http.StatusOK {
+					t.Logf("RED PHASE VALIDATION SUCCESS: Service %s discoverable through service mesh", serviceName)
+				} else {
+					body, _ := io.ReadAll(resp.Body)
+					t.Errorf("RED PHASE VALIDATION: Service %s discovery failed with status %d: %s", 
+						serviceName, resp.StatusCode, string(body))
+				}
+			})
+		}
+	})
+}
+

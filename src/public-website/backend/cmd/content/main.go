@@ -28,6 +28,13 @@ func main() {
 	}
 	defer daprClient.Close()
 
+	// Validate Dapr service registration for content-api
+	ctx := context.Background()
+	if err := daprClient.ValidateServiceRegistration(ctx); err != nil {
+		log.Fatalf("Content service registration validation failed: %v", err)
+	}
+	log.Printf("Content service (content-api) successfully registered with Dapr runtime")
+
 	// Create consolidated content handler
 	contentHandler, err := content.NewContentHandler(daprClient)
 	if err != nil {

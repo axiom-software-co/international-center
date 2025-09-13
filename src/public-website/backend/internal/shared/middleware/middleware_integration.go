@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/axiom-software-co/international-center/src/backend/internal/shared/domain"
 	"github.com/gorilla/mux"
@@ -210,4 +211,57 @@ func DefaultValidationConfig() ValidationConfiguration {
 		StrictMode:              false, // Don't fail requests on response validation errors
 		LogValidationErrors:     true,
 	}
+}
+
+// LightweightValidationMiddleware provides basic request validation without heavy contract checking
+type LightweightValidationMiddleware struct {
+	config ValidationConfiguration
+}
+
+// NewLightweightValidationMiddleware creates a new lightweight validation middleware
+func NewLightweightValidationMiddleware() *LightweightValidationMiddleware {
+	return &LightweightValidationMiddleware{
+		config: DefaultValidationConfig(),
+	}
+}
+
+// ValidateRequest validates incoming requests with lightweight checks
+func (lvm *LightweightValidationMiddleware) ValidateRequest(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Basic request validation - ensure valid HTTP method and headers
+		if r.Method == "" {
+			http.Error(w, "Invalid HTTP method", http.StatusBadRequest)
+			return
+		}
+
+		// Validate Content-Type for POST/PUT requests with body
+		if (r.Method == "POST" || r.Method == "PUT") && r.ContentLength > 0 {
+			contentType := r.Header.Get("Content-Type")
+			if contentType == "" {
+				http.Error(w, "Content-Type header required for requests with body", http.StatusBadRequest)
+				return
+			}
+		}
+
+		// Validate request path for common issues
+		if strings.Contains(r.URL.Path, "..") {
+			http.Error(w, "Invalid request path", http.StatusBadRequest)
+			return
+		}
+
+		// Log validation if enabled
+		if lvm.config.LogValidationErrors {
+			correlationCtx := domain.FromContext(r.Context())
+			correlationID := "unknown"
+			if correlationCtx != nil {
+				correlationID = correlationCtx.CorrelationID
+			}
+			
+			// Log successful validation
+			println("Request validation passed:", r.Method, r.URL.Path, "correlation_id:", correlationID)
+		}
+
+		// Continue to next handler
+		next.ServeHTTP(w, r)
+	})
 }

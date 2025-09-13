@@ -21,7 +21,7 @@ var (
 	once       sync.Once
 )
 
-// NewClient creates a singleton Dapr client instance
+// NewClient creates a singleton Dapr client instance  
 func NewClient() (*Client, error) {
 	var err error
 	once.Do(func() {
@@ -62,6 +62,15 @@ func NewClient() (*Client, error) {
 				environment: environment,
 				appID:       appID,
 			}
+			
+			// Validate Dapr connectivity immediately after client creation
+			ctx := context.Background()
+			if validateErr := daprClient.ValidateDaprConnectivity(ctx); validateErr != nil {
+				log.Printf("Warning: Dapr connectivity validation failed: %v", validateErr)
+				// Don't fail client creation, but log the issue for debugging
+			} else {
+				log.Printf("Dapr client connectivity validated for app-id: %s", appID)
+			}
 		}
 	})
 
@@ -70,6 +79,44 @@ func NewClient() (*Client, error) {
 	}
 
 	return daprClient, nil
+}
+
+// ValidateDaprConnectivity validates that this service can connect to Dapr runtime
+func (c *Client) ValidateDaprConnectivity(ctx context.Context) error {
+	if c.client == nil {
+		return fmt.Errorf("Dapr client not initialized")
+	}
+	
+	// Test Dapr connectivity using metadata API call
+	// This validates that the Dapr runtime is accessible and responding
+	_, err := c.client.GetMetadata(ctx)
+	if err != nil {
+		return fmt.Errorf("Dapr metadata call failed - runtime not accessible: %w", err)
+	}
+	
+	log.Printf("Service %s successfully connected to Dapr runtime", c.appID)
+	return nil
+}
+
+// ValidateServiceRegistration validates that this service is registered with Dapr for service discovery  
+func (c *Client) ValidateServiceRegistration(ctx context.Context) error {
+	if c.client == nil {
+		return fmt.Errorf("Dapr client not initialized")
+	}
+	
+	// Validate service registration by checking if we can get our own metadata
+	metadata, err := c.client.GetMetadata(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get service metadata: %w", err)
+	}
+	
+	// Check if our app-id is properly configured in the metadata
+	if metadata.ID != c.appID {
+		return fmt.Errorf("service registration mismatch: expected app-id %s, got %s", c.appID, metadata.ID)
+	}
+	
+	log.Printf("Service registration validated: app-id %s is properly registered with Dapr", c.appID)
+	return nil
 }
 
 // ResetClientForTesting resets the singleton client for testing purposes

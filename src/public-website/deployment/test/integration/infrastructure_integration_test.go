@@ -216,3 +216,191 @@ func TestInfrastructureIntegration_MigrationExecution(t *testing.T) {
 	})
 }
 
+// RED PHASE: Dapr State Store Connectivity Contract Validation
+func TestInfrastructureIntegration_DaprStateStoreConnectivity(t *testing.T) {
+	// This test validates that Dapr state store components are properly configured and accessible
+	// Critical for service state persistence and data integration
+	sharedValidation.ValidateEnvironmentPrerequisites(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	// State store components that must be accessible through Dapr
+	stateStoreComponents := []struct {
+		componentName string
+		storeType     string
+		description   string
+	}{
+		{
+			componentName: "statestore",
+			storeType:     "state.postgresql",
+			description:   "PostgreSQL state store must be accessible through Dapr for service state persistence",
+		},
+	}
+
+	client := &http.Client{Timeout: 10 * time.Second}
+
+	// Validate Dapr state store component registration
+	t.Run("DaprStateStoreComponentRegistration", func(t *testing.T) {
+		// Check Dapr components endpoint to validate state store is registered
+		componentsURL := "http://localhost:3500/v1.0/components"
+		req, err := http.NewRequestWithContext(ctx, "GET", componentsURL, nil)
+		require.NoError(t, err, "Failed to create Dapr components request")
+
+		resp, err := client.Do(req)
+		require.NoError(t, err, "Dapr components endpoint must be accessible for state store validation")
+		defer resp.Body.Close()
+
+		assert.Equal(t, http.StatusOK, resp.StatusCode,
+			"Dapr components endpoint must return 200 OK for state store component validation")
+
+		// TODO: Parse response and validate state store component is registered
+		// This will be validated when Dapr components are properly configured
+		t.Logf("RED PHASE VALIDATION: Dapr components endpoint accessible - detailed component validation pending proper configuration")
+	})
+
+	// Validate state store connectivity through Dapr state API
+	for _, component := range stateStoreComponents {
+		t.Run("StateStoreConnectivity_"+component.componentName, func(t *testing.T) {
+			// Test state store connectivity via Dapr state API
+			testKey := "integration-test-connectivity"
+			testValue := `{"test": "connectivity", "timestamp": "` + time.Now().Format(time.RFC3339) + `"}`
+
+			// Test state save operation
+			saveURL := fmt.Sprintf("http://localhost:3500/v1.0/state/%s", component.componentName)
+			savePayload := fmt.Sprintf(`[{"key": "%s", "value": %s}]`, testKey, testValue)
+			
+			saveReq, err := http.NewRequestWithContext(ctx, "POST", saveURL, strings.NewReader(savePayload))
+			require.NoError(t, err, "Failed to create state save request")
+			saveReq.Header.Set("Content-Type", "application/json")
+
+			saveResp, err := client.Do(saveReq)
+			if err != nil {
+				t.Errorf("RED PHASE VALIDATION: %s - State store save operation failed: %v", component.description, err)
+				return
+			}
+			defer saveResp.Body.Close()
+
+			if saveResp.StatusCode != http.StatusNoContent && saveResp.StatusCode != http.StatusOK {
+				body := make([]byte, 1024)
+				saveResp.Body.Read(body)
+				t.Errorf("RED PHASE VALIDATION: %s - State store save returned %d: %s", 
+					component.description, saveResp.StatusCode, string(body))
+				return
+			}
+
+			// Test state get operation
+			getURL := fmt.Sprintf("http://localhost:3500/v1.0/state/%s/%s", component.componentName, testKey)
+			getReq, err := http.NewRequestWithContext(ctx, "GET", getURL, nil)
+			require.NoError(t, err, "Failed to create state get request")
+
+			getResp, err := client.Do(getReq)
+			if err != nil {
+				t.Errorf("RED PHASE VALIDATION: %s - State store get operation failed: %v", component.description, err)
+				return
+			}
+			defer getResp.Body.Close()
+
+			if getResp.StatusCode != http.StatusOK {
+				body := make([]byte, 1024)
+				getResp.Body.Read(body)
+				t.Errorf("RED PHASE VALIDATION: %s - State store get returned %d: %s", 
+					component.description, getResp.StatusCode, string(body))
+				return
+			}
+
+			// Clean up test data
+			deleteURL := fmt.Sprintf("http://localhost:3500/v1.0/state/%s/%s", component.componentName, testKey)
+			deleteReq, err := http.NewRequestWithContext(ctx, "DELETE", deleteURL, nil)
+			if err == nil {
+				deleteResp, _ := client.Do(deleteReq)
+				if deleteResp != nil {
+					deleteResp.Body.Close()
+				}
+			}
+
+			t.Logf("RED PHASE VALIDATION SUCCESS: %s - State store CRUD operations functional through Dapr", component.description)
+		})
+	}
+
+	// Validate state store query capabilities 
+	t.Run("DaprStateStoreQueryCapabilities", func(t *testing.T) {
+		// Test state store query functionality that services depend on
+		queryURL := "http://localhost:3500/v1.0/state/statestore/query"
+		queryPayload := `{
+			"filter": {},
+			"page": {
+				"limit": 10
+			}
+		}`
+
+		queryReq, err := http.NewRequestWithContext(ctx, "POST", queryURL, strings.NewReader(queryPayload))
+		require.NoError(t, err, "Failed to create state store query request")
+		queryReq.Header.Set("Content-Type", "application/json")
+
+		queryResp, err := client.Do(queryReq)
+		if err != nil {
+			t.Errorf("RED PHASE VALIDATION: State store query capability failed: %v", err)
+			return
+		}
+		defer queryResp.Body.Close()
+
+		if queryResp.StatusCode != http.StatusOK && queryResp.StatusCode != http.StatusNotFound {
+			body := make([]byte, 1024)
+			queryResp.Body.Read(body)
+			t.Errorf("RED PHASE VALIDATION: State store query returned %d: %s", 
+				queryResp.StatusCode, string(body))
+		} else {
+			t.Logf("RED PHASE VALIDATION SUCCESS: State store query capabilities accessible through Dapr")
+		}
+	})
+
+	// Validate PostgreSQL connectivity through Dapr vs Direct Database Access
+	t.Run("PostgreSQLConnectivityValidation", func(t *testing.T) {
+		// First test direct PostgreSQL connectivity (infrastructure level)
+		connStr := "postgresql://postgres:password@localhost:5432/international_center_development?sslmode=disable"
+		
+		db, err := sql.Open("postgres", connStr)
+		if err != nil {
+			t.Errorf("RED PHASE VALIDATION: Direct PostgreSQL connection failed - infrastructure not ready: %v", err)
+			return
+		}
+		defer db.Close()
+
+		err = db.PingContext(ctx)
+		if err != nil {
+			t.Errorf("RED PHASE VALIDATION: PostgreSQL ping failed - database not accessible: %v", err)
+			return
+		}
+
+		// Test that state store configuration aligns with actual database
+		// This validates that Dapr state store can connect to the same PostgreSQL instance
+		_, err = db.ExecContext(ctx, "SELECT 1")
+		assert.NoError(t, err, "RED PHASE VALIDATION: PostgreSQL must be functional for Dapr state store integration")
+
+		t.Logf("RED PHASE VALIDATION SUCCESS: PostgreSQL database accessible for Dapr state store integration")
+	})
+
+	// Validate state store connection string configuration
+	t.Run("DaprStateStoreConfigurationValidation", func(t *testing.T) {
+		// Test that Dapr state store configuration is consistent with actual database availability
+		// This will help identify configuration mismatches
+
+		// Expected connection details that should match Dapr component configuration
+		expectedHost := "localhost"  // or "postgresql" in container network
+		expectedPort := "5432"
+		expectedDatabase := "international_center_development"
+		expectedUser := "postgres"
+
+		// Validate these match what services expect
+		t.Logf("RED PHASE VALIDATION: Expected state store configuration:")
+		t.Logf("  Host: %s", expectedHost)
+		t.Logf("  Port: %s", expectedPort) 
+		t.Logf("  Database: %s", expectedDatabase)
+		t.Logf("  User: %s", expectedUser)
+
+		// The actual validation will happen when state store operations succeed
+		// This serves as documentation for configuration requirements
+	})
+}
+

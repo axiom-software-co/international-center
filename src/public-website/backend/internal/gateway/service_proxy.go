@@ -141,214 +141,150 @@ func (p *ServiceProxy) parseTargetService(path, targetService, httpMethod string
 	// Parse path components
 	parts := strings.Split(path, "/")
 	
-	// Handle multiple path formats:
-	// 1. Public versioned: /api/v1/service
-	// 2. Admin versioned: /admin/api/v1/service  
-	// 3. Simple admin: /api/admin/service (for development) - MUST check before simple public
-	// 4. Simple public: /api/service (for development)
-	var versionIndex, serviceIndex int
-	var hasVersion bool
-	
-	if len(parts) >= 3 && parts[0] == "api" && parts[1] == "admin" {
-		// Simple admin path: /api/admin/service  
-		serviceIndex = 2  // parts[2] should be the service name (e.g., "inquiries")
-		hasVersion = false
-	} else if len(parts) >= 3 && parts[0] == "api" && parts[1] == "v1" {
-		// Public versioned path: /api/v1/service
-		versionIndex = 1
-		serviceIndex = 2
-		hasVersion = true
-	} else if len(parts) >= 4 && parts[0] == "admin" && parts[1] == "api" {
-		// Admin versioned path: /admin/api/v1/service
-		versionIndex = 2
-		serviceIndex = 3
-		hasVersion = true
-	} else if len(parts) >= 2 && parts[0] == "api" && parts[1] != "v1" && parts[1] != "admin" {
-		// Simple public path: /api/service (no version, not admin)
-		serviceIndex = 1
-		hasVersion = false
-	} else {
-		return "", "", "", fmt.Errorf("invalid API path format")
+	// Standardized routing: only support /api/v1/* pattern
+	if len(parts) < 3 || parts[0] != "api" || parts[1] != "v1" {
+		return "", "", "", fmt.Errorf("invalid API path format - only /api/v1/* paths supported")
 	}
 
-	// Extract version and service from path
-	var version string
-	if hasVersion {
-		version = parts[versionIndex] // version - e.g., "v1"
-	}
-	_ = version // Currently unused
-	service := parts[serviceIndex] // e.g., "content" or "services"
+	// Extract service from standardized path: /api/v1/service
+	service := parts[2] // e.g., "content", "services", "news", etc.
 	
-	// Determine service name and remaining path
+	// Determine service name based on domain consolidation
 	var serviceName string
 	switch service {
-	case "content":
-		serviceName = "content"
-	case "services":
-		// Services domain consolidated into content service
-		serviceName = "content"
-	case "news":
-		// News domain consolidated into content service
-		serviceName = "content"
-	case "research":
-		// Research domain consolidated into content service
-		serviceName = "content"
-	case "events":
-		// Events domain consolidated into content service
+	case "content", "services", "news", "research", "events":
+		// All content domains consolidated into content service
 		serviceName = "content"
 	case "inquiries":
-		// Handle inquiries domain via consolidated inquiries service
 		serviceName = "inquiries"
-	case "notifications":
-		serviceName = "notifications"
-	case "subscribers":
-		// Subscribers are handled by notifications service
+	case "notifications", "subscribers":
+		// Notifications and subscribers handled by notifications service
 		serviceName = "notifications"
 	default:
 		return "", "", "", fmt.Errorf("unknown service: %s", service)
 	}
 
-	// Reconstruct target path for backend service method invocation
-	// Transform admin paths to backend service method paths
-	var targetPath string
-	if len(parts) >= 3 && parts[0] == "api" && parts[1] == "admin" {
-		// Transform /api/admin/inquiries -> api/inquiries
-		targetPath = "api/" + parts[2]
-	} else if len(parts) >= 2 && parts[0] == "api" && parts[1] != "v1" && parts[1] != "admin" {
-		// Transform /api/news -> api/news
-		targetPath = strings.Join(parts, "/")
-	} else {
-		// Keep original path for versioned APIs
-		targetPath = "/" + strings.Join(parts, "/")
-	}
+	// Use original path for backend service invocation
+	targetPath := "/" + strings.Join(parts, "/")
 	
 	return serviceName, httpMethod, targetPath, nil
 }
 
 // invokeContentAPI invokes content API service (handles content, services, research, events, and news domains)
 func (p *ServiceProxy) invokeContentAPI(ctx context.Context, method, path string, data interface{}, headers map[string]string) (*ProxyResponse, error) {
-	switch {
-	case strings.HasPrefix(path, "/api/v1/content"), 
-		 strings.HasPrefix(path, "/api/v1/services"),
-		 strings.HasPrefix(path, "/api/v1/research"),
-		 strings.HasPrefix(path, "/api/v1/events"),
-		 strings.HasPrefix(path, "/api/v1/news"),
-		 strings.HasPrefix(path, "/admin/api/v1/content"), 
-		 strings.HasPrefix(path, "/admin/api/v1/services"),
-		 strings.HasPrefix(path, "/admin/api/v1/research"),
-		 strings.HasPrefix(path, "/admin/api/v1/events"),
-		 strings.HasPrefix(path, "/admin/api/v1/news"),
-		 // Simple API paths for development
-		 strings.HasPrefix(path, "/api/news"),
-		 strings.HasPrefix(path, "/api/events"),
-		 strings.HasPrefix(path, "/api/research"),
-		 strings.HasPrefix(path, "/api/services"):
-		// Convert data to []byte if needed
-		var requestData []byte
-		if data != nil {
-			var err error
-			requestData, err = json.Marshal(data)
-			if err != nil {
-				return nil, domain.NewValidationError("failed to marshal request data")
-			}
-		}
-		response, err := p.serviceInvocation.InvokeContentAPI(ctx, path, method, requestData)
-		if err != nil {
-			return nil, err
-		}
-		// Parse response data back to interface{}
-		var result interface{}
-		if len(response.Data) > 0 {
-			if err := json.Unmarshal(response.Data, &result); err != nil {
-				return nil, domain.NewInternalError("failed to unmarshal response", err)
-			}
-		}
-		return &ProxyResponse{
-			Data:       result,
-			StatusCode: response.StatusCode,
-			Headers:    response.Headers,
-		}, nil
-	default:
+	// Standardized routing: only support /api/v1/* paths for content domains
+	if !strings.HasPrefix(path, "/api/v1/") {
 		return nil, domain.NewNotFoundError("content API endpoint", path)
 	}
+
+	// Convert data to []byte if needed
+	var requestData []byte
+	if data != nil {
+		var err error
+		requestData, err = json.Marshal(data)
+		if err != nil {
+			return nil, domain.NewValidationError("failed to marshal request data")
+		}
+	}
+	
+	response, err := p.serviceInvocation.InvokeContentAPI(ctx, path, method, requestData)
+	if err != nil {
+		return nil, err
+	}
+	
+	// Parse response data back to interface{}
+	var result interface{}
+	if len(response.Data) > 0 {
+		if err := json.Unmarshal(response.Data, &result); err != nil {
+			return nil, domain.NewInternalError("failed to unmarshal response", err)
+		}
+	}
+	
+	return &ProxyResponse{
+		Data:       result,
+		StatusCode: response.StatusCode,
+		Headers:    response.Headers,
+	}, nil
 }
 
 // invokeInquiriesAPI invokes inquiries API service (handles business, donations, media, volunteers)
 func (p *ServiceProxy) invokeInquiriesAPI(ctx context.Context, method, path string, data interface{}, headers map[string]string) (*ProxyResponse, error) {
-	switch {
-	case strings.HasPrefix(path, "/api/v1/inquiries"),
-		 // Admin API paths for development
-		 strings.HasPrefix(path, "/api/admin/inquiries"):
-		// Convert data to []byte if needed
-		var requestData []byte
-		if data != nil {
-			var err error
-			requestData, err = json.Marshal(data)
-			if err != nil {
-				return nil, domain.NewValidationError("failed to marshal request data")
-			}
-		}
-		response, err := p.serviceInvocation.InvokeInquiriesAPI(ctx, path, method, requestData)
-		if err != nil {
-			return nil, err
-		}
-		// Parse response data back to interface{}
-		var result interface{}
-		if len(response.Data) > 0 {
-			if err := json.Unmarshal(response.Data, &result); err != nil {
-				return nil, domain.NewInternalError("failed to unmarshal response", err)
-			}
-		}
-		return &ProxyResponse{
-			Data:       result,
-			StatusCode: response.StatusCode,
-			Headers:    response.Headers,
-		}, nil
-	default:
+	// Standardized routing: only support /api/v1/* paths for inquiries
+	if !strings.HasPrefix(path, "/api/v1/inquiries") {
 		return nil, domain.NewNotFoundError("inquiries API endpoint", path)
 	}
+
+	// Convert data to []byte if needed
+	var requestData []byte
+	if data != nil {
+		var err error
+		requestData, err = json.Marshal(data)
+		if err != nil {
+			return nil, domain.NewValidationError("failed to marshal request data")
+		}
+	}
+	
+	response, err := p.serviceInvocation.InvokeInquiriesAPI(ctx, path, method, requestData)
+	if err != nil {
+		return nil, err
+	}
+	
+	// Parse response data back to interface{}
+	var result interface{}
+	if len(response.Data) > 0 {
+		if err := json.Unmarshal(response.Data, &result); err != nil {
+			return nil, domain.NewInternalError("failed to unmarshal response", err)
+		}
+	}
+	
+	return &ProxyResponse{
+		Data:       result,
+		StatusCode: response.StatusCode,
+		Headers:    response.Headers,
+	}, nil
 }
 
 
 // invokeNotificationAPI invokes notification API service
 func (p *ServiceProxy) invokeNotificationAPI(ctx context.Context, method, path string, data interface{}, headers map[string]string) (*ProxyResponse, error) {
-	switch {
-	case strings.HasPrefix(path, "/api/v1/notifications"),
-		 // Admin API paths for development
-		 strings.HasPrefix(path, "/api/admin/subscribers"):
-		// Convert data to []byte if needed
-		var requestData []byte
-		if data != nil {
-			// Check if data is already []byte (avoid double marshaling)
-			if bytes, ok := data.([]byte); ok {
-				requestData = bytes
-			} else {
-				var err error
-				requestData, err = json.Marshal(data)
-				if err != nil {
-					return nil, domain.NewValidationError("failed to marshal request data")
-				}
-			}
-		}
-		response, err := p.serviceInvocation.InvokeNotificationAPI(ctx, path, method, requestData)
-		if err != nil {
-			return nil, err
-		}
-		// Parse response data back to interface{}
-		var result interface{}
-		if len(response.Data) > 0 {
-			if err := json.Unmarshal(response.Data, &result); err != nil {
-				return nil, domain.NewInternalError("failed to unmarshal response", err)
-			}
-		}
-		return &ProxyResponse{
-			Data:       result,
-			StatusCode: response.StatusCode,
-			Headers:    response.Headers,
-		}, nil
-	default:
+	// Standardized routing: only support /api/v1/* paths for notifications and subscribers
+	if !strings.HasPrefix(path, "/api/v1/notifications") && !strings.HasPrefix(path, "/api/v1/subscribers") {
 		return nil, domain.NewNotFoundError("notification API endpoint", path)
 	}
+
+	// Convert data to []byte if needed
+	var requestData []byte
+	if data != nil {
+		// Check if data is already []byte (avoid double marshaling)
+		if bytes, ok := data.([]byte); ok {
+			requestData = bytes
+		} else {
+			var err error
+			requestData, err = json.Marshal(data)
+			if err != nil {
+				return nil, domain.NewValidationError("failed to marshal request data")
+			}
+		}
+	}
+	
+	response, err := p.serviceInvocation.InvokeNotificationAPI(ctx, path, method, requestData)
+	if err != nil {
+		return nil, err
+	}
+	
+	// Parse response data back to interface{}
+	var result interface{}
+	if len(response.Data) > 0 {
+		if err := json.Unmarshal(response.Data, &result); err != nil {
+			return nil, domain.NewInternalError("failed to unmarshal response", err)
+		}
+	}
+	
+	return &ProxyResponse{
+		Data:       result,
+		StatusCode: response.StatusCode,
+		Headers:    response.Headers,
+	}, nil
 }
 
 // extractForwardableHeaders extracts headers that should be forwarded to backend services

@@ -77,21 +77,7 @@ func (s *ServiceInvocation) InvokeService(ctx context.Context, req *ServiceReque
 		ctx = timeoutCtx
 	}
 
-	// In test mode, return mock response
-	if s.client.GetClient() == nil {
-		// Check for context cancellation even in test mode
-		if ctx != nil {
-			if ctx.Err() == context.Canceled {
-				return nil, ctx.Err()
-			}
-			if ctx.Err() == context.DeadlineExceeded {
-				return nil, fmt.Errorf("service invocation timeout for %s.%s", req.AppID, req.MethodName)
-			}
-		}
-		return s.getMockServiceResponse(req)
-	}
-
-	// Production Dapr SDK integration
+	// Dapr SDK integration
 	var resp []byte
 	var err error
 
@@ -374,75 +360,4 @@ func (s *ServiceInvocation) GetNotificationAPIMetrics(ctx context.Context) (map[
 	}, nil
 }
 
-// getMockServiceResponse returns mock service response for testing
-func (s *ServiceInvocation) getMockServiceResponse(req *ServiceRequest) (*ServiceResponse, error) {
-	// Generate different mock responses based on service and method
-	switch req.AppID {
-	case "content-api":
-		switch req.MethodName {
-		case "health/live", "health/ready":
-			return &ServiceResponse{
-				Data:        []byte(`{"status":"healthy","service":"content-api"}`),
-				ContentType: "application/json",
-				StatusCode:  200,
-				Headers:     map[string]string{"Content-Type": "application/json"},
-			}, nil
-		case "content/list":
-			return &ServiceResponse{
-				Data:        []byte(`{"content":[{"id":"1","title":"Mock Content 1"},{"id":"2","title":"Mock Content 2"}]}`),
-				ContentType: "application/json",
-				StatusCode:  200,
-				Headers:     map[string]string{"Content-Type": "application/json"},
-			}, nil
-		case "metrics":
-			return &ServiceResponse{
-				Data:        []byte(`{"status":"healthy","uptime":"1h30m","requests":150}`),
-				ContentType: "application/json",
-				StatusCode:  200,
-				Headers:     map[string]string{"Content-Type": "application/json"},
-			}, nil
-		}
-	case "services-api":
-		switch req.MethodName {
-		case "health/live", "health/ready":
-			return &ServiceResponse{
-				Data:        []byte(`{"status":"healthy","service":"services-api"}`),
-				ContentType: "application/json",
-				StatusCode:  200,
-				Headers:     map[string]string{"Content-Type": "application/json"},
-			}, nil
-		case "services/list":
-			return &ServiceResponse{
-				Data:        []byte(`{"services":[{"id":"1","name":"Mock Service 1"},{"id":"2","name":"Mock Service 2"}]}`),
-				ContentType: "application/json",
-				StatusCode:  200,
-				Headers:     map[string]string{"Content-Type": "application/json"},
-			}, nil
-		case "metrics":
-			return &ServiceResponse{
-				Data:        []byte(`{"status":"healthy","uptime":"1h25m","requests":200}`),
-				ContentType: "application/json",
-				StatusCode:  200,
-				Headers:     map[string]string{"Content-Type": "application/json"},
-			}, nil
-		}
-	case "admin-gateway", "public-gateway":
-		return &ServiceResponse{
-			Data:        []byte(`{"status":"healthy","service":"` + req.AppID + `"}`),
-			ContentType: "application/json",
-			StatusCode:  200,
-			Headers:     map[string]string{"Content-Type": "application/json"},
-		}, nil
-	case "non-existent-service":
-		return nil, fmt.Errorf("service %s not found", req.AppID)
-	}
-
-	// Default mock response for unknown services/methods
-	return &ServiceResponse{
-		Data:        []byte(`{"status":"success","message":"mock service response"}`),
-		ContentType: req.ContentType,
-		StatusCode:  200,
-		Headers:     map[string]string{"Content-Type": req.ContentType},
-	}, nil
-}
 

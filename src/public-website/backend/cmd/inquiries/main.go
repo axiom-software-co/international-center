@@ -28,6 +28,13 @@ func main() {
 	}
 	defer daprClient.Close()
 
+	// Validate Dapr service registration for inquiries-api
+	ctx := context.Background()
+	if err := daprClient.ValidateServiceRegistration(ctx); err != nil {
+		log.Fatalf("Inquiries service registration validation failed: %v", err)
+	}
+	log.Printf("Inquiries service (inquiries-api) successfully registered with Dapr runtime")
+
 	// Create consolidated inquiries handler
 	inquiriesHandler, err := inquiries.NewInquiriesHandler(daprClient)
 	if err != nil {

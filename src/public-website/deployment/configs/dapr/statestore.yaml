@@ -8,7 +8,9 @@ spec:
   version: v1
   metadata:
   - name: connectionString
-    value: "postgresql://postgres:password@postgresql:5432/international_center_development?sslmode=disable"
+    secretKeyRef:
+      name: postgresql-connection
+      key: connectionString
   - name: tableName
     value: "state"
   - name: metadataTableName
@@ -26,7 +28,6 @@ spec:
 scopes:
 - content-api
 - inquiries-api
-- notification-api
-- services-api
+- notifications-api
 - public-gateway
 - admin-gateway

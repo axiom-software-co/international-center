@@ -600,6 +600,16 @@ func (s *EventsService) AdminGetEventRegistrations(ctx context.Context, eventID 
 	return registrations, nil
 }
 
+// GetFeaturedEvent retrieves the current featured event (public access)
+func (s *EventsService) GetFeaturedEvent(ctx context.Context) (*FeaturedEvent, error) {
+	featuredEvent, err := s.repository.GetFeaturedEvent(ctx)
+	if err != nil {
+		return nil, domain.WrapError(err, "failed to get featured event")
+	}
+	
+	return featuredEvent, nil
+}
+
 // Private validation helper methods
 
 func (s *EventsService) validateCreateEventRequest(request AdminCreateEventRequest) error {

@@ -143,24 +143,15 @@ func (h *ContentHandler) registerFeaturedContentRoutes(router *mux.Router) {
 
 // GetFeaturedNews handles GET /api/v1/news/featured
 func (h *ContentHandler) GetFeaturedNews(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	userID := "" // Public endpoint doesn't require specific user ID
 	
-	// Temporary implementation until Dapr state store is fixed
-	// Provide working featured news without state store dependency
-	// Provide working featured news for development
-	featuredNews := map[string]interface{}{
-			"news_id":              "featured-news-1",
-			"title":                "Featured: International Center News",
-			"summary":              "Latest updates from the International Center",
-			"content":              "Stay updated with our latest news and developments.",
-			"category_id":          "news",
-			"news_type":           "announcement",
-			"priority_level":      "high",
-			"publishing_status":   "published",
-			"publication_timestamp": "2025-09-12T00:00:00Z",
-			"created_on":          "2025-09-12T00:00:00Z",
-			"slug":                "featured-international-center-news",
-		}
-		
+	featuredNews, err := h.newsService.GetFeaturedNews(ctx, userID)
+	if err != nil {
+		h.writeJSONError(w, http.StatusInternalServerError, "Failed to get featured news", err)
+		return
+	}
+	
 	response := map[string]interface{}{
 		"data": featuredNews,
 	}
@@ -170,20 +161,18 @@ func (h *ContentHandler) GetFeaturedNews(w http.ResponseWriter, r *http.Request)
 
 // GetFeaturedServices handles GET /api/v1/services/featured
 func (h *ContentHandler) GetFeaturedServices(w http.ResponseWriter, r *http.Request) {
-	// Temporary implementation until Dapr state store is fixed
-	featuredService := map[string]interface{}{
-		"service_id":       "featured-service-1",
-		"title":            "Featured: International Center Services",
-		"description":      "Comprehensive healthcare services at International Center",
-		"category_id":      "medical",
-		"service_type":     "healthcare",
-		"availability":     "available",
-		"created_on":       "2025-09-12T00:00:00Z",
-		"slug":             "featured-international-center-services",
+	ctx := r.Context()
+	userID := "" // Public endpoint doesn't require specific user ID
+	
+	// Get featured service category at position 1 (primary featured)
+	featuredCategory, err := h.servicesService.GetFeaturedCategoryByPosition(ctx, 1, userID)
+	if err != nil {
+		h.writeJSONError(w, http.StatusInternalServerError, "Failed to get featured services", err)
+		return
 	}
 	
 	response := map[string]interface{}{
-		"data": featuredService,
+		"data": featuredCategory,
 	}
 
 	h.writeJSONResponse(w, http.StatusOK, response)
@@ -191,17 +180,12 @@ func (h *ContentHandler) GetFeaturedServices(w http.ResponseWriter, r *http.Requ
 
 // GetFeaturedResearch handles GET /api/v1/research/featured  
 func (h *ContentHandler) GetFeaturedResearch(w http.ResponseWriter, r *http.Request) {
-	// Temporary implementation until Dapr state store is fixed
-	featuredResearch := map[string]interface{}{
-		"research_id":              "featured-research-1",
-		"title":                    "Featured: International Center Research",
-		"summary":                  "Cutting-edge research at International Center",
-		"research_type":           "clinical",
-		"priority_level":          "high",
-		"publishing_status":       "published",
-		"publication_timestamp":   "2025-09-12T00:00:00Z",
-		"created_on":              "2025-09-12T00:00:00Z",
-		"slug":                    "featured-international-center-research",
+	ctx := r.Context()
+	
+	featuredResearch, err := h.researchService.GetFeaturedResearch(ctx)
+	if err != nil {
+		h.writeJSONError(w, http.StatusInternalServerError, "Failed to get featured research", err)
+		return
 	}
 	
 	response := map[string]interface{}{
@@ -213,17 +197,12 @@ func (h *ContentHandler) GetFeaturedResearch(w http.ResponseWriter, r *http.Requ
 
 // GetFeaturedEvents handles GET /api/v1/events/featured
 func (h *ContentHandler) GetFeaturedEvents(w http.ResponseWriter, r *http.Request) {
-	// Temporary implementation until Dapr state store is fixed
-	featuredEvent := map[string]interface{}{
-		"event_id":               "featured-event-1",
-		"title":                  "Featured: International Center Event",
-		"description":            "Join us for upcoming events at International Center",
-		"event_type":             "conference",
-		"start_timestamp":        "2025-10-01T10:00:00Z",
-		"end_timestamp":          "2025-10-01T16:00:00Z",
-		"registration_required":  true,
-		"created_on":             "2025-09-12T00:00:00Z",
-		"slug":                   "featured-international-center-event",
+	ctx := r.Context()
+	
+	featuredEvent, err := h.eventsService.GetFeaturedEvent(ctx)
+	if err != nil {
+		h.writeJSONError(w, http.StatusInternalServerError, "Failed to get featured event", err)
+		return
 	}
 	
 	response := map[string]interface{}{
@@ -386,18 +365,51 @@ func (h *ContentHandler) GetAllServices(w http.ResponseWriter, r *http.Request) 
 	h.writeJSONResponse(w, http.StatusOK, response)
 }
 
-// writeJSONError writes a JSON error response
-func (h *ContentHandler) writeJSONError(w http.ResponseWriter, status int, message string, err error) {
+// writeJSONError writes a JSON error response with proper domain error mapping
+func (h *ContentHandler) writeJSONError(w http.ResponseWriter, fallbackStatus int, message string, err error) {
+	// Map domain errors to proper HTTP status codes
+	var statusCode int
+	var errorCode string
+	
+	// Inspect domain error types and map to appropriate HTTP status codes
+	switch {
+	case domain.IsNotFoundError(err):
+		statusCode = http.StatusNotFound
+		errorCode = "NOT_FOUND"
+	case domain.IsValidationError(err):
+		statusCode = http.StatusBadRequest
+		errorCode = "VALIDATION_ERROR"
+	case domain.IsUnauthorizedError(err):
+		statusCode = http.StatusUnauthorized
+		errorCode = "UNAUTHORIZED"
+	case domain.IsForbiddenError(err):
+		statusCode = http.StatusForbidden
+		errorCode = "FORBIDDEN"
+	case domain.IsConflictError(err):
+		statusCode = http.StatusConflict
+		errorCode = "CONFLICT"
+	case domain.IsRateLimitError(err):
+		statusCode = http.StatusTooManyRequests
+		errorCode = "RATE_LIMIT_EXCEEDED"
+	case domain.IsDependencyError(err):
+		statusCode = http.StatusBadGateway
+		errorCode = "DEPENDENCY_ERROR"
+	default:
+		// Use fallback status for unknown errors
+		statusCode = fallbackStatus
+		errorCode = "INTERNAL_ERROR"
+	}
+	
 	errorResponse := map[string]interface{}{
 		"error": map[string]interface{}{
-			"code":    "INTERNAL_ERROR",
+			"code":    errorCode,
 			"message": message,
 			"details": err.Error(),
 		},
 	}
 	
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
+	w.WriteHeader(statusCode)
 	json.NewEncoder(w).Encode(errorResponse)
 }
 

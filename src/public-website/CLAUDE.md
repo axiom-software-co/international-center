@@ -24,6 +24,8 @@
 
 - note : we will not work on the newsletter for now 
 
+- note : we will not work with blob store for the moment 
+
 - note : we are currently focused on integration testing . be causious of integration test files proliferation . you may not create new integration test files , but you may edit our current integration testing framework and and integtation tests implementations if needed . 
 
 [deployment secrets]
